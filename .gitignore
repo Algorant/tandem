@@ -1,0 +1,18 @@
+# Local agent/runtime state
+.pi/
+
+# Rust
+/target/
+**/target/
+Cargo.lock
+
+# Editors / OS
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs / temp
+*.log
+/tmp/
