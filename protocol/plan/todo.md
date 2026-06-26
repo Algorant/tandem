@@ -43,11 +43,14 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 - [x] Drafted completion/logs/events model.
 - [x] Drafted protocol-facing CLI surface using `tdm`.
 - [x] Added `protocol/README.md` for protocol-area documentation.
+- [x] Added implementation-facing v0 field reference for workspace config, task documents, decision documents, accords, reviews, completion metadata, logs, and rules.
+- [x] Added minimal audit event envelope and event name catalog.
+- [x] Added validation diagnostics with error/warning categories and examples.
+- [x] Defined completed-log document expectations.
 
 ## Current tasks
 
 - [ ] Keep `protocol/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent docs.
-- [ ] Tighten the v0 field reference for workspace config, task documents, decision documents, accords, reviews, completion metadata, events, and rules.
 - [ ] Define mutation semantics precisely:
   - add task
   - add decision
@@ -55,21 +58,17 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
   - update accord
   - request/accept review
   - complete/archive
-  - reopen/restore
-- [ ] Define lifecycle event name catalog using the minimal audit-only event payload shape.
-- [ ] Expand structural validation diagnostics using the strict-core-reference severity policy.
-- [ ] Define completed-log document requirements and how events enrich log timelines.
+  - post-v0 restore/reopen naming boundaries
 - [ ] Define minimal-diff file editing requirements for compliant tools.
+- [ ] Tighten examples if implementation discovers ambiguous field behavior.
+- [ ] Coordinate any protocol-facing CLI wording changes with `../tandem-tui/` docs through the orchestrator.
 
 ## Next recommended steps
 
-1. Expand the locked v0 decisions into a concise field-by-field protocol reference.
-2. Write mutation semantics for the core lifecycle operations.
-3. Specify the structural validation diagnostic catalog from the locked warning/error policy.
-4. Specify event names for task, accord, review, completion, and restore operations using the locked minimal audit event shape.
-5. Add small inline examples for valid task and decision documents if the spec needs more clarity.
-6. Update parent and CLI/TUI docs whenever protocol decisions affect them.
-7. Keep schemas and fixtures out of v0; revisit only after CLI MVP/protocol stabilization and explicit approval.
+1. Write mutation semantics for the core lifecycle operations.
+2. Specify minimal-diff write behavior for frontmatter and Markdown body preservation.
+3. Review the protocol-facing CLI surface against the CLI/TUI worker before implementation starts.
+4. Keep schemas, fixtures, and implementation layout out of v0 unless explicitly approved.
 
 ## Acceptance criteria for protocol v0 draft
 

@@ -207,6 +207,137 @@ Tools should discover a Tandem workspace in this order:
 
 Discovery should stop at repository boundaries unless explicitly told to search parent directories.
 
+## V0 field reference
+
+This section is the implementation-facing reference for v0 frontmatter and JSONL records. Unknown fields are allowed and must be preserved by compliant tools unless a user explicitly formats or removes them.
+
+Severity notes:
+
+- **error** means structural validation should fail and mutating commands should refuse to proceed unless an explicit recovery/force flow exists.
+- **warning** means tools should report the issue but may proceed.
+- Missing or malformed required structure is an error.
+- Unresolved core references, `parentId` and `blockers`, are errors.
+- Unresolved related references, rule sources, and completion-policy issues are warnings.
+
+### Workspace config fields
+
+Workspace config lives in `.tandem/tandem.md` frontmatter.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `protocolVersion` | yes | error | Must be `0.1.0` for this v0 draft. |
+| `title` | yes | error | Human-readable workspace title. |
+| `states` | yes | error | Array of workflow states. `tdm init` writes `todo`, `in-progress`, `review`. Duplicate IDs are errors. Missing defaults are warnings if no active task uses them. |
+| `completion` | no | warning | Completion policy hints. V0 warns but does not block when review/accord acceptance is missing. |
+| `types` | no | error if malformed | Defines first-class and custom document type metadata. Custom types are config-only in v0. |
+| `rules` | no | error if malformed | Rule groups `always`, `never`, `prefer`, `context`; each entry is a rule object. |
+| `agent` | no | warning if malformed | Agent-facing instructions. Unknown nested fields should be preserved. |
+| `theme` | no | none | Protocol stores the value but CLI/TUI owns interpretation. |
+| `views` | no | none | Optional saved views/filters; preserved if present. |
+
+### Task document fields
+
+Task documents live in `.tandem/board/` while active and `.tandem/logs/` after completion/archive.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `id` | yes | error | Canonical ID. New task IDs are sequential, e.g. `task-1`. IDs must be unique across board and logs. |
+| `type` | yes | error | Must be `task` for v0 task documents. |
+| `title` | yes | error | Display title. |
+| `state` | yes in board | error | Must match a configured workspace state. Omitted in logs is allowed. |
+| `priority` | no | warning if unrecognized | Suggested values: `low`, `medium`, `high`, `critical`; projects may extend. |
+| `effort` | no | warning if unrecognized | Suggested values: `trivial`, `small`, `medium`, `large`, `xlarge`; projects may extend. |
+| `tags` | no | error if malformed | Array of strings. |
+| `assignee` | no | none | Human or agent responsible. |
+| `parentId` | no | error if unresolved | Core reference to any Tandem document ID. |
+| `blockers` | no | error if unresolved | Core references to Tandem document IDs blocking this task. |
+| `references` | no | warning if unresolved | Related Tandem document IDs. |
+| `relatedFiles` | no | warning if path malformed | Project paths relevant to the task; paths do not have to exist. |
+| `accord` | no | error if malformed | Work-agreement object. If present, `accord.status` is required. |
+| `review` | no | error if malformed | Review object. If present, `review.status` is required. |
+| `subtasks` | no | error if malformed | Array of `{ id, title, completed }`; IDs are parent-based sequential values such as `task-1-1`. |
+| `createdAt` | no | warning if malformed | Timestamp for creation. |
+| `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
+| `completedAt` | logs only | error in logs if missing | Timestamp for completion/archive. Active tasks should not normally carry it. |
+| `completion` | logs only | error in logs if missing | Completion metadata; see below. |
+
+### Decision document fields
+
+Decision documents are first-class v0 documents. They live in `.tandem/board/` and capture durable project, product, or architecture choices. They do not need a lifecycle field in v0.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `id` | yes | error | Canonical ID. New decision IDs are sequential, e.g. `decision-1`. |
+| `type` | yes | error | Must be `decision`. |
+| `title` | yes | error | Display title. |
+| `references` | no | warning if unresolved | Related Tandem document IDs. |
+| `createdAt` | no | warning if malformed | Timestamp for creation. |
+| `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
+
+### Accord object fields
+
+`accord` is optional on a task. If present, it must be an object with a canonical status.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `status` | yes | error | One of `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`. |
+| `assignee` | no | none | Human or agent responsible for the accord. |
+| `claimedAt` | no | warning if malformed | Timestamp when claimed. |
+| `deliveredAt` | no | warning if malformed | Timestamp when delivered. |
+| `summary` | no | none | Current delivery or agreement summary. |
+| `deliverables` | no | warning if malformed | Array of deliverable objects. Suggested fields: `type`, `path`, `description`, `required`. |
+| `validation` | no | warning if malformed | Validation expectations such as `commands`; v0 lint does not execute them. |
+| `evidence` | no | warning if malformed | Recorded evidence such as command results, file paths, or notes. |
+| `constraints` | no | warning if malformed | Scope constraints. |
+| `outOfScope` | no | warning if malformed | Explicit exclusions. |
+
+### Review object fields
+
+`review` is optional on a task. If present, it must be an object with a canonical review state.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `status` | yes | error | One of `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`. |
+| `reviewer` | no | none | Human/agent reviewer identifier. |
+| `requestedAt` | no | warning if malformed | Timestamp when review was requested. |
+| `decidedAt` | no | warning if malformed | Timestamp when accepted/rejected/changes requested. |
+| `notes` | no | warning if malformed | Array of review notes or note objects. |
+
+### Completion metadata fields
+
+Completed task documents in `.tandem/logs/` should include `completedAt` and `completion` metadata. Missing required log metadata is an error because logs are the completed-work source of truth.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `completedAt` | yes in logs | error | Completion/archive timestamp. |
+| `completion.summary` | yes in logs | error | Human-readable completion summary. |
+| `completion.filesChanged` | no | warning if malformed | Array of project paths changed. |
+| `completion.validation` | no | warning if malformed | Recorded validation result summary; v0 lint does not execute commands. |
+| `completion.reviewer` | no | none | Reviewer or completer identifier. |
+| `completion.notes` | no | warning if malformed | Additional completion notes. |
+
+### Log document expectations
+
+Archived Markdown documents in `.tandem/logs/` are the completed-work source of truth. Events may enrich timelines, but a log document must remain understandable without replaying `.tandem/events.jsonl`.
+
+A valid completed task log should contain:
+
+- original task identity fields: `id`, `type: task`, `title`
+- `completedAt`
+- `completion.summary`
+- any retained `accord`, `review`, `subtasks`, `references`, `blockers`, and `relatedFiles`
+- the original or final Markdown body
+
+### Rule object fields
+
+Rules are structured objects inside one of the workspace config groups: `always`, `never`, `prefer`, or `context`.
+
+| Field | Required | Severity | Notes |
+| --- | --- | --- | --- |
+| `id` | yes | error | Stable rule ID such as `rule-1`. |
+| `rule` | yes | error | Human-readable rule text. |
+| `source` | no | warning if unresolved | Tandem document ID explaining where the rule came from. |
+
 ## Board/workspace config
 
 Example:
@@ -276,7 +407,7 @@ Human-readable project context goes here.
 | `theme` | no | Optional TUI theme preference. |
 | `views` | no | Optional saved filters/views. |
 
-The v0 spec uses built-in structural validation. Schema URLs, schema files, fixtures, and schema-management commands are deferred out of v0.
+The v0 spec uses built-in structural validation. Remote schema URLs, fixture directories, and schema-management commands are deferred out of v0.
 
 ## Task document
 
@@ -489,16 +620,18 @@ Archived Markdown documents in `.tandem/logs/` are the source of truth for compl
 
 `.tandem/events.jsonl` should be append-only and machine-readable.
 
-V0 event records are minimal audit-only records. Required fields:
+V0 event records use a minimal audit envelope. Required fields:
 
 | Field | Required | Purpose |
 | --- | --- | --- |
 | `ts` | yes | Event timestamp. |
-| `event` | yes | Event name such as `task.created`, `accord.claimed`, or `task.completed`. |
-| `id` | yes | Tandem document ID that the event is about. |
+| `event` | yes | Event name from the catalog below. |
+| `id` | yes | Primary subject ID. Usually a Tandem document ID; rule events may use a rule ID. |
 | `summary` | yes | Human-readable audit summary. |
+| `actor` | no | Human/agent/tool responsible for the event. |
+| `details` | no | Freeform JSON object for extra context. |
 
-Tools may include optional top-level fields such as `actor` or `details`, but v0 does not require typed per-event payload schemas.
+V0 intentionally does not define typed per-event payload schemas. Consumers must tolerate unknown optional fields.
 
 Example events:
 
@@ -510,6 +643,53 @@ Example events:
 ```
 
 Events should never be required to reconstruct the current board. They provide audit/history and power richer logs.
+
+### Event name catalog
+
+Task events:
+
+- `task.created`
+- `task.updated`
+- `task.moved`
+- `task.completed`
+
+Decision events:
+
+- `decision.created`
+- `decision.updated`
+
+Accord events:
+
+- `accord.ready`
+- `accord.claimed`
+- `accord.delivered`
+- `accord.accepted`
+- `accord.rework`
+- `accord.failed`
+- `accord.blocked`
+
+Review events:
+
+- `review.requested`
+- `review.accepted`
+- `review.changes_requested`
+- `review.rejected`
+- `review.note_added`
+
+Completion/archive events:
+
+- `task.completed` — completion/archive mutation from `.tandem/board/` to `.tandem/logs/`.
+
+Restore/reopen events, post-v0 names reserved:
+
+- `task.restored`
+- `task.reopened`
+
+Rule events:
+
+- `rule.added`
+- `rule.updated`
+- `rule.deleted`
 
 ## Rules
 
@@ -558,31 +738,60 @@ types:
 
 A custom type may define an `idPrefix` and whether documents of that type are completable. v0 does not include commands for creating, editing, or managing type definitions.
 
-## Validation and lint
+## Validation diagnostics
 
-V0 validation/lint is built-in structural validation only.
+V0 validation/lint is built-in structural validation only. It does not execute project validation commands, enforce remote schemas, run hooks, perform auth checks, generate fixture data, or manage custom type definitions.
 
-Severity policy:
+Diagnostics should include at least: severity, code, path, document ID when known, field path when known, and a human-readable message.
 
-- **Errors:** invalid frontmatter, missing required fields, duplicate document IDs, unknown active task states, unknown accord/review statuses, invalid structured rules, invalid subtask ID shape, unresolved `parentId`, and unresolved `blockers`.
-- **Warnings:** unresolved related `references`, unresolved rule `source` links, missing accepted review/accord during completion, and non-canonical but recoverable metadata.
+### Error categories
 
-Structural checks should cover at least:
+Errors fail validation and should block normal mutations.
 
-- workspace config parses and has `protocolVersion`, `title`, and `states`
-- configured state IDs are unique
-- default states `todo`, `in-progress`, and `review` exist unless the project intentionally overrides defaults
-- document frontmatter parses
-- document IDs are unique
-- document `type` is first-class or configured as a custom type
-- active task `state` exists in workspace `states`
-- accord status is one of the canonical v0 statuses
-- review status is one of the documented review statuses
-- rules are structured objects with `id` and `rule`
-- subtask IDs follow the parent-based sequential pattern
-- `parentId`, `blockers`, and `references` target Tandem document IDs when present
+| Code | Category | Example |
+| --- | --- | --- |
+| `E001` | workspace config unreadable | `.tandem/tandem.md` is missing or frontmatter cannot be parsed. |
+| `E002` | workspace required field missing | Missing `protocolVersion`, `title`, or `states`. |
+| `E003` | unsupported protocol version | `protocolVersion` is not `0.1.0`. |
+| `E010` | document frontmatter unreadable | A Markdown file in `board/` or `logs/` has invalid frontmatter. |
+| `E011` | document required field missing | A task is missing `id`, `type`, `title`, or active `state`. |
+| `E012` | duplicate document ID | The same ID appears in more than one board/log document. |
+| `E013` | invalid document ID shape | A v0 task ID is not `task-N`, or a decision ID is not `decision-N`. |
+| `E020` | unknown document type | `type` is neither `task`, `decision`, nor a configured custom type. |
+| `E021` | unknown active state | A task has `state: blocked` but `blocked` is not in workspace `states`. |
+| `E030` | invalid accord object | `accord.status` is missing or not one of the canonical v0 values. |
+| `E031` | invalid review object | `review.status` is missing or not one of the documented review values. |
+| `E040` | invalid rule object | A rule entry is not an object or lacks `id`/`rule`. |
+| `E050` | invalid subtask object | A subtask lacks `id`, `title`, or `completed`, or its ID does not match the parent-based sequential pattern. |
+| `E060` | unresolved core parent | `parentId` points to no Tandem document. |
+| `E061` | unresolved core blocker | A `blockers` entry points to no Tandem document. |
+| `E070` | invalid completed log | A log task lacks `completedAt` or `completion.summary`. |
 
-V0 structural validation does not execute project validation commands, enforce remote schemas, run hooks, perform auth checks, or manage custom type definitions.
+### Warning categories
+
+Warnings should be shown, but tools may proceed.
+
+| Code | Category | Example |
+| --- | --- | --- |
+| `W010` | unresolved related reference | A `references` entry points to no known Tandem document. |
+| `W011` | unresolved rule source | A rule `source` points to no known Tandem document. |
+| `W020` | completion review policy | A task is being completed without `review.status: accepted`. |
+| `W021` | completion accord policy | A task with an accord is being completed without `accord.status: accepted`. |
+| `W030` | missing default state | Workspace `states` omits one of the default states and no active task currently needs it. |
+| `W040` | malformed optional metadata | Optional timestamp, priority, effort, notes, evidence, or validation metadata is malformed but recoverable. |
+| `W050` | non-canonical preserved field | A field is unknown to v0 but can be preserved safely. |
+
+### Reference validation
+
+Reference checks should build an ID index from both `.tandem/board/` and `.tandem/logs/`.
+
+- `parentId` and `blockers` are core references. Missing targets are errors.
+- `references` and rule `source` are related references. Missing targets are warnings.
+- References may point to any Tandem document type, including completed log documents.
+
+### Completion-policy validation
+
+Completion-policy findings are warnings in v0. `tdm complete` should warn when review or accord acceptance is missing, then allow completion unless structural errors are present.
 
 ## Mutation rules for tools
 
