@@ -1,0 +1,10 @@
+[package]
+name = "tandem-tui"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "tdm"
+path = "src/main.rs"
+
+[dependencies]

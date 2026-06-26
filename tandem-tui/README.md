@@ -23,7 +23,19 @@ The CLI/TUI area does **not** own the underlying protocol semantics. Protocol ru
 
 ## Current status
 
-Planning/specification mode. No CLI or TUI implementation exists yet. Do not lock in crate layout or dependency choices until explicitly decided.
+Planning/specification mode with the first minimal CLI implementation started. A std-only Rust binary package now lives in this directory and builds a `tdm` binary with the initial `init`, `list`, and `show` commands. The interactive TUI is not implemented yet. Do not lock in broader crate layout or dependency choices until explicitly decided.
+
+## Build/run
+
+From this directory:
+
+```text
+cargo run -- init --title "Demo"
+cargo run -- list
+cargo run -- show task-1
+```
+
+Use `cargo run -- <command>` during early development. The package binary name is `tdm`.
 
 ## Documentation
 
@@ -84,4 +96,4 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - Keymaps: fixed defaults in v0; custom keymap config later.
 - Markdown rendering: styled basics in v0.
 - Theme config loading order: built-in defaults, then user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.
-- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.
+- Deferred from v0: non-core command families and integrations listed in `plan/spec.md`, plus schemas, fixtures, and root Rust workspace layout.
