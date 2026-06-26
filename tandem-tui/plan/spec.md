@@ -83,7 +83,7 @@ Command behavior rules:
 - Design and document the CLI before the interactive TUI.
 - Use Tandem vocabulary: `state`, `accord`, and `decision`.
 - Human-readable output is the default: list/search commands use compact tables; detail commands use labeled blocks with Markdown body where applicable.
-- V0 uses canonical command names and long flags only; no short aliases are part of v0.
+- V0 uses canonical command names and long flags only; abbreviated flags or alias commands are not part of v0.
 - All read commands support `--json`: `list`, `show`, `search`, `log list`, `log show`, `log search`, `rules list`, `decision list`, and `decision show`.
 - `--json` responses use an envelope object: `{ "ok": true, "data": ..., "warnings": [] }`.
 - `tdm log` is limited to `list`, `show`, and `search` in v0.
@@ -104,6 +104,603 @@ Deferred from v0:
 - Third-party archive/export integrations.
 - Brainfile conversion commands are not required for v0.
 - Schemas, fixtures, and root Rust workspace layout are not part of v0.
+
+## `tdm` v0 command reference
+
+This section is the implementation-facing CLI reference for v0. Syntax examples use canonical command names and long flags only. V0 commands auto-discover the `.tandem/` workspace from the current directory; an explicit workspace-path override is not part of the locked v0 surface.
+
+### Global CLI conventions
+
+- Human-readable output is the default.
+- Compact tables are used for list/search commands.
+- Labeled detail blocks are used for show/log/decision detail commands.
+- All read commands support `--json` and return this envelope:
+
+```json
+{
+  "ok": true,
+  "data": {},
+  "warnings": []
+}
+```
+
+- JSON read failures should return non-zero and may use the same envelope shape with `ok: false` and an error object in `data`.
+- Mutation commands are human-readable in v0; structured mutation output is not required.
+- Exit behavior:
+  - success exits `0`.
+  - usage errors, missing required inputs, missing workspace, missing document, invalid state/status/category, structural validation errors, and failed writes exit non-zero.
+  - warnings do not make a command fail unless paired with a structural error.
+
+### `tdm init`
+
+- Purpose: create a new Tandem workspace in the current project.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm init --title <title> [--force]
+```
+
+- Required inputs:
+  - `--title <title>`: workspace title.
+- Optional inputs:
+  - `--force`: overwrite existing Tandem workspace files after user intent is explicit.
+- Human output shape: labeled summary of created paths and default states.
+- Exit/error notes:
+  - fails if a workspace already exists and `--force` is not present.
+  - fails on file creation or write errors.
+
+### `tdm list`
+
+- Purpose: list active task and decision documents from the board.
+- Kind: read.
+- Syntax:
+
+```text
+tdm list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--accord <status>] [--review <status>] [--json]
+```
+
+- Required inputs: none.
+- Optional inputs:
+  - filters: `--state`, `--type`, `--priority`, `--tag`, `--assignee`, `--accord`, `--review`.
+  - `--json`: emit structured output.
+- Human output shape: compact table grouped or sorted by state.
+
+```text
+ID      STATE        PRI   TITLE                         ASSIGNEE  ACCORD      REVIEW
+task-7  in-progress  high  Implement theme loader        pi        claimed     not-ready
+task-8  review       med   Add decision view             pi        delivered   pending
+```
+
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": "task-7",
+        "type": "task",
+        "title": "Implement theme loader",
+        "state": "in-progress",
+        "priority": "high",
+        "assignee": "pi",
+        "tags": ["tui"],
+        "accord": { "status": "claimed" },
+        "review": { "status": "not-ready" }
+      }
+    ],
+    "counts": {
+      "total": 1,
+      "byState": { "in-progress": 1 }
+    }
+  },
+  "warnings": []
+}
+```
+
+- Exit/error notes:
+  - fails on missing workspace, invalid filter value, or parse/structure errors.
+
+### `tdm show`
+
+- Purpose: show one active or completed document by ID.
+- Kind: read.
+- Syntax:
+
+```text
+tdm show <id> [--json]
+```
+
+- Required inputs:
+  - `<id>`: task or decision ID.
+- Optional inputs:
+  - `--json`: emit structured output.
+- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "document": {
+      "id": "task-7",
+      "type": "task",
+      "title": "Implement theme loader",
+      "state": "in-progress",
+      "priority": "high",
+      "tags": ["tui"],
+      "accord": { "status": "claimed" },
+      "review": { "status": "not-ready" }
+    },
+    "body": "## Description\nBuild the theme loader.",
+    "path": ".tandem/board/task-7.md",
+    "location": "board"
+  },
+  "warnings": []
+}
+```
+
+- Exit/error notes:
+  - fails when the ID is not found in active board documents or completed logs.
+
+### `tdm add`
+
+- Purpose: create a new task in an active state.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm add --title <title> [--state <state>] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
+```
+
+- Required inputs:
+  - `--title <title>`.
+- Optional inputs:
+  - `--state <state>` defaults to `todo`.
+  - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, `--parent`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`, repeated `--subtask`.
+- Human output shape: labeled created-task summary with ID, state, title, and file path.
+- Exit/error notes:
+  - fails on invalid state, invalid referenced parent/blocker, structure errors, or failed write.
+
+### `tdm move`
+
+- Purpose: move an active document to another active state.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm move <id> --state <state>
+```
+
+- Required inputs:
+  - `<id>`: task or decision ID.
+  - `--state <state>`: target active state.
+- Human output shape: one-line status transition plus path.
+- Exit/error notes:
+  - fails if the document is not active, the state is unknown, or the write fails.
+
+### `tdm complete`
+
+- Purpose: complete an active task, archive it to logs, and append an audit event.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm complete <id> --summary <text> [--file-changed <path>] [--validation <text>] [--reviewer <name>]
+```
+
+- Required inputs:
+  - `<id>`: task ID.
+  - `--summary <text>`: completion summary.
+- Optional inputs:
+  - repeated `--file-changed <path>`.
+  - `--validation <text>`: human-readable validation result summary.
+  - `--reviewer <name>`.
+- Human output shape: warnings first, then completion summary.
+
+Example warning output:
+
+```text
+Warning: task-7 has review.status=pending.
+Warning: task-7 has accord.status=delivered, not accepted.
+Completing anyway in v0.
+
+Completed task-7
+Moved: .tandem/board/task-7.md -> .tandem/logs/task-7.md
+Event: task.completed
+```
+
+- Exit/error notes:
+  - warns but does not fail for missing accepted review or accepted accord in v0.
+  - fails when the ID is missing, the document is not completable, the document is already completed, blockers remain unresolved, structure validation fails, or the move/write fails.
+
+### `tdm log`
+
+#### `tdm log list`
+
+- Purpose: list completed log documents.
+- Kind: read.
+- Syntax:
+
+```text
+tdm log list [--limit <count>] [--json]
+```
+
+- Required inputs: none.
+- Optional inputs:
+  - `--limit <count>`: maximum rows to show.
+  - `--json`: emit structured output.
+- Human output shape: compact table sorted by most recent completion.
+
+```text
+ID      COMPLETED            TITLE                    ACCORD    SUMMARY
+task-7  2026-06-26 15:00     Implement theme loader   accepted  Theme loader complete
+```
+
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": "task-7",
+        "type": "task",
+        "title": "Implement theme loader",
+        "completedAt": "2026-06-26T15:00:00Z",
+        "summary": "Theme loader complete",
+        "accordStatus": "accepted",
+        "validationStatus": "passed"
+      }
+    ],
+    "count": 1
+  },
+  "warnings": []
+}
+```
+
+#### `tdm log show`
+
+- Purpose: show one completed log document.
+- Kind: read.
+- Syntax:
+
+```text
+tdm log show <id> [--json]
+```
+
+- Required inputs:
+  - `<id>`: completed task ID.
+- Optional inputs:
+  - `--json`: emit structured output.
+- Human output shape: labeled completion detail block with body, completion metadata, accord evidence, validation, files changed, and timeline where available.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "document": {
+      "id": "task-7",
+      "type": "task",
+      "title": "Implement theme loader",
+      "completedAt": "2026-06-26T15:00:00Z"
+    },
+    "completion": {
+      "summary": "Theme loader complete",
+      "filesChanged": ["src/tui/theme.rs"],
+      "validation": { "status": "passed", "summary": "cargo test passed" },
+      "reviewer": "ivan"
+    },
+    "accord": { "status": "accepted" },
+    "body": "## Description\nBuild the theme loader.",
+    "events": [
+      { "ts": "2026-06-26T15:00:00Z", "event": "task.completed", "id": "task-7", "summary": "Theme loader complete" }
+    ]
+  },
+  "warnings": []
+}
+```
+
+#### `tdm log search`
+
+- Purpose: search completed logs only.
+- Kind: read.
+- Syntax:
+
+```text
+tdm log search <query> [--json]
+```
+
+- Required inputs:
+  - `<query>`.
+- Optional inputs:
+  - `--json`: emit structured output.
+- Human output shape: compact search table with matching context.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "query": "theme",
+    "results": [
+      {
+        "id": "task-7",
+        "title": "Implement theme loader",
+        "completedAt": "2026-06-26T15:00:00Z",
+        "match": "Summary: Theme loader complete"
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
+### `tdm search`
+
+- Purpose: search active documents and completed logs.
+- Kind: read.
+- Syntax:
+
+```text
+tdm search <query> [--state <state>] [--type <type>] [--json]
+```
+
+- Required inputs:
+  - `<query>`.
+- Optional inputs:
+  - `--state <state>` filters active board results.
+  - `--type <type>` filters by document type.
+  - `--json`: emit structured output.
+- Human output shape: compact table with location (`board` or `logs`) and match snippet.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "query": "theme",
+    "results": [
+      {
+        "id": "task-7",
+        "type": "task",
+        "title": "Implement theme loader",
+        "location": "board",
+        "state": "in-progress",
+        "snippet": "Build the theme loader."
+      },
+      {
+        "id": "task-2",
+        "type": "task",
+        "title": "Choose theme colors",
+        "location": "logs",
+        "completedAt": "2026-06-25T18:00:00Z",
+        "snippet": "Summary: Theme palette chosen."
+      }
+    ]
+  },
+  "warnings": []
+}
+```
+
+### `tdm accord`
+
+- Purpose: manage the work agreement attached to a task.
+- Kind: mutation.
+
+Subcommands:
+
+```text
+tdm accord ready <id> [--assignee <name>] [--deliverable <spec>] [--validation <command>] [--constraint <text>]
+tdm accord claim <id> --assignee <name>
+tdm accord deliver <id> --summary <text> [--evidence <text>] [--file-changed <path>]
+tdm accord accept <id> [--reviewer <name>] [--note <text>]
+tdm accord rework <id> --note <text>
+tdm accord block <id> --reason <text>
+tdm accord fail <id> --reason <text>
+```
+
+- Required inputs:
+  - all subcommands require `<id>`.
+  - `claim` requires `--assignee`.
+  - `deliver` requires `--summary`.
+  - `rework` requires `--note`.
+  - `block` and `fail` require `--reason`.
+- Optional inputs:
+  - `ready` may include repeated `--deliverable`, repeated `--validation`, repeated `--constraint`, and `--assignee`.
+  - `deliver` may include repeated `--evidence` and repeated `--file-changed`.
+  - `accept` may include `--reviewer` and `--note`.
+- Human output shape: labeled status transition and any state/review warnings.
+
+Examples:
+
+```text
+tdm accord ready task-7 --assignee pi --deliverable file:src/tui/theme.rs:Theme loader --validation "cargo test"
+tdm accord deliver task-7 --summary "Theme loader implemented" --evidence "cargo test passed" --file-changed src/tui/theme.rs
+tdm accord rework task-7 --note "Please add no-color fallback."
+```
+
+- Exit/error notes:
+  - fails if the task is missing, the requested accord transition is invalid, required inputs are missing, or the write fails.
+
+### `tdm rules`
+
+#### `tdm rules list`
+
+- Purpose: list project rules.
+- Kind: read.
+- Syntax:
+
+```text
+tdm rules list [--category <category>] [--json]
+```
+
+- Required inputs: none.
+- Optional inputs:
+  - `--category <always|never|prefer|context>`.
+  - `--json`: emit structured output.
+- Human output shape: grouped rules by category.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "rules": {
+      "always": [
+        { "id": 1, "rule": "Run tests before completing tasks.", "source": "decision-1" }
+      ],
+      "never": [],
+      "prefer": [],
+      "context": []
+    },
+    "counts": { "always": 1, "never": 0, "prefer": 0, "context": 0, "total": 1 }
+  },
+  "warnings": []
+}
+```
+
+#### Rule mutations
+
+- Purpose: add, edit, and delete project rules.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm rules add --category <category> --rule <text> [--source <id>]
+tdm rules edit --category <category> --id <rule-id> --rule <text> [--source <id>]
+tdm rules delete --category <category> --id <rule-id>
+```
+
+- Human output shape: one-line success plus category and rule ID.
+- Examples:
+
+```text
+tdm rules add --category always --rule "Run tests before completing tasks." --source decision-1
+tdm rules edit --category always --id 1 --rule "Run tests before completing task changes."
+tdm rules delete --category always --id 1
+```
+
+- Exit/error notes:
+  - fails on invalid category, missing rule ID, missing rule text, unresolved required source if treated as structural, or write failure.
+
+### `tdm decision`
+
+#### `tdm decision list`
+
+- Purpose: list decision documents.
+- Kind: read.
+- Syntax:
+
+```text
+tdm decision list [--json]
+```
+
+- Required inputs: none.
+- Optional inputs:
+  - `--json`: emit structured output.
+- Human output shape: compact table with ID, title, references, and first-line summary.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "items": [
+      {
+        "id": "decision-1",
+        "type": "decision",
+        "title": "Use styled-basic Markdown in v0",
+        "references": ["task-7"],
+        "summary": "Record the v0 rendering scope."
+      }
+    ],
+    "count": 1
+  },
+  "warnings": []
+}
+```
+
+#### `tdm decision show`
+
+- Purpose: show one decision document.
+- Kind: read.
+- Syntax:
+
+```text
+tdm decision show <id> [--json]
+```
+
+- Required inputs:
+  - `<id>`: decision ID.
+- Optional inputs:
+  - `--json`: emit structured output.
+- Human output shape: labeled detail block with metadata, references, body, and path.
+- `--json` data shape:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "decision": {
+      "id": "decision-1",
+      "type": "decision",
+      "title": "Use styled-basic Markdown in v0",
+      "references": ["task-7"]
+    },
+    "body": "## Decision\nUse styled-basic Markdown rendering for v0.",
+    "path": ".tandem/board/decision-1.md"
+  },
+  "warnings": []
+}
+```
+
+#### `tdm decision add`
+
+- Purpose: create a decision document.
+- Kind: mutation.
+- Syntax:
+
+```text
+tdm decision add --title <title> [--body <markdown>] [--reference <ref>] [--tag <tag>]
+```
+
+- Required inputs:
+  - `--title <title>`.
+- Optional inputs:
+  - `--body <markdown>`.
+  - repeated `--reference <ref>`.
+  - repeated `--tag <tag>`.
+- Human output shape: labeled created-decision summary with ID and path.
+- Example:
+
+```text
+tdm decision add --title "Use styled-basic Markdown in v0" --body "## Decision\nUse styled-basic rendering first." --reference task-7
+```
+
+- Exit/error notes:
+  - fails on missing title, invalid references that are structural errors, or failed write.
+
+### `tdm tui`
+
+- Purpose: launch the interactive terminal UI.
+- Kind: interactive.
+- Syntax:
+
+```text
+tdm tui
+```
+
+- Required inputs: none.
+- Optional inputs: none in v0.
+- Human output shape: enters the TUI; startup errors are plain terminal errors.
+- Exit/error notes:
+  - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
+  - v0 does not include a separate TUI executable.
 
 ## Brainfile parity reference
 

@@ -27,7 +27,7 @@ This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tand
 - [x] Locked v0 `rules` scope: `list`, `add`, `edit`, `delete`.
 - [x] Locked v0 `accord` scope: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - [x] Locked CLI output direction: human-readable by default, with `--json` for all read commands.
-- [x] Locked v0 alias policy: canonical commands and long flags only; no short aliases.
+- [x] Locked v0 command-name policy: canonical commands and long flags only; no abbreviated flags or alias commands.
 - [x] Locked human-readable output style: compact tables for list/search, labeled detail blocks for show/log/decision.
 - [x] Locked `--json` response envelope: `{ "ok": true, "data": ..., "warnings": [] }`.
 - [x] Locked `tdm decision` v0 scope: `list`, `show`, `add`.
@@ -61,35 +61,33 @@ This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tand
 - [x] Drafted keyboard model and command palette ideas.
 - [x] Drafted review, completion, logs, and accord UX.
 - [x] Added `tandem-tui/README.md` for CLI/TUI-area documentation.
+- [x] Drafted implementation-facing `tdm` v0 command reference covering every locked command family.
+- [x] Defined command purpose, canonical long-flag syntax, inputs, output shape, command kind, and obvious exit/error notes.
+- [x] Defined `--json` data payload examples for `list`, `show`, `search`, `log list`, `log show`, `log search`, `rules list`, `decision list`, and `decision show`.
+- [x] Added examples for completion warnings and accord/rules/decision mutations.
+- [x] Defined `tdm decision list|show|add` v0 command model.
+- [x] Defined v0 `tdm log` output fields for list, show, and search.
+- [x] Defined v0 rules CLI add/edit/delete flow.
+- [x] Defined simple Review view sort direction: priority first, then recently updated or delivered.
 
 ## Current tasks
 
 - [ ] Keep `tandem-tui/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and protocol docs.
-- [ ] Define exact long options and per-command output examples for each locked v0 CLI command.
-- [ ] Define `data` payload shape inside the locked `--json` envelope for all read commands.
-- [ ] Define detailed `tdm decision list|show|add` options and outputs.
-- [ ] Define completion warnings for missing review or accord acceptance.
-- [ ] Define Review view filtered-list sort order.
-- [ ] Define Logs view fields for list, show, and search results.
-- [ ] Define Rules view and CLI edit flows.
+- [ ] Define numeric exit-code categories for CLI implementation.
+- [ ] Define exact no-match and empty-list behavior for each read command.
 - [ ] Define accord badge/status visual language.
 - [ ] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
 - [ ] Decide initial Ratatui event loop approach.
 - [ ] Define exact TOML theme keys for user themes and workspace override.
-- [ ] Define initial fixed keyboard defaults.
+- [ ] Define final fixed keyboard default table for v0.
 - [ ] Define styled-basic Markdown rendering details.
 
 ## Next recommended steps
 
-1. Draft the detailed `tdm` v0 command reference:
-   - long options
-   - examples
-   - human-readable output using compact tables/detail blocks
-   - `--json` data payloads inside the locked envelope
-   - exit/error behavior
-2. Draft the `tdm decision list|show|add` command model.
+1. Review the command reference with the orchestrator and adjust any command options or output shapes.
+2. Define numeric CLI exit-code categories and empty/no-match read-command behavior.
 3. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
-4. Draft theme and mouse interaction requirements at MVP level.
+4. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
 5. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
 6. Start implementation planning only after command and TUI behavior are accepted.
 
