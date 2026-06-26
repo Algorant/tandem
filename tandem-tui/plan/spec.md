@@ -734,7 +734,7 @@ The first TUI MVP is not read-only. It should include:
 
 ### 1. Board view
 
-Primary view for active work.
+Primary view for active Tandem items.
 
 Default states:
 
@@ -1166,6 +1166,50 @@ Hot reload behavior:
 - show reload flash/status
 - detect selected item deletion/move
 - surface parse errors without crashing
+
+## Minimal-diff write behavior
+
+The CLI and TUI should treat Tandem files as hand-written documents, not generated state blobs. Mutations should preserve as much source text as practical while still enforcing required structure.
+
+### Source preservation model
+
+- Parse each Markdown document as three logical regions: opening frontmatter delimiter, frontmatter source, and Markdown body source.
+- Keep the raw source for both frontmatter and body alongside any typed projection used by commands or views.
+- Update only touched frontmatter fields where possible instead of serializing the full document from an in-memory object.
+- Preserve unknown frontmatter fields exactly unless the user edits or removes them directly.
+- Preserve frontmatter field order, comments, blank lines, and scalar style as much as practical. If a localized patch cannot safely preserve formatting, prefer a clear error or narrowly scoped rewrite over a whole-document rewrite.
+- Preserve the Markdown body byte-for-byte unless the command or TUI action explicitly edits the body.
+- `$EDITOR` flows may replace the full edited document because the user directly controls that edit; command-driven mutations should still use targeted patches.
+
+### Command mutation coverage
+
+These v0 command families mutate files and must follow the minimal-diff behavior:
+
+- `tdm init`: creates new workspace files; no prior source exists, but generated files should be stable and readable.
+- `tdm add`: writes one new task file and updates only required workspace/event state.
+- `tdm move`: updates only the document `state` and mutation timestamp fields that actually change.
+- `tdm complete`: moves the document to logs, adds completion metadata, removes active-only fields only when required, and appends a separate event.
+- `tdm accord ...`: updates only the `accord` subtree and any timestamp/review fields that the transition requires.
+- `tdm rules add|edit|delete`: patches only the relevant rule category in workspace frontmatter.
+- `tdm decision add`: writes one new decision file and appends a creation event.
+- TUI quick edits and action buttons must call the same mutation behavior as CLI commands.
+
+### Writes, timestamps, and events
+
+- Use atomic writes for document rewrites: write a temp file in the same directory, flush it, then replace the target path.
+- Do not leave temp files behind after successful writes; on failure, leave the original target unchanged and report the temp path only if cleanup fails.
+- Detect concurrent edits before writing. A command or TUI action should compare the current file metadata/content identity with the snapshot it parsed; if the file changed, reload and revalidate before applying the mutation.
+- Update `updatedAt` only for real mutations. Do not touch timestamps for read commands, no-op commands, failed validation, or unchanged writes.
+- Append lifecycle events separately from document rewrites. The event append should not require reserializing the changed document.
+- Event names must use Tandem-native domains, for example `task.created`, `task.moved`, `task.completed`, `decision.created`, `accord.delivered`, `review.updated`, and `rules.updated`.
+- If a document mutation succeeds but event append fails, report the failure clearly. The implementation should either roll back when safe or surface a repair instruction; silently dropping the event is not acceptable.
+
+### Error handling for writes
+
+- If frontmatter or document structure cannot be parsed, do not attempt a mutation. Report the file path and the most specific location/field available.
+- If validation fails, do not write partial changes. Warnings may be shown without blocking when the protocol marks them as warnings.
+- If a minimal patch cannot be applied because the source changed or the target field is ambiguous, reload and retry once; if still ambiguous, fail with a clear message rather than rewriting unrelated fields.
+- TUI write failures should leave UI state consistent with disk and show a status/error panel. Do not optimistically keep mutations that failed on disk.
 
 ## Implementation boundaries (open)
 

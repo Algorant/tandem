@@ -3,7 +3,7 @@
 Status: active planning  
 Last updated: 2026-06-26
 
-This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tandem-tui/plan/spec.md`.
+This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tandem-tui/plan/spec.md`.
 
 ## Accomplished
 
@@ -69,12 +69,14 @@ This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tand
 - [x] Defined v0 `tdm log` output fields for list, show, and search.
 - [x] Defined v0 rules CLI add/edit/delete flow.
 - [x] Defined simple Review view sort direction: priority first, then recently updated or delivered.
+- [x] Planned minimal-diff write behavior for CLI/TUI mutations, including raw source preservation, atomic writes, concurrent edit detection, timestamp discipline, and separate event appends.
 
 ## Current tasks
 
 - [ ] Keep `tandem-tui/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and protocol docs.
 - [ ] Define numeric exit-code categories for CLI implementation.
 - [ ] Define exact no-match and empty-list behavior for each read command.
+- [ ] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
 - [ ] Define accord badge/status visual language.
 - [ ] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
 - [ ] Decide initial Ratatui event loop approach.
@@ -85,11 +87,12 @@ This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tand
 ## Next recommended steps
 
 1. Review the command reference with the orchestrator and adjust any command options or output shapes.
-2. Define numeric CLI exit-code categories and empty/no-match read-command behavior.
-3. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
-4. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
-5. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
-6. Start implementation planning only after command and TUI behavior are accepted.
+2. Define numeric CLI exit-code categories, empty/no-match read-command behavior, and write-failure messages.
+3. Convert minimal-diff write behavior into an implementation checklist when coding begins.
+4. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
+5. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
+6. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
+7. Start implementation planning only after command and TUI behavior are accepted.
 
 ## First TUI MVP checklist
 
