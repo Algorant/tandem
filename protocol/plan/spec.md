@@ -36,7 +36,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Protocol version for the first v0 draft is `0.1.0`.
 - Events live at `.tandem/events.jsonl`.
 - Event payloads are minimal audit records in v0: require `ts`, `event`, `id`, and `summary`; defer typed per-event payload schemas.
-- Completed logs are archived Markdown documents in `.tandem/logs/`; those documents are the source of truth for completed work. Events enrich timeline and audit views.
+- Completed logs are archived Markdown documents in `.tandem/logs/`; those documents are the source of truth for completed history. Events enrich timeline and audit views.
 - Validation/lint is built-in structural validation only in v0.
 - Schemas and fixtures are not part of v0.
 - Validation severity is strict for structure and core references: invalid/missing required structure and unresolved `parentId`/`blockers` are errors; unresolved related `references`/rule sources and completion-policy issues are warnings.
@@ -614,7 +614,7 @@ accord:
   status: accepted
 ```
 
-Archived Markdown documents in `.tandem/logs/` are the source of truth for completed work. Events enrich timeline, audit, and search views, but tools should not need events to reconstruct the current board or completed-log corpus.
+Archived Markdown documents in `.tandem/logs/` are the source of truth for completed history. Events enrich timeline, audit, and search views, but tools should not need events to reconstruct the current board or completed-log corpus.
 
 ## Events
 
@@ -687,9 +687,9 @@ Restore/reopen events, post-v0 names reserved:
 
 Rule events:
 
-- `rule.added`
-- `rule.updated`
-- `rule.deleted`
+- `rules.added`
+- `rules.updated`
+- `rules.deleted`
 
 ## Rules
 
@@ -712,7 +712,7 @@ rules:
       rule: This project uses Tandem for local-first coordination.
 ```
 
-Rules are for humans and agents. Agents should read them before starting work. `source` is optional and may point to any Tandem document ID.
+Rules are for humans and agents. Agents should read them before starting tasks. `source` is optional and may point to any Tandem document ID.
 
 ## Document types
 
@@ -792,6 +792,118 @@ Reference checks should build an ID index from both `.tandem/board/` and `.tande
 ### Completion-policy validation
 
 Completion-policy findings are warnings in v0. `tdm complete` should warn when review or accord acceptance is missing, then allow completion unless structural errors are present.
+
+## Mutation semantics
+
+This section defines the v0 protocol-level effects of mutating operations. It intentionally does not define minimal-diff write mechanics; compliant tools still preserve unknown fields and Markdown bodies as described below.
+
+All mutations should:
+
+- discover and read `.tandem/tandem.md`
+- validate required structure before writing
+- update `updatedAt` on the changed document when applicable
+- append one minimal audit event to `.tandem/events.jsonl` unless the operation fails before mutation
+- preserve unrelated files
+
+Event records use the v0 audit envelope: `ts`, `event`, `id`, `summary`, with optional `actor` and `details`.
+
+### Add task
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | `title`; optional `state`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, subtasks, accord, review. |
+| Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and reference validation. |
+| Files written | New `.tandem/board/task-N*.md`; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, `parentId`/`blockers` are unresolved, or nested accord/review/subtasks are malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
+| Event | `task.created`. |
+| Resulting state | New task document in `.tandem/board/` with `id: task-N`, `type: task`, `title`, `state` defaulting to `todo`, `createdAt`, and `updatedAt`. |
+
+Task ID allocation chooses the next available positive integer after scanning existing task IDs in both board and logs. Human-readable filename suffixes are optional and non-canonical.
+
+### Add decision
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | `title`; optional body/decision text, `references`, `createdAt`/`updatedAt` override only for trusted bulk-authoring tooling outside normal v0 commands. |
+| Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and related reference validation. |
+| Files written | New `.tandem/board/decision-N*.md`; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if workspace is invalid or generated ID would duplicate. Warn for unresolved `references` or malformed optional timestamps. No decision lifecycle field is required or written in v0. |
+| Event | `decision.created`. |
+| Resulting state | New decision document in `.tandem/board/` with `id: decision-N`, `type: decision`, `title`, `createdAt`, `updatedAt`, and Markdown body. |
+
+Decision ID allocation chooses the next available positive integer after scanning existing decision IDs in both board and logs.
+
+### Move state
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Task ID and target `state`. |
+| Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and enough document index data to validate core references. |
+| Files written | Target task document; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, resolves only in `.tandem/logs/`, target `state` is not configured, target task has unresolved `parentId`/`blockers`, or task structure is invalid. Warn for unresolved related `references` or state/accord visual misalignment. |
+| Event | `task.moved`. |
+| Resulting state | Existing active task remains in `.tandem/board/` with updated `state` and `updatedAt`. |
+
+Moving state does not implicitly change accord or review status. Tools may suggest aligned changes, but the protocol keeps the layers separate.
+
+### Update accord
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Task ID and requested accord status/action. Optional assignee, summary, deliverables, validation expectations, evidence, constraints, and out-of-scope entries. |
+| Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
+| Files written | Target task document; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, requested status is not canonical, accord object would be malformed, or existing core references are unresolved. Warn for unresolved related `references`, completion-policy issues when relevant, or state/accord visual misalignment. |
+| Event | Status-specific event: `accord.ready`, `accord.claimed`, `accord.delivered`, `accord.accepted`, `accord.rework`, `accord.failed`, or `accord.blocked`. |
+| Resulting state | Task stays in `.tandem/board/`; `accord.status` and related accord fields are updated; task `state` is not automatically changed by protocol semantics. |
+
+Suggested visual alignment remains: `ready` with `todo`, `claimed` with `in-progress`, `delivered`/`accepted` with `review`. Misalignment is allowed but should be visible in tools.
+
+### Request review
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Task ID. Optional reviewer and notes. |
+| Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
+| Files written | Target task document; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or state/review mismatch if the task is not in `review`. |
+| Event | `review.requested`. |
+| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `pending`, `requestedAt` is set, optional reviewer/notes are recorded. Protocol does not automatically move `state`, though tools may pair this with a separate move to `review`. |
+
+### Accept review / request changes
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Task ID and review decision: accept, request changes, or reject. Optional reviewer and notes. |
+| Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
+| Files written | Target task document; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, requested review status is not canonical, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or completion-policy issues when the review remains unaccepted. |
+| Event | `review.accepted`, `review.changes_requested`, or `review.rejected`. |
+| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `accepted`, `changes-requested`, or `rejected`; `decidedAt` is set; optional reviewer/notes are recorded. |
+
+Requesting changes does not automatically set accord status to `rework` or move task state to `in-progress`; tools may offer that as a paired mutation, but protocol semantics keep review, accord, and state separate.
+
+### Complete/archive
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Task ID and `completion.summary`. Optional files changed, validation result summary, reviewer/completer, and completion notes. |
+| Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, `.tandem/logs/` destination index, and document index for validation. |
+| Files written | Completed task document in `.tandem/logs/`; remove/move the active `.tandem/board/` task document; append `.tandem/events.jsonl`. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, already lives only in logs, required structure is invalid, destination would duplicate an existing log path/ID, or `parentId`/`blockers` are unresolved. Warn, but allow completion, when `review.status` is not `accepted`, an existing accord is not `accepted`, related `references` or rule sources are unresolved, or optional completion metadata is malformed but recoverable. |
+| Event | `task.completed`. |
+| Resulting state | Task is archived as a Markdown log document in `.tandem/logs/` with `completedAt` and `completion.summary`; active board document is gone; log document is the completed-work source of truth. |
+
+Completion is not a persistent board state. The completed log may omit active-only `state`, but must retain enough identity, completion, body, review, accord, reference, and subtask information to stand alone.
+
+### Post-v0 restore/reopen boundaries
+
+Restore/reopen is not part of the v0 command surface. The protocol reserves event names so future tooling can distinguish two concepts:
+
+- `task.restored` — move a completed log document back to `.tandem/board/` while preserving completion history.
+- `task.reopened` — mark previously completed work as needing new active work, likely with a new active `state` and follow-up context.
+
+V0 tools should be able to read unknown future restore/reopen events as ordinary audit records, but do not need to implement restore/reopen mutations.
 
 ## Mutation rules for tools
 

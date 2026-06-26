@@ -3,7 +3,7 @@
 Status: active planning  
 Last updated: 2026-06-26
 
-This todo tracks protocol-specific work. The current protocol draft lives in `protocol/plan/spec.md`.
+This todo tracks protocol-specific tasks. The current protocol draft lives in `protocol/plan/spec.md`.
 
 ## Accomplished
 
@@ -27,7 +27,7 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 - [x] Decided `parentId`, `blockers`, and `references` may point to any Tandem document by ID.
 - [x] Chose parent-based sequential subtask IDs such as `task-1-1`.
 - [x] Decided completion warns about missing accepted review or accord but allows completion in v0.
-- [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed work.
+- [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed history.
 - [x] Decided `.tandem/events.jsonl` enriches timeline/audit history.
 - [x] Decided v0 validation/lint is built-in structural validation only.
 - [x] Chose `protocolVersion: 0.1.0` for the first v0 draft.
@@ -47,28 +47,20 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 - [x] Added minimal audit event envelope and event name catalog.
 - [x] Added validation diagnostics with error/warning categories and examples.
 - [x] Defined completed-log document expectations.
+- [x] Defined mutation semantics for adding tasks/decisions, moving state, updating accords, review decisions, complete/archive, and post-v0 restore/reopen boundaries.
 
 ## Current tasks
 
 - [ ] Keep `protocol/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent docs.
-- [ ] Define mutation semantics precisely:
-  - add task
-  - add decision
-  - move state
-  - update accord
-  - request/accept review
-  - complete/archive
-  - post-v0 restore/reopen naming boundaries
-- [ ] Define minimal-diff file editing requirements for compliant tools.
+- [ ] Define minimal-diff file editing requirements for compliant tools after the CLI/TUI tooling-side write behavior settles.
 - [ ] Tighten examples if implementation discovers ambiguous field behavior.
 - [ ] Coordinate any protocol-facing CLI wording changes with `../tandem-tui/` docs through the orchestrator.
 
 ## Next recommended steps
 
-1. Write mutation semantics for the core lifecycle operations.
-2. Specify minimal-diff write behavior for frontmatter and Markdown body preservation.
-3. Review the protocol-facing CLI surface against the CLI/TUI worker before implementation starts.
-4. Keep schemas, fixtures, and implementation layout out of v0 unless explicitly approved.
+1. Review the protocol-facing CLI surface against the CLI/TUI worker before implementation starts.
+2. Specify minimal-diff write behavior for frontmatter and Markdown body preservation after parallel CLI/TUI work lands.
+3. Keep schemas, fixtures, and implementation layout out of v0 unless explicitly approved.
 
 ## Acceptance criteria for protocol v0 draft
 
