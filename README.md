@@ -23,18 +23,27 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - CLI binary: `tdm`
 - CLI/TUI directory: `tandem-tui/`
 - Work agreement object: `accord`
-- Future prefixes: `td` / `tdm`
+- User-facing CLI: `tdm`; reserved future/internal prefix: `td`
 
 ## Locked v0 scope
 
+- Protocol version: `0.1.0` for the first v0 draft.
 - Protocol fields: `state`/`states`, `type: task`, sequential `task-N` IDs.
 - Default states: `todo`, `in-progress`, `review`.
 - Document types: `task` and `decision`; custom types are config-only.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
-- Logs: archived markdown docs in `.tandem/logs/`; lifecycle events in `.tandem/events.jsonl`.
-- v0 `tdm` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in `.tandem/events.jsonl`.
+- v0 `tdm` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`; `tdm decision` supports `list`, `show`, `add`.
+- Validation: strict structure/core refs; unresolved `parentId`/`blockers` are errors while related `references` are warnings.
+- Decision docs: no lifecycle field required in v0.
 - First implementation: Rust inside `tandem-tui/`.
-- First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, and mouse support.
+- CLI output: human-readable by default using compact tables/detail blocks; all read commands support `--json` envelope objects.
+- TUI invocation: `tdm tui` only in v0.
+- First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering.
+- V0 CLI aliases: none; canonical commands and long flags only.
+- V0 repo shape: implementation stays under `tandem-tui/`; no root Rust workspace, schemas, or fixtures.
+- Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.
+- Planning docs remain Markdown until the CLI MVP; migrate/dogfood Tandem documents after that.
 
 ## Documentation contract
 
@@ -46,7 +55,7 @@ Minimum documentation set for each major area:
 - `plan/spec.md` — design/specification.
 - `plan/todo.md` — accomplished/current/next work tracking.
 
-When naming, scope, architecture, lifecycle, or workflow decisions change, update the parent docs and all affected sub-area docs in the same change. Keep the project simple: do not treat Rust workspace layout, crates, dependency choices, or schema/fixture directories as settled until explicitly approved.
+When naming, scope, architecture, lifecycle, or workflow decisions change, update the parent docs and all affected sub-area docs in the same change. Keep the project simple: no root Rust workspace, crates, dependency choices, schemas, or fixtures in v0.
 
 ## Current docs
 

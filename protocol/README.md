@@ -17,13 +17,13 @@ The protocol area owns:
 - review and completion semantics
 - Brainfile-inspired protocol parity decisions
 - local v3 proposal reconciliation from `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`
-- future schema/fixture definitions only when explicitly useful
+- post-v0 schema/fixture definitions only if explicitly useful later
 
 The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem-tui/`, though both areas must stay synchronized.
 
 ## Current status
 
-Planning/specification mode. No protocol crate, schemas, or fixtures exist yet. Do not add implementation structure here unless explicitly delegated.
+Planning/specification mode. No protocol crate, schemas, or fixtures exist yet, and schemas/fixtures are not part of v0. Do not add implementation structure here unless explicitly delegated.
 
 ## Documentation
 
@@ -65,12 +65,13 @@ No drift is allowed. If this README contradicts parent docs, fix the contradicti
 
 ## Locked v0 protocol decisions
 
+- Protocol version: `0.1.0` for the first v0 draft.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `review`.
 - New work items: `type: task`, sequential IDs such as `task-1`.
-- First-class document types: `task` and `decision`; custom types are config-only.
+- First-class document types: `task` and `decision`; decision docs do not need a lifecycle field in v0; custom types are config-only.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
 - Completion warns but allows completion in v0.
-- Completed logs are archived markdown docs in `.tandem/logs/`; events live in `.tandem/events.jsonl`.
-- Validation is built-in structural validation only.
+- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in `.tandem/events.jsonl`.
+- Validation is built-in structural validation only, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.

@@ -3,7 +3,7 @@
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: CLI design first, then Rust + Ratatui TUI
+Implementation target: CLI design first; first implementation language Rust inside `tandem-tui/`; TUI target Rust + Ratatui
 
 Naming:
 
@@ -11,8 +11,8 @@ Naming:
 - CLI/TUI source directory: `tandem-tui/`
 - CLI binary: `tdm`
 - CLI design precedes TUI design/implementation
-- Likely TUI invocation: `tdm tui` initially, with `tdm-tui` possible as a standalone binary later
-- Future extension/tool prefixes: `td` or `tdm`
+- V0 TUI invocation: `tdm tui` only
+- User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
 
 This document describes the user-facing `tdm` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
@@ -26,7 +26,7 @@ The CLI/TUI baseline is broad feature parity with the live Brainfile project: ke
 - Tandem protocol draft in `../../protocol/plan/spec.md`.
 - Local Brainfile v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`.
 
-The first CLI/TUI planning deliverable should be a feature parity matrix: keep, rename, improve, omit, open.
+Feature parity remains a planning reference. The locked v0 CLI/TUI scope below is binding for the first implementation pass.
 
 ## Current Brainfile TUI issues to avoid
 
@@ -50,7 +50,7 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 
 - **CLI first:** design `tdm` command workflows before the interactive TUI.
 - **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
-- **Logs are real:** completed work is browsable, searchable, inspectable, restorable, and useful.
+- **Logs are real:** completed work is browsable, searchable, inspectable, and useful; restore/reopen behavior can come after the v0 log read scope.
 - **Review is central:** delivered work should naturally flow to review, validation, acceptance, rework, and completion.
 - **Agent state is visible:** accord status, evidence, validation, and blockers should be visible without opening raw files.
 - **Fast scanning:** compact cards, good color hierarchy, clear badges, and useful filtering.
@@ -59,28 +59,81 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 - **Small-screen aware:** usable in narrow terminals and inside split panes.
 - **File-native:** edits should reflect on disk; external edits should hot reload cleanly.
 
-## CLI planning scope
+## Locked v0 CLI scope
 
-The CLI is still being designed. Do not lock in implementation dependencies or crate layout yet.
-
-Initial CLI questions:
-
-- Which Brainfile commands map directly to `tdm`?
-- Which commands should be renamed for Tandem vocabulary, especially `contract` → `accord`?
-- Which Brainfile commands are out of scope for v0?
-- What output modes are needed: human-readable only, `--json`, or both?
-- Which operations should require confirmation or review policy checks?
-- How should `tdm tui` launch the interactive TUI?
-
-Likely command families to evaluate for parity:
+The v0 CLI command families are settled:
 
 ```text
-init, list, show, add, move, complete, log, search, accord, rules, decision, tui
+tdm init
+tdm list
+tdm show <id>
+tdm add ...
+tdm move <id> --state <state>
+tdm complete <id>
+tdm log list|show|search
+tdm search <query>
+tdm accord ready|claim|deliver|accept|rework|block|fail
+tdm rules list|add|edit|delete
+tdm decision list|show|add
+tdm tui
 ```
 
-These are planning inputs, not settled implementation commitments.
+Command behavior rules:
 
-## Core views
+- Design and document the CLI before the interactive TUI.
+- Use Tandem vocabulary: `state`, `accord`, and `decision`.
+- Human-readable output is the default: list/search commands use compact tables; detail commands use labeled blocks with Markdown body where applicable.
+- V0 uses canonical command names and long flags only; no short aliases are part of v0.
+- All read commands support `--json`: `list`, `show`, `search`, `log list`, `log show`, `log search`, `rules list`, `decision list`, and `decision show`.
+- `--json` responses use an envelope object: `{ "ok": true, "data": ..., "warnings": [] }`.
+- `tdm log` is limited to `list`, `show`, and `search` in v0.
+- `tdm rules` supports `list`, `add`, `edit`, and `delete` in v0.
+- `tdm accord` supports `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, and `fail` in v0.
+- `tdm decision` supports `list`, `show`, and `add` in v0.
+- The TUI launches through `tdm tui` only in v0; no standalone TUI binary is part of v0.
+- `tdm complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
+- The first implementation language is Rust, implemented inside `tandem-tui/`.
+- CLI parser, dependency, and package layout choices remain open until implementation is explicitly started.
+
+Deferred from v0:
+
+- Template features.
+- Schema-management command surface.
+- AI-assistant integration commands.
+- Credential/provider commands.
+- Third-party archive/export integrations.
+- Brainfile conversion commands are not required for v0.
+- Schemas, fixtures, and root Rust workspace layout are not part of v0.
+
+## Brainfile parity reference
+
+| Brainfile shape | Tandem v0 decision |
+| --- | --- |
+| Board/task CRUD | Keep, using `state` and Tandem document IDs. |
+| Completed work area | Improve through first-class logs. |
+| Contract workflow | Rename and improve as `accord`. |
+| Rules categories | Keep: `always`, `never`, `prefer`, `context`. |
+| ADR command | Rename around `decision`; v0 subcommands are `list`, `show`, and `add`. |
+| Type management | Defer CLI management; protocol config may still define types. |
+| Template features | Defer. |
+| External service/archive integrations | Defer. |
+| Assistant/server integration commands | Defer. |
+
+## First TUI MVP
+
+The first TUI MVP is not read-only. It should include:
+
+- Top-level views: Board, Review, Logs, Rules, Decisions.
+- Board mutations: add item, move state, edit item, complete to logs, update priority/tags/assignee where supported, and toggle subtasks.
+- Accord actions: ready, claim, deliver, accept, rework, block, fail.
+- Rules actions: list, add, edit, delete.
+- Decision browsing and basic decision actions matching `tdm decision list|show|add`.
+- First-class logs with list/show/search behavior.
+- Theme support in the first MVP, not a later polish pass.
+- Mouse support is enabled by default in the first MVP for selection, scrolling, tabs, and action buttons; drag/drop is not in v0.
+- Progress/health metrics that do not require a persistent `done` state.
+
+## TUI views
 
 ### 1. Board view
 
@@ -89,39 +142,39 @@ Primary view for active work.
 Default states:
 
 ```text
-backlog | todo | active | review
+todo | in-progress | review
 ```
 
-Projects may configure state names. The TUI should not assume `done` exists.
+Projects may configure state names. The TUI should not assume a persistent completion state exists.
 
 Board view should support:
 
 - state/column tabs or columns depending on layout width
-- task/work cards
+- task/decision cards
 - compact and expanded card modes
 - priority, type, tags, parent, blocker, assignee, due date badges
 - accord status badges
 - review status badges
 - selection and multi-select later
-- drag or click actions when mouse mode is enabled
+- click actions when mouse mode is enabled
 
 Card example:
 
 ```text
-▌ HIGH [work] Implement Ratatui theme system       [A:claimed] [2/5]
-    #tui #rust · @pi · child of epic_01j...        work_01j...
+▌ HIGH [task] Implement Ratatui theme system       [A:claimed] [2/5]
+    #tui #rust · @pi · child of task-4             task-7
 ```
 
 Delivered/review item example:
 
 ```text
 ▌ MED  Add decision view                           [A:delivered] [review]
-    validation pending · 3 files changed           work_01j...
+    validation pending · 3 files changed           task-8
 ```
 
-### 2. Detail view
+### Shared detail pane
 
-A focused pane or full-screen view for the selected document.
+A focused pane or full-screen surface for the selected document.
 
 Sections:
 
@@ -138,12 +191,12 @@ Sections:
 Detail view should make PM validation easy:
 
 ```text
-Actions: [accept] [request changes] [complete] [reopen] [edit] [copy id]
+Actions: [accept] [request changes] [complete] [edit] [copy id]
 ```
 
-### 3. Review queue
+### 2. Review queue
 
-A dedicated view showing items needing attention:
+A dedicated filtered list showing items needing attention:
 
 - accord delivered
 - review pending
@@ -151,18 +204,9 @@ A dedicated view showing items needing attention:
 - blocked items
 - accepted but not completed
 
-This should answer: “What needs me?”
+This should answer: “What needs me?” without imposing hard-coded workflow sections in v0. Sorting should start simple, such as priority first, then most recently updated or delivered.
 
-Suggested sections:
-
-```text
-Delivered        3
-Validation failed 1
-Blocked          2
-Ready to complete 4
-```
-
-### 4. Logs view
+### 3. Logs view
 
 A first-class completed-work browser.
 
@@ -181,12 +225,15 @@ Actions:
 
 - search logs
 - inspect completion details
-- restore/reopen
 - copy summary
 - open files changed
+
+Deferred log actions:
+
+- restore/reopen
 - permanently delete only with strong confirmation
 
-### 5. Rules view
+### 4. Rules view
 
 A view for project rules:
 
@@ -203,15 +250,11 @@ Actions:
 - copy rule
 - maybe promote decision to rule later
 
-### 6. Decisions/notes view
+### 5. Decisions view
 
-If protocol document types include `decision` and `note`, the TUI should allow browsing them outside normal task flow.
+The TUI should allow browsing and managing `decision` documents outside normal task flow.
 
-Decision states may be separate from work states:
-
-```text
-draft | accepted | superseded
-```
+Decision documents do not have a v0 lifecycle field. The Decisions view should show `type: decision` documents and their Markdown body/metadata without inventing separate decision states.
 
 ## Layout modes
 
@@ -221,11 +264,11 @@ For terminals >= ~120 columns:
 
 ```text
 ┌ Project title ──────────────── health/status/search ┐
-├ Board | Review | Logs | Rules | Decisions | Search ─┤
-│ backlog       todo          active        review     │
-│ ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌────────┐│
-│ │ cards   │   │ cards   │   │ cards   │   │ cards  ││
-│ └─────────┘   └─────────┘   └─────────┘   └────────┘│
+├ Board | Review | Logs | Rules | Decisions ──────────┤
+│ todo             in-progress          review         │
+│ ┌───────────┐    ┌───────────┐       ┌───────────┐  │
+│ │ cards     │    │ cards     │       │ cards     │  │
+│ └───────────┘    └───────────┘       └───────────┘  │
 ├──────────────── selected detail / status ───────────┤
 │ key hints / command mode / status messages           │
 └──────────────────────────────────────────────────────┘
@@ -260,7 +303,7 @@ Do not compute progress from a `done` column.
 
 Useful metrics:
 
-- active count
+- in-progress count
 - review count
 - blocked count
 - delivered needing review
@@ -272,7 +315,7 @@ Useful metrics:
 Potential header:
 
 ```text
-My Project  active 4 · review 3 · blocked 1 · completed this week 7
+My Project  in-progress 4 · review 3 · blocked 1 · completed this week 7
 ```
 
 Optional progress bars:
@@ -280,7 +323,7 @@ Optional progress bars:
 - epic progress: completed children / total children
 - review queue: accepted / delivered
 - validation: passed / total delivered
-- milestone progress if milestones exist
+- decision/review progress if useful
 
 ## Theming
 
@@ -300,11 +343,13 @@ Suggested built-ins:
 
 ### Theme file
 
-Possible config path:
+V0 theme files use TOML. Loading order is built-in defaults, user theme files, then workspace theme override.
+
+Config paths:
 
 ```text
-.tandem/theme.toml
 ~/.config/tandem/themes/*.toml
+.tandem/theme.toml
 ```
 
 Example:
@@ -362,7 +407,7 @@ Required interactions:
 - click column/state picker in move mode
 - click confirmation buttons
 
-Stretch interactions:
+Deferred interactions:
 
 - drag card between states
 - drag to reorder within a state
@@ -425,11 +470,11 @@ Work actions:
 | `a` | accord action menu (assign/claim/deliver) |
 | `v` | validation/review action menu |
 | `c` | complete/archive, if allowed |
-| `R` | reopen/restore in logs |
+| `R` | reopen/restore in logs, if enabled after v0 |
 | `d` | delete with confirmation |
 | `y` | copy ID/link |
 
-All keybindings should be configurable eventually.
+V0 uses fixed default keybindings. Keymap configuration is deferred until after the first MVP.
 
 ## Command palette
 
@@ -438,7 +483,7 @@ The command palette should expose every action so users do not have to memorize 
 Examples:
 
 ```text
-:new work
+:new task
 :move review
 :complete
 :accord deliver
@@ -475,6 +520,18 @@ views:
     query: "assignee:ivan OR assignee:pi"
 ```
 
+## Markdown rendering
+
+The first TUI MVP should support styled basics:
+
+- headings
+- bullet and numbered lists
+- code fences as visibly distinct blocks
+- inline code and emphasis
+- links rendered as readable text/URLs
+
+Tables, images, syntax highlighting, and advanced Markdown blocks are deferred.
+
 ## Editing model
 
 The TUI should support two editing styles:
@@ -503,6 +560,8 @@ The app should watch:
 - `events.jsonl`
 - theme files
 
+Theme config loading order is built-in defaults first, then user TOML theme files from `~/.config/tandem/themes/*.toml`, then workspace override `.tandem/theme.toml`. Workspace config wins when settings conflict.
+
 Hot reload behavior:
 
 - debounce changes
@@ -513,7 +572,7 @@ Hot reload behavior:
 
 ## Implementation boundaries (open)
 
-The implementation layout is not settled. Do not assume a root Rust workspace, `crates/`, a standalone core crate, or a specific CLI parsing library until explicitly decided.
+The implementation layout inside `tandem-tui/` is not settled. Do not assume a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a specific CLI parsing library in v0.
 
 Even before folder/crate layout is chosen, the behavioral boundaries should stay clear:
 
@@ -525,16 +584,16 @@ Even before folder/crate layout is chosen, the behavioral boundaries should stay
 - preserve raw documents for minimal patches
 - list/filter/query work documents
 - mutate fields/states/accords/reviews
-- complete/archive/reopen
+- complete/archive and any later reopen behavior
 - append events
 
 ### CLI responsibilities
 
 - expose scriptable `tdm` commands
 - map command inputs to protocol behavior
-- provide predictable human-readable output and optional structured output where useful
+- provide predictable human-readable output and `--json` structured output for all read commands
 - report clear errors and policy failures
-- launch the TUI through `tdm tui` if that remains the chosen invocation
+- launch the TUI through `tdm tui` in v0
 
 ### TUI responsibilities
 
@@ -549,21 +608,19 @@ Even before folder/crate layout is chosen, the behavioral boundaries should stay
 
 ## Possible dependency areas (not settled)
 
-Potential implementation dependencies should be chosen later and kept minimal:
-
-- `ratatui` for rendering
-- terminal input/backend support such as `crossterm`
-- focused serialization/frontmatter/event formats
-- theme/config parsing if needed
-- file watching if it is in MVP
-- ID/timestamp helpers only after protocol decisions require them
+Potential implementation dependencies should be chosen later and kept minimal. The only settled implementation choice here is Rust inside `tandem-tui/`, with Rust + Ratatui as the TUI target.
 
 Need to choose later:
 
-- CLI parser strategy
-- direct terminal event loop vs thin internal event abstraction
-- text input widgets vs simple custom forms
-- how much Markdown rendering is needed for v0
+- CLI parser strategy.
+- Terminal input/backend strategy.
+- Serialization/frontmatter/event parsing strategy.
+- Theme parser/config behavior for TOML theme files at `~/.config/tandem/themes/*.toml` and `.tandem/theme.toml`.
+- File watching strategy for the first TUI MVP.
+- ID/timestamp helper strategy, if helpers are needed.
+- Direct terminal event loop vs thin internal event abstraction.
+- Text input widgets vs simple custom forms.
+- Markdown rendering strategy for the locked styled-basics behavior.
 
 ## App state sketch
 
@@ -574,7 +631,6 @@ enum View {
     Logs,
     Rules,
     Decisions,
-    Search,
 }
 
 enum Mode {
@@ -613,6 +669,10 @@ enum UiAction {
     CompleteSelected,
     AccordClaim,
     AccordDeliver,
+    AccordAccept,
+    AccordRework,
+    AccordBlock,
+    AccordFail,
     ReviewAccept,
     ReviewRequestChanges,
     OpenCommandPalette,
@@ -655,7 +715,7 @@ When pressing complete/archive:
 Example:
 
 ```text
-Complete work_01j...? 
+Complete task-7?
 
 Summary: [ Theme system implemented and tested                    ]
 Validation: cargo test passed, cargo clippy passed
@@ -672,7 +732,7 @@ Logs are not a trash can. They are a memory/audit surface.
 Expanded log item should show:
 
 ```text
-work_01j... Implement Ratatui theme system
+task-7 Implement Ratatui theme system
 Completed: 2026-06-26 15:00 by ivan
 Summary: Theme loading, built-in palettes, runtime style mapping.
 Validation: passed
@@ -691,9 +751,9 @@ Timeline:
 
 ## Error handling
 
-The TUI should never silently corrupt project files.
+The CLI and TUI should never silently corrupt project files.
 
-When a file has invalid YAML/schema:
+When a file has invalid frontmatter or document structure:
 
 - keep the app open
 - show error panel
@@ -709,20 +769,25 @@ For failed writes:
 
 ## Testing strategy
 
-Core:
+Exact test tooling is open, but planned coverage should include:
 
-- fixture-based parse/list/mutate tests
-- golden-file minimal diff tests
-- event ledger append tests
-- archive/reopen tests
+CLI/protocol behavior:
 
-TUI:
+- workspace discovery
+- read command output, including `--json` for all read commands
+- add/move/complete/log/search/accord/rules/decision flows
+- minimal-diff document mutation behavior
+- event ledger append behavior
+- completion behavior and any later reopen/restore behavior
 
-- widget snapshot tests with `ratatui::backend::TestBackend`
+TUI behavior:
+
+- widget/screen snapshot tests if supported by the chosen stack
 - input-to-action tests
 - mouse hit-map tests
 - layout breakpoint tests
-- theme parsing tests
+- theme parsing and rendering tests
+- board mutation flows from inside the TUI
 
 Manual smoke:
 
@@ -735,61 +800,41 @@ Manual smoke:
 
 ## MVP phases
 
-### Phase 0: Protocol fixtures
+### Phase 0: v0 CLI design lock
 
-- Create example workspace fixtures.
-- Use Tandem as the working name/directory while final naming is confirmed.
-- Define core structs and parse config/documents.
+- Specify options and output shape for the locked v0 command families.
+- Define `--json` behavior for all read commands.
+- Define warnings and policy checks for `tdm complete`.
+- Define detailed options and output for `tdm decision list|show|add`.
+- Keep implementation layout inside `tandem-tui/` and dependency choices open until coding begins.
 
-### Phase 1: Read-only board
+### Phase 1: v0 CLI implementation
 
-- Workspace discovery.
-- Read config and board docs.
-- Render board/list layouts.
-- Selection/navigation.
-- Built-in themes.
-- Basic detail expansion.
+- Implement in Rust inside `tandem-tui/`.
+- Implement workspace discovery and document reading.
+- Implement v0 read commands: `list`, `show`, `log list`, `log show`, `log search`, `search`, read-oriented `rules`, and read-oriented `decision` operations.
+- Implement v0 mutations: `init`, `add`, `move`, `complete`, `accord`, `rules`, and decision operations.
+- Preserve unknown fields and minimize document rewrites.
 
-### Phase 2: Mutations
+### Phase 2: First TUI MVP
 
-- Add work item.
-- Move state.
-- Edit in `$EDITOR`.
-- Change priority/tags/assignee.
-- Toggle subtasks.
-- Hot reload.
+- Launch through `tdm tui`.
+- Render Board, Review, Logs, Rules, and Decisions views.
+- Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
+- Include built-in theme support and user-selectable theme loading.
+- Include mouse selection, scrolling, tab switching, and action-button clicks enabled by default.
+- Exclude drag/drop from v0.
+- Render Markdown with styled basics.
+- Hot reload file changes and surface parse/write errors safely.
 
-### Phase 3: Accord and review
+### Phase 3: TUI polish and post-MVP features
 
-- Accord ready/claim/deliver/accept/rework/block.
-- Review queue.
-- Validation command display/results.
-- Review accept/request changes.
-
-### Phase 4: Completion and logs
-
-- Completion form.
-- Archive to logs.
-- Event ledger append.
-- Logs view with rich details.
-- Restore/reopen.
-
-### Phase 5: Mouse and polish
-
-- Hit-map mouse selection.
-- Clickable tabs/buttons.
-- Scroll wheel.
-- Drag/reorder if desired.
 - Configurable keymap.
 - Saved filters/views.
+- Drag/reorder if desired.
+- Richer Markdown rendering if needed.
+- Additional integrations only after v0 CLI/TUI workflows are stable.
 
 ## Open questions
 
-- Confirm Tandem as the final project/product name.
-- Should the TUI run as a CLI subcommand (`tdm tui`), a standalone binary (`tdm-tui`), or both?
-- Should theme config live in workspace, global config, or both?
-- Should mouse mode be enabled by default?
-- Should drag-and-drop be MVP or later?
-- Which keybindings should be default vs user-configurable in v0?
-- Should Markdown rendering be simple text initially or styled headings/lists/code blocks?
-- How opinionated should the Review queue be?
+All previously listed CLI/TUI policy questions are now resolved. Remaining work is command-reference detail and implementation planning, tracked in `todo.md`.

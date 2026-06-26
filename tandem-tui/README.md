@@ -59,13 +59,13 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - CLI/TUI directory: `tandem-tui/`
 - CLI binary: `tdm`
 - CLI design comes before TUI design/implementation.
-- Likely TUI invocation: `tdm tui`, with `tdm-tui` possible later.
+- V0 TUI invocation: `tdm tui` only.
 - TUI implementation target: Rust + Ratatui.
 - Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.
 - Theme support is required from the beginning.
-- Mouse support should use a hit-map style model.
+- Mouse support should use a hit-map style model, be enabled by default, and exclude drag/drop in v0.
 
 
 ## Locked v0 CLI/TUI decisions
@@ -74,7 +74,14 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - `tdm log`: `list`, `show`, `search`.
 - `tdm rules`: `list`, `add`, `edit`, `delete`.
 - `tdm accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
-- Human-readable output by default; read commands should support `--json`.
+- Human-readable output by default: compact tables for list/search and labeled detail blocks for show/log/decision.
+- All read commands support `--json` using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
+- V0 CLI uses canonical command names and long flags only; no short aliases.
 - First implementation language: Rust inside `tandem-tui/`.
+- `tdm decision`: `list`, `show`, `add`.
 - First TUI MVP: board mutations immediately; Board, Review, Logs, Rules, Decisions views; theme and mouse support included.
-- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations.
+- Review queue: simple filtered list in v0.
+- Keymaps: fixed defaults in v0; custom keymap config later.
+- Markdown rendering: styled basics in v0.
+- Theme config loading order: built-in defaults, then user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.
+- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.

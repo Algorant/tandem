@@ -15,7 +15,7 @@ Core concepts:
 - **review**: human/PM validation state, separate from accord state.
 - **logs**: first-class completed-work history, not just a trash/archive folder.
 - **tdm**: intended CLI binary name.
-- **td / tdm**: possible future shorthand prefixes for Pi extensions, tools, and integrations.
+- **tdm**: user-facing CLI binary. **td** is reserved for future/internal tool prefixes unless explicitly revisited.
 
 ## Canonical project brief
 
@@ -27,7 +27,7 @@ Current direction is intentionally simple:
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem-tui/` is the current home for user-facing CLI + TUI planning and eventual implementation. The CLI binary name is `tdm`; the directory remains `tandem-tui/` until the user changes it.
 - CLI/TUI work is still in planning/design. Decide the CLI shape first, then the TUI. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
-- The TUI target is Rust + Ratatui, but do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure unless explicitly requested or approved.
+- The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem-tui/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
 - Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
 
@@ -37,8 +37,9 @@ Protocol:
 
 - Canonical workflow field: `state` / `states`.
 - Default active states: `todo`, `in-progress`, `review`.
+- Protocol version for the first v0 draft: `0.1.0`.
 - Default task identity: `type: task` with sequential IDs such as `task-1`.
-- First-class document types: `task` and `decision`.
+- First-class document types: `task` and `decision`; decision documents do not need a lifecycle field in v0.
 - Custom document types: allowed in config only; no v0 type-management CLI.
 - Work agreement object: `accord`.
 - Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
@@ -46,9 +47,9 @@ Protocol:
 - References: `parentId`, blockers, and related references may point to any Tandem document by ID.
 - Subtask IDs: parent-based sequential IDs such as `task-1-1`.
 - Completion: `tdm complete` warns about missing review/accord acceptance but allows completion in v0.
-- Events: `.tandem/events.jsonl`.
+- Events: `.tandem/events.jsonl` stores minimal audit-only lifecycle records requiring `ts`, `event`, `id`, and `summary`.
 - Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
-- Validation/lint: built-in structural validation only in v0.
+- Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings.
 - Brainfile migration/import: no v0 requirement and no required command.
 
 CLI/TUI:
@@ -57,12 +58,20 @@ CLI/TUI:
 - v0 `tdm log`: `list`, `show`, `search` only.
 - v0 `tdm rules`: `list`, `add`, `edit`, `delete`.
 - v0 `tdm accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
-- CLI output: human-readable by default; `--json` for read commands.
+- CLI output: human-readable by default using compact tables for list/search and labeled detail blocks for show/log/decision; `--json` envelope objects for all read commands.
+- V0 CLI alias policy: canonical command names and long flags only; no short aliases.
+- `tdm decision`: `list`, `show`, `add`.
 - First CLI implementation language: Rust, inside `tandem-tui/`.
+- TUI invocation: `tdm tui` only in v0.
 - First TUI MVP: includes board mutations immediately.
 - TUI top-level views: Board, Review, Logs, Rules, Decisions.
 - Theme and mouse support are part of the first TUI MVP.
-- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations.
+- Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded from v0.
+- Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, workspace TOML override at `.tandem/theme.toml`.
+- V0 keybindings are fixed defaults; custom keymap config is deferred.
+- V0 Markdown rendering is styled basics.
+- V0 Review queue is a simple filtered list, not hard-coded workflow sections.
+- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.
 
 
 ## Repository layout
@@ -154,7 +163,7 @@ Use these names consistently unless the user explicitly changes them:
 - CLI binary: `tdm`
 - CLI/TUI area: `tandem-tui/`
 - Work agreement object: `accord`
-- Future integration prefixes: `td` / `tdm`
+- User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
 
 Avoid reintroducing `contract` except when discussing Brainfile design mapping from `contract` to Tandem `accord`.
 
@@ -184,7 +193,7 @@ CLI/TUI:
 - Support themes from the beginning.
 - Support mouse selection/scroll/click via a hit-map style event model.
 - Keep keyboard-first ergonomics with vim-style and conventional bindings.
-- Treat CLI implementation details, crate layout, and dependency choices as open until explicitly decided.
+- Keep v0 implementation under `tandem-tui/`; treat package/module layout and dependency choices inside that area as open until coding begins.
 - Evaluate live Brainfile CLI/TUI features for parity, then decide what to keep, rename, improve, or intentionally omit.
 
 ## Agent workflow
@@ -201,7 +210,7 @@ Before making changes:
 When adding implementation code later:
 
 - Prefer small, reviewable commits/changes.
-- Add tests or fixtures with protocol changes.
+- Add tests with protocol changes when implementation exists; do not add schemas or fixtures in v0.
 - Keep protocol parsing/mutation logic separate from TUI rendering logic.
 - Do not create opaque state as the only source of truth.
 - Update documentation and todos alongside code changes.
