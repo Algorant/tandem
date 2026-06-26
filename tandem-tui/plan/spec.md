@@ -13,7 +13,7 @@ Naming:
 - Likely TUI invocation: `tdm tui` initially, with `tdm-tui` possible as a standalone binary later
 - Future extension/tool prefixes: `td` or `tdm`
 
-This document describes a new terminal UI for the Tandem protocol described in `../protocol/spec.md`.
+This document describes a new terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
 The intent is not to port the current Brainfile Ink TUI directly. The intent is to keep the useful workflow concepts while building a more capable, responsive, themeable, mouse-aware TUI from scratch.
 

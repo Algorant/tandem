@@ -7,6 +7,7 @@ It takes inspiration from Brainfile's file-based task board model, but leans har
 ## Monorepo layout
 
 ```text
+plan/          Parent project planning and cross-cutting todos
 protocol/      Tandem protocol/specification work
 tandem-tui/    Rust/Ratatui TUI planning and implementation
 ```
@@ -22,7 +23,26 @@ tandem-tui/    Rust/Ratatui TUI planning and implementation
 - Work agreement object: `accord`
 - Future prefixes: `td` / `tdm`
 
+## Documentation contract
+
+Every discrete aspect of Tandem must have its own documentation and keep it synchronized with the parent project docs. No documentation drift is allowed.
+
+Minimum documentation set for each major area:
+
+- `README.md` — purpose, scope, layout, current status, and links.
+- `plan/spec.md` — design/specification.
+- `plan/todo.md` — accomplished/current/next work tracking.
+
+When naming, scope, architecture, lifecycle, or workflow decisions change, update the parent docs and all affected sub-area docs in the same change.
+
 ## Current docs
 
-- `protocol/spec.md` — protocol draft
-- `tandem-tui/spec.md` — TUI draft
+- `AGENTS.md` — guidance for AI agents working in this repo
+- `plan/spec.md` — parent project plan
+- `plan/todo.md` — parent project todo
+- `protocol/README.md` — protocol area README
+- `protocol/plan/spec.md` — protocol draft
+- `protocol/plan/todo.md` — protocol todo
+- `tandem-tui/README.md` — TUI area README
+- `tandem-tui/plan/spec.md` — TUI draft
+- `tandem-tui/plan/todo.md` — TUI todo
