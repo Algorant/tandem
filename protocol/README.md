@@ -1,8 +1,8 @@
 # Tandem Protocol
 
-This directory contains the Tandem protocol planning and, later, protocol implementation assets such as schemas, fixtures, migration notes, and core data-model documentation.
+This directory contains the Tandem protocol/spec planning.
 
-The protocol defines the local-first file format for human/agent coordination.
+The protocol defines the local-first file format for human/agent coordination. It is inspired by Brainfile's useful shape, adapted into Tandem terminology, and extended with the local v3 direction around review, complete/archive, and first-class logs. It has no v0 Brainfile import/migration requirement.
 
 ## Scope
 
@@ -15,14 +15,15 @@ The protocol area owns:
 - `.tandem/events.jsonl` lifecycle ledger
 - `accord` work-agreement model
 - review and completion semantics
-- Brainfile import/migration compatibility
-- schema and fixture definitions once implementation begins
+- Brainfile-inspired protocol parity decisions
+- local v3 proposal reconciliation from `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`
+- future schema/fixture definitions only when explicitly useful
 
 The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem-tui/`, though both areas must stay synchronized.
 
 ## Current status
 
-Planning/specification mode. No protocol crate, schemas, or fixtures exist yet.
+Planning/specification mode. No protocol crate, schemas, or fixtures exist yet. Do not add implementation structure here unless explicitly delegated.
 
 ## Documentation
 
@@ -59,3 +60,17 @@ No drift is allowed. If this README contradicts parent docs, fix the contradicti
 - Completion is an action/archive transition, not a default `done` column.
 - Human workflow state, accord state, and review state are separate.
 - Logs are first-class completed-work history.
+- Match Brainfile's basic protocol feature shape unless Tandem intentionally improves or omits something.
+
+
+## Locked v0 protocol decisions
+
+- Canonical workflow field: `state`; default states: `todo`, `in-progress`, `review`.
+- New work items: `type: task`, sequential IDs such as `task-1`.
+- First-class document types: `task` and `decision`; custom types are config-only.
+- Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
+- Rules are structured objects. References can point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
+- Completion warns but allows completion in v0.
+- Completed logs are archived markdown docs in `.tandem/logs/`; events live in `.tandem/events.jsonl`.
+- Validation is built-in structural validation only.
+- No Brainfile import/migration command is required in v0.

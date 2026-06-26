@@ -1,21 +1,32 @@
-# Tandem TUI Spec Draft
+# Tandem CLI/TUI Spec Draft
 
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: Rust + Ratatui
+Implementation target: CLI design first, then Rust + Ratatui TUI
 
 Naming:
 
 - Product/protocol: **Tandem**
-- TUI source directory: `tandem-tui/`
+- CLI/TUI source directory: `tandem-tui/`
 - CLI binary: `tdm`
+- CLI design precedes TUI design/implementation
 - Likely TUI invocation: `tdm tui` initially, with `tdm-tui` possible as a standalone binary later
 - Future extension/tool prefixes: `td` or `tdm`
 
-This document describes a new terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
+This document describes the user-facing `tdm` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
-The intent is not to port the current Brainfile Ink TUI directly. The intent is to keep the useful workflow concepts while building a more capable, responsive, themeable, mouse-aware TUI from scratch.
+The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The intent is to design the CLI first, then build a more capable, responsive, themeable, mouse-aware TUI.
+
+## Baseline inputs
+
+- Live Brainfile CLI behavior from `brainfile --help` and subcommand help.
+- Installed Brainfile implementation under `/usr/lib/node_modules/@brainfile/cli` for feature discovery.
+- Current Brainfile TUI behavior and shortcomings.
+- Tandem protocol draft in `../../protocol/plan/spec.md`.
+- Local Brainfile v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`.
+
+The first CLI/TUI planning deliverable should be a feature parity matrix: keep, rename, improve, omit, open.
 
 ## Current Brainfile TUI issues to avoid
 
@@ -31,12 +42,14 @@ Observed/known pain points:
 
 ## Product goal
 
-A fast terminal workspace for managing project work, agent accords, reviews, decisions, rules, and logs.
+A fast CLI and terminal workspace for managing project work, agent accords, reviews, decisions, rules, and logs.
 
 It should feel closer to a local-first Linear/kanban/logbook hybrid than a simple task list.
 
 ## Design principles
 
+- **CLI first:** design `tdm` command workflows before the interactive TUI.
+- **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
 - **Logs are real:** completed work is browsable, searchable, inspectable, restorable, and useful.
 - **Review is central:** delivered work should naturally flow to review, validation, acceptance, rework, and completion.
 - **Agent state is visible:** accord status, evidence, validation, and blockers should be visible without opening raw files.
@@ -45,6 +58,27 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 - **Themeable from day one:** no hardcoded palette-only implementation.
 - **Small-screen aware:** usable in narrow terminals and inside split panes.
 - **File-native:** edits should reflect on disk; external edits should hot reload cleanly.
+
+## CLI planning scope
+
+The CLI is still being designed. Do not lock in implementation dependencies or crate layout yet.
+
+Initial CLI questions:
+
+- Which Brainfile commands map directly to `tdm`?
+- Which commands should be renamed for Tandem vocabulary, especially `contract` → `accord`?
+- Which Brainfile commands are out of scope for v0?
+- What output modes are needed: human-readable only, `--json`, or both?
+- Which operations should require confirmation or review policy checks?
+- How should `tdm tui` launch the interactive TUI?
+
+Likely command families to evaluate for parity:
+
+```text
+init, list, show, add, move, complete, log, search, accord, rules, decision, tui
+```
+
+These are planning inputs, not settled implementation commitments.
 
 ## Core views
 
@@ -81,7 +115,7 @@ Card example:
 Delivered/review item example:
 
 ```text
-▌ MED  Add Brainfile importer                      [A:delivered] [review]
+▌ MED  Add decision view                           [A:delivered] [review]
     validation pending · 3 files changed           work_01j...
 ```
 
@@ -477,32 +511,32 @@ Hot reload behavior:
 - detect selected item deletion/move
 - surface parse errors without crashing
 
-## Rust crate architecture
+## Implementation boundaries (open)
 
-Suggested workspace:
+The implementation layout is not settled. Do not assume a root Rust workspace, `crates/`, a standalone core crate, or a specific CLI parsing library until explicitly decided.
 
-```text
-crates/
-├── core/          # protocol parsing, validation, mutation, events
-├── cli/           # command-line interface
-├── tui/           # ratatui application
-└── test-support/  # fixtures/helpers
-```
+Even before folder/crate layout is chosen, the behavioral boundaries should stay clear:
 
-### Core crate responsibilities
+### Protocol behavior responsibilities
 
-- discover workspace
+- discover `.tandem/` workspaces
 - parse config and documents
-- expose typed projections
+- expose typed projections for commands/views
 - preserve raw documents for minimal patches
-- validate schemas/rules
 - list/filter/query work documents
 - mutate fields/states/accords/reviews
 - complete/archive/reopen
 - append events
-- import Brainfile
 
-### TUI crate responsibilities
+### CLI responsibilities
+
+- expose scriptable `tdm` commands
+- map command inputs to protocol behavior
+- provide predictable human-readable output and optional structured output where useful
+- report clear errors and policy failures
+- launch the TUI through `tdm tui` if that remains the chosen invocation
+
+### TUI responsibilities
 
 - app state
 - event loop
@@ -513,25 +547,23 @@ crates/
 - theme loading
 - file watching integration
 
-## Ratatui stack
+## Possible dependency areas (not settled)
 
-Likely dependencies:
+Potential implementation dependencies should be chosen later and kept minimal:
 
 - `ratatui` for rendering
-- `crossterm` for terminal input/backend
-- `color-eyre` or `anyhow` for error reporting
-- `serde`, `serde_yaml`, `serde_json`
-- `toml` for theme/config
-- `notify` for file watching
-- `ulid` or `uuid` for IDs
-- `chrono` or `time` for timestamps
-- `pulldown-cmark` or custom light Markdown rendering later
+- terminal input/backend support such as `crossterm`
+- focused serialization/frontmatter/event formats
+- theme/config parsing if needed
+- file watching if it is in MVP
+- ID/timestamp helpers only after protocol decisions require them
 
-Need to choose between:
+Need to choose later:
 
-- direct `crossterm` loop
-- `tui-input` for text boxes
-- `ratatui` component architecture manually
+- CLI parser strategy
+- direct terminal event loop vs thin internal event abstraction
+- text input widgets vs simple custom forms
+- how much Markdown rendering is needed for v0
 
 ## App state sketch
 
@@ -645,8 +677,8 @@ Completed: 2026-06-26 15:00 by ivan
 Summary: Theme loading, built-in palettes, runtime style mapping.
 Validation: passed
 Files changed:
-  crates/tui/src/theme.rs
-  crates/tui/src/app.rs
+  src/tui/theme.rs
+  src/tui/app.rs
 Accord:
   assignee: pi
   status: accepted
@@ -681,7 +713,6 @@ Core:
 
 - fixture-based parse/list/mutate tests
 - golden-file minimal diff tests
-- import Brainfile fixture tests
 - event ledger append tests
 - archive/reopen tests
 

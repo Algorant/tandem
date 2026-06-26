@@ -17,6 +17,54 @@ Core concepts:
 - **tdm**: intended CLI binary name.
 - **td / tdm**: possible future shorthand prefixes for Pi extensions, tools, and integrations.
 
+## Canonical project brief
+
+Current direction is intentionally simple:
+
+- Keep this as one parent monorepo named `tandem`.
+- Keep exactly two major child areas for now: `protocol/` and `tandem-tui/`.
+- `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
+- The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
+- `tandem-tui/` is the current home for user-facing CLI + TUI planning and eventual implementation. The CLI binary name is `tdm`; the directory remains `tandem-tui/` until the user changes it.
+- CLI/TUI work is still in planning/design. Decide the CLI shape first, then the TUI. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
+- The TUI target is Rust + Ratatui, but do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure unless explicitly requested or approved.
+- Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
+- Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
+
+## Locked v0 decisions
+
+Protocol:
+
+- Canonical workflow field: `state` / `states`.
+- Default active states: `todo`, `in-progress`, `review`.
+- Default task identity: `type: task` with sequential IDs such as `task-1`.
+- First-class document types: `task` and `decision`.
+- Custom document types: allowed in config only; no v0 type-management CLI.
+- Work agreement object: `accord`.
+- Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
+- Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
+- References: `parentId`, blockers, and related references may point to any Tandem document by ID.
+- Subtask IDs: parent-based sequential IDs such as `task-1-1`.
+- Completion: `tdm complete` warns about missing review/accord acceptance but allows completion in v0.
+- Events: `.tandem/events.jsonl`.
+- Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
+- Validation/lint: built-in structural validation only in v0.
+- Brainfile migration/import: no v0 requirement and no required command.
+
+CLI/TUI:
+
+- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- v0 `tdm log`: `list`, `show`, `search` only.
+- v0 `tdm rules`: `list`, `add`, `edit`, `delete`.
+- v0 `tdm accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- CLI output: human-readable by default; `--json` for read commands.
+- First CLI implementation language: Rust, inside `tandem-tui/`.
+- First TUI MVP: includes board mutations immediately.
+- TUI top-level views: Board, Review, Logs, Rules, Decisions.
+- Theme and mouse support are part of the first TUI MVP.
+- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations.
+
+
 ## Repository layout
 
 ```text
@@ -32,13 +80,13 @@ Core concepts:
 │       ├── spec.md        # Tandem protocol draft
 │       └── todo.md        # protocol todo
 └── tandem-tui/
-    ├── README.md          # TUI area README
+    ├── README.md          # CLI/TUI area README
     └── plan/
-        ├── spec.md        # Rust/Ratatui TUI draft
-        └── todo.md        # TUI todo
+        ├── spec.md        # CLI + Rust/Ratatui TUI draft
+        └── todo.md        # CLI/TUI todo
 ```
 
-The repo is intentionally a monorepo for now. Do not split protocol/TUI into separate repositories unless explicitly asked.
+The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI into separate repositories unless explicitly asked.
 
 ## Documentation contract: no drift
 
@@ -75,6 +123,8 @@ Before finishing documentation or planning changes, check for stale references a
 - `handoff` where `accord` should be used
 - `done` column assumptions
 - outdated CLI references such as `tandem` instead of `tdm`
+- unapproved Rust workspace/crate layout assumptions
+- claims that `clap`, `crates/`, `tandem-core`, or a root `Cargo.toml` are settled decisions
 
 ## Current state
 
@@ -102,16 +152,17 @@ Use these names consistently unless the user explicitly changes them:
 - Protocol data directory: `.tandem/`
 - Protocol config file: `.tandem/tandem.md`
 - CLI binary: `tdm`
-- TUI area: `tandem-tui/`
+- CLI/TUI area: `tandem-tui/`
 - Work agreement object: `accord`
 - Future integration prefixes: `td` / `tdm`
 
-Avoid reintroducing `contract` except when discussing Brainfile compatibility or migration from Brainfile `contract` to Tandem `accord`.
+Avoid reintroducing `contract` except when discussing Brainfile design mapping from `contract` to Tandem `accord`.
 
 ## Design direction
 
 Protocol:
 
+- Start from Brainfile's live protocol and command shape, then adapt it into Tandem vocabulary and v3 improvements.
 - Use Markdown files with YAML frontmatter.
 - Keep one active work document per file.
 - Keep active work in `.tandem/board/`.
@@ -120,16 +171,21 @@ Protocol:
 - Treat completion as an action/archive transition, not a persistent `done` column.
 - Keep human workflow state, accord state, and review state separate.
 - Preserve unknown fields and minimize file rewrites.
+- Use the local v3 Brainfile proposal as directional input for review/logs/completion behavior.
 
-TUI:
+CLI/TUI:
 
-- Target Rust + Ratatui.
+- Keep CLI and TUI planning together in `tandem-tui/` for now.
+- The CLI binary name is `tdm`.
+- Target Rust + Ratatui for the interactive TUI.
 - Do not port the Brainfile Ink TUI directly.
 - Do not assume a `done` column for progress.
 - Make review, accord status, logs, and validation prominent.
 - Support themes from the beginning.
 - Support mouse selection/scroll/click via a hit-map style event model.
 - Keep keyboard-first ergonomics with vim-style and conventional bindings.
+- Treat CLI implementation details, crate layout, and dependency choices as open until explicitly decided.
+- Evaluate live Brainfile CLI/TUI features for parity, then decide what to keep, rename, improve, or intentionally omit.
 
 ## Agent workflow
 

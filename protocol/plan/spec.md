@@ -4,9 +4,19 @@ Status: draft
 Date: 2026-06-26  
 Working name: Tandem
 
-This document sketches a new protocol inspired by Brainfile's best ideas, but intentionally not limited to Brainfile's current naming, lifecycle, implementation choices, or TUI assumptions.
+This document sketches the Tandem protocol: a Brainfile-inspired protocol that keeps the useful Brainfile shape, renames/adapts concepts for Tandem, and folds in local v3 improvements.
 
 The goal is a durable, file-based project coordination format that works well for humans, AI agents, CLI tools, and a first-class terminal UI.
+
+## Baseline inputs
+
+Tandem protocol work should reconcile these inputs:
+
+- Live Brainfile protocol v2: `.brainfile/brainfile.md`, `board/`, `logs/`, Markdown files with YAML frontmatter, rules, custom types, parent links, subtasks, contracts, logs, CLI/MCP operations.
+- Brainfile public references: `https://github.com/brainfile/protocol` and `https://brainfile.md/reference/protocol`.
+- Local Brainfile v3 proposal: `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`.
+
+The default stance is feature parity with Brainfile's basic protocol shape, with intentional Tandem improvements documented explicitly.
 
 ## Naming model
 
@@ -64,7 +74,7 @@ Tandem examples use the project-local directory and config file:
 
 ## What to keep from Brainfile
 
-Brainfile gets several important things right:
+Brainfile gets several important things right and is the design baseline:
 
 - File-based source of truth.
 - Markdown files with YAML frontmatter.
@@ -75,7 +85,7 @@ Brainfile gets several important things right:
 - Agent-oriented assignment/accord metadata.
 - CLI and MCP/tool friendliness.
 
-This protocol should preserve those ideas while changing the parts that feel underdeveloped or awkward in practice.
+This protocol should preserve those ideas while changing the parts that feel underdeveloped or awkward in practice. Changes from Brainfile should be deliberate and documented, but Tandem has no v0 Brainfile import/migration requirement.
 
 ## Key changes from Brainfile
 
@@ -149,7 +159,7 @@ Tools should discover a Tandem workspace in this order:
 
 1. `.tandem/tandem.md`
 2. `tandem.md` in the repository root, for simple/single-file compatibility
-3. legacy import paths, if supported by migration tooling
+3. no legacy Brainfile discovery paths in v0
 
 Discovery should stop at repository boundaries unless explicitly told to search parent directories.
 
@@ -236,7 +246,7 @@ tags: [tui, rust]
 assignee: pi
 parentId: epic_01j2parent
 relatedFiles:
-  - crates/tui/src/theme.rs
+  - src/tui/theme.rs
 blockedBy: []
 createdAt: 2026-06-26T12:00:00Z
 updatedAt: 2026-06-26T12:20:00Z
@@ -246,7 +256,7 @@ accord:
   claimedAt: 2026-06-26T12:05:00Z
   deliverables:
     - type: file
-      path: crates/tui/src/theme.rs
+      path: src/tui/theme.rs
       description: Theme parser and runtime palette mapping
       required: true
   validation:
@@ -380,8 +390,8 @@ completedAt: 2026-06-26T15:00:00Z
 completion:
   summary: Theme loading, built-in palettes, and runtime style mapping implemented.
   filesChanged:
-    - crates/tui/src/theme.rs
-    - crates/tui/src/app.rs
+    - src/tui/theme.rs
+    - src/tui/app.rs
   validation:
     status: passed
     commands:
@@ -498,24 +508,23 @@ tdm accord ready|claim|deliver|accept|rework|block
 tdm review request|accept|changes
 tdm rules list|add|edit|delete
 tdm tui
-tdm import brainfile
 tdm lint --fix
 ```
 
-## Brainfile import compatibility
+## Brainfile design mapping
 
-A migration/import command should be able to convert Brainfile v2 boards:
+Tandem uses Brainfile as a design reference, not as an import/migration requirement. No v0 `tdm import brainfile` or `tdm migrate brainfile` command is required.
+
+Useful conceptual mappings for design discussions:
 
 ```text
 .brainfile/brainfile.md → .tandem/tandem.md
 .brainfile/board/*.md  → .tandem/board/*.md
 .brainfile/logs/*.md   → .tandem/logs/*.md
-logs/ledger.jsonl      → events.jsonl, if compatible
 contract               → accord
 column                 → state
+ADR                    → decision
 ```
-
-The importer should preserve original files by default and write a migration report.
 
 ## Open questions
 

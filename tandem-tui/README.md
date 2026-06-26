@@ -1,13 +1,15 @@
-# Tandem TUI
+# Tandem CLI/TUI
 
-This directory contains planning and, later, implementation work for the Tandem terminal UI.
+This directory contains planning and, later, implementation work for the Tandem user-facing CLI and terminal UI.
 
-The intended implementation target is Rust + Ratatui.
+Current phase: planning/design. Decide the `tdm` CLI shape first, then design the Rust + Ratatui TUI on top of the same protocol concepts.
 
 ## Scope
 
-The TUI area owns:
+The CLI/TUI area owns:
 
+- `tdm` CLI command design and user experience
+- CLI output/error conventions and command workflow design
 - Ratatui app architecture
 - board/review/logs/rules/decisions views
 - responsive layouts
@@ -17,28 +19,28 @@ The TUI area owns:
 - review, accord, completion, and logs workflows as presented in the UI
 - eventual TUI tests and snapshots
 
-The TUI area does **not** own the underlying protocol semantics. Protocol rules and data-model decisions belong in `../protocol/`, though the TUI must represent them faithfully.
+The CLI/TUI area does **not** own the underlying protocol semantics. Protocol rules and data-model decisions belong in `../protocol/`, though the CLI and TUI must represent them faithfully.
 
 ## Current status
 
-Planning/specification mode. No Rust TUI crate exists yet.
+Planning/specification mode. No CLI or TUI implementation exists yet. Do not lock in crate layout or dependency choices until explicitly decided.
 
 ## Documentation
 
-- `plan/spec.md` — TUI draft
-- `plan/todo.md` — TUI task tracker
+- `plan/spec.md` — CLI/TUI draft
+- `plan/todo.md` — CLI/TUI task tracker
 - `../README.md` — parent project overview
 - `../plan/spec.md` — parent project plan
 - `../plan/todo.md` — parent project todo
 - `../protocol/README.md` — protocol area overview
-- `../protocol/plan/spec.md` — protocol draft the TUI must follow
+- `../protocol/plan/spec.md` — protocol draft the CLI/TUI must follow
 - `../AGENTS.md` — agent guidance and documentation sync rules
 
 ## Sync requirements
 
 This directory must stay aligned with the parent Tandem docs and the protocol docs.
 
-When TUI architecture, invocation, layout, workflow, or status terminology changes, update all affected docs in the same change:
+When CLI/TUI architecture, invocation, layout, workflow, or status terminology changes, update all affected docs in the same change:
 
 - `../README.md`
 - `../plan/spec.md`
@@ -54,11 +56,25 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 ## Key current decisions
 
 - Product/protocol name: **Tandem**
-- TUI directory: `tandem-tui/`
+- CLI/TUI directory: `tandem-tui/`
 - CLI binary: `tdm`
-- Likely invocation: `tdm tui` initially, with `tdm-tui` possible later.
+- CLI design comes before TUI design/implementation.
+- Likely TUI invocation: `tdm tui`, with `tdm-tui` possible later.
 - TUI implementation target: Rust + Ratatui.
+- Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.
 - Theme support is required from the beginning.
 - Mouse support should use a hit-map style model.
+
+
+## Locked v0 CLI/TUI decisions
+
+- v0 commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- `tdm log`: `list`, `show`, `search`.
+- `tdm rules`: `list`, `add`, `edit`, `delete`.
+- `tdm accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- Human-readable output by default; read commands should support `--json`.
+- First implementation language: Rust inside `tandem-tui/`.
+- First TUI MVP: board mutations immediately; Board, Review, Logs, Rules, Decisions views; theme and mouse support included.
+- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations.

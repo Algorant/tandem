@@ -22,13 +22,15 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 - [x] Drafted accord lifecycle.
 - [x] Drafted review model.
 - [x] Drafted completion/logs/event-ledger model.
-- [x] Drafted Brainfile import compatibility mapping.
+- [x] Captured Brainfile-inspired design mapping.
 - [x] Drafted CLI surface using `tdm`.
 - [x] Added `protocol/README.md` for protocol-area documentation.
 
 ## Current tasks
 
 - [ ] Keep `protocol/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent docs.
+- [ ] Audit live Brainfile protocol v2 against Tandem protocol draft and record keep/rename/improve/omit decisions without adding import requirements.
+- [ ] Fold in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` review/completion/log direction.
 - [ ] Tighten vocabulary around `state`, `review`, `completion`, and `accord`.
 - [ ] Decide default states: `todo/active/review` vs `backlog/todo/active/review`.
 - [ ] Decide whether completion requires accepted review by default.
@@ -44,24 +46,25 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 
 ## Next recommended steps
 
-1. Create example Tandem workspace fixtures.
-2. Write JSON Schema or Rust struct sketches for:
+1. Produce a Brainfile protocol parity matrix: keep, rename, improve, omit, open.
+2. Reconcile local v3 proposal into the Tandem protocol lifecycle.
+3. Create example Tandem workspace fixtures only after the protocol shape is stable enough.
+4. Write JSON Schema or Rust struct sketches later, only when implementation needs them, for:
    - workspace config
    - work document
    - accord
    - review
    - event records
-3. Define mutation semantics precisely:
+5. Define mutation semantics precisely:
    - add work
    - move state
    - update accord
    - request/accept review
    - complete/archive
    - reopen/restore
-4. Define minimal-diff file editing requirements.
-5. Draft Brainfile v2 importer behavior and migration report format.
-6. Update parent and TUI docs whenever protocol decisions affect them.
-7. Start `tandem-core` once the data model is stable enough.
+6. Define minimal-diff file editing requirements.
+7. Update parent and CLI/TUI docs whenever protocol decisions affect them.
+8. Decide implementation structure only when the data model is stable enough and the user approves.
 
 ## Acceptance criteria for protocol v0 draft
 
@@ -69,5 +72,5 @@ This todo tracks protocol-specific work. The current protocol draft lives in `pr
 - [ ] An agent can read rules, claim work through an accord, deliver evidence, and request review.
 - [ ] A tool can list active work without reading event history.
 - [ ] A tool can show rich completed history from logs/events.
-- [ ] Brainfile v2 boards can be imported with minimal data loss.
+- [ ] Brainfile-inspired design differences are documented clearly.
 - [ ] Unknown fields are preserved by compliant tooling.

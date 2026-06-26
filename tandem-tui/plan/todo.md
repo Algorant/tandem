@@ -1,13 +1,13 @@
-# Tandem TUI Todo
+# Tandem CLI/TUI Todo
 
 Status: active planning  
 Last updated: 2026-06-26
 
-This todo tracks TUI-specific work. The current TUI draft lives in `tandem-tui/plan/spec.md`.
+This todo tracks CLI/TUI-specific work. The current CLI/TUI draft lives in `tandem-tui/plan/spec.md`.
 
 ## Accomplished
 
-- [x] Chose implementation direction: Rust + Ratatui.
+- [x] Chose TUI implementation target: Rust + Ratatui.
 - [x] Captured current Brainfile TUI issues to avoid:
   - fake progress tied to a `done` column
   - hardcoded theming
@@ -30,12 +30,14 @@ This todo tracks TUI-specific work. The current TUI draft lives in `tandem-tui/p
 - [x] Drafted keyboard model and command palette ideas.
 - [x] Drafted review, completion, logs, and accord UX.
 - [x] Drafted MVP phases.
-- [x] Added `tandem-tui/README.md` for TUI-area documentation.
+- [x] Added `tandem-tui/README.md` for CLI/TUI-area documentation.
 
 ## Current tasks
 
 - [ ] Keep `tandem-tui/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and protocol docs.
-- [ ] Decide final crate/package layout for the TUI.
+- [ ] Audit live Brainfile CLI/TUI features and classify each as keep, rename, improve, omit, or open.
+- [ ] Decide the `tdm` CLI command surface before TUI implementation planning.
+- [ ] Decide final crate/package layout for the CLI/TUI only when implementation begins.
 - [ ] Decide whether the TUI lives as:
   - `tdm tui`
   - `tdm-tui`
@@ -50,14 +52,14 @@ This todo tracks TUI-specific work. The current TUI draft lives in `tandem-tui/p
 
 ## Next recommended steps
 
-1. Create static mock fixtures from the protocol examples.
-2. Build a read-only Ratatui board using test data.
-3. Add layout breakpoint tests with `ratatui::backend::TestBackend`.
-4. Implement theme structs and built-in themes.
-5. Implement keyboard action mapping.
-6. Implement mouse hit-map selection and scroll.
-7. Wire to `tandem-core` once protocol parsing exists.
-8. Update parent and protocol docs whenever TUI decisions affect naming, invocation, or protocol-facing workflow.
+1. Produce a Brainfile CLI/TUI feature parity matrix.
+2. Draft the `tdm` CLI command model from that matrix and Tandem protocol vocabulary.
+3. Decide TUI UX flows after CLI behavior is clear.
+4. Create static mock data from protocol examples once available.
+5. Build a read-only Ratatui board using test data.
+6. Add layout breakpoint tests if/when implementation starts.
+7. Implement theme, keyboard, and mouse models after TUI design is accepted.
+8. Update parent and protocol docs whenever CLI/TUI decisions affect naming, invocation, or protocol-facing workflow.
 9. Add mutation flows:
    - move state
    - update accord
