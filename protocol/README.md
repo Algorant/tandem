@@ -23,7 +23,7 @@ The protocol area does **not** own TUI rendering details. TUI design belongs in 
 
 ## Current status
 
-Planning/specification mode. No protocol crate, schemas, or fixtures exist yet, and schemas/fixtures are not part of v0. Do not add implementation structure here unless explicitly delegated.
+Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or fixtures exist, and schemas/fixtures are not part of v0. Implementation begins in `../tandem-tui/`; protocol docs should change only for implementation feedback, bug fixes, or explicit product decisions.
 
 ## Documentation
 

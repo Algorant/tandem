@@ -1,6 +1,6 @@
 # Tandem Protocol Todo
 
-Status: active planning  
+Status: v0 draft accepted for implementation
 Last updated: 2026-06-26
 
 This todo tracks protocol-specific tasks. The current protocol draft lives in `protocol/plan/spec.md`.
@@ -48,26 +48,26 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Added validation diagnostics with error/warning categories and examples.
 - [x] Defined completed-log document expectations.
 - [x] Defined mutation semantics for adding tasks/decisions, moving state, updating accords, review decisions, complete/archive, and post-v0 restore/reopen boundaries.
+- [x] Accepted protocol v0 draft for implementation.
 
 ## Current tasks
 
 - [ ] Keep `protocol/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent docs.
-- [ ] Define minimal-diff file editing requirements for compliant tools after the CLI/TUI tooling-side write behavior settles.
 - [ ] Tighten examples if implementation discovers ambiguous field behavior.
 - [ ] Coordinate any protocol-facing CLI wording changes with `../tandem-tui/` docs through the orchestrator.
 
 ## Next recommended steps
 
-1. Review the protocol-facing CLI surface against the CLI/TUI worker before implementation starts.
-2. Specify minimal-diff write behavior for frontmatter and Markdown body preservation after parallel CLI/TUI work lands.
-3. Keep schemas, fixtures, and implementation layout out of v0 unless explicitly approved.
+1. Implement the first `tdm` CLI slice in `../tandem-tui/`: `init`, `list`, and `show`.
+2. Tighten protocol examples only when implementation discovers ambiguous behavior.
+3. Keep schemas, fixtures, and protocol implementation layout out of v0 unless explicitly approved.
 
 ## Acceptance criteria for protocol v0 draft
 
-- [ ] A human can create/edit valid Tandem files by hand.
-- [ ] An agent can read rules, claim work through an accord, deliver evidence, and request review.
-- [ ] A tool can list active tasks without reading event history.
-- [ ] A tool can browse first-class decision documents.
-- [ ] A tool can show rich completed history from archived Markdown logs plus event timelines.
-- [ ] Brainfile-inspired design differences are documented clearly without creating a conversion requirement.
-- [ ] Unknown fields are preserved by compliant tooling.
+- [x] A human can create/edit valid Tandem files by hand.
+- [x] An agent can read rules, claim work through an accord, deliver evidence, and request review.
+- [x] A tool can list active tasks without reading event history.
+- [x] A tool can browse first-class decision documents.
+- [x] A tool can show rich completed history from archived Markdown logs plus event timelines.
+- [x] Brainfile-inspired design differences are documented clearly without creating a conversion requirement.
+- [x] Unknown fields are preserved by compliant tooling.

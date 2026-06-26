@@ -1,12 +1,14 @@
 # Tandem Protocol Spec Draft
 
-Status: draft  
+Status: v0 draft accepted for implementation
 Date: 2026-06-26  
 Working name: Tandem
 
 This document sketches the Tandem protocol: a Brainfile-inspired file format that keeps Brainfile's useful shape, adapts the language for Tandem, and folds in local v3 improvements around review, complete/archive, and first-class logs.
 
 The protocol is the spec/source of truth for Tandem's local-first project coordination files. It is not an implementation package or crate layout.
+
+Acceptance stamp: the v0 draft is complete enough to implement `tdm init`, `tdm list`, `tdm show`, and subsequent v0 mutations. Future protocol edits should come from implementation feedback or explicit product decisions, not abstract planning churn.
 
 ## Baseline inputs
 
