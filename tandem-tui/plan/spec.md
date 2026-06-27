@@ -711,6 +711,8 @@ tdm tui
   - keeps Board keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - shows Review, Logs, Rules, and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
+  - loads the built-in `default-dark` semantic palette, applies it to Board headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - applies a workspace theme override from `.tandem/theme.toml` using the documented simple TOML-style color keys; invalid or unknown keys become status-line warnings while the default palette remains active.
   - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
@@ -957,16 +959,18 @@ Suggested built-ins:
 
 ### Theme file
 
-V0 theme files use TOML. Loading order is built-in defaults, user theme files, then workspace theme override.
+V0 theme files use TOML. The intended full loading order remains built-in defaults, user theme files, then workspace theme override.
 
 Config paths:
 
 ```text
-~/.config/tandem/themes/*.toml
-.tandem/theme.toml
+~/.config/tandem/themes/*.toml   # planned user theme discovery
+.tandem/theme.toml               # implemented workspace override
 ```
 
-Example:
+Current implementation starts from the built-in `default-dark` palette and applies `.tandem/theme.toml` if present. The parser intentionally accepts only simple TOML-style `key = "color"` entries plus section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys and invalid colors are reported as non-fatal TUI status warnings.
+
+Implemented keys:
 
 ```toml
 name = "rose-pine-custom"
@@ -982,12 +986,14 @@ warning = "#f6c177"
 error = "#eb6f92"
 border = "#403d52"
 selected_bg = "#26233a"
+selected_fg = "#e0def4"
 
 [priority]
 critical = "#eb6f92"
 high = "#f6c177"
 medium = "#31748f"
 low = "#6e6a86"
+none = "#6e6a86"
 
 [badges.accord]
 ready = "#f6c177"
@@ -995,8 +1001,21 @@ claimed = "#31748f"
 delivered = "#c4a7e7"
 accepted = "#9ccfd8"
 rework = "#ebbcba"
+failed = "#eb6f92"
 blocked = "#eb6f92"
+unknown = "#6e6a86"
+
+[badges.review]
+not-ready = "#6e6a86"
+pending = "#f6c177"
+accepted = "#9ccfd8"
+changes-requested = "#ebbcba"
+rejected = "#eb6f92"
+failed = "#eb6f92"
+unknown = "#6e6a86"
 ```
+
+`NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback. User theme discovery and named built-ins beyond `default-dark` remain planned.
 
 ### Theme requirements
 
@@ -1274,7 +1293,7 @@ Need to choose later:
 - Whether to keep manual CLI parsing or approve a CLI parser crate after v0 command behavior stabilizes.
 
 - Serialization/frontmatter/event parsing strategy.
-- Theme parser/config behavior for TOML theme files at `~/.config/tandem/themes/*.toml` and `.tandem/theme.toml`.
+- Whether to keep the current no-dependency workspace theme parser or later approve a fuller TOML parser for user theme discovery at `~/.config/tandem/themes/*.toml`.
 - File watching strategy for the first TUI MVP.
 - ID/timestamp helper strategy, if helpers are needed.
 - Whether to keep the direct crossterm event loop or introduce a thin internal event abstraction as the TUI grows.
@@ -1479,7 +1498,7 @@ Manual smoke:
 
 - Launch through `tdm tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review/Logs/Rules/Decisions currently have read-only placeholders/counts.
-- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, and move-state mutation via `H`/`L`.
+- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, and workspace `.tandem/theme.toml` color overrides.
 - Render full Review, Logs, Rules, and Decisions workflows on top of the existing view shell.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.

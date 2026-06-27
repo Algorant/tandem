@@ -105,6 +105,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 - [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; read-only placeholder/count views for non-Board areas while preserving Board quick-add and move flows.
+- [x] Implemented the first TUI theme foundation without new dependencies:
+  - built-in `default-dark` semantic palette
+  - workspace `.tandem/theme.toml` overrides for `[colors]`, `[priority]`, `[badges.accord]`, and `[badges.review]`
+  - status-line warnings for unknown keys or invalid colors
+  - `NO_COLOR`/`TANDEM_NO_COLOR` terminal fallback
+  - Board styling for headers, tabs, borders, selection, priority, accord, review, details, and status lines
 
 ## Current tasks
 
@@ -117,10 +123,11 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implement `tdm accord ready|claim|deliver|accept|rework|block|fail`.
 - [x] Implement `tdm rules add|edit|delete`.
 - [x] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
-- [ ] Define accord badge/status visual language.
+- [x] Define accord badge/status visual language for the current Board shell.
 - [x] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
 - [x] Decide initial Ratatui event loop approach.
-- [ ] Define exact TOML theme keys for user themes and workspace override.
+- [x] Define exact TOML theme keys for workspace override in the current theme foundation.
+- [ ] Add full user theme discovery from `~/.config/tandem/themes/*.toml`.
 - [ ] Define final fixed keyboard default table for v0.
 - [ ] Define styled-basic Markdown rendering details.
 
@@ -128,7 +135,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 1. Implement full Review/Logs/Rules/Decisions workflows on the existing top-level view shell.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
-3. Draft final theme, mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
+3. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 4. Keep parent and area docs synchronized as TUI implementation continues.
 5. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
@@ -143,7 +150,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [ ] Run accord actions from detail/review flows.
 - [ ] Add/edit/delete rules.
 - [ ] Show and search logs.
-- [ ] Load and apply themes.
+- [x] Load and apply built-in plus workspace override themes.
 - [ ] Support mouse selection, scrolling, tab switching, and action buttons by default (tab switching is implemented; action buttons remain).
 - [ ] Confirm drag/drop is absent from v0 interactions.
 - [ ] Watch/reload file changes.
@@ -155,7 +162,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [ ] Makes the simple filtered Review queue obvious.
 - [x] Makes accord state obvious at a basic status-badge level.
 - [x] Supports board mutations immediately.
-- [ ] Supports themes.
+- [x] Supports built-in plus workspace override themes.
 - [ ] Supports mouse selection and scroll.
 - [ ] Handles external file edits without crashing.
 - [ ] Keeps logs useful, searchable, and inspectable.
