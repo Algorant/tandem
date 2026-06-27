@@ -104,11 +104,15 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
-- [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; read-only placeholder/count views for non-Board areas while preserving Board quick-add and move flows.
+- [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows.
 - [x] Implemented a real read-only Review queue view:
   - filters active items needing attention: delivered accords, pending/in-review items, changes-requested/rejected/failed reviews, blocked/failed/rework accords, accepted active accords, validation failures, and blockers
   - sorts priority first, then most recently delivered/updated
   - renders selectable queue rows plus inspection detail with reason badges/lines, accord/review/state/priority metadata, blockers, delivered evidence/files, and CLI action hints
+- [x] Implemented useful Rules and Decisions TUI views:
+  - Rules lists `always`/`never`/`prefer`/`context` groups with selection plus add/edit/delete prompts.
+  - Decisions lists active decision docs, shows selected metadata/body/path, and adds basic title/body decisions.
+- [x] Split Rules and Decisions TUI view code into dedicated `src/tui/rules.rs` and `src/tui/decisions.rs` modules.
 - [x] Implemented the first TUI theme foundation without new dependencies:
   - built-in `default-dark` semantic palette
   - workspace `.tandem/theme.toml` overrides for `[colors]`, `[priority]`, `[badges.accord]`, and `[badges.review]`
@@ -142,11 +146,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Next recommended steps
 
-1. Implement full Rules/Decisions workflows on the existing top-level view shell, and later add safe Review action buttons/mutations on top of the current read-only queue.
+1. Add safe Review action buttons/mutations on top of the current read-only queue, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
-3. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
-4. Keep parent and area docs synchronized as TUI implementation continues.
-5. Change existing CLI behavior only for explicit new feature requests or bug fixes.
+3. Extend Decisions with references/tags prompts only if the TUI needs full CLI option parity beyond the basic title/body flow.
+4. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
+5. Keep parent and area docs synchronized as TUI implementation continues.
+6. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
 ## First TUI MVP checklist
 
@@ -158,7 +163,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [ ] Edit items from the TUI.
 - [ ] Complete items to logs.
 - [ ] Run accord actions from detail/review flows.
-- [ ] Add/edit/delete rules.
+- [x] Add/edit/delete rules.
+- [x] Browse active decisions and add basic title/body decisions.
 - [x] Show and search logs.
 - [x] Load and apply built-in plus workspace override themes.
 - [ ] Support mouse selection, scrolling, tab switching, and action buttons by default (tab switching is implemented; action buttons remain).

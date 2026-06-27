@@ -21,10 +21,14 @@ use ratatui::{
 
 use super::*;
 
+mod decisions;
 mod logs;
 mod review;
+mod rules;
 mod theme;
 
+use decisions::DecisionsState;
+use rules::RulesState;
 use theme::{StatusTone, TuiTheme};
 
 pub(crate) fn run_tui() -> Result<(), CliError> {
@@ -201,6 +205,8 @@ struct TuiApp {
     status: String,
     show_help: bool,
     quick_add: Option<QuickAddInput>,
+    rules_view: RulesState,
+    decisions_view: DecisionsState,
     hits: Vec<HitRegion>,
 }
 
@@ -233,6 +239,8 @@ impl TuiApp {
             status: String::new(),
             show_help: false,
             quick_add: None,
+            rules_view: RulesState::default(),
+            decisions_view: DecisionsState::default(),
             hits: Vec::new(),
         };
         app.reload()?;
@@ -271,6 +279,8 @@ impl TuiApp {
         self.theme_source = theme_load.source;
         self.theme_warnings = theme_load.warnings;
         self.clamp_selection();
+        self.clamp_rules_state();
+        self.clamp_decisions_state();
         let theme_note = if self.theme_warnings.is_empty() {
             format!("theme {}", self.theme.source_label(&self.theme_source))
         } else {
@@ -342,6 +352,16 @@ impl TuiApp {
             return Ok(false);
         }
 
+        if self.rules_prompt_active() {
+            self.handle_rules_prompt_key(key);
+            return Ok(false);
+        }
+
+        if self.decision_prompt_active() {
+            self.handle_decision_prompt_key(key);
+            return Ok(false);
+        }
+
         if self.show_help {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -365,8 +385,12 @@ impl TuiApp {
                 Err(error) => self.status = format!("Reload failed: {}", error.message),
             },
             KeyCode::Char('a') if self.view == TuiView::Board => self.start_quick_add(),
+            KeyCode::Char('a') if self.view == TuiView::Rules => self.start_rule_add_prompt(),
+            KeyCode::Char('a') if self.view == TuiView::Decisions => {
+                self.start_decision_add_prompt()
+            }
             KeyCode::Char('a') => {
-                self.status = "Quick add is available in Board view; press 1 for Board.".to_string()
+                self.status = "Add is available in Board, Rules, and Decisions views.".to_string()
             }
             KeyCode::Char('H') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(-1)
@@ -389,12 +413,6 @@ impl TuiApp {
             KeyCode::Enter if self.view == TuiView::Logs => self.toggle_focus(),
             KeyCode::Tab => self.next_view(),
             KeyCode::BackTab => self.previous_view(),
-            KeyCode::Enter => {
-                self.status = format!(
-                    "{} view is read-only in this slice; press 1 for Board actions.",
-                    self.view.label()
-                )
-            }
             KeyCode::Esc => match self.view {
                 TuiView::Board | TuiView::Review if self.focus == FocusPane::Detail => {
                     self.focus = FocusPane::Board
@@ -412,7 +430,8 @@ impl TuiApp {
                     FocusPane::Detail => self.handle_review_detail_key(key),
                 },
                 TuiView::Logs => self.handle_logs_key(key),
-                _ => self.handle_placeholder_key(key),
+                TuiView::Rules => self.handle_rules_key(key),
+                TuiView::Decisions => self.handle_decisions_key(key),
             },
         }
         Ok(false)
@@ -428,6 +447,12 @@ impl TuiApp {
         }
         if view == TuiView::Logs {
             self.clamp_selection();
+        }
+        if view == TuiView::Rules {
+            self.clamp_rules_state();
+        }
+        if view == TuiView::Decisions {
+            self.clamp_decisions_state();
         }
         self.status = match view {
             TuiView::Board => {
@@ -446,12 +471,12 @@ impl TuiApp {
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
-                "Rules view active (read-only placeholder): {} project rule{} loaded.",
+                "Rules view active: {} project rule{} loaded. Use j/k select, h/l category, a/e/d add/edit/delete.",
                 self.rules_total(),
                 if self.rules_total() == 1 { "" } else { "s" }
             ),
             TuiView::Decisions => format!(
-                "Decisions view active (read-only placeholder): {} decision{} loaded.",
+                "Decisions view active: {} decision{} loaded. Use j/k select, a add, PgUp/PgDn scroll body.",
                 self.decision_docs().len(),
                 if self.decision_docs().len() == 1 {
                     ""
@@ -601,14 +626,6 @@ impl TuiApp {
                 }
                 self.refresh_log_search_status();
             }
-            _ => {}
-        }
-    }
-
-    fn handle_placeholder_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
             _ => {}
         }
     }
@@ -840,7 +857,12 @@ impl TuiApp {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
-        if self.quick_add.is_some() || self.log_search_input.is_some() || self.show_help {
+        if self.quick_add.is_some()
+            || self.log_search_input.is_some()
+            || self.rules_prompt_active()
+            || self.decision_prompt_active()
+            || self.show_help
+        {
             return;
         }
 
@@ -924,6 +946,16 @@ impl TuiApp {
                 FocusPane::Board => self.previous_log(),
                 FocusPane::Detail => self.scroll_log_detail_up(3),
             },
+            MouseEventKind::ScrollDown if self.view == TuiView::Rules => self.next_rule_selection(),
+            MouseEventKind::ScrollUp if self.view == TuiView::Rules => {
+                self.previous_rule_selection()
+            }
+            MouseEventKind::ScrollDown if self.view == TuiView::Decisions => {
+                self.next_decision_selection()
+            }
+            MouseEventKind::ScrollUp if self.view == TuiView::Decisions => {
+                self.previous_decision_selection()
+            }
             _ => {}
         }
     }
@@ -1245,11 +1277,23 @@ impl TuiApp {
                 self.draw_review(frame, view_area);
             } else if self.view == TuiView::Logs {
                 self.draw_logs(frame, view_area);
+            } else if self.view == TuiView::Rules {
+                self.draw_rules_view(frame, view_area);
+            } else if self.view == TuiView::Decisions {
+                self.draw_decisions_view(frame, view_area);
             } else {
                 self.draw_placeholder_view(frame, view_area);
             }
         }
         self.draw_footer(frame, chunks[4]);
+
+        if self.rules_prompt_active() {
+            self.draw_rules_prompt(frame, area);
+        }
+
+        if self.decision_prompt_active() {
+            self.draw_decision_prompt(frame, area);
+        }
 
         if self.show_help {
             self.draw_help(frame, area);
@@ -1317,10 +1361,8 @@ impl TuiApp {
                     })
                     .unwrap_or_else(|| format!("no completed log selected{filter}"))
             }
-            TuiView::Rules => "read-only rules placeholder; add/edit/delete come later".to_string(),
-            TuiView::Decisions => {
-                "read-only decisions placeholder; browsing/actions come later".to_string()
-            }
+            TuiView::Rules => self.rules_context(),
+            TuiView::Decisions => self.decisions_context(),
         };
         let header = Paragraph::new(vec![
             Line::from(vec![
@@ -1561,8 +1603,8 @@ impl TuiApp {
             TuiView::Board => (" Board ".to_string(), Vec::new()),
             TuiView::Review => self.review_placeholder_lines(),
             TuiView::Logs => self.logs_placeholder_lines(),
-            TuiView::Rules => self.rules_placeholder_lines(),
-            TuiView::Decisions => self.decisions_placeholder_lines(),
+            TuiView::Rules => (" Rules ".to_string(), Vec::new()),
+            TuiView::Decisions => (" Decisions ".to_string(), Vec::new()),
         };
         let paragraph = Paragraph::new(lines)
             .block(
@@ -1631,102 +1673,6 @@ impl TuiApp {
             Style::default().fg(Color::DarkGray),
         )));
         (" Logs ".to_string(), lines)
-    }
-
-    fn rules_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
-        let mut lines = vec![
-            Line::from(Span::styled(
-                "Rules placeholder",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(format!(
-                "{} project rule{} loaded from {}.",
-                self.rules_total(),
-                if self.rules_total() == 1 { "" } else { "s" },
-                display_path(&self.workspace.config_path)
-            )),
-            Line::from(""),
-        ];
-        append_load_error_lines(&mut lines, &self.load_errors);
-        for category in ["always", "never", "prefer", "context"] {
-            let items = self.rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
-            lines.push(Line::from(vec![
-                Span::styled(format!("{category}: "), self.theme.label_style()),
-                Span::raw(format!(
-                    "{} rule{}",
-                    items.len(),
-                    if items.len() == 1 { "" } else { "s" }
-                )),
-            ]));
-            for rule in items.iter().take(3) {
-                let source = rule
-                    .source
-                    .as_ref()
-                    .map(|source| format!(" ({source})"))
-                    .unwrap_or_default();
-                lines.push(Line::from(format!(
-                    "  #{} {}{}",
-                    rule.id,
-                    truncate(&rule.rule, 72),
-                    source
-                )));
-            }
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Read-only in task-4; future work can wire add/edit/delete actions here.",
-            Style::default().fg(Color::DarkGray),
-        )));
-        (" Rules ".to_string(), lines)
-    }
-
-    fn decisions_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
-        let decisions = self.decision_docs();
-        let mut lines = vec![
-            Line::from(Span::styled(
-                "Decisions placeholder",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(format!(
-                "{} active decision document{} loaded.",
-                decisions.len(),
-                if decisions.len() == 1 { "" } else { "s" }
-            )),
-            Line::from(
-                "Decision documents stay first-class and do not need a lifecycle state in v0.",
-            ),
-            Line::from(""),
-        ];
-        append_load_error_lines(&mut lines, &self.load_errors);
-        if decisions.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "No decision documents found on the active board.",
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "Decision documents:",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            for doc in decisions.into_iter().take(10) {
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
-                    Span::styled(truncate(doc.title(), 64), Style::default().fg(Color::White)),
-                ]));
-            }
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Read-only in task-4; future work can add decision browsing and actions here.",
-            Style::default().fg(Color::DarkGray),
-        )));
-        (" Decisions ".to_string(), lines)
     }
 
     fn draw_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -1868,6 +1814,10 @@ impl TuiApp {
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
             )
+        } else if let Some(status) = self.rules_prompt_status() {
+            (status, self.theme.status_style(StatusTone::Warning))
+        } else if let Some(status) = self.decision_prompt_status() {
+            (status, self.theme.status_style(StatusTone::Warning))
         } else if self.view == TuiView::Board {
             let focus = match self.focus {
                 FocusPane::Board => "board",
@@ -1909,6 +1859,18 @@ impl TuiApp {
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
             )
+        } else if self.view == TuiView::Rules {
+            (
+                self.rules_footer_text(),
+                self.theme
+                    .status_style(status_tone_for_message(&self.status)),
+            )
+        } else if self.view == TuiView::Decisions {
+            (
+                self.decisions_footer_text(),
+                self.theme
+                    .status_style(status_tone_for_message(&self.status)),
+            )
         } else {
             (
                 format!(
@@ -1936,21 +1898,23 @@ impl TuiApp {
             Line::from("r                 Reload board/log/rule data"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / enter       Toggle list/detail focus in Board and Review"),
-            Line::from("tab / shift-tab   Next/previous view outside Board/Review"),
-            Line::from("a                 Board quick-add task in selected/default state"),
-            Line::from("h/l or ←/→        Board: move between states; Review/Logs/placeholders: switch views"),
+            Line::from("tab / enter       Toggle list/detail focus in Board, Review, and Logs"),
+            Line::from("tab / shift-tab   Next/previous view outside Board/Review/Logs"),
+            Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
+            Line::from("h/l or ←/→        Board: move states; Review/Logs: switch views; Rules: switch category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
-            Line::from("j/k or ↑/↓        Board/Review/Logs: move items, or scroll detail when focused"),
-            Line::from("g/G               Board/Review/Logs: first/last item or detail line"),
+            Line::from("j/k or ↑/↓        Board/Review/Logs/Rules/Decisions: move items, or scroll detail when focused"),
+            Line::from("g/G               First/last item in the active list/detail"),
+            Line::from("e / d             Rules: edit selected rule / delete with confirmation"),
+            Line::from("PgUp/PgDn         Logs/Decisions: scroll selected detail/body"),
             Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
-            Line::from("Esc               Logs: clear search filter; Quick add/search prompts: cancel"),
-            Line::from("mouse wheel       Board/Review/Logs: move selection or scroll detail"),
+            Line::from("Esc               Logs: clear search filter; prompts: cancel"),
+            Line::from("mouse wheel       Board/Review/Logs/Rules/Decisions: move selection or scroll detail"),
             Line::from("click list/detail Board/Review/Logs: select/focus panes"),
-            Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
+            Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("This slice keeps Board quick-add/H/L moves, adds a real read-only Review queue with inspection hints, and adds a first-class Logs browser with recency list, detail pane, search/filter, and event context. Built-in defaults and .tandem/theme.toml workspace overrides are active; Rules/Decisions workflows, user theme discovery, and richer action buttons remain planned."),
+            Line::from("Board quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in defaults and .tandem/theme.toml workspace overrides are active; user theme discovery and richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -2325,7 +2289,13 @@ fn status_tone_for_message(message: &str) -> StatusTone {
         StatusTone::Error
     } else if lower.contains("warning") || lower.contains("canceled") || lower.contains("needs") {
         StatusTone::Warning
-    } else if lower.contains("created") || lower.contains("moved") || lower.contains("loaded") {
+    } else if lower.contains("created")
+        || lower.contains("moved")
+        || lower.contains("loaded")
+        || lower.contains("added")
+        || lower.contains("edited")
+        || lower.contains("deleted")
+    {
         StatusTone::Success
     } else if lower.contains("active") {
         StatusTone::Accent
