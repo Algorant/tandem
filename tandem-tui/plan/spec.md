@@ -706,10 +706,12 @@ tdm tui
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
-  - renders a Board-first shell from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
-  - supports keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
+  - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` and mouse tab clicks switch views.
+  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
+  - keeps Board keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
-  - enables crossterm mouse capture for basic column/detail clicks and wheel navigation; drag/drop remains absent.
+  - shows Review, Logs, Rules, and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
+  - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
   - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
@@ -731,7 +733,7 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render the Board view from active documents, support navigation/details/reload/quit, and now include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Additional mutations plus the other top-level views remain for subsequent slices.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review/Logs/Rules/Decisions currently start as read-only placeholders/counts; full workflows remain for subsequent slices.
 
 The full first TUI MVP should include:
 
@@ -1056,7 +1058,7 @@ Global:
 | `:` | command palette / command line |
 | `/` | search current view |
 | `r` | reload |
-| `1..6` | switch major view |
+| `1..5` | switch major view: Board, Review, Logs, Rules, Decisions |
 | `tab` / `shift-tab` | next/previous section |
 | `esc` | close modal/clear filter |
 
@@ -1476,8 +1478,9 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tdm tui`.
-- Started with a Ratatui/crossterm Board shell that renders active board documents, navigation, details, reload, help, safe quit, quick-add via `a`, and move-state mutation via `H`/`L`.
-- Render Board, Review, Logs, Rules, and Decisions views.
+- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review/Logs/Rules/Decisions currently have read-only placeholders/counts.
+- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, and move-state mutation via `H`/`L`.
+- Render full Review, Logs, Rules, and Decisions workflows on top of the existing view shell.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.
 - Include mouse selection, scrolling, tab switching, and action-button clicks enabled by default.

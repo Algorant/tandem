@@ -104,6 +104,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
+- [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; read-only placeholder/count views for non-Board areas while preserving Board quick-add and move flows.
 
 ## Current tasks
 
@@ -125,15 +126,15 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Next recommended steps
 
-1. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
-2. Add real Review/Logs/Rules/Decisions views on the same app shell.
+1. Implement full Review/Logs/Rules/Decisions workflows on the existing top-level view shell.
+2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Draft final theme, mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 4. Keep parent and area docs synchronized as TUI implementation continues.
 5. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
 ## First TUI MVP checklist
 
-- [ ] Render Board, Review, Logs, Rules, and Decisions views.
+- [x] Render Board, Review, Logs, Rules, and Decisions views at shell/placeholder level.
 - [x] Navigate states/items and view details.
 - [x] Add items from the Board view.
 - [x] Move items between states.
@@ -143,7 +144,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [ ] Add/edit/delete rules.
 - [ ] Show and search logs.
 - [ ] Load and apply themes.
-- [ ] Support mouse selection, scrolling, tab switching, and action buttons by default.
+- [ ] Support mouse selection, scrolling, tab switching, and action buttons by default (tab switching is implemented; action buttons remain).
 - [ ] Confirm drag/drop is absent from v0 interactions.
 - [ ] Watch/reload file changes.
 - [ ] Surface parse and write errors safely.
