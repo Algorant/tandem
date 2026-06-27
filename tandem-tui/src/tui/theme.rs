@@ -124,6 +124,60 @@ impl TuiTheme {
         }
     }
 
+    pub(super) fn verdigris() -> Self {
+        Self {
+            name: "verdigris".to_string(),
+            colors: ThemeColors {
+                background: Color::Rgb(29, 32, 33),
+                panel: Color::Rgb(34, 37, 38),
+                text: Color::Rgb(235, 219, 178),
+                muted: Color::Rgb(146, 131, 116),
+                accent: Color::Rgb(142, 192, 124),
+                success: Color::Rgb(142, 192, 124),
+                warning: Color::Rgb(230, 191, 134),
+                error: Color::Rgb(227, 111, 99),
+                border: Color::Rgb(102, 92, 84),
+                selected_bg: Color::Rgb(39, 42, 43),
+                selected_fg: Color::Rgb(251, 241, 199),
+            },
+            priority: PriorityPalette {
+                critical: Color::Rgb(227, 111, 99),
+                high: Color::Rgb(230, 191, 134),
+                medium: Color::Rgb(131, 165, 152),
+                low: Color::Rgb(112, 118, 74),
+                none: Color::Rgb(146, 131, 116),
+            },
+            accord: AccordPalette {
+                ready: Color::Rgb(230, 191, 134),
+                claimed: Color::Rgb(131, 165, 152),
+                delivered: Color::Rgb(142, 192, 124),
+                accepted: Color::Rgb(104, 157, 106),
+                rework: Color::Rgb(230, 191, 134),
+                failed: Color::Rgb(227, 111, 99),
+                blocked: Color::Rgb(227, 111, 99),
+                unknown: Color::Rgb(146, 131, 116),
+            },
+            review: ReviewPalette {
+                not_ready: Color::Rgb(112, 118, 74),
+                pending: Color::Rgb(230, 191, 134),
+                accepted: Color::Rgb(142, 192, 124),
+                changes_requested: Color::Rgb(230, 191, 134),
+                rejected: Color::Rgb(227, 111, 99),
+                failed: Color::Rgb(227, 111, 99),
+                unknown: Color::Rgb(146, 131, 116),
+            },
+            no_color: false,
+        }
+    }
+
+    fn built_in(name: &str) -> Option<Self> {
+        match normalized(name).as_str() {
+            "default-dark" => Some(Self::default_dark()),
+            "verdigris" => Some(Self::verdigris()),
+            _ => None,
+        }
+    }
+
     pub(super) fn load_for_workspace(workspace: &Workspace) -> ThemeLoad {
         let no_color =
             env::var_os("NO_COLOR").is_some() || env::var_os("TANDEM_NO_COLOR").is_some();
@@ -132,12 +186,11 @@ impl TuiTheme {
         } else {
             Self::default_dark()
         };
-        let built_in_source = if no_color {
+        let mut source = if no_color {
             "built-in terminal/no-color".to_string()
         } else {
             format!("built-in {}", theme.name)
         };
-        let mut source = built_in_source.clone();
         let mut warnings = Vec::new();
         let workspace_theme = workspace.config_path.with_file_name("theme.toml");
 
@@ -145,13 +198,30 @@ impl TuiTheme {
             match fs::read_to_string(&workspace_theme) {
                 Ok(content) => {
                     if no_color {
-                        if let Some(name) = parse_theme_name(&content) {
+                        if let Some(name) =
+                            parse_theme_base(&content).or_else(|| parse_theme_name(&content))
+                        {
                             theme.name = format!("{name} (no-color)");
                         }
                     } else {
+                        if let Some(base) = parse_theme_base(&content) {
+                            match Self::built_in(&base) {
+                                Some(base_theme) => theme = base_theme,
+                                None => warnings.push(format!(
+                                    "Theme warning: unknown built-in theme `{base}`; using default-dark"
+                                )),
+                            }
+                        }
+                        let built_in_source = format!("built-in {}", theme.name);
                         warnings.extend(theme.apply_theme_content(&content));
+                        source = format!("{built_in_source} + {}", display_path(&workspace_theme));
                     }
-                    source = format!("{built_in_source} + {}", display_path(&workspace_theme));
+                    if no_color {
+                        source = format!(
+                            "built-in terminal/no-color + {}",
+                            display_path(&workspace_theme)
+                        );
+                    }
                 }
                 Err(error) => warnings.push(format!(
                     "Theme warning: could not read {}: {error}",
@@ -415,17 +485,18 @@ impl TuiTheme {
             }
             let value = parse_value(raw_value);
 
-            if section.is_empty() && key == "name" {
-                if !value.trim().is_empty() {
-                    self.name = value;
-                }
-                continue;
-            }
-
             if section.is_empty() {
-                warnings.push(format!(
-                    "Theme warning line {line_number}: unknown root key `{key}`"
-                ));
+                match key.as_str() {
+                    "name" => {
+                        if !value.trim().is_empty() {
+                            self.name = value;
+                        }
+                    }
+                    "base" | "builtin" | "extends" => {}
+                    _ => warnings.push(format!(
+                        "Theme warning line {line_number}: unknown root key `{key}`"
+                    )),
+                }
                 continue;
             }
 
@@ -493,7 +564,15 @@ impl TuiTheme {
     }
 }
 
+fn parse_theme_base(content: &str) -> Option<String> {
+    parse_root_value(content, &["base", "builtin", "extends"])
+}
+
 fn parse_theme_name(content: &str) -> Option<String> {
+    parse_root_value(content, &["name"])
+}
+
+fn parse_root_value(content: &str, keys: &[&str]) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
         if line.is_empty()
@@ -506,7 +585,10 @@ fn parse_theme_name(content: &str) -> Option<String> {
         let Some((key, value)) = line.split_once('=') else {
             continue;
         };
-        if key.trim().eq_ignore_ascii_case("name") {
+        if keys
+            .iter()
+            .any(|expected| key.trim().eq_ignore_ascii_case(expected))
+        {
             let value = parse_value(value);
             if !value.trim().is_empty() {
                 return Some(value);
@@ -616,6 +698,7 @@ mod tests {
         let mut theme = TuiTheme::default_dark();
         let warnings = theme.apply_theme_content(
             r##"
+base = "verdigris"
 name = "rose-pine-custom"
 
 [colors]
@@ -639,6 +722,27 @@ changes-requested = "#eb6f92"
         assert_eq!(theme.priority.high, Color::Rgb(246, 193, 119));
         assert_eq!(theme.accord.delivered, Color::Rgb(196, 167, 231));
         assert_eq!(theme.review.changes_requested, Color::Rgb(235, 111, 146));
+    }
+
+    #[test]
+    fn selects_and_maps_verdigris_builtin() {
+        let theme = TuiTheme::built_in("verdigris").expect("verdigris theme exists");
+        assert_eq!(
+            parse_theme_base("base = \"verdigris\""),
+            Some("verdigris".to_string())
+        );
+        assert_eq!(theme.name(), "verdigris");
+        assert_eq!(theme.colors.background, Color::Rgb(29, 32, 33));
+        assert_eq!(theme.colors.text, Color::Rgb(235, 219, 178));
+        assert_eq!(theme.colors.accent, Color::Rgb(142, 192, 124));
+        assert_eq!(theme.priority.critical, Color::Rgb(227, 111, 99));
+        assert_eq!(theme.priority.high, Color::Rgb(230, 191, 134));
+        assert_eq!(theme.priority.medium, Color::Rgb(131, 165, 152));
+        assert_eq!(theme.priority.low, Color::Rgb(112, 118, 74));
+        assert_eq!(theme.accord.claimed, Color::Rgb(131, 165, 152));
+        assert_eq!(theme.accord.delivered, Color::Rgb(142, 192, 124));
+        assert_eq!(theme.accord.accepted, Color::Rgb(104, 157, 106));
+        assert_eq!(theme.review.rejected, Color::Rgb(227, 111, 99));
     }
 
     #[test]

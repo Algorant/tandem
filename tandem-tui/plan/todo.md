@@ -119,6 +119,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - status-line warnings for unknown keys or invalid colors
   - `NO_COLOR`/`TANDEM_NO_COLOR` terminal fallback
   - Board styling for headers, tabs, borders, selection, priority, accord, review, details, and status lines
+- [x] Added a selectable built-in `verdigris` TUI theme, root `base`/`builtin`/`extends` theme selection keys, and `tandem-tui/examples/themes/verdigris.toml` for immediate visual evaluation.
 - [x] Implemented the TUI Logs browser:
   - recency-sorted completed-log list from `.tandem/logs/`
   - selected-log detail pane with completion summary, completed timestamp, files changed, validation, reviewer, accord/review status, accord detail/evidence, body, path, and event context
@@ -149,7 +150,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 1. Add safe Review action buttons/mutations on top of the current read-only queue, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Extend Decisions with references/tags prompts only if the TUI needs full CLI option parity beyond the basic title/body flow.
-4. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
+4. Finish full user theme discovery and any additional built-in palettes beyond Verdigris if needed, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 5. Keep parent and area docs synchronized as TUI implementation continues.
 6. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 

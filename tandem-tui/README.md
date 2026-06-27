@@ -23,7 +23,7 @@ The CLI/TUI area does **not** own the underlying protocol semantics. Protocol ru
 
 ## Current status
 
-Planning/specification plus implementation mode. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. The current known CLI surface is considered complete unless new feature requests or bugs appear. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations use raw-source, minimal-diff patches. Completion writes nested `completion` metadata, accord actions write canonical validation/timestamp metadata, and read paths tolerate earlier flat completion fields. The current `tdm tui` implementation uses Ratatui plus crossterm to render top-level Board, Review, Logs, Rules, and Decisions tabs with built-in `default-dark` theme styling and workspace theme overrides from `.tandem/theme.toml`. `1`..`5` and mouse tab clicks switch views. Board remains functional with state/item navigation, selected-item details, reload, keyboard quit, basic mouse wheel/click handling, and first Board mutations: `a` quick-adds a task in the selected/default configured state, while `H`/`L` moves the selected task to the previous/next configured state and reloads the board. Review renders a real read-only filtered queue with list/detail navigation, reason badges, accord/review/state/priority metadata, blockers, and action hints for CLI accord/complete flows. Logs has a real completed-work browser: recency-sorted list, selection/navigation, detail pane with completion metadata/body/path/event context, safe load warnings, and `/` search filtering across log IDs, titles, summaries, bodies, validation text, and files. Rules lists project rules grouped by `always`/`never`/`prefer`/`context` and supports add/edit/delete prompts from `src/tui/rules.rs`. Decisions lists active decision documents, shows selected decision metadata/body/path, and supports a basic title/body add prompt from `src/tui/decisions.rs`. Remaining gaps include user theme discovery from `~/.config/tandem/themes/*.toml`, additional Board mutations, Review action buttons/mutations, Decisions references/tags prompt parity, hot reload, and richer action buttons.
+Planning/specification plus implementation mode. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. The current known CLI surface is considered complete unless new feature requests or bugs appear. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations use raw-source, minimal-diff patches. Completion writes nested `completion` metadata, accord actions write canonical validation/timestamp metadata, and read paths tolerate earlier flat completion fields. The current `tdm tui` implementation uses Ratatui plus crossterm to render top-level Board, Review, Logs, Rules, and Decisions tabs with built-in `default-dark` styling, selectable built-in `verdigris` styling, and workspace theme overrides from `.tandem/theme.toml`. `1`..`5` and mouse tab clicks switch views. Board remains functional with state/item navigation, selected-item details, reload, keyboard quit, basic mouse wheel/click handling, and first Board mutations: `a` quick-adds a task in the selected/default configured state, while `H`/`L` moves the selected task to the previous/next configured state and reloads the board. Review renders a real read-only filtered queue with list/detail navigation, reason badges, accord/review/state/priority metadata, blockers, and action hints for CLI accord/complete flows. Logs has a real completed-work browser: recency-sorted list, selection/navigation, detail pane with completion metadata/body/path/event context, safe load warnings, and `/` search filtering across log IDs, titles, summaries, bodies, validation text, and files. Rules lists project rules grouped by `always`/`never`/`prefer`/`context` and supports add/edit/delete prompts from `src/tui/rules.rs`. Decisions lists active decision documents, shows selected decision metadata/body/path, and supports a basic title/body add prompt from `src/tui/decisions.rs`. Remaining gaps include user theme discovery from `~/.config/tandem/themes/*.toml`, additional Board mutations, Review action buttons/mutations, Decisions references/tags prompt parity, hot reload, and richer action buttons.
 
 ## Build/run
 
@@ -43,16 +43,34 @@ cargo run -- tui
 
 Use `cargo run -- <command>` during early development. The package binary name is `tdm`.
 
-## Implemented TUI theme keys
+## Implemented TUI themes and keys
 
-`tdm tui` always starts from the built-in `default-dark` palette. If `.tandem/theme.toml` exists, it may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names):
+`tdm tui` starts from the built-in `default-dark` palette. If `.tandem/theme.toml` exists, it may select another built-in base and then override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names):
 
+```toml
+base = "verdigris"
+name = "verdigris"
+```
+
+Supported built-in bases are `default-dark` and `verdigris`; `builtin` and `extends` are accepted aliases for `base`.
+
+- root keys: `base`, `builtin`, `extends`, `name`
 - `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
-`NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback. Loading user theme files from `~/.config/tandem/themes/*.toml` is still planned.
+To evaluate Verdigris visually from the repository root:
+
+```text
+cp tandem-tui/examples/themes/verdigris.toml .tandem/theme.toml
+cd tandem-tui
+cargo run -- tui
+```
+
+In the TUI, use `1`..`5` to switch Board/Review/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `/` in Logs to filter, `?` for help, and `q` to quit. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.tandem/theme.toml`, the warm vellum text remains readable on dark panels, and priority/accord/review badges use diff-red, ochre, aqua, moss, fern, and patina intentionally. Delete `.tandem/theme.toml` to return to `default-dark`.
+
+`NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when `.tandem/theme.toml` selects Verdigris. Loading user theme files from `~/.config/tandem/themes/*.toml` is still planned.
 
 ## Documentation
 
@@ -90,7 +108,7 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - CLI design and the current known CLI v0 implementation came before TUI implementation; future CLI work should be explicit new features or bug fixes.
 - V0 TUI invocation: `tdm tui` only.
 - TUI implementation target: Rust + Ratatui with crossterm terminal events/backend.
-- `tdm tui` currently has top-level Board, Review, Logs, Rules, and Decisions tabs. `1`..`5` and mouse tab clicks switch views; Board keeps `a` quick-add and `H`/`L` moves for the selected task. Review is a read-only filtered queue with selectable rows, inspection detail, reason badges, accord/review/state/priority metadata, blockers, and CLI action hints. Logs lists completed work by recency, supports selection/detail browsing, and filters with `/` then Enter/Esc. Rules lists grouped categories and supports add/edit/delete prompts in `src/tui/rules.rs`. Decisions lists active decisions, shows selected metadata/body/path, and supports a basic title/body add prompt in `src/tui/decisions.rs`. Built-in `default-dark` theme styles apply, and `.tandem/theme.toml` can override documented color keys.
+- `tdm tui` currently has top-level Board, Review, Logs, Rules, and Decisions tabs. `1`..`5` and mouse tab clicks switch views; Board keeps `a` quick-add and `H`/`L` moves for the selected task. Review is a read-only filtered queue with selectable rows, inspection detail, reason badges, accord/review/state/priority metadata, blockers, and CLI action hints. Logs lists completed work by recency, supports selection/detail browsing, and filters with `/` then Enter/Esc. Rules lists grouped categories and supports add/edit/delete prompts in `src/tui/rules.rs`. Decisions lists active decisions, shows selected metadata/body/path, and supports a basic title/body add prompt in `src/tui/decisions.rs`. Built-in `default-dark` theme styles apply by default, `.tandem/theme.toml` can select the built-in `verdigris` base, and documented color keys can override either palette.
 - Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.

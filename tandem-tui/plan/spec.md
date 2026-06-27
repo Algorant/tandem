@@ -714,8 +714,8 @@ tdm tui
   - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with selected metadata/body/path detail and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - loads the built-in `default-dark` semantic palette, applies it to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
-  - applies a workspace theme override from `.tandem/theme.toml` using the documented simple TOML-style color keys; invalid or unknown keys become status-line warnings while the default palette remains active.
+  - loads the built-in `default-dark` semantic palette, or selectable built-in `verdigris` when `.tandem/theme.toml` sets `base = "verdigris"`, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - applies workspace theme selection/overrides from `.tandem/theme.toml` using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active built-in palette remains in use.
   - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
@@ -954,6 +954,7 @@ Theme support is required in MVP, not a later polish task.
 Suggested built-ins:
 
 - `default-dark`
+- `verdigris`
 - `default-light`
 - `rose-pine`
 - `catppuccin-mocha`
@@ -972,54 +973,57 @@ Config paths:
 .tandem/theme.toml               # implemented workspace override
 ```
 
-Current implementation starts from the built-in `default-dark` palette and applies `.tandem/theme.toml` if present. The parser intentionally accepts only simple TOML-style `key = "color"` entries plus section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys and invalid colors are reported as non-fatal TUI status warnings.
+Current implementation starts from the built-in `default-dark` palette. If `.tandem/theme.toml` includes root `base = "verdigris"` (or alias `builtin`/`extends`), it selects the built-in Verdigris palette before applying any local overrides. The parser intentionally accepts only simple TOML-style root keys, `key = "color"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys, unknown built-in bases, and invalid colors are reported as non-fatal TUI status warnings.
 
 Implemented keys:
 
 ```toml
-name = "rose-pine-custom"
+base = "verdigris"
+name = "verdigris"
 
 [colors]
-background = "#191724"
-panel = "#1f1d2e"
-text = "#e0def4"
-muted = "#6e6a86"
-accent = "#c4a7e7"
-success = "#9ccfd8"
-warning = "#f6c177"
-error = "#eb6f92"
-border = "#403d52"
-selected_bg = "#26233a"
-selected_fg = "#e0def4"
+background = "#1d2021"
+panel = "#222526"
+text = "#ebdbb2"
+muted = "#928374"
+accent = "#8ec07c"
+success = "#8ec07c"
+warning = "#e6bf86"
+error = "#e36f63"
+border = "#665c54"
+selected_bg = "#272a2b"
+selected_fg = "#fbf1c7"
 
 [priority]
-critical = "#eb6f92"
-high = "#f6c177"
-medium = "#31748f"
-low = "#6e6a86"
-none = "#6e6a86"
+critical = "#e36f63"
+high = "#e6bf86"
+medium = "#83a598"
+low = "#70764a"
+none = "#928374"
 
 [badges.accord]
-ready = "#f6c177"
-claimed = "#31748f"
-delivered = "#c4a7e7"
-accepted = "#9ccfd8"
-rework = "#ebbcba"
-failed = "#eb6f92"
-blocked = "#eb6f92"
-unknown = "#6e6a86"
+ready = "#e6bf86"
+claimed = "#83a598"
+delivered = "#8ec07c"
+accepted = "#689d6a"
+rework = "#e6bf86"
+failed = "#e36f63"
+blocked = "#e36f63"
+unknown = "#928374"
 
 [badges.review]
-not-ready = "#6e6a86"
-pending = "#f6c177"
-accepted = "#9ccfd8"
-changes-requested = "#ebbcba"
-rejected = "#eb6f92"
-failed = "#eb6f92"
-unknown = "#6e6a86"
+not-ready = "#70764a"
+pending = "#e6bf86"
+accepted = "#8ec07c"
+changes-requested = "#e6bf86"
+rejected = "#e36f63"
+failed = "#e36f63"
+unknown = "#928374"
 ```
 
-`NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback. User theme discovery and named built-ins beyond `default-dark` remain planned.
+A checked-in selector for visual evaluation lives at `tandem-tui/examples/themes/verdigris.toml`; copy it to `.tandem/theme.toml`, run `cd tandem-tui && cargo run -- tui`, switch views with `1`..`5`, and press `q` to exit. A manual PTY smoke should confirm the status line reports `theme built-in verdigris + .../.tandem/theme.toml` and that priority/accord/review badges use fern/patina/aqua/ochre/moss/diff-red while keeping vellum text readable on dark panels.
+
+`NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris is selected. User theme discovery from `~/.config/tandem/themes/*.toml` remains planned.
 
 ### Theme requirements
 
@@ -1502,7 +1506,7 @@ Manual smoke:
 
 - Launch through `tdm tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs.
-- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, and workspace `.tandem/theme.toml` color overrides.
+- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, selectable built-in `verdigris` styling, and workspace `.tandem/theme.toml` color overrides.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.
 - Render safe Review action buttons/mutations and remaining Board/accord/completion workflows on top of the existing view shell.
