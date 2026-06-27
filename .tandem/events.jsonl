@@ -25,3 +25,13 @@
 {"ts":"2026-06-27T04:46:09Z","event":"accord.delivered","id":"task-3","summary":"Accord deliver for task-3"}
 {"ts":"2026-06-27T04:56:59Z","event":"accord.accepted","id":"task-3","summary":"Accord accept for task-3"}
 {"ts":"2026-06-27T04:56:59Z","event":"task.completed","id":"task-3","summary":"Implemented TUI quick-add: a opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, then reloads/selects the new task."}
+{"ts":"2026-06-27T04:58:34Z","event":"accord.claimed","id":"task-4","summary":"Accord claim for task-4"}
+{"ts":"2026-06-27T04:58:34Z","event":"task.moved","id":"task-4","summary":"Moved task-4 from todo to in-progress"}
+{"ts":"2026-06-27T04:58:34Z","event":"accord.claimed","id":"task-8","summary":"Accord claim for task-8"}
+{"ts":"2026-06-27T04:58:34Z","event":"task.moved","id":"task-8","summary":"Moved task-8 from todo to in-progress"}
+{"ts":"2026-06-27T05:11:42Z","event":"accord.delivered","id":"task-4","summary":"Accord deliver for task-4"}
+{"ts":"2026-06-27T05:13:37Z","event":"accord.delivered","id":"task-8","summary":"Accord deliver for task-8"}
+{"ts":"2026-06-27T05:49:31Z","event":"accord.accepted","id":"task-4","summary":"Accord accept for task-4"}
+{"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-4","summary":"Integrated top-level TUI view switching with Board, Review, Logs, Rules, and Decisions tabs, numeric/mouse tab switching, and read-only placeholder/count views while preserving Board mutations."}
+{"ts":"2026-06-27T05:49:31Z","event":"accord.accepted","id":"task-8","summary":"Accord accept for task-8"}
+{"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-8","summary":"Integrated TUI theme foundation with default-dark palette, workspace .tandem/theme.toml overrides, no-color fallback, and themed Board/status/badge styling."}
