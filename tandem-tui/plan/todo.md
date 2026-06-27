@@ -70,24 +70,41 @@ This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tan
 - [x] Defined v0 rules CLI add/edit/delete flow.
 - [x] Defined simple Review view sort direction: priority first, then recently updated or delivered.
 - [x] Planned minimal-diff write behavior for CLI/TUI mutations, including raw source preservation, atomic writes, concurrent edit detection, timestamp discipline, and separate event appends.
-- [x] Started the Rust implementation inside `tandem-tui/` with a std-only `tdm` binary package.
+- [x] Started the Rust implementation inside `tandem-tui/` with a single `tdm` binary package.
 - [x] Implemented the first CLI slice:
   - `tdm init --title <title>`
   - `tdm list [--state <state>] [--type <type>] [--json]`
   - `tdm show <id> [--json]`
   - `tdm tui` stub message
+- [x] Implemented the next useful CLI slice:
+  - `tdm add --title <title> ...`
+  - `tdm move <id> --state <state>`
+  - `tdm complete <id> --summary <text> ...`
+  - `tdm search <query> [--state <state>] [--type <type>] [--json]`
+  - `tdm log list|show|search`
+  - `tdm rules list`
+  - `tdm decision list|show|add`
+- [x] Defined implemented exit-code categories in code and CLI docs: success `0`, runtime/data/write failures `1`, usage/argument failures `2`.
+- [x] Defined implemented empty/no-match read behavior: human read commands print an explicit empty message, while JSON read commands return empty arrays/counts and exit `0`.
+- [x] Added atomic document writes, lifecycle event appends, UTC timestamps, and simple file-change checks for `move` and `complete`.
+- [x] Integrated the approved `yaml-rust2` dependency for frontmatter/config/document read parsing while preserving raw body/source mutation behavior.
+- [x] Added targeted parser tests for nested accord/review statuses, inline and block arrays, structured rules, and scalar behavior.
+- [x] Implemented `tdm rules add|edit|delete` with raw-source config patching and `rules.updated` event appends.
+- [x] Implemented `tdm accord ready|claim|deliver|accept|rework|block|fail` with nested accord frontmatter patching and `accord.*` event appends.
 
 ## Current tasks
 
 - [ ] Keep `tandem-tui/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and protocol docs.
-- [ ] Define numeric exit-code categories for CLI implementation.
-- [ ] Define exact no-match and empty-list behavior for each read command.
-- [ ] Replace first-slice YAML-ish frontmatter parsing with a more complete parser while preserving minimal-diff behavior.
-- [ ] Implement `tdm add`, `tdm move`, and `tdm complete`.
-- [ ] Implement `tdm search`, `tdm log list|show|search`, `tdm rules list`, and `tdm decision list|show` read commands.
+- [x] Define numeric exit-code categories for CLI implementation.
+- [x] Define exact no-match and empty-list behavior for implemented read commands.
+- [x] Replace first-slice YAML-ish frontmatter parsing with a more complete parser while preserving minimal-diff behavior.
+- [x] Implement `tdm add`, `tdm move`, and `tdm complete`.
+- [x] Implement `tdm search`, `tdm log list|show|search`, `tdm rules list`, and `tdm decision list|show` read commands.
+- [x] Implement `tdm accord ready|claim|deliver|accept|rework|block|fail`.
+- [x] Implement `tdm rules add|edit|delete`.
 - [ ] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
 - [ ] Define accord badge/status visual language.
-- [ ] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
+- [x] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
 - [ ] Decide initial Ratatui event loop approach.
 - [ ] Define exact TOML theme keys for user themes and workspace override.
 - [ ] Define final fixed keyboard default table for v0.
@@ -95,14 +112,11 @@ This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tan
 
 ## Next recommended steps
 
-1. Review the first CLI slice with the orchestrator and adjust command behavior if needed.
-2. Define numeric CLI exit-code categories, empty/no-match read-command behavior, and write-failure messages.
-3. Convert minimal-diff write behavior into an implementation checklist for mutation commands.
-4. Implement the next CLI mutations: `add`, `move`, and `complete`.
-5. Implement remaining v0 read commands: `search`, `log`, `rules list`, and `decision` reads.
-6. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
-7. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
-8. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
+1. Review the expanded CLI slice with the orchestrator and adjust command behavior if needed.
+2. Tighten completion/review/accord metadata mutation behavior now that nested frontmatter reads are available.
+3. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
+4. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
+5. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
 
 ## First TUI MVP checklist
 

@@ -1,11 +1,16 @@
 use std::collections::{BTreeMap, HashMap};
 use std::env;
-use std::fs::{self, File};
-use std::io;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use yaml_rust2::{Yaml, YamlLoader};
 
 const PROTOCOL_VERSION: &str = "0.1.0";
+const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "review"];
 
+// Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
 struct CliError {
     message: String,
@@ -38,6 +43,8 @@ impl From<io::Error> for CliError {
 struct Workspace {
     board_dir: PathBuf,
     logs_dir: PathBuf,
+    config_path: PathBuf,
+    events_path: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -82,9 +89,20 @@ impl Document {
 }
 
 #[derive(Debug, Default)]
+struct InitOptions {
+    title: Option<String>,
+    force: bool,
+}
+
+#[derive(Debug, Default)]
 struct ListOptions {
     state: Option<String>,
     doc_type: Option<String>,
+    priority: Option<String>,
+    tag: Option<String>,
+    assignee: Option<String>,
+    accord: Option<String>,
+    review: Option<String>,
     json: bool,
 }
 
@@ -95,9 +113,106 @@ struct ShowOptions {
 }
 
 #[derive(Debug, Default)]
-struct InitOptions {
+struct AddOptions {
     title: Option<String>,
-    force: bool,
+    state: Option<String>,
+    description: Option<String>,
+    priority: Option<String>,
+    tags: Vec<String>,
+    assignee: Option<String>,
+    due_date: Option<String>,
+    parent: Option<String>,
+    blockers: Vec<String>,
+    references: Vec<String>,
+    related_files: Vec<String>,
+    subtasks: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct MoveOptions {
+    id: String,
+    state: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct CompleteOptions {
+    id: String,
+    summary: Option<String>,
+    files_changed: Vec<String>,
+    validation: Option<String>,
+    reviewer: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct SearchOptions {
+    query: String,
+    state: Option<String>,
+    doc_type: Option<String>,
+    json: bool,
+}
+
+#[derive(Debug, Default)]
+struct LogListOptions {
+    limit: Option<usize>,
+    json: bool,
+}
+
+#[derive(Debug, Default)]
+struct CategoryListOptions {
+    category: Option<String>,
+    json: bool,
+}
+
+#[derive(Debug, Default)]
+struct RuleAddOptions {
+    category: Option<String>,
+    rule: Option<String>,
+    source: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct RuleEditOptions {
+    category: Option<String>,
+    id: Option<usize>,
+    rule: Option<String>,
+    source: Option<String>,
+}
+
+#[derive(Debug, Default)]
+struct RuleDeleteOptions {
+    category: Option<String>,
+    id: Option<usize>,
+}
+
+#[derive(Debug, Default)]
+struct AccordOptions {
+    id: String,
+    assignee: Option<String>,
+    summary: Option<String>,
+    reviewer: Option<String>,
+    note: Option<String>,
+    reason: Option<String>,
+    deliverables: Vec<String>,
+    validations: Vec<String>,
+    constraints: Vec<String>,
+    evidence: Vec<String>,
+    files_changed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct AccordRecord {
+    status: String,
+    assignee: Option<String>,
+    deliverables: Vec<String>,
+    validations: Vec<String>,
+    constraints: Vec<String>,
+    summary: Option<String>,
+    evidence: Vec<String>,
+    files_changed: Vec<String>,
+    reviewer: Option<String>,
+    note: Option<String>,
+    reason: Option<String>,
+    updated_at: String,
 }
 
 fn main() {
@@ -119,11 +234,19 @@ fn run() -> Result<(), CliError> {
         "init" => cmd_init(parse_init_args(&args)?)?,
         "list" => cmd_list(parse_list_args(&args)?)?,
         "show" => cmd_show(parse_show_args(&args)?)?,
+        "add" => cmd_add(parse_add_args(&args)?)?,
+        "move" => cmd_move(parse_move_args(&args)?)?,
+        "complete" => cmd_complete(parse_complete_args(&args)?)?,
+        "search" => cmd_search(parse_search_args(&args)?)?,
+        "log" => cmd_log(&args)?,
+        "accord" => cmd_accord(&args)?,
+        "rules" => cmd_rules(&args)?,
+        "decision" => cmd_decision(&args)?,
         "tui" => cmd_tui(&args)?,
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported first-slice commands: init, list, show, tui"
+                "unknown command `{other}`. Supported commands: init, list, show, add, move, complete, search, log, accord, rules, decision, tui"
             )))
         }
     }
@@ -138,6 +261,14 @@ fn print_help() {
     println!("  tdm init --title <title>");
     println!("  tdm list [--state <state>] [--type <type>] [--json]");
     println!("  tdm show <id> [--json]");
+    println!("  tdm add --title <title> [--state <state>] [--description <text>]");
+    println!("  tdm move <id> --state <state>");
+    println!("  tdm complete <id> --summary <text>");
+    println!("  tdm search <query> [--state <state>] [--type <type>] [--json]");
+    println!("  tdm log list|show|search ...");
+    println!("  tdm accord ready|claim|deliver|accept|rework|block|fail ...");
+    println!("  tdm rules list|add|edit|delete ...");
+    println!("  tdm decision list|show|add ...");
     println!("  tdm tui");
 }
 
@@ -148,10 +279,7 @@ fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
         match args[index].as_str() {
             "--title" => {
                 index += 1;
-                let value = args
-                    .get(index)
-                    .ok_or_else(|| CliError::usage("--title requires a value"))?;
-                options.title = Some(value.clone());
+                options.title = Some(required_value(args, index, "--title")?.to_string());
             }
             "--force" => options.force = true,
             flag if flag.starts_with('-') => {
@@ -181,6 +309,26 @@ fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
                 index += 1;
                 options.doc_type = Some(required_value(args, index, "--type")?.to_string());
             }
+            "--priority" => {
+                index += 1;
+                options.priority = Some(required_value(args, index, "--priority")?.to_string());
+            }
+            "--tag" => {
+                index += 1;
+                options.tag = Some(required_value(args, index, "--tag")?.to_string());
+            }
+            "--assignee" => {
+                index += 1;
+                options.assignee = Some(required_value(args, index, "--assignee")?.to_string());
+            }
+            "--accord" => {
+                index += 1;
+                options.accord = Some(required_value(args, index, "--accord")?.to_string());
+            }
+            "--review" => {
+                index += 1;
+                options.review = Some(required_value(args, index, "--review")?.to_string());
+            }
             "--json" => options.json = true,
             flag if flag.starts_with('-') => {
                 return Err(CliError::usage(format!("unknown list flag `{flag}`")))
@@ -205,15 +353,7 @@ fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
             flag if flag.starts_with('-') => {
                 return Err(CliError::usage(format!("unknown show flag `{flag}`")))
             }
-            value => {
-                if options.id.is_empty() {
-                    options.id = value.to_string();
-                } else {
-                    return Err(CliError::usage(format!(
-                        "unexpected extra show argument `{value}`"
-                    )));
-                }
-            }
+            value => set_single_positional(&mut options.id, value, "show")?,
         }
         index += 1;
     }
@@ -225,11 +365,453 @@ fn parse_show_args(args: &[String]) -> Result<ShowOptions, CliError> {
     Ok(options)
 }
 
+fn parse_add_args(args: &[String]) -> Result<AddOptions, CliError> {
+    let mut options = AddOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--title" => {
+                index += 1;
+                options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--state" => {
+                index += 1;
+                options.state = Some(required_value(args, index, "--state")?.to_string());
+            }
+            "--description" => {
+                index += 1;
+                options.description =
+                    Some(required_value(args, index, "--description")?.to_string());
+            }
+            "--priority" => {
+                index += 1;
+                options.priority = Some(required_value(args, index, "--priority")?.to_string());
+            }
+            "--tag" => {
+                index += 1;
+                options
+                    .tags
+                    .push(required_value(args, index, "--tag")?.to_string());
+            }
+            "--assignee" => {
+                index += 1;
+                options.assignee = Some(required_value(args, index, "--assignee")?.to_string());
+            }
+            "--due-date" => {
+                index += 1;
+                options.due_date = Some(required_value(args, index, "--due-date")?.to_string());
+            }
+            "--parent" => {
+                index += 1;
+                options.parent = Some(required_value(args, index, "--parent")?.to_string());
+            }
+            "--blocker" => {
+                index += 1;
+                options
+                    .blockers
+                    .push(required_value(args, index, "--blocker")?.to_string());
+            }
+            "--reference" => {
+                index += 1;
+                options
+                    .references
+                    .push(required_value(args, index, "--reference")?.to_string());
+            }
+            "--related-file" => {
+                index += 1;
+                options
+                    .related_files
+                    .push(required_value(args, index, "--related-file")?.to_string());
+            }
+            "--subtask" => {
+                index += 1;
+                options
+                    .subtasks
+                    .push(required_value(args, index, "--subtask")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown add flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected add argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_move_args(args: &[String]) -> Result<MoveOptions, CliError> {
+    let mut options = MoveOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--state" => {
+                index += 1;
+                options.state = Some(required_value(args, index, "--state")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown move flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.id, value, "move")?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage("move requires an <id>"));
+    }
+    Ok(options)
+}
+
+fn parse_complete_args(args: &[String]) -> Result<CompleteOptions, CliError> {
+    let mut options = CompleteOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--summary" => {
+                index += 1;
+                options.summary = Some(required_value(args, index, "--summary")?.to_string());
+            }
+            "--file-changed" => {
+                index += 1;
+                options
+                    .files_changed
+                    .push(required_value(args, index, "--file-changed")?.to_string());
+            }
+            "--validation" => {
+                index += 1;
+                options.validation = Some(required_value(args, index, "--validation")?.to_string());
+            }
+            "--reviewer" => {
+                index += 1;
+                options.reviewer = Some(required_value(args, index, "--reviewer")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown complete flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.id, value, "complete")?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage("complete requires an <id>"));
+    }
+    Ok(options)
+}
+
+fn parse_search_args(args: &[String]) -> Result<SearchOptions, CliError> {
+    let mut options = SearchOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--state" => {
+                index += 1;
+                options.state = Some(required_value(args, index, "--state")?.to_string());
+            }
+            "--type" => {
+                index += 1;
+                options.doc_type = Some(required_value(args, index, "--type")?.to_string());
+            }
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown search flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.query, value, "search")?,
+        }
+        index += 1;
+    }
+    if options.query.is_empty() {
+        return Err(CliError::usage("search requires a <query>"));
+    }
+    Ok(options)
+}
+
+fn parse_log_search_args(args: &[String]) -> Result<SearchOptions, CliError> {
+    let mut options = SearchOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown log search flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.query, value, "log search")?,
+        }
+        index += 1;
+    }
+    if options.query.is_empty() {
+        return Err(CliError::usage("log search requires a <query>"));
+    }
+    Ok(options)
+}
+
+fn parse_log_list_args(args: &[String]) -> Result<LogListOptions, CliError> {
+    let mut options = LogListOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--limit" => {
+                index += 1;
+                let value = required_value(args, index, "--limit")?;
+                options.limit = Some(
+                    value
+                        .parse::<usize>()
+                        .map_err(|_| CliError::usage("--limit must be a positive integer"))?,
+                );
+            }
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown log list flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected log list argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_category_list_args(
+    args: &[String],
+    command: &str,
+) -> Result<CategoryListOptions, CliError> {
+    let mut options = CategoryListOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--category" => {
+                index += 1;
+                options.category = Some(required_value(args, index, "--category")?.to_string());
+            }
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown {command} flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected {command} argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_rule_add_args(args: &[String]) -> Result<RuleAddOptions, CliError> {
+    let mut options = RuleAddOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--category" => {
+                index += 1;
+                options.category = Some(required_value(args, index, "--category")?.to_string());
+            }
+            "--rule" => {
+                index += 1;
+                options.rule = Some(required_value(args, index, "--rule")?.to_string());
+            }
+            "--source" => {
+                index += 1;
+                options.source = Some(required_value(args, index, "--source")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown rules add flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected rules add argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_rule_edit_args(args: &[String]) -> Result<RuleEditOptions, CliError> {
+    let mut options = RuleEditOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--category" => {
+                index += 1;
+                options.category = Some(required_value(args, index, "--category")?.to_string());
+            }
+            "--id" => {
+                index += 1;
+                let value = required_value(args, index, "--id")?;
+                options.id = Some(parse_rule_id(value)?);
+            }
+            "--rule" => {
+                index += 1;
+                options.rule = Some(required_value(args, index, "--rule")?.to_string());
+            }
+            "--source" => {
+                index += 1;
+                options.source = Some(required_value(args, index, "--source")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown rules edit flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected rules edit argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_rule_delete_args(args: &[String]) -> Result<RuleDeleteOptions, CliError> {
+    let mut options = RuleDeleteOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--category" => {
+                index += 1;
+                options.category = Some(required_value(args, index, "--category")?.to_string());
+            }
+            "--id" => {
+                index += 1;
+                let value = required_value(args, index, "--id")?;
+                options.id = Some(parse_rule_id(value)?);
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown rules delete flag `{flag}`"
+                )))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected rules delete argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn parse_rule_id(value: &str) -> Result<usize, CliError> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|id| *id > 0)
+        .ok_or_else(|| CliError::usage("--id must be a positive integer"))
+}
+
+fn parse_accord_args(action: &str, args: &[String]) -> Result<AccordOptions, CliError> {
+    let mut options = AccordOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--assignee" => {
+                index += 1;
+                options.assignee = Some(required_value(args, index, "--assignee")?.to_string());
+            }
+            "--summary" => {
+                index += 1;
+                options.summary = Some(required_value(args, index, "--summary")?.to_string());
+            }
+            "--reviewer" => {
+                index += 1;
+                options.reviewer = Some(required_value(args, index, "--reviewer")?.to_string());
+            }
+            "--note" => {
+                index += 1;
+                options.note = Some(required_value(args, index, "--note")?.to_string());
+            }
+            "--reason" => {
+                index += 1;
+                options.reason = Some(required_value(args, index, "--reason")?.to_string());
+            }
+            "--deliverable" => {
+                index += 1;
+                options
+                    .deliverables
+                    .push(required_value(args, index, "--deliverable")?.to_string());
+            }
+            "--validation" => {
+                index += 1;
+                options
+                    .validations
+                    .push(required_value(args, index, "--validation")?.to_string());
+            }
+            "--constraint" => {
+                index += 1;
+                options
+                    .constraints
+                    .push(required_value(args, index, "--constraint")?.to_string());
+            }
+            "--evidence" => {
+                index += 1;
+                options
+                    .evidence
+                    .push(required_value(args, index, "--evidence")?.to_string());
+            }
+            "--file-changed" => {
+                index += 1;
+                options
+                    .files_changed
+                    .push(required_value(args, index, "--file-changed")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown accord {action} flag `{flag}`"
+                )))
+            }
+            value => set_single_positional(&mut options.id, value, &format!("accord {action}"))?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage(format!("accord {action} requires an <id>")));
+    }
+    Ok(options)
+}
+
+fn parse_json_only_args(args: &[String], command: &str) -> Result<bool, CliError> {
+    let mut json = false;
+    for arg in args {
+        match arg.as_str() {
+            "--json" => json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown {command} flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected {command} argument `{value}`"
+                )))
+            }
+        }
+    }
+    Ok(json)
+}
+
 fn required_value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'a str, CliError> {
     args.get(index)
         .map(String::as_str)
         .filter(|value| !value.starts_with('-'))
         .ok_or_else(|| CliError::usage(format!("{flag} requires a value")))
+}
+
+fn set_single_positional(target: &mut String, value: &str, command: &str) -> Result<(), CliError> {
+    if target.is_empty() {
+        *target = value.to_string();
+        Ok(())
+    } else {
+        Err(CliError::usage(format!(
+            "unexpected extra {command} argument `{value}`"
+        )))
+    }
 }
 
 fn cmd_init(options: InitOptions) -> Result<(), CliError> {
@@ -249,7 +831,7 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
 
     if tandem_dir.exists() || config_path.exists() {
         let hint = if options.force {
-            " --force overwrite is not implemented in this first CLI slice."
+            " --force overwrite is not implemented yet."
         } else {
             ""
         };
@@ -285,28 +867,8 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
 fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    let mut filtered = docs
-        .into_iter()
-        .filter(|doc| {
-            options
-                .state
-                .as_deref()
-                .map_or(true, |state| doc.field("state") == Some(state))
-        })
-        .filter(|doc| {
-            options
-                .doc_type
-                .as_deref()
-                .map_or(true, |doc_type| doc.doc_type() == doc_type)
-        })
-        .collect::<Vec<_>>();
-
-    filtered.sort_by(|a, b| {
-        a.field("state")
-            .unwrap_or("")
-            .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| a.id().cmp(b.id()))
-    });
+    let mut filtered = filter_documents(docs, &options);
+    sort_documents(&mut filtered);
 
     if options.json {
         println!("{}", list_json(&filtered));
@@ -331,14 +893,643 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     Ok(())
 }
 
+fn cmd_add(options: AddOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let title = require_nonempty(options.title.as_deref(), "add requires --title <title>")?;
+    let state = options.state.as_deref().unwrap_or("todo");
+    validate_state(&workspace, state)?;
+
+    if let Some(parent) = options.parent.as_deref() {
+        require_existing_document(&workspace, parent, "parent")?;
+    }
+    for blocker in &options.blockers {
+        require_existing_document(&workspace, blocker, "blocker")?;
+    }
+
+    let mut warnings = Vec::new();
+    for reference in &options.references {
+        if !document_exists(&workspace, reference)? {
+            warnings.push(format!("reference not found: {reference}"));
+        }
+    }
+
+    let task_id = next_sequential_id(&workspace, "task")?;
+    let now = current_timestamp();
+    let task_path = workspace.board_dir.join(format!("{task_id}.md"));
+    let mut lines = vec![
+        "---".to_string(),
+        format!("id: {task_id}"),
+        "type: task".to_string(),
+        format!("title: {}", yaml_double_quote(title)),
+        format!("state: {state}"),
+    ];
+    push_optional_line(&mut lines, "priority", options.priority.as_deref());
+    push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
+    push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
+    push_optional_line(&mut lines, "parentId", options.parent.as_deref());
+    push_array_line(&mut lines, "blockers", &options.blockers);
+    push_array_line(&mut lines, "references", &options.references);
+    push_array_line(&mut lines, "relatedFiles", &options.related_files);
+    push_array_line(&mut lines, "tags", &options.tags);
+    lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+    lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+    if !options.subtasks.is_empty() {
+        lines.push("subtasks:".to_string());
+        for (index, subtask) in options.subtasks.iter().enumerate() {
+            let subtask_id = format!("{task_id}-{}", index + 1);
+            lines.push(format!("  - id: {subtask_id}"));
+            lines.push(format!("    title: {}", yaml_double_quote(subtask)));
+            lines.push("    completed: false".to_string());
+        }
+    }
+    lines.push("---".to_string());
+    lines.push(String::new());
+    if let Some(description) = options.description.as_deref() {
+        lines.push("## Description".to_string());
+        lines.push(String::new());
+        lines.push(description.to_string());
+    }
+    lines.push(String::new());
+    write_atomic(&task_path, &lines.join("\n"))?;
+    append_event(&workspace, "task.created", &task_id, title)?;
+
+    for warning in warnings {
+        println!("Warning: {warning}");
+    }
+    println!("Created task");
+    println!("ID:    {task_id}");
+    println!("State: {state}");
+    println!("Title: {title}");
+    println!("Path:  {}", display_path(&task_path));
+    Ok(())
+}
+
+fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let state = options
+        .state
+        .as_deref()
+        .ok_or_else(|| CliError::usage("move requires --state <state>"))?;
+    validate_state(&workspace, state)?;
+
+    let doc = find_board_document(&workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("active document not found: {}", options.id)))?;
+    let previous_state = doc.field("state").unwrap_or("-").to_string();
+    if previous_state == state {
+        println!("{} is already in state {state}", doc.id());
+        return Ok(());
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut updates = BTreeMap::new();
+    updates.insert("state".to_string(), state.to_string());
+    updates.insert("updatedAt".to_string(), now);
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    let event_name = if doc.doc_type() == "decision" {
+        "decision.moved"
+    } else {
+        "task.moved"
+    };
+    append_event(
+        &workspace,
+        event_name,
+        doc.id(),
+        &format!("Moved {} from {previous_state} to {state}", doc.id()),
+    )?;
+
+    println!("Moved {}", doc.id());
+    println!("From: {previous_state}");
+    println!("To:   {state}");
+    println!("Path: {}", display_path(&doc.path));
+    Ok(())
+}
+
+fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let summary = require_nonempty(
+        options.summary.as_deref(),
+        "complete requires --summary <text>",
+    )?;
+    let doc = find_board_document(&workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "only task documents can be completed in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    let unresolved = unresolved_blockers(&workspace, doc.field("blockers"))?;
+    if !unresolved.is_empty() {
+        return Err(CliError::user(format!(
+            "{} has unresolved blockers: {}",
+            doc.id(),
+            unresolved.join(", ")
+        )));
+    }
+
+    let review_status = review_status(&doc).unwrap_or("missing");
+    let accord_status = accord_status(&doc).unwrap_or("missing");
+    if review_status != "accepted" {
+        println!("Warning: {} has review.status={review_status}.", doc.id());
+    }
+    if accord_status != "accepted" {
+        println!(
+            "Warning: {} has accord.status={accord_status}, not accepted.",
+            doc.id()
+        );
+    }
+    if review_status != "accepted" || accord_status != "accepted" {
+        println!("Completing anyway in v0.");
+        println!();
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut updates = BTreeMap::new();
+    updates.insert("completedAt".to_string(), now.clone());
+    updates.insert("updatedAt".to_string(), now);
+    updates.insert("completionSummary".to_string(), summary.to_string());
+    if let Some(validation) = options.validation.as_deref() {
+        updates.insert("completionValidation".to_string(), validation.to_string());
+    }
+    if let Some(reviewer) = options.reviewer.as_deref() {
+        updates.insert("completionReviewer".to_string(), reviewer.to_string());
+    }
+    if !options.files_changed.is_empty() {
+        updates.insert(
+            "filesChanged".to_string(),
+            inline_array(&options.files_changed),
+        );
+    }
+    let patched = patch_frontmatter_content(&content, &updates, &["state"])?;
+    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
+    if log_path.exists() {
+        return Err(CliError::user(format!(
+            "log document already exists: {}",
+            display_path(&log_path)
+        )));
+    }
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&log_path, &patched)?;
+    fs::remove_file(&doc.path)?;
+    append_event(&workspace, "task.completed", doc.id(), summary)?;
+
+    println!("Completed {}", doc.id());
+    println!(
+        "Moved: {} -> {}",
+        display_path(&doc.path),
+        display_path(&log_path)
+    );
+    println!("Event: task.completed");
+    Ok(())
+}
+
+fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    let mut results = docs
+        .into_iter()
+        .filter(|doc| {
+            options
+                .doc_type
+                .as_deref()
+                .map_or(true, |doc_type| doc.doc_type() == doc_type)
+        })
+        .filter(|doc| {
+            if doc.location == DocumentLocation::Logs {
+                options.state.is_none()
+            } else {
+                options
+                    .state
+                    .as_deref()
+                    .map_or(true, |state| doc.field("state") == Some(state))
+            }
+        })
+        .filter_map(|doc| search_match(doc, &options.query))
+        .collect::<Vec<_>>();
+    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+
+    if options.json {
+        println!("{}", search_json(&options.query, &results));
+    } else {
+        print_search_table(&results);
+    }
+    Ok(())
+}
+
+fn cmd_log(args: &[String]) -> Result<(), CliError> {
+    let Some((subcommand, rest)) = args.split_first() else {
+        return Err(CliError::usage("tdm log requires list, show, or search"));
+    };
+    match subcommand.as_str() {
+        "list" => cmd_log_list(parse_log_list_args(rest)?),
+        "show" => cmd_log_show(parse_show_args(rest)?),
+        "search" => cmd_log_search(parse_log_search_args(rest)?),
+        other => Err(CliError::usage(format!(
+            "unknown log subcommand `{other}`; use list, show, or search"
+        ))),
+    }
+}
+
+fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let mut docs = read_documents(&workspace.logs_dir, DocumentLocation::Logs)?;
+    docs.sort_by(|a, b| {
+        b.field("completedAt")
+            .unwrap_or("")
+            .cmp(a.field("completedAt").unwrap_or(""))
+            .then_with(|| a.id().cmp(b.id()))
+    });
+    if let Some(limit) = options.limit {
+        docs.truncate(limit);
+    }
+
+    if options.json {
+        println!("{}", log_list_json(&docs));
+    } else {
+        print_log_table(&docs);
+    }
+    Ok(())
+}
+
+fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let doc = find_log_document(&workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("log document not found: {}", options.id)))?;
+    if options.json {
+        println!("{}", log_show_json(&doc));
+    } else {
+        print_log_show(&doc);
+    }
+    Ok(())
+}
+
+fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let mut results = read_documents(&workspace.logs_dir, DocumentLocation::Logs)?
+        .into_iter()
+        .filter_map(|doc| search_match(doc, &options.query))
+        .collect::<Vec<_>>();
+    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    if options.json {
+        println!("{}", search_json(&options.query, &results));
+    } else {
+        print_search_table(&results);
+    }
+    Ok(())
+}
+
+fn cmd_accord(args: &[String]) -> Result<(), CliError> {
+    let Some((action, rest)) = args.split_first() else {
+        return Err(CliError::usage(
+            "tdm accord requires ready, claim, deliver, accept, rework, block, or fail",
+        ));
+    };
+    let status = match action.as_str() {
+        "ready" => "ready",
+        "claim" => "claimed",
+        "deliver" => "delivered",
+        "accept" => "accepted",
+        "rework" => "rework",
+        "block" => "blocked",
+        "fail" => "failed",
+        other => {
+            return Err(CliError::usage(format!(
+                "unknown accord subcommand `{other}`; use ready, claim, deliver, accept, rework, block, or fail"
+            )))
+        }
+    };
+    let options = parse_accord_args(action, rest)?;
+    cmd_accord_update(action, status, options)
+}
+
+fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let doc = find_board_document(&workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "only task documents can have accord actions in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+
+    validate_accord_inputs(action, &options)?;
+    let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
+    validate_accord_transition(action, &previous_status)?;
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut accord = AccordRecord::from_document(&doc, &now);
+    apply_accord_action(&mut accord, action, status, &options);
+    let patched = patch_accord_content(&content, &accord)?;
+    let mut updates = BTreeMap::new();
+    updates.insert("updatedAt".to_string(), now);
+    let patched = patch_frontmatter_content(&patched, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    let event_name = accord_event_name(action);
+    append_event(
+        &workspace,
+        event_name,
+        doc.id(),
+        &format!("Accord {action} for {}", doc.id()),
+    )?;
+
+    print_accord_update(doc.id(), &previous_status, status, event_name, &doc.path);
+    Ok(())
+}
+
+fn cmd_rules(args: &[String]) -> Result<(), CliError> {
+    let Some((subcommand, rest)) = args.split_first() else {
+        return Err(CliError::usage(
+            "tdm rules requires list, add, edit, or delete",
+        ));
+    };
+    match subcommand.as_str() {
+        "list" => cmd_rules_list(parse_category_list_args(rest, "rules list")?),
+        "add" => cmd_rules_add(parse_rule_add_args(rest)?),
+        "edit" => cmd_rules_edit(parse_rule_edit_args(rest)?),
+        "delete" => cmd_rules_delete(parse_rule_delete_args(rest)?),
+        other => Err(CliError::usage(format!(
+            "unknown rules subcommand `{other}`; use list, add, edit, or delete"
+        ))),
+    }
+}
+
+fn cmd_rules_list(options: CategoryListOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    if let Some(category) = options.category.as_deref() {
+        validate_rule_category(category)?;
+    }
+    let rules = read_rules(&workspace.config_path)?;
+    if options.json {
+        println!("{}", rules_json(&rules, options.category.as_deref()));
+    } else {
+        print_rules(&rules, options.category.as_deref());
+    }
+    Ok(())
+}
+
+fn cmd_rules_add(options: RuleAddOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let category = require_rule_category(options.category.as_deref())?;
+    let rule = require_nonempty(options.rule.as_deref(), "rules add requires --rule <text>")?;
+    warn_missing_rule_source(&workspace, options.source.as_deref())?;
+
+    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
+    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
+    let next_id = rules
+        .get(category)
+        .into_iter()
+        .flatten()
+        .map(|item| item.id)
+        .max()
+        .unwrap_or(0)
+        + 1;
+    rules
+        .entry(category.to_string())
+        .or_default()
+        .push(RuleItem {
+            id: next_id,
+            rule: rule.to_string(),
+            source: options.source.filter(|source| !source.trim().is_empty()),
+        });
+    let patched = patch_rules_category_content(&content, category, &rules)?;
+    ensure_file_unchanged(&workspace.config_path, &signature)?;
+    write_atomic(&workspace.config_path, &patched)?;
+    append_event(
+        &workspace,
+        "rules.updated",
+        "rules",
+        &format!("Added rule {next_id} to {category}"),
+    )?;
+
+    println!("Added rule");
+    println!("Category: {category}");
+    println!("ID:       {next_id}");
+    println!("Rule:     {rule}");
+    Ok(())
+}
+
+fn cmd_rules_edit(options: RuleEditOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let category = require_rule_category(options.category.as_deref())?;
+    let id = options
+        .id
+        .ok_or_else(|| CliError::usage("rules edit requires --id <rule-id>"))?;
+    let rule = require_nonempty(options.rule.as_deref(), "rules edit requires --rule <text>")?;
+    warn_missing_rule_source(&workspace, options.source.as_deref())?;
+
+    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
+    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
+    let items = rules.entry(category.to_string()).or_default();
+    let item = items
+        .iter_mut()
+        .find(|item| item.id == id)
+        .ok_or_else(|| CliError::user(format!("rule not found: {category} #{id}")))?;
+    item.rule = rule.to_string();
+    if let Some(source) = options.source {
+        item.source = (!source.trim().is_empty()).then_some(source);
+    }
+    let patched = patch_rules_category_content(&content, category, &rules)?;
+    ensure_file_unchanged(&workspace.config_path, &signature)?;
+    write_atomic(&workspace.config_path, &patched)?;
+    append_event(
+        &workspace,
+        "rules.updated",
+        "rules",
+        &format!("Edited rule {id} in {category}"),
+    )?;
+
+    println!("Edited rule");
+    println!("Category: {category}");
+    println!("ID:       {id}");
+    println!("Rule:     {rule}");
+    Ok(())
+}
+
+fn cmd_rules_delete(options: RuleDeleteOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let category = require_rule_category(options.category.as_deref())?;
+    let id = options
+        .id
+        .ok_or_else(|| CliError::usage("rules delete requires --id <rule-id>"))?;
+
+    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
+    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
+    let items = rules.entry(category.to_string()).or_default();
+    let before_len = items.len();
+    items.retain(|item| item.id != id);
+    if items.len() == before_len {
+        return Err(CliError::user(format!("rule not found: {category} #{id}")));
+    }
+    let patched = patch_rules_category_content(&content, category, &rules)?;
+    ensure_file_unchanged(&workspace.config_path, &signature)?;
+    write_atomic(&workspace.config_path, &patched)?;
+    append_event(
+        &workspace,
+        "rules.updated",
+        "rules",
+        &format!("Deleted rule {id} from {category}"),
+    )?;
+
+    println!("Deleted rule");
+    println!("Category: {category}");
+    println!("ID:       {id}");
+    Ok(())
+}
+
+fn cmd_decision(args: &[String]) -> Result<(), CliError> {
+    let Some((subcommand, rest)) = args.split_first() else {
+        return Err(CliError::usage("tdm decision requires list, show, or add"));
+    };
+    match subcommand.as_str() {
+        "list" => cmd_decision_list(parse_json_only_args(rest, "decision list")?),
+        "show" => cmd_decision_show(parse_show_args(rest)?),
+        "add" => cmd_decision_add(parse_decision_add_args(rest)?),
+        other => Err(CliError::usage(format!(
+            "unknown decision subcommand `{other}`; use list, show, or add"
+        ))),
+    }
+}
+
+#[derive(Debug, Default)]
+struct DecisionAddOptions {
+    title: Option<String>,
+    body: Option<String>,
+    references: Vec<String>,
+    tags: Vec<String>,
+}
+
+fn parse_decision_add_args(args: &[String]) -> Result<DecisionAddOptions, CliError> {
+    let mut options = DecisionAddOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--title" => {
+                index += 1;
+                options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--body" => {
+                index += 1;
+                options.body = Some(required_value(args, index, "--body")?.to_string());
+            }
+            "--reference" => {
+                index += 1;
+                options
+                    .references
+                    .push(required_value(args, index, "--reference")?.to_string());
+            }
+            "--tag" => {
+                index += 1;
+                options
+                    .tags
+                    .push(required_value(args, index, "--tag")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown decision add flag `{flag}`"
+                )))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected decision add argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+fn cmd_decision_list(json: bool) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?
+        .into_iter()
+        .filter(|doc| doc.doc_type() == "decision")
+        .collect::<Vec<_>>();
+    docs.sort_by(|a, b| a.id().cmp(b.id()));
+    if json {
+        println!("{}", decision_list_json(&docs));
+    } else {
+        print_decision_table(&docs);
+    }
+    Ok(())
+}
+
+fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let doc = find_document(&workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("decision not found: {}", options.id)))?;
+    if doc.doc_type() != "decision" {
+        return Err(CliError::user(format!(
+            "{} is type {}, not decision",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    if options.json {
+        println!("{}", decision_show_json(&doc));
+    } else {
+        print_show(&doc);
+    }
+    Ok(())
+}
+
+fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let title = require_nonempty(
+        options.title.as_deref(),
+        "decision add requires --title <title>",
+    )?;
+    for reference in &options.references {
+        require_existing_document(&workspace, reference, "reference")?;
+    }
+
+    let decision_id = next_sequential_id(&workspace, "decision")?;
+    let now = current_timestamp();
+    let decision_path = workspace.board_dir.join(format!("{decision_id}.md"));
+    let mut lines = vec![
+        "---".to_string(),
+        format!("id: {decision_id}"),
+        "type: decision".to_string(),
+        format!("title: {}", yaml_double_quote(title)),
+    ];
+    push_array_line(&mut lines, "references", &options.references);
+    push_array_line(&mut lines, "tags", &options.tags);
+    lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+    lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+    lines.push("---".to_string());
+    lines.push(String::new());
+    if let Some(body) = options.body.as_deref() {
+        lines.push(body.to_string());
+    }
+    lines.push(String::new());
+    write_atomic(&decision_path, &lines.join("\n"))?;
+    append_event(&workspace, "decision.created", &decision_id, title)?;
+
+    println!("Created decision");
+    println!("ID:    {decision_id}");
+    println!("Title: {title}");
+    println!("Path:  {}", display_path(&decision_path));
+    Ok(())
+}
+
 fn cmd_tui(args: &[String]) -> Result<(), CliError> {
     if !args.is_empty() {
         return Err(CliError::usage(
-            "tdm tui does not accept options in this first slice",
+            "tdm tui does not accept options in this implementation slice",
         ));
     }
 
-    println!("tdm tui is planned but not implemented in this first CLI slice.");
+    println!("tdm tui is planned but not implemented in this CLI implementation slice.");
     Ok(())
 }
 
@@ -352,6 +1543,8 @@ fn discover_workspace() -> Result<Workspace, CliError> {
             return Ok(Workspace {
                 board_dir: tandem_dir.join("board"),
                 logs_dir: tandem_dir.join("logs"),
+                events_path: tandem_dir.join("events.jsonl"),
+                config_path,
             });
         }
 
@@ -398,7 +1591,12 @@ fn read_document(path: &Path, location: DocumentLocation) -> Result<Document, Cl
     let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
         CliError::user(format!("failed to parse {}: {message}", display_path(path)))
     })?;
-    let fields = parse_simple_frontmatter(&frontmatter);
+    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "failed to parse {} frontmatter YAML: {message}",
+            display_path(path)
+        ))
+    })?;
 
     Ok(Document {
         path: path.to_path_buf(),
@@ -421,6 +1619,47 @@ fn find_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, Cl
         }
     }
     Ok(None)
+}
+
+fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
+    Ok(
+        read_documents(&workspace.board_dir, DocumentLocation::Board)?
+            .into_iter()
+            .find(|doc| doc.id() == id),
+    )
+}
+
+fn find_log_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
+    Ok(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?
+        .into_iter()
+        .find(|doc| doc.id() == id))
+}
+
+fn document_exists(workspace: &Workspace, id: &str) -> Result<bool, CliError> {
+    Ok(find_document(workspace, id)?.is_some())
+}
+
+fn require_existing_document(workspace: &Workspace, id: &str, kind: &str) -> Result<(), CliError> {
+    if document_exists(workspace, id)? {
+        Ok(())
+    } else {
+        Err(CliError::user(format!("{kind} document not found: {id}")))
+    }
+}
+
+fn unresolved_blockers(
+    workspace: &Workspace,
+    blockers: Option<&str>,
+) -> Result<Vec<String>, CliError> {
+    let mut unresolved = Vec::new();
+    for blocker in blockers.map(parse_field_values).unwrap_or_default() {
+        if find_board_document(workspace, &blocker)?.is_some() {
+            unresolved.push(blocker);
+        } else if find_log_document(workspace, &blocker)?.is_none() {
+            unresolved.push(format!("{blocker} (missing)"));
+        }
+    }
+    Ok(unresolved)
 }
 
 fn split_frontmatter(content: &str) -> Result<(String, String), &'static str> {
@@ -453,31 +1692,114 @@ fn split_frontmatter(content: &str) -> Result<(String, String), &'static str> {
     Err("missing closing frontmatter delimiter")
 }
 
-fn parse_simple_frontmatter(frontmatter: &str) -> HashMap<String, String> {
+fn parse_frontmatter_fields(frontmatter: &str) -> Result<HashMap<String, String>, String> {
+    let Some(root) = parse_frontmatter_yaml(frontmatter)? else {
+        return Ok(HashMap::new());
+    };
+    let hash = root
+        .as_hash()
+        .ok_or_else(|| "frontmatter root must be a YAML mapping".to_string())?;
     let mut fields = HashMap::new();
+    flatten_yaml_hash(hash, "", &mut fields);
+    add_status_aliases(&mut fields);
+    Ok(fields)
+}
 
-    for line in frontmatter.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty()
-            || trimmed.starts_with('#')
-            || trimmed.starts_with('-')
-            || line.starts_with(' ')
-            || line.starts_with('\t')
-        {
-            continue;
-        }
+fn parse_frontmatter_yaml(frontmatter: &str) -> Result<Option<Yaml>, String> {
+    if frontmatter.trim().is_empty() {
+        return Ok(None);
+    }
+    let docs = YamlLoader::load_from_str(frontmatter).map_err(|error| error.to_string())?;
+    if docs.is_empty() {
+        return Ok(None);
+    }
+    if docs.len() > 1 {
+        return Err("frontmatter must contain exactly one YAML document".to_string());
+    }
+    let root = docs.into_iter().next().unwrap();
+    if root.is_badvalue() {
+        return Err("frontmatter root must be a YAML mapping".to_string());
+    }
+    Ok(Some(root))
+}
 
-        let Some((key, value)) = trimmed.split_once(':') else {
+fn flatten_yaml_hash(
+    hash: &yaml_rust2::yaml::Hash,
+    prefix: &str,
+    fields: &mut HashMap<String, String>,
+) {
+    for (key, value) in hash {
+        let Some(key) = yaml_scalar_to_string(key) else {
             continue;
         };
-        let key = key.trim();
-        let value = parse_scalar_value(value.trim());
-        if !key.is_empty() && !value.is_empty() {
-            fields.insert(key.to_string(), value);
+        if key.is_empty() {
+            continue;
+        }
+        let field_key = if prefix.is_empty() {
+            key
+        } else {
+            format!("{prefix}.{key}")
+        };
+        flatten_yaml_value(&field_key, value, fields);
+    }
+}
+
+fn flatten_yaml_value(prefix: &str, value: &Yaml, fields: &mut HashMap<String, String>) {
+    match value {
+        Yaml::Hash(hash) => flatten_yaml_hash(hash, prefix, fields),
+        Yaml::Array(values) => {
+            if let Some(inline) = yaml_array_field_value(values) {
+                fields.insert(prefix.to_string(), inline);
+            } else {
+                for (index, item) in values.iter().enumerate() {
+                    flatten_yaml_value(&format!("{prefix}.{index}"), item, fields);
+                }
+            }
+        }
+        _ => {
+            if let Some(value) = yaml_scalar_to_string(value) {
+                if !value.is_empty() {
+                    fields.insert(prefix.to_string(), value);
+                }
+            }
         }
     }
+}
 
-    fields
+fn yaml_array_field_value(values: &[Yaml]) -> Option<String> {
+    let mut scalars = Vec::new();
+    for value in values {
+        scalars.push(yaml_scalar_to_string(value)?);
+    }
+    Some(inline_array(&scalars))
+}
+
+fn yaml_scalar_to_string(value: &Yaml) -> Option<String> {
+    match value {
+        Yaml::String(value) | Yaml::Real(value) => Some(value.clone()),
+        Yaml::Integer(value) => Some(value.to_string()),
+        Yaml::Boolean(value) => Some(value.to_string()),
+        Yaml::Null | Yaml::BadValue | Yaml::Array(_) | Yaml::Hash(_) | Yaml::Alias(_) => None,
+    }
+}
+
+fn yaml_mapping_value<'a>(root: &'a Yaml, key: &str) -> Option<&'a Yaml> {
+    root.as_hash()?.iter().find_map(|(candidate, value)| {
+        (yaml_scalar_to_string(candidate).as_deref() == Some(key)).then_some(value)
+    })
+}
+
+fn add_status_aliases(fields: &mut HashMap<String, String>) {
+    if !fields.contains_key("accordStatus") {
+        if let Some(status) = fields.get("accord.status").cloned() {
+            fields.insert("accordStatus".to_string(), status);
+        }
+    }
+    if !fields.contains_key("reviewStatus") {
+        if let Some(status) = fields.get("review.status").cloned() {
+            fields.insert("reviewStatus".to_string(), status);
+        }
+    }
 }
 
 fn parse_scalar_value(value: &str) -> String {
@@ -532,6 +1854,275 @@ fn unescape_double_quoted(value: &str) -> String {
     output
 }
 
+fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
+    docs.into_iter()
+        .filter(|doc| {
+            options
+                .state
+                .as_deref()
+                .map_or(true, |state| doc.field("state") == Some(state))
+        })
+        .filter(|doc| {
+            options
+                .doc_type
+                .as_deref()
+                .map_or(true, |doc_type| doc.doc_type() == doc_type)
+        })
+        .filter(|doc| {
+            options
+                .priority
+                .as_deref()
+                .map_or(true, |priority| doc.field("priority") == Some(priority))
+        })
+        .filter(|doc| {
+            options
+                .assignee
+                .as_deref()
+                .map_or(true, |assignee| doc.field("assignee") == Some(assignee))
+        })
+        .filter(|doc| {
+            options
+                .tag
+                .as_deref()
+                .map_or(true, |tag| field_values_contain(doc.field("tags"), tag))
+        })
+        .filter(|doc| {
+            options
+                .accord
+                .as_deref()
+                .map_or(true, |accord| accord_status(doc) == Some(accord))
+        })
+        .filter(|doc| {
+            options
+                .review
+                .as_deref()
+                .map_or(true, |review| review_status(doc) == Some(review))
+        })
+        .collect()
+}
+
+fn accord_status(doc: &Document) -> Option<&str> {
+    doc.field("accord.status")
+        .or_else(|| doc.field("accordStatus"))
+}
+
+fn review_status(doc: &Document) -> Option<&str> {
+    doc.field("review.status")
+        .or_else(|| doc.field("reviewStatus"))
+}
+
+impl AccordRecord {
+    fn from_document(doc: &Document, updated_at: &str) -> Self {
+        Self {
+            status: accord_status(doc).unwrap_or("missing").to_string(),
+            assignee: doc.field("accord.assignee").map(str::to_string),
+            deliverables: doc
+                .field("accord.deliverables")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            validations: doc
+                .field("accord.validations")
+                .or_else(|| doc.field("accord.validation"))
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            constraints: doc
+                .field("accord.constraints")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            summary: doc.field("accord.summary").map(str::to_string),
+            evidence: doc
+                .field("accord.evidence")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            files_changed: doc
+                .field("accord.filesChanged")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            reviewer: doc.field("accord.reviewer").map(str::to_string),
+            note: doc.field("accord.note").map(str::to_string),
+            reason: doc.field("accord.reason").map(str::to_string),
+            updated_at: updated_at.to_string(),
+        }
+    }
+}
+
+fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), CliError> {
+    match action {
+        "claim" => {
+            require_nonempty(
+                options.assignee.as_deref(),
+                "accord claim requires --assignee <name>",
+            )?;
+        }
+        "deliver" => {
+            require_nonempty(
+                options.summary.as_deref(),
+                "accord deliver requires --summary <text>",
+            )?;
+        }
+        "rework" => {
+            require_nonempty(
+                options.note.as_deref(),
+                "accord rework requires --note <text>",
+            )?;
+        }
+        "block" | "fail" => {
+            require_nonempty(
+                options.reason.as_deref(),
+                &format!("accord {action} requires --reason <text>"),
+            )?;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn validate_accord_transition(action: &str, previous_status: &str) -> Result<(), CliError> {
+    match action {
+        "accept" if previous_status != "delivered" && previous_status != "accepted" => {
+            Err(CliError::user(format!(
+                "accord accept requires current accord.status=delivered; current status is {previous_status}"
+            )))
+        }
+        "rework" if previous_status != "delivered" && previous_status != "rework" => {
+            Err(CliError::user(format!(
+                "accord rework requires current accord.status=delivered; current status is {previous_status}"
+            )))
+        }
+        "ready" | "claim" | "deliver" | "block" | "fail"
+            if previous_status == "accepted" && action != "ready" =>
+        {
+            Err(CliError::user(
+                "accepted accord cannot transition without resetting with `tdm accord ready`".to_string(),
+            ))
+        }
+        _ => Ok(()),
+    }
+}
+
+fn apply_accord_action(
+    accord: &mut AccordRecord,
+    action: &str,
+    status: &str,
+    options: &AccordOptions,
+) {
+    accord.status = status.to_string();
+    match action {
+        "ready" | "claim" => {
+            accord.summary = None;
+            accord.evidence.clear();
+            accord.files_changed.clear();
+            accord.reviewer = None;
+            accord.note = None;
+            accord.reason = None;
+        }
+        "deliver" => {
+            accord.reviewer = None;
+            accord.note = None;
+            accord.reason = None;
+        }
+        "accept" => {
+            accord.reason = None;
+        }
+        "rework" => {
+            accord.reviewer = None;
+            accord.reason = None;
+        }
+        "block" | "fail" => {
+            accord.reviewer = None;
+            accord.note = None;
+        }
+        _ => {}
+    }
+    if let Some(assignee) = options
+        .assignee
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        accord.assignee = Some(assignee.to_string());
+    }
+    if !options.deliverables.is_empty() {
+        accord.deliverables = options.deliverables.clone();
+    }
+    if !options.validations.is_empty() {
+        accord.validations = options.validations.clone();
+    }
+    if !options.constraints.is_empty() {
+        accord.constraints = options.constraints.clone();
+    }
+    if let Some(summary) = options
+        .summary
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        accord.summary = Some(summary.to_string());
+    }
+    if !options.evidence.is_empty() {
+        accord.evidence = options.evidence.clone();
+    }
+    if !options.files_changed.is_empty() {
+        accord.files_changed = options.files_changed.clone();
+    }
+    if let Some(reviewer) = options
+        .reviewer
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        accord.reviewer = Some(reviewer.to_string());
+    }
+    if let Some(note) = options
+        .note
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        accord.note = Some(note.to_string());
+    }
+    if let Some(reason) = options
+        .reason
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        accord.reason = Some(reason.to_string());
+    }
+}
+
+fn accord_event_name(action: &str) -> &'static str {
+    match action {
+        "ready" => "accord.ready",
+        "claim" => "accord.claimed",
+        "deliver" => "accord.delivered",
+        "accept" => "accord.accepted",
+        "rework" => "accord.rework",
+        "block" => "accord.blocked",
+        "fail" => "accord.failed",
+        _ => "accord.updated",
+    }
+}
+
+fn print_accord_update(
+    id: &str,
+    previous_status: &str,
+    status: &str,
+    event_name: &str,
+    path: &Path,
+) {
+    println!("Updated accord");
+    println!("ID:     {id}");
+    println!("From:   {previous_status}");
+    println!("To:     {status}");
+    println!("Path:   {}", display_path(path));
+    println!("Event:  {event_name}");
+}
+
+fn sort_documents(docs: &mut [Document]) {
+    docs.sort_by(|a, b| {
+        a.field("state")
+            .unwrap_or("")
+            .cmp(b.field("state").unwrap_or(""))
+            .then_with(|| a.id().cmp(b.id()))
+    });
+}
+
 fn print_list_table(docs: &[Document]) {
     if docs.is_empty() {
         println!("No active Tandem documents found.");
@@ -567,6 +2158,9 @@ fn print_show(doc: &Document) {
     if let Some(assignee) = doc.field("assignee") {
         println!("Assignee:  {assignee}");
     }
+    if let Some(due_date) = doc.field("dueDate") {
+        println!("Due:       {due_date}");
+    }
     if let Some(created_at) = doc.field("createdAt") {
         println!("Created:   {created_at}");
     }
@@ -575,6 +2169,15 @@ fn print_show(doc: &Document) {
     }
     if let Some(completed_at) = doc.field("completedAt") {
         println!("Completed: {completed_at}");
+    }
+    if let Some(status) = accord_status(doc) {
+        println!("Accord:    {status}");
+    }
+    if let Some(status) = review_status(doc) {
+        println!("Review:    {status}");
+    }
+    if let Some(summary) = doc.field("completionSummary") {
+        println!("Summary:   {summary}");
     }
     println!("Location:  {}", doc.location.as_str());
     println!("Path:      {}", display_path(&doc.path));
@@ -587,6 +2190,489 @@ fn print_show(doc: &Document) {
         if !doc.body.ends_with('\n') {
             println!();
         }
+    }
+}
+
+#[derive(Debug)]
+struct SearchResult {
+    doc: Document,
+    snippet: String,
+}
+
+fn search_match(doc: Document, query: &str) -> Option<SearchResult> {
+    let lowered_query = query.to_lowercase();
+    let mut haystacks = vec![
+        doc.id().to_string(),
+        doc.title().to_string(),
+        doc.body.clone(),
+    ];
+    haystacks.extend(doc.fields.values().cloned());
+    for haystack in haystacks {
+        if haystack.to_lowercase().contains(&lowered_query) {
+            return Some(SearchResult {
+                doc,
+                snippet: snippet_for_match(&haystack, query),
+            });
+        }
+    }
+    None
+}
+
+fn snippet_for_match(value: &str, query: &str) -> String {
+    let condensed = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if condensed.chars().count() <= 80 {
+        return condensed;
+    }
+
+    let lower = condensed.to_lowercase();
+    let query_lower = query.to_lowercase();
+    let byte_index = lower.find(&query_lower).unwrap_or(0);
+    let char_index = condensed[..byte_index].chars().count();
+    let start = char_index.saturating_sub(20);
+    let end = (start + 80).min(condensed.chars().count());
+    let chars = condensed.chars().collect::<Vec<_>>();
+    let mut snippet = chars[start..end].iter().collect::<String>();
+    if start > 0 {
+        snippet.insert_str(0, "…");
+    }
+    if end < chars.len() {
+        snippet.push('…');
+    }
+    snippet
+}
+
+fn print_search_table(results: &[SearchResult]) {
+    if results.is_empty() {
+        println!("No matching Tandem documents found.");
+        return;
+    }
+    println!(
+        "{:<12} {:<8} {:<12} {:<8} {:<32} MATCH",
+        "ID", "WHERE", "STATE", "TYPE", "TITLE"
+    );
+    for result in results {
+        let doc = &result.doc;
+        println!(
+            "{:<12} {:<8} {:<12} {:<8} {:<32} {}",
+            truncate(doc.id(), 12),
+            doc.location.as_str(),
+            truncate(doc.field("state").unwrap_or("-"), 12),
+            truncate(doc.doc_type(), 8),
+            truncate(doc.title(), 32),
+            truncate(&result.snippet, 80)
+        );
+    }
+}
+
+fn print_log_table(docs: &[Document]) {
+    if docs.is_empty() {
+        println!("No completed Tandem logs found.");
+        return;
+    }
+    println!("{:<12} {:<20} {:<36} SUMMARY", "ID", "COMPLETED", "TITLE");
+    for doc in docs {
+        println!(
+            "{:<12} {:<20} {:<36} {}",
+            truncate(doc.id(), 12),
+            truncate(doc.field("completedAt").unwrap_or("-"), 20),
+            truncate(doc.title(), 36),
+            truncate(doc.field("completionSummary").unwrap_or("-"), 80)
+        );
+    }
+}
+
+fn print_log_show(doc: &Document) {
+    println!("Log document");
+    print_show(doc);
+    if let Some(validation) = doc.field("completionValidation") {
+        println!();
+        println!("Validation: {validation}");
+    }
+    if let Some(files) = doc.field("filesChanged") {
+        println!("Files changed: {files}");
+    }
+    if let Some(reviewer) = doc.field("completionReviewer") {
+        println!("Reviewer: {reviewer}");
+    }
+}
+
+fn print_decision_table(docs: &[Document]) {
+    if docs.is_empty() {
+        println!("No Tandem decisions found.");
+        return;
+    }
+    println!("{:<14} {:<42} {:<24} SUMMARY", "ID", "TITLE", "REFERENCES");
+    for doc in docs {
+        println!(
+            "{:<14} {:<42} {:<24} {}",
+            truncate(doc.id(), 14),
+            truncate(doc.title(), 42),
+            truncate(doc.field("references").unwrap_or("-"), 24),
+            truncate(&first_body_line(doc), 80)
+        );
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RuleItem {
+    id: usize,
+    rule: String,
+    source: Option<String>,
+}
+
+type RulesByCategory = BTreeMap<String, Vec<RuleItem>>;
+
+fn empty_rules() -> RulesByCategory {
+    let mut rules = BTreeMap::new();
+    for category in ["always", "never", "prefer", "context"] {
+        rules.insert(category.to_string(), Vec::new());
+    }
+    rules
+}
+
+fn read_rules(config_path: &Path) -> Result<RulesByCategory, CliError> {
+    let root = read_frontmatter_yaml_file(config_path)?;
+    Ok(parse_rules_from_yaml(root.as_ref()))
+}
+
+fn parse_rules_from_content(content: &str, path: &Path) -> Result<RulesByCategory, CliError> {
+    let (frontmatter, _) = split_frontmatter(content).map_err(|message| {
+        CliError::user(format!("failed to parse {}: {message}", display_path(path)))
+    })?;
+    let root = parse_frontmatter_yaml(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "failed to parse {} frontmatter YAML: {message}",
+            display_path(path)
+        ))
+    })?;
+    Ok(parse_rules_from_yaml(root.as_ref()))
+}
+
+fn read_frontmatter_yaml_file(path: &Path) -> Result<Option<Yaml>, CliError> {
+    let content = fs::read_to_string(path)?;
+    let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
+        CliError::user(format!("failed to parse {}: {message}", display_path(path)))
+    })?;
+    parse_frontmatter_yaml(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "failed to parse {} frontmatter YAML: {message}",
+            display_path(path)
+        ))
+    })
+}
+
+fn parse_rules_from_yaml(root: Option<&Yaml>) -> RulesByCategory {
+    let mut rules = empty_rules();
+    let Some(rules_yaml) = root.and_then(|root| yaml_mapping_value(root, "rules")) else {
+        return rules;
+    };
+    for category in ["always", "never", "prefer", "context"] {
+        let Some(category_yaml) = yaml_mapping_value(rules_yaml, category) else {
+            continue;
+        };
+        let parsed = parse_rule_category_items(category_yaml);
+        rules.insert(category.to_string(), parsed);
+    }
+    rules
+}
+
+fn parse_rule_category_items(value: &Yaml) -> Vec<RuleItem> {
+    match value {
+        Yaml::Array(items) => items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| parse_rule_item(item, index + 1))
+            .collect(),
+        _ => parse_rule_item(value, 1).into_iter().collect(),
+    }
+}
+
+fn parse_rule_item(value: &Yaml, fallback_id: usize) -> Option<RuleItem> {
+    match value {
+        Yaml::Hash(_) => {
+            let id = yaml_mapping_value(value, "id")
+                .and_then(yaml_scalar_to_string)
+                .and_then(|value| value.parse::<usize>().ok())
+                .unwrap_or(fallback_id);
+            let rule = yaml_mapping_value(value, "rule")
+                .and_then(yaml_scalar_to_string)
+                .unwrap_or_default();
+            if rule.trim().is_empty() {
+                return None;
+            }
+            let source = yaml_mapping_value(value, "source")
+                .and_then(yaml_scalar_to_string)
+                .filter(|source| !source.trim().is_empty());
+            Some(RuleItem { id, rule, source })
+        }
+        _ => yaml_scalar_to_string(value)
+            .filter(|rule| !rule.trim().is_empty())
+            .map(|rule| RuleItem {
+                id: fallback_id,
+                rule,
+                source: None,
+            }),
+    }
+}
+
+fn require_rule_category(category: Option<&str>) -> Result<&str, CliError> {
+    let category =
+        category.ok_or_else(|| CliError::usage("rules mutation requires --category <category>"))?;
+    validate_rule_category(category)?;
+    Ok(category)
+}
+
+fn validate_rule_category(category: &str) -> Result<(), CliError> {
+    if ["always", "never", "prefer", "context"].contains(&category) {
+        Ok(())
+    } else {
+        Err(CliError::usage(format!(
+            "unknown rule category `{category}`; use always, never, prefer, or context"
+        )))
+    }
+}
+
+fn warn_missing_rule_source(workspace: &Workspace, source: Option<&str>) -> Result<(), CliError> {
+    if let Some(source) = source {
+        if !source.trim().is_empty() && !document_exists(workspace, source)? {
+            println!("Warning: rule source not found: {source}");
+        }
+    }
+    Ok(())
+}
+
+fn patch_accord_content(content: &str, accord: &AccordRecord) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let accord_block = render_accord_block(accord);
+    let mut output_frontmatter = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0usize;
+    let mut replaced = false;
+
+    while index < lines.len() {
+        let raw_line = lines[index];
+        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
+        if frontmatter_line_key(line) == Some("accord") {
+            output_frontmatter.push_str(&accord_block);
+            replaced = true;
+            index += 1;
+            while index < lines.len() {
+                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                if is_top_level_frontmatter_boundary(skip_line) {
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        output_frontmatter.push_str(raw_line);
+        index += 1;
+    }
+
+    if !replaced {
+        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+            output_frontmatter.push('\n');
+        }
+        output_frontmatter.push_str(&accord_block);
+    }
+
+    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+        output_frontmatter.push('\n');
+    }
+
+    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
+}
+
+fn render_accord_block(accord: &AccordRecord) -> String {
+    let mut lines = Vec::new();
+    lines.push("accord:".to_string());
+    lines.push(format!("  status: {}", yaml_double_quote(&accord.status)));
+    push_optional_nested_line(&mut lines, "assignee", accord.assignee.as_deref());
+    push_nested_array_line(&mut lines, "deliverables", &accord.deliverables);
+    push_nested_array_line(&mut lines, "validations", &accord.validations);
+    push_nested_array_line(&mut lines, "constraints", &accord.constraints);
+    push_optional_nested_line(&mut lines, "summary", accord.summary.as_deref());
+    push_nested_array_line(&mut lines, "evidence", &accord.evidence);
+    push_nested_array_line(&mut lines, "filesChanged", &accord.files_changed);
+    push_optional_nested_line(&mut lines, "reviewer", accord.reviewer.as_deref());
+    push_optional_nested_line(&mut lines, "note", accord.note.as_deref());
+    push_optional_nested_line(&mut lines, "reason", accord.reason.as_deref());
+    lines.push(format!(
+        "  updatedAt: {}",
+        yaml_double_quote(&accord.updated_at)
+    ));
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+fn push_optional_nested_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        if !value.trim().is_empty() {
+            lines.push(format!("  {key}: {}", yaml_double_quote(value.trim())));
+        }
+    }
+}
+
+fn push_nested_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
+    if !values.is_empty() {
+        lines.push(format!("  {key}: {}", inline_array(values)));
+    }
+}
+
+fn patch_rules_category_content(
+    content: &str,
+    category: &str,
+    rules: &RulesByCategory,
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let category_block = render_rule_category_block(
+        category,
+        rules.get(category).map(Vec::as_slice).unwrap_or(&[]),
+    );
+    let mut output_frontmatter = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0usize;
+    let mut in_rules = false;
+    let mut saw_rules = false;
+    let mut replaced_category = false;
+
+    while index < lines.len() {
+        let raw_line = lines[index];
+        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
+
+        if !in_rules {
+            if frontmatter_line_key(line) == Some("rules") {
+                let inline_value = line
+                    .split_once(':')
+                    .map(|(_, value)| value.trim())
+                    .unwrap_or("");
+                if inline_value.is_empty() {
+                    output_frontmatter.push_str(raw_line);
+                } else {
+                    output_frontmatter.push_str("rules:\n");
+                }
+                in_rules = true;
+                saw_rules = true;
+            } else {
+                output_frontmatter.push_str(raw_line);
+            }
+            index += 1;
+            continue;
+        }
+
+        if is_top_level_frontmatter_boundary(line) {
+            if !replaced_category {
+                output_frontmatter.push_str(&category_block);
+                replaced_category = true;
+            }
+            in_rules = false;
+            output_frontmatter.push_str(raw_line);
+            index += 1;
+            continue;
+        }
+
+        if rule_category_key(line) == Some(category) {
+            output_frontmatter.push_str(&category_block);
+            replaced_category = true;
+            index += 1;
+            while index < lines.len() {
+                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                if is_top_level_frontmatter_boundary(skip_line)
+                    || rule_category_key(skip_line).is_some()
+                {
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+
+        output_frontmatter.push_str(raw_line);
+        index += 1;
+    }
+
+    if in_rules && !replaced_category {
+        output_frontmatter.push_str(&category_block);
+    }
+
+    if !saw_rules {
+        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+            output_frontmatter.push('\n');
+        }
+        output_frontmatter.push_str(&render_rules_block(rules));
+    }
+
+    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+        output_frontmatter.push('\n');
+    }
+
+    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
+}
+
+fn render_rules_block(rules: &RulesByCategory) -> String {
+    let mut output = String::from("rules:\n");
+    for category in ["always", "never", "prefer", "context"] {
+        output.push_str(&render_rule_category_block(
+            category,
+            rules.get(category).map(Vec::as_slice).unwrap_or(&[]),
+        ));
+    }
+    output
+}
+
+fn render_rule_category_block(category: &str, items: &[RuleItem]) -> String {
+    let mut lines = Vec::new();
+    if items.is_empty() {
+        lines.push(format!("  {category}: []"));
+    } else {
+        lines.push(format!("  {category}:"));
+        for item in items {
+            lines.push(format!("    - id: {}", item.id));
+            lines.push(format!("      rule: {}", yaml_double_quote(&item.rule)));
+            if let Some(source) = item.source.as_deref() {
+                lines.push(format!("      source: {}", yaml_double_quote(source)));
+            }
+        }
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
+fn rule_category_key(line: &str) -> Option<&str> {
+    let indentation = line.chars().take_while(|ch| *ch == ' ').count();
+    if indentation != 2 || line.starts_with('\t') {
+        return None;
+    }
+    let trimmed = line.trim();
+    let (key, _) = trimmed.split_once(':')?;
+    ["always", "never", "prefer", "context"]
+        .contains(&key)
+        .then_some(key)
+}
+
+fn print_rules(rules: &RulesByCategory, category_filter: Option<&str>) {
+    let categories = ["always", "never", "prefer", "context"];
+    let mut printed_any = false;
+    for category in categories {
+        if category_filter.is_some_and(|filter| filter != category) {
+            continue;
+        }
+        println!("{category}:");
+        let items = rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
+        if items.is_empty() {
+            println!("  (none)");
+        } else {
+            printed_any = true;
+            for item in items {
+                match item.source.as_deref() {
+                    Some(source) => println!("  {}. {} ({source})", item.id, item.rule),
+                    None => println!("  {}. {}", item.id, item.rule),
+                }
+            }
+        }
+    }
+    if !printed_any && category_filter.is_some() {
+        // The category heading above is the intended empty-list output.
     }
 }
 
@@ -622,6 +2708,160 @@ fn show_json(doc: &Document) -> String {
     )
 }
 
+fn log_list_json(docs: &[Document]) -> String {
+    let items = docs.iter().map(log_summary_json).collect::<Vec<_>>();
+    format!(
+        "{{\"ok\":true,\"data\":{{\"items\":[{}],\"count\":{}}},\"warnings\":[]}}",
+        items.join(","),
+        docs.len()
+    )
+}
+
+fn log_show_json(doc: &Document) -> String {
+    let files = doc
+        .field("filesChanged")
+        .map(parse_field_values)
+        .unwrap_or_default();
+    format!(
+        "{{\"ok\":true,\"data\":{{\"document\":{},\"completion\":{{\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
+        document_detail_json(doc),
+        json_string(doc.field("completionSummary").unwrap_or("")),
+        json_array_strings(&files),
+        json_string(doc.field("completionValidation").unwrap_or("")),
+        json_string(doc.field("completionReviewer").unwrap_or("")),
+        json_string(&doc.body),
+        json_string(&display_path(&doc.path))
+    )
+}
+
+fn search_json(query: &str, results: &[SearchResult]) -> String {
+    let items = results
+        .iter()
+        .map(|result| {
+            let doc = &result.doc;
+            let mut fields = Vec::new();
+            push_json_field(&mut fields, "id", doc.id());
+            push_json_field(&mut fields, "type", doc.doc_type());
+            push_json_field(&mut fields, "title", doc.title());
+            push_json_field(&mut fields, "location", doc.location.as_str());
+            push_optional_json_field(&mut fields, "state", doc.field("state"));
+            push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+            push_json_field(&mut fields, "snippet", &result.snippet);
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>();
+    format!(
+        "{{\"ok\":true,\"data\":{{\"query\":{},\"results\":[{}]}},\"warnings\":[]}}",
+        json_string(query),
+        items.join(",")
+    )
+}
+
+fn rules_json(rules: &RulesByCategory, category_filter: Option<&str>) -> String {
+    let categories = ["always", "never", "prefer", "context"];
+    let mut category_fields = Vec::new();
+    let mut count_fields = Vec::new();
+    let mut total = 0usize;
+    for category in categories {
+        let items = rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
+        let included_items = if category_filter.is_some_and(|filter| filter != category) {
+            Vec::new()
+        } else {
+            items.to_vec()
+        };
+        total += included_items.len();
+        let json_items = included_items
+            .iter()
+            .map(|item| {
+                let mut fields = Vec::new();
+                fields.push(format!("\"id\":{}", item.id));
+                push_json_field(&mut fields, "rule", &item.rule);
+                push_optional_json_field(&mut fields, "source", item.source.as_deref());
+                format!("{{{}}}", fields.join(","))
+            })
+            .collect::<Vec<_>>();
+        category_fields.push(format!(
+            "{}:[{}]",
+            json_string(category),
+            json_items.join(",")
+        ));
+        count_fields.push(format!(
+            "{}:{}",
+            json_string(category),
+            included_items.len()
+        ));
+    }
+    count_fields.push(format!("\"total\":{total}"));
+    format!(
+        "{{\"ok\":true,\"data\":{{\"rules\":{{{}}},\"counts\":{{{}}}}},\"warnings\":[]}}",
+        category_fields.join(","),
+        count_fields.join(",")
+    )
+}
+
+fn decision_list_json(docs: &[Document]) -> String {
+    let items = docs
+        .iter()
+        .map(|doc| {
+            let references = doc
+                .field("references")
+                .map(parse_field_values)
+                .unwrap_or_default();
+            let mut fields = Vec::new();
+            push_json_field(&mut fields, "id", doc.id());
+            push_json_field(&mut fields, "type", doc.doc_type());
+            push_json_field(&mut fields, "title", doc.title());
+            fields.push(format!(
+                "\"references\":{}",
+                json_array_strings(&references)
+            ));
+            push_json_field(&mut fields, "summary", &first_body_line(doc));
+            format!("{{{}}}", fields.join(","))
+        })
+        .collect::<Vec<_>>();
+    format!(
+        "{{\"ok\":true,\"data\":{{\"items\":[{}],\"count\":{}}},\"warnings\":[]}}",
+        items.join(","),
+        docs.len()
+    )
+}
+
+fn decision_show_json(doc: &Document) -> String {
+    let mut fields = Vec::new();
+    push_json_field(&mut fields, "id", doc.id());
+    push_json_field(&mut fields, "type", doc.doc_type());
+    push_json_field(&mut fields, "title", doc.title());
+    let references = doc
+        .field("references")
+        .map(parse_field_values)
+        .unwrap_or_default();
+    fields.push(format!(
+        "\"references\":{}",
+        json_array_strings(&references)
+    ));
+    if let Some(tags) = doc.field("tags") {
+        fields.push(format!(
+            "\"tags\":{}",
+            json_array_strings(&parse_field_values(tags))
+        ));
+    }
+    format!(
+        "{{\"ok\":true,\"data\":{{\"decision\":{{{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
+        fields.join(","),
+        json_string(&doc.body),
+        json_string(&display_path(&doc.path))
+    )
+}
+
+fn first_body_line(doc: &Document) -> String {
+    doc.body
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("")
+        .to_string()
+}
+
 fn document_summary_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
@@ -630,6 +2870,14 @@ fn document_summary_json(doc: &Document) -> String {
     push_optional_json_field(&mut fields, "state", doc.field("state"));
     push_optional_json_field(&mut fields, "priority", doc.field("priority"));
     push_optional_json_field(&mut fields, "assignee", doc.field("assignee"));
+    if let Some(tags) = doc.field("tags") {
+        fields.push(format!(
+            "\"tags\":{}",
+            json_array_strings(&parse_field_values(tags))
+        ));
+    }
+    push_status_object_json(&mut fields, "accord", accord_status(doc));
+    push_status_object_json(&mut fields, "review", review_status(doc));
     format!("{{{}}}", fields.join(","))
 }
 
@@ -642,12 +2890,37 @@ fn document_detail_json(doc: &Document) -> String {
         "state",
         "priority",
         "assignee",
+        "dueDate",
         "createdAt",
         "updatedAt",
         "completedAt",
+        "completionSummary",
     ] {
         push_optional_json_field(&mut fields, key, doc.field(key));
     }
+    if let Some(tags) = doc.field("tags") {
+        fields.push(format!(
+            "\"tags\":{}",
+            json_array_strings(&parse_field_values(tags))
+        ));
+    }
+    push_status_object_json(&mut fields, "accord", accord_status(doc));
+    push_status_object_json(&mut fields, "review", review_status(doc));
+    format!("{{{}}}", fields.join(","))
+}
+
+fn log_summary_json(doc: &Document) -> String {
+    let mut fields = Vec::new();
+    push_json_field(&mut fields, "id", doc.id());
+    push_json_field(&mut fields, "type", doc.doc_type());
+    push_json_field(&mut fields, "title", doc.title());
+    push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+    push_optional_json_field(&mut fields, "summary", doc.field("completionSummary"));
+    push_optional_json_field(
+        &mut fields,
+        "validationStatus",
+        doc.field("completionValidation"),
+    );
     format!("{{{}}}", fields.join(","))
 }
 
@@ -655,10 +2928,31 @@ fn push_json_field(fields: &mut Vec<String>, key: &str, value: &str) {
     fields.push(format!("{}:{}", json_string(key), json_string(value)));
 }
 
+fn push_status_object_json(fields: &mut Vec<String>, key: &str, status: Option<&str>) {
+    if let Some(status) = status {
+        fields.push(format!(
+            "{}:{{\"status\":{}}}",
+            json_string(key),
+            json_string(status)
+        ));
+    }
+}
+
 fn push_optional_json_field(fields: &mut Vec<String>, key: &str, value: Option<&str>) {
     if let Some(value) = value {
         push_json_field(fields, key, value);
     }
+}
+
+fn json_array_strings(values: &[String]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|value| json_string(value))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 fn json_string(value: &str) -> String {
@@ -680,6 +2974,290 @@ fn json_string(value: &str) -> String {
     output
 }
 
+fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str, CliError> {
+    let value = value.ok_or_else(|| CliError::usage(message))?.trim();
+    if value.is_empty() {
+        Err(CliError::usage(message))
+    } else {
+        Ok(value)
+    }
+}
+
+fn read_workspace_states(workspace: &Workspace) -> Result<Vec<String>, CliError> {
+    let root = read_frontmatter_yaml_file(&workspace.config_path)?;
+    let mut states = Vec::new();
+    if let Some(states_yaml) = root
+        .as_ref()
+        .and_then(|root| yaml_mapping_value(root, "states"))
+    {
+        match states_yaml {
+            Yaml::Array(items) => {
+                for item in items {
+                    if let Some(state) = yaml_scalar_to_string(item)
+                        .or_else(|| yaml_mapping_value(item, "id").and_then(yaml_scalar_to_string))
+                    {
+                        if !state.trim().is_empty() {
+                            states.push(state);
+                        }
+                    }
+                }
+            }
+            _ => {
+                if let Some(state) = yaml_scalar_to_string(states_yaml) {
+                    if !state.trim().is_empty() {
+                        states.push(state);
+                    }
+                }
+            }
+        }
+    }
+    if states.is_empty() {
+        states.extend(DEFAULT_STATES.iter().map(|state| (*state).to_string()));
+    }
+    Ok(states)
+}
+
+fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
+    if state.trim().is_empty() {
+        return Err(CliError::usage("state must not be empty"));
+    }
+    let states = read_workspace_states(workspace)?;
+    if states.iter().any(|known| known == state) {
+        Ok(())
+    } else {
+        Err(CliError::usage(format!(
+            "unknown state `{state}`; known states: {}",
+            states.join(", ")
+        )))
+    }
+}
+
+fn next_sequential_id(workspace: &Workspace, prefix: &str) -> Result<String, CliError> {
+    let mut max_number = 0usize;
+    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    let needle = format!("{prefix}-");
+    for doc in docs {
+        if let Some(number) = doc.id().strip_prefix(&needle) {
+            if let Ok(value) = number.parse::<usize>() {
+                max_number = max_number.max(value);
+            }
+        }
+    }
+    Ok(format!("{prefix}-{}", max_number + 1))
+}
+
+fn patch_frontmatter_content(
+    content: &str,
+    updates: &BTreeMap<String, String>,
+    removes: &[&str],
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let mut seen = BTreeMap::<String, bool>::new();
+    let mut output_frontmatter = String::new();
+
+    for raw_line in frontmatter.split_inclusive('\n') {
+        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
+        if let Some(key) = frontmatter_line_key(line) {
+            if removes.iter().any(|remove| *remove == key) {
+                continue;
+            }
+            if let Some(value) = updates.get(key) {
+                output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
+                seen.insert(key.to_string(), true);
+                continue;
+            }
+        }
+        output_frontmatter.push_str(raw_line);
+    }
+
+    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+        output_frontmatter.push('\n');
+    }
+    for (key, value) in updates {
+        if !seen.contains_key(key) {
+            output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
+        }
+    }
+
+    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
+}
+
+fn frontmatter_line_key(line: &str) -> Option<&str> {
+    if line.starts_with(' ') || line.starts_with('\t') || line.trim_start().starts_with('-') {
+        return None;
+    }
+    let (key, _) = line.split_once(':')?;
+    let key = key.trim();
+    if key.is_empty() {
+        None
+    } else {
+        Some(key)
+    }
+}
+
+fn is_top_level_frontmatter_boundary(line: &str) -> bool {
+    !line.starts_with(' ')
+        && !line.starts_with('\t')
+        && !line.trim().is_empty()
+        && (frontmatter_line_key(line).is_some() || line.trim_start().starts_with('#'))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FileSignature {
+    len: u64,
+    modified: Option<SystemTime>,
+}
+
+fn read_file_snapshot(path: &Path) -> Result<(String, FileSignature), CliError> {
+    let before = file_signature(path)?;
+    let content = fs::read_to_string(path)?;
+    let after = file_signature(path)?;
+    if before != after {
+        return Err(CliError::user(format!(
+            "write conflict: {} changed while the command was reading it; rerun the command",
+            display_path(path)
+        )));
+    }
+    Ok((content, after))
+}
+
+fn ensure_file_unchanged(path: &Path, expected: &FileSignature) -> Result<(), CliError> {
+    let current = file_signature(path)?;
+    if &current == expected {
+        Ok(())
+    } else {
+        Err(CliError::user(format!(
+            "write conflict: {} changed while the command was preparing its update; rerun the command",
+            display_path(path)
+        )))
+    }
+}
+
+fn file_signature(path: &Path) -> Result<FileSignature, CliError> {
+    let metadata = fs::metadata(path)?;
+    Ok(FileSignature {
+        len: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
+}
+
+fn write_atomic(path: &Path, content: &str) -> Result<(), CliError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp_path = temporary_path_for(path);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temp_path)?;
+    if let Err(error) = file
+        .write_all(content.as_bytes())
+        .and_then(|_| file.sync_all())
+    {
+        let _ = fs::remove_file(&temp_path);
+        return Err(CliError::user(format!(
+            "failed to write {}: {error}",
+            display_path(path)
+        )));
+    }
+    if let Err(error) = fs::rename(&temp_path, path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(CliError::user(format!(
+            "failed to replace {}: {error}",
+            display_path(path)
+        )));
+    }
+    Ok(())
+}
+
+fn temporary_path_for(path: &Path) -> PathBuf {
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("document.md");
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    path.with_file_name(format!(
+        ".{file_name}.tmp.{}.{}",
+        std::process::id(),
+        millis
+    ))
+}
+
+fn append_event(
+    workspace: &Workspace,
+    event_name: &str,
+    id: &str,
+    summary: &str,
+) -> Result<(), CliError> {
+    let ts = current_timestamp();
+    let line = format!(
+        "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{}}}\n",
+        json_string(&ts),
+        json_string(event_name),
+        json_string(id),
+        json_string(summary)
+    );
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&workspace.events_path)
+        .map_err(|error| {
+            CliError::user(format!(
+                "failed to open event log {}: {error}",
+                display_path(&workspace.events_path)
+            ))
+        })?;
+    file.write_all(line.as_bytes()).map_err(|error| {
+        CliError::user(format!(
+            "failed to append event log {}: {error}",
+            display_path(&workspace.events_path)
+        ))
+    })
+}
+
+fn file_name_for_path(path: &Path) -> Result<PathBuf, CliError> {
+    path.file_name()
+        .map(PathBuf::from)
+        .ok_or_else(|| CliError::user(format!("cannot determine file name for {}", path.display())))
+}
+
+fn push_optional_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
+    if let Some(value) = value {
+        if !value.trim().is_empty() {
+            lines.push(format!("{key}: {}", yaml_double_quote(value.trim())));
+        }
+    }
+}
+
+fn push_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
+    if !values.is_empty() {
+        lines.push(format!("{key}: {}", inline_array(values)));
+    }
+}
+
+fn inline_array(values: &[String]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|value| yaml_double_quote(value))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn yaml_value_for_update(value: &str) -> String {
+    if value.starts_with('[') && value.ends_with(']') {
+        value.to_string()
+    } else {
+        yaml_double_quote(value)
+    }
+}
+
 fn yaml_double_quote(value: &str) -> String {
     let escaped = value
         .replace('\\', "\\\\")
@@ -688,6 +3266,71 @@ fn yaml_double_quote(value: &str) -> String {
         .replace('\r', "\\r")
         .replace('\t', "\\t");
     format!("\"{escaped}\"")
+}
+
+fn field_values_contain(value: Option<&str>, needle: &str) -> bool {
+    value
+        .map(parse_field_values)
+        .map_or(false, |values| values.iter().any(|value| value == needle))
+}
+
+fn parse_field_values(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed == "[]" {
+        return Vec::new();
+    }
+    if trimmed.starts_with('[') && trimmed.ends_with(']') {
+        if let Ok(docs) = YamlLoader::load_from_str(trimmed) {
+            if let Some(Yaml::Array(values)) = docs.first() {
+                return values
+                    .iter()
+                    .filter_map(yaml_scalar_to_string)
+                    .filter(|item| !item.is_empty())
+                    .collect();
+            }
+        }
+        return trimmed[1..trimmed.len() - 1]
+            .split(',')
+            .map(|item| parse_scalar_value(item.trim()))
+            .filter(|item| !item.is_empty())
+            .collect();
+    }
+    vec![parse_scalar_value(trimmed)]
+        .into_iter()
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+fn current_timestamp() -> String {
+    let seconds = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0);
+    format_unix_seconds(seconds)
+}
+
+fn format_unix_seconds(seconds: i64) -> String {
+    let days = seconds.div_euclid(86_400);
+    let second_of_day = seconds.rem_euclid(86_400);
+    let hour = second_of_day / 3_600;
+    let minute = (second_of_day % 3_600) / 60;
+    let second = second_of_day % 60;
+    let (year, month, day) = civil_from_days(days);
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+fn civil_from_days(days_since_epoch: i64) -> (i64, i64, i64) {
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 }.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096).div_euclid(365);
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2).div_euclid(153);
+    let day = doy - (153 * mp + 2).div_euclid(5) + 1;
+    let month = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if month <= 2 { 1 } else { 0 };
+    (year, month, day)
 }
 
 fn truncate(value: &str, max_chars: usize) -> String {
@@ -720,10 +3363,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parses_simple_frontmatter_and_body() {
+    fn parses_yaml_frontmatter_and_preserves_body() {
         let input = "---\nid: task-1\ntitle: \"Hello\"\nstate: todo\n---\n\nBody\n";
         let (frontmatter, body) = split_frontmatter(input).unwrap();
-        let fields = parse_simple_frontmatter(&frontmatter);
+        let fields = parse_frontmatter_fields(&frontmatter).unwrap();
         assert_eq!(fields.get("id").map(String::as_str), Some("task-1"));
         assert_eq!(fields.get("title").map(String::as_str), Some("Hello"));
         assert_eq!(fields.get("state").map(String::as_str), Some("todo"));
@@ -731,7 +3374,146 @@ mod tests {
     }
 
     #[test]
+    fn parses_nested_accord_and_review_statuses() {
+        let frontmatter = r#"
+id: task-1
+accord:
+  status: delivered
+  assignee: pi
+review:
+  status: pending
+tags: ["tui", "cli"]
+"#;
+        let fields = parse_frontmatter_fields(frontmatter).unwrap();
+        assert_eq!(
+            fields.get("accord.status").map(String::as_str),
+            Some("delivered")
+        );
+        assert_eq!(
+            fields.get("accordStatus").map(String::as_str),
+            Some("delivered")
+        );
+        assert_eq!(
+            fields.get("accord.assignee").map(String::as_str),
+            Some("pi")
+        );
+        assert_eq!(
+            fields.get("review.status").map(String::as_str),
+            Some("pending")
+        );
+        assert_eq!(
+            fields.get("reviewStatus").map(String::as_str),
+            Some("pending")
+        );
+        assert_eq!(
+            parse_field_values(fields.get("tags").unwrap()),
+            vec!["tui", "cli"]
+        );
+    }
+
+    #[test]
+    fn parses_block_arrays_and_quoted_commas() {
+        let frontmatter = r#"
+tags:
+  - "ui, polish"
+  - cli
+blockers: [task-1, "task-2"]
+"#;
+        let fields = parse_frontmatter_fields(frontmatter).unwrap();
+        assert_eq!(
+            parse_field_values(fields.get("tags").unwrap()),
+            vec!["ui, polish", "cli"]
+        );
+        assert_eq!(
+            parse_field_values(fields.get("blockers").unwrap()),
+            vec!["task-1", "task-2"]
+        );
+    }
+
+    #[test]
+    fn parses_structured_rules_with_sources() {
+        let root = parse_frontmatter_yaml(
+            r#"
+rules:
+  always:
+    - id: 3
+      rule: "Run tests"
+      source: decision-1
+  prefer:
+    - "Keep changes small"
+"#,
+        )
+        .unwrap();
+        let rules = parse_rules_from_yaml(root.as_ref());
+        assert_eq!(rules["always"][0].id, 3);
+        assert_eq!(rules["always"][0].rule, "Run tests");
+        assert_eq!(rules["always"][0].source.as_deref(), Some("decision-1"));
+        assert_eq!(rules["prefer"][0].id, 1);
+        assert_eq!(rules["prefer"][0].rule, "Keep changes small");
+    }
+
+    #[test]
+    fn patches_rules_category_without_touching_other_categories_or_body() {
+        let input = "---\ntitle: Demo\nrules:\n  always: []\n  never:\n    - id: 9\n      rule: \"Keep me\"\nstate: ignored\n---\n\n# Body\n";
+        let mut rules = empty_rules();
+        rules.get_mut("always").unwrap().push(RuleItem {
+            id: 1,
+            rule: "Run tests".to_string(),
+            source: Some("decision-1".to_string()),
+        });
+        let output = patch_rules_category_content(input, "always", &rules).unwrap();
+        assert!(output.contains("rules:\n  always:\n    - id: 1\n"));
+        assert!(output.contains("      source: \"decision-1\"\n"));
+        assert!(output.contains("  never:\n    - id: 9\n      rule: \"Keep me\"\n"));
+        assert!(output.contains("state: ignored\n"));
+        assert!(output.ends_with("\n# Body\n"));
+    }
+
+    #[test]
+    fn patches_accord_without_touching_body_or_other_fields() {
+        let input = "---\nid: task-1\ntitle: Demo\naccord:\n  status: ready\n  assignee: pi\nreview:\n  status: pending\n---\n\nBody\n";
+        let accord = AccordRecord {
+            status: "delivered".to_string(),
+            assignee: Some("pi".to_string()),
+            summary: Some("Done".to_string()),
+            evidence: vec!["cargo test".to_string()],
+            updated_at: "2026-06-26T00:00:00Z".to_string(),
+            ..AccordRecord::default()
+        };
+        let output = patch_accord_content(input, &accord).unwrap();
+        assert!(output.contains("accord:\n  status: \"delivered\"\n"));
+        assert!(output.contains("  assignee: \"pi\"\n"));
+        assert!(output.contains("  summary: \"Done\"\n"));
+        assert!(output.contains("  evidence: [\"cargo test\"]\n"));
+        assert!(output.contains("review:\n  status: pending\n"));
+        assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
     fn escapes_json_strings() {
         assert_eq!(json_string("a\"b\\c\n"), "\"a\\\"b\\\\c\\n\"");
+    }
+
+    #[test]
+    fn patches_frontmatter_without_touching_body() {
+        let input = "---\nid: task-1\nstate: todo\ntitle: Old\n---\n\nBody\n";
+        let mut updates = BTreeMap::new();
+        updates.insert("state".to_string(), "review".to_string());
+        updates.insert("updatedAt".to_string(), "2026-06-26T00:00:00Z".to_string());
+        let output = patch_frontmatter_content(input, &updates, &[]).unwrap();
+        assert!(output.contains("state: \"review\"\n"));
+        assert!(output.contains("updatedAt: \"2026-06-26T00:00:00Z\"\n"));
+        assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn parses_inline_arrays_for_filters() {
+        let values = parse_field_values("[\"tui\", \"cli\"]");
+        assert_eq!(values, vec!["tui".to_string(), "cli".to_string()]);
+    }
+
+    #[test]
+    fn formats_unix_epoch_as_utc() {
+        assert_eq!(format_unix_seconds(0), "1970-01-01T00:00:00Z");
     }
 }

@@ -93,7 +93,7 @@ Command behavior rules:
 - The TUI launches through `tdm tui` only in v0; no standalone TUI binary is part of v0.
 - `tdm complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
 - The first implementation language is Rust, implemented inside `tandem-tui/`.
-- CLI parser, dependency, and package layout choices remain open until implementation is explicitly started.
+- The current implementation package is a Rust binary crate in `tandem-tui/` with manual argument parsing and the approved `yaml-rust2` dependency for frontmatter reads; additional dependency changes still require an explicit decision.
 
 Deferred from v0:
 
@@ -126,9 +126,14 @@ This section is the implementation-facing CLI reference for v0. Syntax examples 
 
 - JSON read failures should return non-zero and may use the same envelope shape with `ok: false` and an error object in `data`.
 - Mutation commands are human-readable in v0; structured mutation output is not required.
+- Empty/no-match read behavior:
+  - human-readable list/search commands print an explicit empty message and exit `0`.
+  - JSON read commands return empty arrays/count objects inside the normal `{ "ok": true, ... }` envelope and exit `0`.
+  - missing requested IDs are errors, not no-match results.
 - Exit behavior:
   - success exits `0`.
-  - usage errors, missing required inputs, missing workspace, missing document, invalid state/status/category, structural validation errors, and failed writes exit non-zero.
+  - usage/argument errors exit `2`.
+  - runtime, data, validation, missing-workspace, missing-document, parse, write, and event-append failures exit `1` in the current CLI implementation.
   - warnings do not make a command fail unless paired with a structural error.
 
 ### `tdm init`
@@ -1211,11 +1216,11 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 - If a minimal patch cannot be applied because the source changed or the target field is ambiguous, reload and retry once; if still ambiguous, fail with a clear message rather than rewriting unrelated fields.
 - TUI write failures should leave UI state consistent with disk and show a status/error panel. Do not optimistically keep mutations that failed on disk.
 
-## Implementation boundaries (open)
+## Implementation boundaries
 
-The implementation layout inside `tandem-tui/` is not settled. Do not assume a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a specific CLI parsing library in v0.
+The current implementation layout is a single Rust binary crate in `tandem-tui/` that builds `tdm`. It uses manual CLI parsing and the approved `yaml-rust2` dependency for frontmatter reads. Do not assume or introduce a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a CLI parsing dependency without an explicit decision.
 
-Even before folder/crate layout is chosen, the behavioral boundaries should stay clear:
+The behavioral boundaries should stay clear:
 
 ### Protocol behavior responsibilities
 
@@ -1249,11 +1254,11 @@ Even before folder/crate layout is chosen, the behavioral boundaries should stay
 
 ## Possible dependency areas (not settled)
 
-Potential implementation dependencies should be chosen later and kept minimal. The only settled implementation choice here is Rust inside `tandem-tui/`, with Rust + Ratatui as the TUI target.
+Potential implementation dependencies should be chosen deliberately and kept minimal. The current CLI keeps manual argument parsing and uses `yaml-rust2` for frontmatter/config/document read parsing; Rust + Ratatui remains the TUI target.
 
 Need to choose later:
 
-- CLI parser strategy.
+- Whether to keep manual CLI parsing or approve a CLI parser crate after v0 command behavior stabilizes.
 - Terminal input/backend strategy.
 - Serialization/frontmatter/event parsing strategy.
 - Theme parser/config behavior for TOML theme files at `~/.config/tandem/themes/*.toml` and `.tandem/theme.toml`.

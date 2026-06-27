@@ -1,8 +1,8 @@
 # Tandem CLI/TUI
 
-This directory contains planning and, later, implementation work for the Tandem user-facing CLI and terminal UI.
+This directory contains planning and implementation work for the Tandem user-facing CLI and terminal UI.
 
-Current phase: planning/design. Decide the `tdm` CLI shape first, then design the Rust + Ratatui TUI on top of the same protocol concepts.
+Current phase: CLI implementation plus TUI planning. Continue hardening the `tdm` CLI shape first, then design the Rust + Ratatui TUI on top of the same protocol concepts.
 
 ## Scope
 
@@ -23,7 +23,7 @@ The CLI/TUI area does **not** own the underlying protocol semantics. Protocol ru
 
 ## Current status
 
-Planning/specification mode with the first minimal CLI implementation started. A std-only Rust binary package now lives in this directory and builds a `tdm` binary with the initial `init`, `list`, and `show` commands. The interactive TUI is not implemented yet. Do not lock in broader crate layout or dependency choices until explicitly decided.
+Planning/specification mode with a useful CLI slice implemented. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations still use raw-source, minimal-diff patches. The interactive TUI is still a stub. Do not lock in broader crate layout or dependency choices until explicitly decided.
 
 ## Build/run
 
@@ -31,8 +31,13 @@ From this directory:
 
 ```text
 cargo run -- init --title "Demo"
+cargo run -- add --title "Implement next CLI slice"
 cargo run -- list
-cargo run -- show task-1
+cargo run -- move task-1 --state in-progress
+cargo run -- accord ready task-1 --assignee pi --validation "cargo test"
+cargo run -- complete task-1 --summary "Implemented and tested"
+cargo run -- log list
+cargo run -- rules add --category always --rule "Run tests before completing tasks."
 ```
 
 Use `cargo run -- <command>` during early development. The package binary name is `tdm`.
