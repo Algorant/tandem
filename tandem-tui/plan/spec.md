@@ -3,20 +3,20 @@
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: CLI design first; first implementation language Rust inside `tandem-tui/`; TUI target Rust + Ratatui
+Implementation target: CLI v0 surface complete for current known scope; forward focus Rust + Ratatui/crossterm TUI inside `tandem-tui/`
 
 Naming:
 
 - Product/protocol: **Tandem**
 - CLI/TUI source directory: `tandem-tui/`
 - CLI binary: `tdm`
-- CLI design precedes TUI design/implementation
+- CLI design and current known CLI v0 implementation precede TUI implementation; future CLI work should be explicit new features or bug fixes
 - V0 TUI invocation: `tdm tui` only
 - User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
 
 This document describes the user-facing `tdm` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
-The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The intent is to design the CLI first, then build a more capable, responsive, themeable, mouse-aware TUI.
+The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The CLI v0 surface is now implemented for the current known scope; the active implementation focus is a more capable, responsive, themeable, mouse-aware TUI.
 
 ## Baseline inputs
 
@@ -48,7 +48,7 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 
 ## Design principles
 
-- **CLI first:** design `tdm` command workflows before the interactive TUI.
+- **CLI first, TUI now:** the `tdm` command workflows are implemented for the current known v0 scope; focus new work on the interactive TUI unless fixing CLI bugs or adding requested CLI features.
 - **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
 - **Logs are real:** completed work is browsable, searchable, inspectable, and useful; restore/reopen behavior can come after the v0 log read scope.
 - **Review is central:** delivered work should naturally flow to review, validation, acceptance, rework, and completion.
@@ -93,7 +93,7 @@ Command behavior rules:
 - The TUI launches through `tdm tui` only in v0; no standalone TUI binary is part of v0.
 - `tdm complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
 - The first implementation language is Rust, implemented inside `tandem-tui/`.
-- The current implementation package is a Rust binary crate in `tandem-tui/` with manual argument parsing and the approved `yaml-rust2` dependency for frontmatter reads; additional dependency changes still require an explicit decision.
+- The current implementation package is a Rust binary crate in `tandem-tui/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
 Deferred from v0:
 
@@ -135,6 +135,7 @@ This section is the implementation-facing CLI reference for v0. Syntax examples 
   - usage/argument errors exit `2`.
   - runtime, data, validation, missing-workspace, missing-document, parse, write, and event-append failures exit `1` in the current CLI implementation.
   - warnings do not make a command fail unless paired with a structural error.
+- Error wording prefixes recoverable categories where possible: `Parse failure`, `Validation failed`, `Write conflict`, `Write failure`, and `Event append failure`. Event append failures note that the file mutation may already be on disk and needs inspection/repair.
 
 ### `tdm init`
 
@@ -271,7 +272,7 @@ tdm add --title <title> [--state <state>] [--description <text>] [--priority <pr
 
 ### `tdm move`
 
-- Purpose: move an active document to another active state.
+- Purpose: move an active task to another active state.
 - Kind: mutation.
 - Syntax:
 
@@ -280,11 +281,11 @@ tdm move <id> --state <state>
 ```
 
 - Required inputs:
-  - `<id>`: task or decision ID.
+  - `<id>`: task ID.
   - `--state <state>`: target active state.
 - Human output shape: one-line status transition plus path.
 - Exit/error notes:
-  - fails if the document is not active, the state is unknown, or the write fails.
+  - fails if the task is not active, the ID resolves to a non-task document, the state is unknown, structural validation fails, or the write fails.
 
 ### `tdm complete`
 
@@ -303,7 +304,7 @@ tdm complete <id> --summary <text> [--file-changed <path>] [--validation <text>]
   - repeated `--file-changed <path>`.
   - `--validation <text>`: human-readable validation result summary.
   - `--reviewer <name>`.
-- Human output shape: warnings first, then completion summary.
+- Human output shape: warnings first, then completion summary. The current implementation writes `completedAt` plus nested `completion.summary`, `completion.filesChanged`, `completion.validation`, and `completion.reviewer` metadata; read commands still tolerate earlier flat completion fields.
 
 Example warning output:
 
@@ -519,7 +520,7 @@ tdm accord fail <id> --reason <text>
   - `ready` may include repeated `--deliverable`, repeated `--validation`, repeated `--constraint`, and `--assignee`.
   - `deliver` may include repeated `--evidence` and repeated `--file-changed`.
   - `accept` may include `--reviewer` and `--note`.
-- Human output shape: labeled status transition and any state/review warnings.
+- Human output shape: labeled status transition and any state/review warnings. The current implementation writes `accord.claimedAt` on claim, `accord.deliveredAt` on deliver, and repeated `--validation` values under `accord.validation.commands`; it still reads earlier `accord.validations` values.
 
 Examples:
 
@@ -530,7 +531,7 @@ tdm accord rework task-7 --note "Please add no-color fallback."
 ```
 
 - Exit/error notes:
-  - fails if the task is missing, the requested accord transition is invalid, required inputs are missing, or the write fails.
+  - fails if the task is missing, the target is not an active task, existing task/accord/review structure is invalid, the requested accord transition is invalid, required inputs are missing, or the write fails.
 
 ### `tdm rules`
 
@@ -703,6 +704,12 @@ tdm tui
 - Required inputs: none.
 - Optional inputs: none in v0.
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
+- Current implementation slice:
+  - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
+  - renders a Board-first, read-only shell from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
+  - supports keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
+  - enables crossterm mouse capture for basic column/detail clicks and wheel navigation; drag/drop remains absent.
+  - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
   - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
   - v0 does not include a separate TUI executable.
@@ -723,7 +730,9 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. It should include:
+The first TUI MVP is not read-only. The current starter slice is intentionally smaller and read-only: it establishes the Ratatui/crossterm event loop, renders the Board view from active documents, supports navigation/details/reload/quit, and leaves mutations plus the other top-level views for subsequent slices.
+
+The full first TUI MVP should include:
 
 - Top-level views: Board, Review, Logs, Rules, Decisions.
 - Board mutations: add item, move state, edit item, complete to logs, update priority/tags/assignee where supported, and toggle subtasks.
@@ -1192,9 +1201,9 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 
 - `tdm init`: creates new workspace files; no prior source exists, but generated files should be stable and readable.
 - `tdm add`: writes one new task file and updates only required workspace/event state.
-- `tdm move`: updates only the document `state` and mutation timestamp fields that actually change.
-- `tdm complete`: moves the document to logs, adds completion metadata, removes active-only fields only when required, and appends a separate event.
-- `tdm accord ...`: updates only the `accord` subtree and any timestamp/review fields that the transition requires.
+- `tdm move`: updates only an active task document's `state` and mutation timestamp fields that actually change.
+- `tdm complete`: moves the document to logs, adds nested `completion` metadata, removes active-only fields only when required, and appends a separate event.
+- `tdm accord ...`: updates only the `accord` subtree plus the task `updatedAt`; claim/deliver timestamps are written inside `accord`.
 - `tdm rules add|edit|delete`: patches only the relevant rule category in workspace frontmatter.
 - `tdm decision add`: writes one new decision file and appends a creation event.
 - TUI quick edits and action buttons must call the same mutation behavior as CLI commands.
@@ -1218,7 +1227,7 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 
 ## Implementation boundaries
 
-The current implementation layout is a single Rust binary crate in `tandem-tui/` that builds `tdm`. It uses manual CLI parsing and the approved `yaml-rust2` dependency for frontmatter reads. Do not assume or introduce a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a CLI parsing dependency without an explicit decision.
+The current implementation layout is a single Rust binary crate in `tandem-tui/` that builds `tdm`. It uses manual CLI parsing, raw-source mutation patches, the approved `yaml-rust2` dependency for frontmatter reads, and Ratatui/crossterm for the first TUI event loop and rendering layer. Do not assume or introduce a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a CLI parsing dependency without an explicit decision.
 
 The behavioral boundaries should stay clear:
 
@@ -1254,17 +1263,17 @@ The behavioral boundaries should stay clear:
 
 ## Possible dependency areas (not settled)
 
-Potential implementation dependencies should be chosen deliberately and kept minimal. The current CLI keeps manual argument parsing and uses `yaml-rust2` for frontmatter/config/document read parsing; Rust + Ratatui remains the TUI target.
+Potential implementation dependencies should be chosen deliberately and kept minimal. The current CLI keeps manual argument parsing and uses `yaml-rust2` for frontmatter/config/document read parsing. The first TUI slice uses Ratatui for rendering and crossterm for terminal input/backend handling.
 
 Need to choose later:
 
 - Whether to keep manual CLI parsing or approve a CLI parser crate after v0 command behavior stabilizes.
-- Terminal input/backend strategy.
+
 - Serialization/frontmatter/event parsing strategy.
 - Theme parser/config behavior for TOML theme files at `~/.config/tandem/themes/*.toml` and `.tandem/theme.toml`.
 - File watching strategy for the first TUI MVP.
 - ID/timestamp helper strategy, if helpers are needed.
-- Direct terminal event loop vs thin internal event abstraction.
+- Whether to keep the direct crossterm event loop or introduce a thin internal event abstraction as the TUI grows.
 - Text input widgets vs simple custom forms.
 - Markdown rendering strategy for the locked styled-basics behavior.
 
@@ -1465,6 +1474,7 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tdm tui`.
+- Started with a read-only Ratatui/crossterm Board shell that renders active board documents, navigation, details, reload, help, and safe quit.
 - Render Board, Review, Logs, Rules, and Decisions views.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.
@@ -1483,4 +1493,4 @@ Manual smoke:
 
 ## Open questions
 
-All previously listed CLI/TUI policy questions are now resolved. Remaining work is command-reference detail and implementation planning, tracked in `todo.md`.
+All previously listed CLI/TUI policy questions are now resolved. Remaining existing-work focus is TUI implementation, tracked in `todo.md`; CLI changes should be explicit new features or bug fixes.

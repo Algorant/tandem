@@ -1,9 +1,9 @@
 # Tandem CLI/TUI Todo
 
-Status: active planning  
-Last updated: 2026-06-26
+Status: active TUI implementation
+Last updated: 2026-06-27
 
-This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tandem-tui/plan/spec.md`.
+This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI draft lives in `tandem-tui/plan/spec.md`.
 
 ## Accomplished
 
@@ -91,6 +91,17 @@ This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tan
 - [x] Added targeted parser tests for nested accord/review statuses, inline and block arrays, structured rules, and scalar behavior.
 - [x] Implemented `tdm rules add|edit|delete` with raw-source config patching and `rules.updated` event appends.
 - [x] Implemented `tdm accord ready|claim|deliver|accept|rework|block|fail` with nested accord frontmatter patching and `accord.*` event appends.
+- [x] Tightened completion metadata writes to use nested `completion` frontmatter while preserving read compatibility with earlier flat completion fields.
+- [x] Tightened accord metadata writes to include claim/delivery timestamps and canonical `accord.validation.commands` while reading earlier `accord.validations` fields.
+- [x] Added structural mutation validation for active task moves, completion, and accord actions, including canonical accord/review status checks.
+- [x] Defined clearer CLI error message categories for parse failures, validation failures, write conflicts/write failures, and event append failures.
+- [x] Added unit coverage for nested completion metadata, legacy completion reads, canonical accord validation metadata, and invalid review-status validation.
+- [x] Considered the current known v0 CLI surface complete; future CLI work should be explicit new features or bug fixes.
+- [x] Added the minimal Ratatui/crossterm dependency stack for `tdm tui` without adding theme/TOML/Markdown parser dependencies.
+- [x] Replaced the `tdm tui` stub with a read-only Board-first TUI shell in `src/tui.rs`.
+- [x] Implemented the initial direct crossterm event loop with alternate-screen setup, raw mode, mouse capture, reload, help, and safe cleanup on quit.
+- [x] Rendered active `.tandem/board` documents by configured state, including an `unfiled` bucket for state-less active documents.
+- [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
 
 ## Current tasks
 
@@ -102,26 +113,26 @@ This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tan
 - [x] Implement `tdm search`, `tdm log list|show|search`, `tdm rules list`, and `tdm decision list|show` read commands.
 - [x] Implement `tdm accord ready|claim|deliver|accept|rework|block|fail`.
 - [x] Implement `tdm rules add|edit|delete`.
-- [ ] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
+- [x] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
 - [ ] Define accord badge/status visual language.
 - [x] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
-- [ ] Decide initial Ratatui event loop approach.
+- [x] Decide initial Ratatui event loop approach.
 - [ ] Define exact TOML theme keys for user themes and workspace override.
 - [ ] Define final fixed keyboard default table for v0.
 - [ ] Define styled-basic Markdown rendering details.
 
 ## Next recommended steps
 
-1. Review the expanded CLI slice with the orchestrator and adjust command behavior if needed.
-2. Tighten completion/review/accord metadata mutation behavior now that nested frontmatter reads are available.
-3. Draft the first TUI MVP interaction flows for Board, Review, Logs, Rules, and Decisions.
-4. Draft final theme, mouse, keyboard, and styled-basic Markdown requirements at MVP level.
-5. Update parent/protocol docs only if any CLI/TUI decision changes protocol-facing behavior.
+1. Extend the Board shell from read-only navigation into the first mutation flow, likely move/change state or quick add.
+2. Add real Review/Logs/Rules/Decisions views on the same app shell.
+3. Draft final theme, mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
+4. Keep parent and area docs synchronized as TUI implementation continues.
+5. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
 ## First TUI MVP checklist
 
 - [ ] Render Board, Review, Logs, Rules, and Decisions views.
-- [ ] Navigate states/items and view details.
+- [x] Navigate states/items and view details.
 - [ ] Add items from the Board view.
 - [ ] Move items between states.
 - [ ] Edit items from the TUI.
@@ -137,9 +148,9 @@ This todo tracks CLI/TUI planning tasks. The current CLI/TUI draft lives in `tan
 
 ## Acceptance criteria for first usable TUI
 
-- [ ] Does not assume a persistent completion state.
+- [x] Does not assume a persistent completion state.
 - [ ] Makes the simple filtered Review queue obvious.
-- [ ] Makes accord state obvious.
+- [x] Makes accord state obvious at a basic status-badge level.
 - [ ] Supports board mutations immediately.
 - [ ] Supports themes.
 - [ ] Supports mouse selection and scroll.

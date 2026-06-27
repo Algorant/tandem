@@ -2,7 +2,7 @@
 
 This directory contains planning and implementation work for the Tandem user-facing CLI and terminal UI.
 
-Current phase: CLI implementation plus TUI planning. Continue hardening the `tdm` CLI shape first, then design the Rust + Ratatui TUI on top of the same protocol concepts.
+Current phase: CLI v0 surface complete for the current known scope, with forward focus on the Rust/Ratatui TUI. `tdm tui` now launches a minimal Board-first shell on top of the same protocol concepts.
 
 ## Scope
 
@@ -17,13 +17,13 @@ The CLI/TUI area owns:
 - mouse support and hit-map interaction model
 - keyboard and command-palette UX
 - review, accord, completion, and logs workflows as presented in the UI
-- eventual TUI tests and snapshots
+- TUI tests and snapshots
 
 The CLI/TUI area does **not** own the underlying protocol semantics. Protocol rules and data-model decisions belong in `../protocol/`, though the CLI and TUI must represent them faithfully.
 
 ## Current status
 
-Planning/specification mode with a useful CLI slice implemented. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations still use raw-source, minimal-diff patches. The interactive TUI is still a stub. Do not lock in broader crate layout or dependency choices until explicitly decided.
+Planning/specification plus implementation mode. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. The current known CLI surface is considered complete unless new feature requests or bugs appear. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations use raw-source, minimal-diff patches. Completion writes nested `completion` metadata, accord actions write canonical validation/timestamp metadata, and read paths tolerate earlier flat completion fields. The initial `tdm tui` implementation uses Ratatui plus crossterm to render a read-only Board-first shell with state/item navigation, selected-item details, reload, keyboard quit, and basic mouse wheel/click handling. Board mutations and the Review/Logs/Rules/Decisions views are the next implementation focus.
 
 ## Build/run
 
@@ -38,6 +38,7 @@ cargo run -- accord ready task-1 --assignee pi --validation "cargo test"
 cargo run -- complete task-1 --summary "Implemented and tested"
 cargo run -- log list
 cargo run -- rules add --category always --rule "Run tests before completing tasks."
+cargo run -- tui
 ```
 
 Use `cargo run -- <command>` during early development. The package binary name is `tdm`.
@@ -75,9 +76,10 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - Product/protocol name: **Tandem**
 - CLI/TUI directory: `tandem-tui/`
 - CLI binary: `tdm`
-- CLI design comes before TUI design/implementation.
+- CLI design and the current known CLI v0 implementation came before TUI implementation; future CLI work should be explicit new features or bug fixes.
 - V0 TUI invocation: `tdm tui` only.
-- TUI implementation target: Rust + Ratatui.
+- TUI implementation target: Rust + Ratatui with crossterm terminal events/backend.
+- `tdm tui` currently starts with a Board-first read-only shell; broader MVP views and mutations are the active focus.
 - Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.

@@ -4,7 +4,7 @@ Tandem is a draft local-first protocol and toolchain for human/agent project coo
 
 It takes inspiration from Brainfile's file-based task board model, but leans harder into collaborative workflows: humans and agents agree on work through **accords**, move delivered work through review, and preserve completed work in useful logs.
 
-Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around review, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. CLI/TUI work is still in planning: decide the CLI first, then the TUI.
+Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around review, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. The v0 `tdm` CLI surface is implemented and considered complete for the current known scope; forward implementation focus is the Rust/Ratatui TUI.
 
 ## Monorepo layout
 
@@ -36,14 +36,14 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - v0 `tdm` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`; `tdm decision` supports `list`, `show`, `add`.
 - Validation: strict structure/core refs; unresolved `parentId`/`blockers` are errors while related `references` are warnings.
 - Decision docs: no lifecycle field required in v0.
-- First implementation: Rust inside `tandem-tui/`.
+- First implementation: Rust inside `tandem-tui/`, currently as one `tdm` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a Ratatui/crossterm TUI module.
 - CLI output: human-readable by default using compact tables/detail blocks; all read commands support `--json` envelope objects.
 - TUI invocation: `tdm tui` only in v0.
 - First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering.
 - V0 CLI aliases: none; canonical commands and long flags only.
 - V0 repo shape: implementation stays under `tandem-tui/`; no root Rust workspace, schemas, or fixtures.
 - Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.
-- Planning docs remain Markdown until the CLI MVP; migrate/dogfood Tandem documents after that.
+- Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Documentation contract
 

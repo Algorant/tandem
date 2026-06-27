@@ -55,7 +55,7 @@ Keep protocol and CLI/TUI work together while the idea is still forming. Split l
 Current areas:
 
 - `protocol/` — the protocol/spec source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile.
-- `tandem-tui/` — CLI + TUI design and later implementation. The user-facing CLI is `tdm`; CLI design comes first, then the interactive Rust + Ratatui TUI.
+- `tandem-tui/` — CLI + TUI design and implementation. The user-facing CLI is `tdm`; the current v0 CLI surface is implemented as a single Rust binary crate, and forward implementation focus is the interactive Rust + Ratatui/crossterm TUI.
 - `plan/` — parent project coordination and cross-cutting decisions.
 
 Do not overdesign the repository. For v0, keep implementation under `tandem-tui/` and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
@@ -80,14 +80,14 @@ CLI/TUI:
 - v0 commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
 - `tdm log` includes `list`, `show`, `search`; `tdm rules` includes `list`, `add`, `edit`, `delete`; `tdm accord` includes `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - Human-readable output is default using compact tables for list/search and labeled detail blocks for show/log/decision; all read commands support `--json` envelope objects.
-- First CLI implementation language is Rust inside `tandem-tui/`.
+- First CLI implementation language is Rust inside `tandem-tui/`; the current implementation remains one `tdm` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.
 - `tdm decision` supports `list`, `show`, and `add`.
 - The TUI launches as `tdm tui` only in v0.
 - First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue.
 - V0 CLI uses canonical command names and long flags only; no short aliases.
 - Theme config loads in this order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, workspace TOML override at `.tandem/theme.toml`.
 - Defer templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, and fixtures.
-- Markdown planning docs stay canonical until the CLI MVP; migrate/dogfood Tandem documents after the CLI MVP can manage them safely.
+- Markdown planning docs stay canonical for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `td` is reserved for future/internal tool prefixes; `tdm` remains the user-facing CLI.
 
 ## Documentation contract
@@ -109,8 +109,8 @@ Parent docs are the coordination source of truth. When a naming, scope, architec
 3. Stabilize protocol vocabulary and lifecycle.
 4. Keep protocol, parent, and CLI/TUI documentation synchronized.
 5. Draft the detailed `tdm` command reference from the locked CLI surface.
-6. Decide the minimal implementation layout inside `tandem-tui/` only when coding starts.
-7. Build protocol parsing and mutation primitives only after the spec is stable enough.
-8. Build the first Ratatui TUI MVP with board mutations after core file semantics are clear.
-9. Add accord/review/completion flows.
+6. Keep the existing `tandem-tui/` Rust package layout stable unless implementation pressure proves a change is needed.
+7. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
+8. Continue the first Ratatui/crossterm TUI MVP from the current read-only Board shell toward board mutations and the remaining top-level views.
+9. Add TUI accord/review/completion flows.
 10. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.

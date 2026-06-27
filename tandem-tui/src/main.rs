@@ -7,8 +7,26 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::{Yaml, YamlLoader};
 
+mod tui;
+
 const PROTOCOL_VERSION: &str = "0.1.0";
 const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "review"];
+const ACCORD_STATUSES: &[&str] = &[
+    "ready",
+    "claimed",
+    "delivered",
+    "accepted",
+    "rework",
+    "failed",
+    "blocked",
+];
+const REVIEW_STATUSES: &[&str] = &[
+    "not-ready",
+    "pending",
+    "accepted",
+    "changes-requested",
+    "rejected",
+];
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
@@ -203,6 +221,8 @@ struct AccordOptions {
 struct AccordRecord {
     status: String,
     assignee: Option<String>,
+    claimed_at: Option<String>,
+    delivered_at: Option<String>,
     deliverables: Vec<String>,
     validations: Vec<String>,
     constraints: Vec<String>,
@@ -973,7 +993,15 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
     validate_state(&workspace, state)?;
 
     let doc = find_board_document(&workspace, &options.id)?
-        .ok_or_else(|| CliError::user(format!("active document not found: {}", options.id)))?;
+        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can be moved in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    validate_task_document_for_mutation(&workspace, &doc)?;
     let previous_state = doc.field("state").unwrap_or("-").to_string();
     if previous_state == state {
         println!("{} is already in state {state}", doc.id());
@@ -988,14 +1016,9 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
     let patched = patch_frontmatter_content(&content, &updates, &[])?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
-    let event_name = if doc.doc_type() == "decision" {
-        "decision.moved"
-    } else {
-        "task.moved"
-    };
     append_event(
         &workspace,
-        event_name,
+        "task.moved",
         doc.id(),
         &format!("Moved {} from {previous_state} to {state}", doc.id()),
     )?;
@@ -1017,15 +1040,16 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
         .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
-            "only task documents can be completed in v0: {} is type {}",
+            "Validation failed: only task documents can be completed in v0: {} is type {}",
             doc.id(),
             doc.doc_type()
         )));
     }
+    validate_task_document_for_mutation(&workspace, &doc)?;
     let unresolved = unresolved_blockers(&workspace, doc.field("blockers"))?;
     if !unresolved.is_empty() {
         return Err(CliError::user(format!(
-            "{} has unresolved blockers: {}",
+            "Validation failed: {} has unresolved blockers: {}",
             doc.id(),
             unresolved.join(", ")
         )));
@@ -1052,30 +1076,40 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     let mut updates = BTreeMap::new();
     updates.insert("completedAt".to_string(), now.clone());
     updates.insert("updatedAt".to_string(), now);
-    updates.insert("completionSummary".to_string(), summary.to_string());
-    if let Some(validation) = options.validation.as_deref() {
-        updates.insert("completionValidation".to_string(), validation.to_string());
-    }
-    if let Some(reviewer) = options.reviewer.as_deref() {
-        updates.insert("completionReviewer".to_string(), reviewer.to_string());
-    }
-    if !options.files_changed.is_empty() {
-        updates.insert(
-            "filesChanged".to_string(),
-            inline_array(&options.files_changed),
-        );
-    }
-    let patched = patch_frontmatter_content(&content, &updates, &["state"])?;
+    let patched = patch_frontmatter_content(
+        &content,
+        &updates,
+        &[
+            "state",
+            "completionSummary",
+            "completionValidation",
+            "completionReviewer",
+            "filesChanged",
+        ],
+    )?;
+    let patched = patch_completion_content(
+        &patched,
+        summary,
+        &options.files_changed,
+        options.validation.as_deref(),
+        options.reviewer.as_deref(),
+    )?;
     let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
     if log_path.exists() {
         return Err(CliError::user(format!(
-            "log document already exists: {}",
+            "Validation failed: log document already exists: {}",
             display_path(&log_path)
         )));
     }
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&log_path, &patched)?;
-    fs::remove_file(&doc.path)?;
+    fs::remove_file(&doc.path).map_err(|error| {
+        CliError::user(format!(
+            "Write failure: could not remove active document {} after writing log {}: {error}",
+            display_path(&doc.path),
+            display_path(&log_path)
+        ))
+    })?;
     append_event(&workspace, "task.completed", doc.id(), summary)?;
 
     println!("Completed {}", doc.id());
@@ -1214,11 +1248,12 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
         .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
-            "only task documents can have accord actions in v0: {} is type {}",
+            "Validation failed: only task documents can have accord actions in v0: {} is type {}",
             doc.id(),
             doc.doc_type()
         )));
     }
+    validate_task_document_for_mutation(&workspace, &doc)?;
 
     validate_accord_inputs(action, &options)?;
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
@@ -1529,8 +1564,7 @@ fn cmd_tui(args: &[String]) -> Result<(), CliError> {
         ));
     }
 
-    println!("tdm tui is planned but not implemented in this CLI implementation slice.");
-    Ok(())
+    tui::run_tui()
 }
 
 fn discover_workspace() -> Result<Workspace, CliError> {
@@ -1589,11 +1623,11 @@ fn read_document(path: &Path, location: DocumentLocation) -> Result<Document, Cl
         CliError::user(format!("failed to read {}: {error}", display_path(path)))
     })?;
     let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!("failed to parse {}: {message}", display_path(path)))
+        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
     })?;
     let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
         CliError::user(format!(
-            "failed to parse {} frontmatter YAML: {message}",
+            "Parse failure: {} frontmatter YAML: {message}",
             display_path(path)
         ))
     })?;
@@ -1643,7 +1677,9 @@ fn require_existing_document(workspace: &Workspace, id: &str, kind: &str) -> Res
     if document_exists(workspace, id)? {
         Ok(())
     } else {
-        Err(CliError::user(format!("{kind} document not found: {id}")))
+        Err(CliError::user(format!(
+            "Validation failed: {kind} document not found: {id}"
+        )))
     }
 }
 
@@ -1790,14 +1826,30 @@ fn yaml_mapping_value<'a>(root: &'a Yaml, key: &str) -> Option<&'a Yaml> {
 }
 
 fn add_status_aliases(fields: &mut HashMap<String, String>) {
-    if !fields.contains_key("accordStatus") {
-        if let Some(status) = fields.get("accord.status").cloned() {
-            fields.insert("accordStatus".to_string(), status);
-        }
+    copy_first_alias(fields, "accordStatus", &["accord.status"]);
+    copy_first_alias(fields, "reviewStatus", &["review.status"]);
+    copy_first_alias(fields, "completionSummary", &["completion.summary"]);
+    copy_first_alias(
+        fields,
+        "completionValidation",
+        &[
+            "completion.validation",
+            "completion.validation.summary",
+            "completion.validation.status",
+        ],
+    );
+    copy_first_alias(fields, "completionReviewer", &["completion.reviewer"]);
+    copy_first_alias(fields, "filesChanged", &["completion.filesChanged"]);
+}
+
+fn copy_first_alias(fields: &mut HashMap<String, String>, alias: &str, sources: &[&str]) {
+    if fields.contains_key(alias) {
+        return;
     }
-    if !fields.contains_key("reviewStatus") {
-        if let Some(status) = fields.get("review.status").cloned() {
-            fields.insert("reviewStatus".to_string(), status);
+    for source in sources {
+        if let Some(value) = fields.get(*source).cloned() {
+            fields.insert(alias.to_string(), value);
+            return;
         }
     }
 }
@@ -1911,18 +1963,129 @@ fn review_status(doc: &Document) -> Option<&str> {
         .or_else(|| doc.field("reviewStatus"))
 }
 
+fn completion_summary(doc: &Document) -> Option<&str> {
+    doc.field("completion.summary")
+        .or_else(|| doc.field("completionSummary"))
+}
+
+fn completion_validation(doc: &Document) -> Option<&str> {
+    doc.field("completion.validation")
+        .or_else(|| doc.field("completion.validation.summary"))
+        .or_else(|| doc.field("completion.validation.status"))
+        .or_else(|| doc.field("completionValidation"))
+}
+
+fn completion_reviewer(doc: &Document) -> Option<&str> {
+    doc.field("completion.reviewer")
+        .or_else(|| doc.field("completionReviewer"))
+}
+
+fn completion_files_changed(doc: &Document) -> Vec<String> {
+    doc.field("completion.filesChanged")
+        .or_else(|| doc.field("filesChanged"))
+        .map(parse_field_values)
+        .unwrap_or_default()
+}
+
+fn validate_task_document_for_mutation(
+    workspace: &Workspace,
+    doc: &Document,
+) -> Result<(), CliError> {
+    let mut errors = Vec::new();
+    if doc.id().trim().is_empty() {
+        errors.push("missing required field `id`".to_string());
+    }
+    if doc.title().trim().is_empty() {
+        errors.push("missing required field `title`".to_string());
+    }
+    match doc.field("type") {
+        Some("task") => {}
+        Some(other) => errors.push(format!("expected type `task`, found `{other}`")),
+        None => errors.push("missing required field `type`".to_string()),
+    }
+    if doc.location == DocumentLocation::Board {
+        match doc.field("state") {
+            Some(state) if !state.trim().is_empty() => {
+                let states = read_workspace_states(workspace)?;
+                if !states.iter().any(|known| known == state) {
+                    errors.push(format!(
+                        "unknown state `{state}`; known states: {}",
+                        states.join(", ")
+                    ));
+                }
+            }
+            _ => errors.push("missing required field `state`".to_string()),
+        }
+    }
+    if let Some(parent) = doc
+        .field("parentId")
+        .filter(|value| !value.trim().is_empty())
+    {
+        if !document_exists(workspace, parent)? {
+            errors.push(format!("unresolved parentId `{parent}`"));
+        }
+    }
+    for blocker in doc
+        .field("blockers")
+        .map(parse_field_values)
+        .unwrap_or_default()
+    {
+        if !document_exists(workspace, &blocker)? {
+            errors.push(format!("unresolved blocker `{blocker}`"));
+        }
+    }
+    if has_metadata(doc, "accord") || doc.field("accordStatus").is_some() {
+        match accord_status(doc) {
+            Some(status) if ACCORD_STATUSES.contains(&status) => {}
+            Some(status) => errors.push(format!("invalid accord.status `{status}`")),
+            None => {
+                errors.push("accord.status is required when accord metadata is present".to_string())
+            }
+        }
+    }
+    if has_metadata(doc, "review") || doc.field("reviewStatus").is_some() {
+        match review_status(doc) {
+            Some(status) if REVIEW_STATUSES.contains(&status) => {}
+            Some(status) => errors.push(format!("invalid review.status `{status}`")),
+            None => {
+                errors.push("review.status is required when review metadata is present".to_string())
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CliError::user(format!(
+            "Validation failed for {}: {}",
+            display_path(&doc.path),
+            errors.join("; ")
+        )))
+    }
+}
+
+fn has_metadata(doc: &Document, prefix: &str) -> bool {
+    let nested_prefix = format!("{prefix}.");
+    doc.fields
+        .keys()
+        .any(|key| key == prefix || key.starts_with(&nested_prefix))
+}
+
 impl AccordRecord {
     fn from_document(doc: &Document, updated_at: &str) -> Self {
         Self {
             status: accord_status(doc).unwrap_or("missing").to_string(),
             assignee: doc.field("accord.assignee").map(str::to_string),
+            claimed_at: doc.field("accord.claimedAt").map(str::to_string),
+            delivered_at: doc.field("accord.deliveredAt").map(str::to_string),
             deliverables: doc
                 .field("accord.deliverables")
                 .map(parse_field_values)
                 .unwrap_or_default(),
             validations: doc
-                .field("accord.validations")
+                .field("accord.validation.commands")
                 .or_else(|| doc.field("accord.validation"))
+                .or_else(|| doc.field("accord.validations"))
                 .map(parse_field_values)
                 .unwrap_or_default(),
             constraints: doc
@@ -2008,7 +2171,19 @@ fn apply_accord_action(
 ) {
     accord.status = status.to_string();
     match action {
-        "ready" | "claim" => {
+        "ready" => {
+            accord.claimed_at = None;
+            accord.delivered_at = None;
+            accord.summary = None;
+            accord.evidence.clear();
+            accord.files_changed.clear();
+            accord.reviewer = None;
+            accord.note = None;
+            accord.reason = None;
+        }
+        "claim" => {
+            accord.claimed_at = Some(accord.updated_at.clone());
+            accord.delivered_at = None;
             accord.summary = None;
             accord.evidence.clear();
             accord.files_changed.clear();
@@ -2017,6 +2192,7 @@ fn apply_accord_action(
             accord.reason = None;
         }
         "deliver" => {
+            accord.delivered_at = Some(accord.updated_at.clone());
             accord.reviewer = None;
             accord.note = None;
             accord.reason = None;
@@ -2176,7 +2352,7 @@ fn print_show(doc: &Document) {
     if let Some(status) = review_status(doc) {
         println!("Review:    {status}");
     }
-    if let Some(summary) = doc.field("completionSummary") {
+    if let Some(summary) = completion_summary(doc) {
         println!("Summary:   {summary}");
     }
     println!("Location:  {}", doc.location.as_str());
@@ -2276,7 +2452,7 @@ fn print_log_table(docs: &[Document]) {
             truncate(doc.id(), 12),
             truncate(doc.field("completedAt").unwrap_or("-"), 20),
             truncate(doc.title(), 36),
-            truncate(doc.field("completionSummary").unwrap_or("-"), 80)
+            truncate(completion_summary(doc).unwrap_or("-"), 80)
         );
     }
 }
@@ -2284,14 +2460,15 @@ fn print_log_table(docs: &[Document]) {
 fn print_log_show(doc: &Document) {
     println!("Log document");
     print_show(doc);
-    if let Some(validation) = doc.field("completionValidation") {
+    if let Some(validation) = completion_validation(doc) {
         println!();
         println!("Validation: {validation}");
     }
-    if let Some(files) = doc.field("filesChanged") {
-        println!("Files changed: {files}");
+    let files = completion_files_changed(doc);
+    if !files.is_empty() {
+        println!("Files changed: {}", files.join(", "));
     }
-    if let Some(reviewer) = doc.field("completionReviewer") {
+    if let Some(reviewer) = completion_reviewer(doc) {
         println!("Reviewer: {reviewer}");
     }
 }
@@ -2337,11 +2514,11 @@ fn read_rules(config_path: &Path) -> Result<RulesByCategory, CliError> {
 
 fn parse_rules_from_content(content: &str, path: &Path) -> Result<RulesByCategory, CliError> {
     let (frontmatter, _) = split_frontmatter(content).map_err(|message| {
-        CliError::user(format!("failed to parse {}: {message}", display_path(path)))
+        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
     })?;
     let root = parse_frontmatter_yaml(&frontmatter).map_err(|message| {
         CliError::user(format!(
-            "failed to parse {} frontmatter YAML: {message}",
+            "Parse failure: {} frontmatter YAML: {message}",
             display_path(path)
         ))
     })?;
@@ -2351,11 +2528,11 @@ fn parse_rules_from_content(content: &str, path: &Path) -> Result<RulesByCategor
 fn read_frontmatter_yaml_file(path: &Path) -> Result<Option<Yaml>, CliError> {
     let content = fs::read_to_string(path)?;
     let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!("failed to parse {}: {message}", display_path(path)))
+        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
     })?;
     parse_frontmatter_yaml(&frontmatter).map_err(|message| {
         CliError::user(format!(
-            "failed to parse {} frontmatter YAML: {message}",
+            "Parse failure: {} frontmatter YAML: {message}",
             display_path(path)
         ))
     })
@@ -2441,6 +2618,92 @@ fn warn_missing_rule_source(workspace: &Workspace, source: Option<&str>) -> Resu
     Ok(())
 }
 
+fn patch_completion_content(
+    content: &str,
+    summary: &str,
+    files_changed: &[String],
+    validation: Option<&str>,
+    reviewer: Option<&str>,
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let completion_block = render_completion_block(summary, files_changed, validation, reviewer);
+    let mut output_frontmatter = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0usize;
+    let mut replaced = false;
+
+    while index < lines.len() {
+        let raw_line = lines[index];
+        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
+        if matches!(
+            frontmatter_line_key(line),
+            Some("completionSummary")
+                | Some("completionValidation")
+                | Some("completionReviewer")
+                | Some("filesChanged")
+        ) {
+            index += 1;
+            continue;
+        }
+        if frontmatter_line_key(line) == Some("completion") {
+            output_frontmatter.push_str(&completion_block);
+            replaced = true;
+            index += 1;
+            while index < lines.len() {
+                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                if is_top_level_frontmatter_boundary(skip_line) {
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        output_frontmatter.push_str(raw_line);
+        index += 1;
+    }
+
+    if !replaced {
+        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+            output_frontmatter.push('\n');
+        }
+        output_frontmatter.push_str(&completion_block);
+    }
+
+    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
+        output_frontmatter.push('\n');
+    }
+
+    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
+}
+
+fn render_completion_block(
+    summary: &str,
+    files_changed: &[String],
+    validation: Option<&str>,
+    reviewer: Option<&str>,
+) -> String {
+    let mut lines = Vec::new();
+    lines.push("completion:".to_string());
+    lines.push(format!("  summary: {}", yaml_double_quote(summary)));
+    if !files_changed.is_empty() {
+        lines.push(format!("  filesChanged: {}", inline_array(files_changed)));
+    }
+    if let Some(validation) = validation.filter(|value| !value.trim().is_empty()) {
+        lines.push(format!(
+            "  validation: {}",
+            yaml_double_quote(validation.trim())
+        ));
+    }
+    if let Some(reviewer) = reviewer.filter(|value| !value.trim().is_empty()) {
+        lines.push(format!(
+            "  reviewer: {}",
+            yaml_double_quote(reviewer.trim())
+        ));
+    }
+    lines.push(String::new());
+    lines.join("\n")
+}
+
 fn patch_accord_content(content: &str, accord: &AccordRecord) -> Result<String, CliError> {
     let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
     let accord_block = render_accord_block(accord);
@@ -2488,8 +2751,10 @@ fn render_accord_block(accord: &AccordRecord) -> String {
     lines.push("accord:".to_string());
     lines.push(format!("  status: {}", yaml_double_quote(&accord.status)));
     push_optional_nested_line(&mut lines, "assignee", accord.assignee.as_deref());
+    push_optional_nested_line(&mut lines, "claimedAt", accord.claimed_at.as_deref());
+    push_optional_nested_line(&mut lines, "deliveredAt", accord.delivered_at.as_deref());
     push_nested_array_line(&mut lines, "deliverables", &accord.deliverables);
-    push_nested_array_line(&mut lines, "validations", &accord.validations);
+    push_nested_validation_commands(&mut lines, &accord.validations);
     push_nested_array_line(&mut lines, "constraints", &accord.constraints);
     push_optional_nested_line(&mut lines, "summary", accord.summary.as_deref());
     push_nested_array_line(&mut lines, "evidence", &accord.evidence);
@@ -2516,6 +2781,13 @@ fn push_optional_nested_line(lines: &mut Vec<String>, key: &str, value: Option<&
 fn push_nested_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
     if !values.is_empty() {
         lines.push(format!("  {key}: {}", inline_array(values)));
+    }
+}
+
+fn push_nested_validation_commands(lines: &mut Vec<String>, values: &[String]) {
+    if !values.is_empty() {
+        lines.push("  validation:".to_string());
+        lines.push(format!("    commands: {}", inline_array(values)));
     }
 }
 
@@ -2718,17 +2990,14 @@ fn log_list_json(docs: &[Document]) -> String {
 }
 
 fn log_show_json(doc: &Document) -> String {
-    let files = doc
-        .field("filesChanged")
-        .map(parse_field_values)
-        .unwrap_or_default();
+    let files = completion_files_changed(doc);
     format!(
         "{{\"ok\":true,\"data\":{{\"document\":{},\"completion\":{{\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
         document_detail_json(doc),
-        json_string(doc.field("completionSummary").unwrap_or("")),
+        json_string(completion_summary(doc).unwrap_or("")),
         json_array_strings(&files),
-        json_string(doc.field("completionValidation").unwrap_or("")),
-        json_string(doc.field("completionReviewer").unwrap_or("")),
+        json_string(completion_validation(doc).unwrap_or("")),
+        json_string(completion_reviewer(doc).unwrap_or("")),
         json_string(&doc.body),
         json_string(&display_path(&doc.path))
     )
@@ -2894,10 +3163,10 @@ fn document_detail_json(doc: &Document) -> String {
         "createdAt",
         "updatedAt",
         "completedAt",
-        "completionSummary",
     ] {
         push_optional_json_field(&mut fields, key, doc.field(key));
     }
+    push_optional_json_field(&mut fields, "completionSummary", completion_summary(doc));
     if let Some(tags) = doc.field("tags") {
         fields.push(format!(
             "\"tags\":{}",
@@ -2915,12 +3184,8 @@ fn log_summary_json(doc: &Document) -> String {
     push_json_field(&mut fields, "type", doc.doc_type());
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
-    push_optional_json_field(&mut fields, "summary", doc.field("completionSummary"));
-    push_optional_json_field(
-        &mut fields,
-        "validationStatus",
-        doc.field("completionValidation"),
-    );
+    push_optional_json_field(&mut fields, "summary", completion_summary(doc));
+    push_optional_json_field(&mut fields, "validationStatus", completion_validation(doc));
     format!("{{{}}}", fields.join(","))
 }
 
@@ -3025,8 +3290,8 @@ fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
     if states.iter().any(|known| known == state) {
         Ok(())
     } else {
-        Err(CliError::usage(format!(
-            "unknown state `{state}`; known states: {}",
+        Err(CliError::user(format!(
+            "Validation failed: unknown state `{state}`; known states: {}",
             states.join(", ")
         )))
     }
@@ -3115,7 +3380,7 @@ fn read_file_snapshot(path: &Path) -> Result<(String, FileSignature), CliError> 
     let after = file_signature(path)?;
     if before != after {
         return Err(CliError::user(format!(
-            "write conflict: {} changed while the command was reading it; rerun the command",
+            "Write conflict: {} changed while the command was reading it. No files were updated; rerun the command.",
             display_path(path)
         )));
     }
@@ -3128,7 +3393,7 @@ fn ensure_file_unchanged(path: &Path, expected: &FileSignature) -> Result<(), Cl
         Ok(())
     } else {
         Err(CliError::user(format!(
-            "write conflict: {} changed while the command was preparing its update; rerun the command",
+            "Write conflict: {} changed while the command was preparing its update. No files were updated; rerun the command.",
             display_path(path)
         )))
     }
@@ -3150,21 +3415,28 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), CliError> {
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&temp_path)?;
+        .open(&temp_path)
+        .map_err(|error| {
+            CliError::user(format!(
+                "Write failure: could not create temp file {} for {}: {error}",
+                display_path(&temp_path),
+                display_path(path)
+            ))
+        })?;
     if let Err(error) = file
         .write_all(content.as_bytes())
         .and_then(|_| file.sync_all())
     {
         let _ = fs::remove_file(&temp_path);
         return Err(CliError::user(format!(
-            "failed to write {}: {error}",
+            "Write failure: could not write {}: {error}",
             display_path(path)
         )));
     }
     if let Err(error) = fs::rename(&temp_path, path) {
         let _ = fs::remove_file(&temp_path);
         return Err(CliError::user(format!(
-            "failed to replace {}: {error}",
+            "Write failure: could not replace {}: {error}",
             display_path(path)
         )));
     }
@@ -3207,13 +3479,13 @@ fn append_event(
         .open(&workspace.events_path)
         .map_err(|error| {
             CliError::user(format!(
-                "failed to open event log {}: {error}",
+                "Event append failure: could not open {} while recording `{event_name}` for `{id}`: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
                 display_path(&workspace.events_path)
             ))
         })?;
     file.write_all(line.as_bytes()).map_err(|error| {
         CliError::user(format!(
-            "failed to append event log {}: {error}",
+            "Event append failure: could not append `{event_name}` for `{id}` to {}: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
             display_path(&workspace.events_path)
         ))
     })
@@ -3475,18 +3747,94 @@ rules:
         let accord = AccordRecord {
             status: "delivered".to_string(),
             assignee: Some("pi".to_string()),
+            delivered_at: Some("2026-06-26T00:00:00Z".to_string()),
             summary: Some("Done".to_string()),
-            evidence: vec!["cargo test".to_string()],
+            validations: vec!["cargo test".to_string()],
+            evidence: vec!["cargo test passed".to_string()],
             updated_at: "2026-06-26T00:00:00Z".to_string(),
             ..AccordRecord::default()
         };
         let output = patch_accord_content(input, &accord).unwrap();
         assert!(output.contains("accord:\n  status: \"delivered\"\n"));
         assert!(output.contains("  assignee: \"pi\"\n"));
+        assert!(output.contains("  deliveredAt: \"2026-06-26T00:00:00Z\"\n"));
+        assert!(output.contains("  validation:\n    commands: [\"cargo test\"]\n"));
         assert!(output.contains("  summary: \"Done\"\n"));
-        assert!(output.contains("  evidence: [\"cargo test\"]\n"));
+        assert!(output.contains("  evidence: [\"cargo test passed\"]\n"));
         assert!(output.contains("review:\n  status: pending\n"));
         assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn patches_completion_as_nested_metadata_and_preserves_body() {
+        let input = "---\nid: task-1\ntype: task\ntitle: Demo\ncompletionSummary: old\nfilesChanged: [old.rs]\n---\n\nBody\n";
+        let output = patch_completion_content(
+            input,
+            "Done",
+            &["src/main.rs".to_string()],
+            Some("cargo test passed"),
+            Some("ivan"),
+        )
+        .unwrap();
+        assert!(!output.contains("completionSummary:"));
+        assert!(!output.contains("filesChanged: [old.rs]"));
+        assert!(output.contains("completion:\n  summary: \"Done\"\n"));
+        assert!(output.contains("  filesChanged: [\"src/main.rs\"]\n"));
+        assert!(output.contains("  validation: \"cargo test passed\"\n"));
+        assert!(output.contains("  reviewer: \"ivan\"\n"));
+        assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn completion_helpers_read_nested_and_legacy_flat_metadata() {
+        let nested = Document {
+            path: PathBuf::from("task-1.md"),
+            location: DocumentLocation::Logs,
+            fields: parse_frontmatter_fields(
+                "completion:\n  summary: Done\n  validation: passed\n  reviewer: ivan\n  filesChanged: [src/main.rs]\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        assert_eq!(completion_summary(&nested), Some("Done"));
+        assert_eq!(completion_validation(&nested), Some("passed"));
+        assert_eq!(completion_reviewer(&nested), Some("ivan"));
+        assert_eq!(completion_files_changed(&nested), vec!["src/main.rs"]);
+
+        let legacy = Document {
+            path: PathBuf::from("task-2.md"),
+            location: DocumentLocation::Logs,
+            fields: parse_frontmatter_fields(
+                "completionSummary: Done\ncompletionValidation: passed\ncompletionReviewer: ivan\nfilesChanged: [src/lib.rs]\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        assert_eq!(completion_summary(&legacy), Some("Done"));
+        assert_eq!(completion_validation(&legacy), Some("passed"));
+        assert_eq!(completion_reviewer(&legacy), Some("ivan"));
+        assert_eq!(completion_files_changed(&legacy), vec!["src/lib.rs"]);
+    }
+
+    #[test]
+    fn validation_reports_invalid_review_status() {
+        let doc = Document {
+            path: PathBuf::from(".tandem/board/task-1.md"),
+            location: DocumentLocation::Logs,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\ntitle: Demo\nstate: todo\nreview:\n  status: maybe\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        let workspace = Workspace {
+            board_dir: PathBuf::from(".tandem/board"),
+            logs_dir: PathBuf::from(".tandem/logs"),
+            config_path: PathBuf::from("missing-tandem.md"),
+            events_path: PathBuf::from(".tandem/events.jsonl"),
+        };
+        let error = validate_task_document_for_mutation(&workspace, &doc).unwrap_err();
+        assert!(error.message.contains("invalid review.status `maybe`"));
     }
 
     #[test]

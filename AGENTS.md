@@ -25,8 +25,8 @@ Current direction is intentionally simple:
 - Keep exactly two major child areas for now: `protocol/` and `tandem-tui/`.
 - `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
-- `tandem-tui/` is the current home for user-facing CLI + TUI planning and eventual implementation. The CLI binary name is `tdm`; the directory remains `tandem-tui/` until the user changes it.
-- CLI/TUI work is still in planning/design. Decide the CLI shape first, then the TUI. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
+- `tandem-tui/` is the current home for user-facing CLI + TUI planning and implementation. The CLI binary name is `tdm`; the directory remains `tandem-tui/` until the user changes it.
+- The v0 `tdm` CLI surface is implemented and considered complete for the current known scope; future CLI work should be explicit new features or bug fixes. Forward implementation focus is the Rust/Ratatui TUI, starting from the current Ratatui/crossterm Board shell. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem-tui/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
 - Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
@@ -137,7 +137,7 @@ Before finishing documentation or planning changes, check for stale references a
 
 ## Current state
 
-This project is currently in planning/specification mode. There is no Rust workspace or build system yet.
+This project is currently in planning/specification plus implementation mode. There is no root Rust workspace; implementation lives in the single `tandem-tui/` Rust binary crate that builds `tdm`.
 
 Primary planning documents:
 

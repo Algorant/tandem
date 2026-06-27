@@ -1,7 +1,7 @@
 # Tandem Parent Todo
 
-Status: active planning  
-Last updated: 2026-06-26
+Status: active implementation
+Last updated: 2026-06-27
 
 This todo tracks monorepo-level work that cuts across the protocol and TUI areas.
 
@@ -21,8 +21,10 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [x] Locked v0 reconciliation decisions for protocol fields, lifecycle, logs/events, CLI commands, and TUI MVP scope.
 - [x] Resolved remaining protocol detail decisions: `protocolVersion: 0.1.0`, minimal audit-only events, strict-core-reference validation severity, and no v0 decision lifecycle field.
 - [x] Resolved CLI/TUI detail decisions: `tdm tui` only, `tdm decision list|show|add`, no short aliases, compact-table/detail-block human output, `--json` envelope objects for all read commands, TOML theme loading built-in/user/workspace, mouse on by default without drag/drop, fixed v0 keymaps, styled-basic Markdown rendering, and simple filtered Review queue.
-- [x] Resolved parent strategy decisions: keep implementation under `tandem-tui/` for v0, no schemas/fixtures in v0, migrate/dogfood Tandem documents after CLI MVP, and reserve `td` while keeping `tdm` user-facing.
+- [x] Resolved parent strategy decisions: keep implementation under `tandem-tui/` for v0, no schemas/fixtures in v0, migrate/dogfood Tandem documents after the tooling can manage them safely, and reserve `td` while keeping `tdm` user-facing.
 - [x] Accepted protocol v0 draft for implementation.
+- [x] Implemented and hardened the current known v0 `tdm` CLI surface inside `tandem-tui/`.
+- [x] Started the first Ratatui/crossterm `tdm tui` implementation with a read-only Board shell under `tandem-tui/src/tui.rs`.
 
 ## Current tasks
 
@@ -30,19 +32,20 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
 - [ ] Enforce no-drift documentation updates whenever naming, scope, architecture, lifecycle, or workflow decisions change.
-- [ ] Keep Markdown planning docs canonical until CLI MVP; migrate/dogfood Tandem documents after CLI MVP.
-- [ ] Define minimal Rust implementation layout inside `tandem-tui/` as implementation begins.
-- [ ] Decide exact Rust package/module layout for `tdm` inside `tandem-tui/` from the first implementation slice.
+- [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.
+- [x] Define minimal Rust implementation layout inside `tandem-tui/` as implementation begins.
+- [x] Decide exact Rust package/module layout for `tdm` inside `tandem-tui/` from the first implementation slice.
 - [ ] Revisit standalone `tdm-tui` only after v0 if packaging/user needs justify it.
-- [ ] Do not create schemas or fixtures in v0; revisit after CLI MVP/protocol stabilization.
+- [ ] Do not create schemas or fixtures in v0; revisit after TUI MVP/protocol stabilization.
 - [ ] Track any remaining open naming/vocabulary decisions after detailed spec updates.
 
 ## Next recommended steps
 
-1. Implement the first `tdm` CLI slice in `tandem-tui/`: `init`, `list`, and `show`.
-2. Keep schemas and fixtures out of v0; use inline examples in docs.
-3. Keep area READMEs, specs, and todos synchronized as implementation begins.
-4. Migrate/dogfood Tandem documents after the CLI MVP can manage them safely.
+1. Extend the first `tdm tui` Board shell into board mutations, starting with one small flow such as move/change state or quick add.
+2. Add the remaining TUI top-level views: Review, Logs, Rules, and Decisions.
+3. Keep schemas and fixtures out of v0; use inline examples in docs.
+4. Keep area READMEs, specs, and todos synchronized as TUI implementation continues.
+5. Migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Open questions
 
