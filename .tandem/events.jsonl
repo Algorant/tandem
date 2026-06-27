@@ -62,3 +62,17 @@
 {"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-10","summary":"Moved task-10 from todo to in-progress"}
 {"ts":"2026-06-27T22:49:30Z","event":"accord.claimed","id":"task-11","summary":"Accord claim for task-11"}
 {"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-11","summary":"Moved task-11 from todo to in-progress"}
+{"ts":"2026-06-27T23:04:00Z","event":"accord.delivered","id":"task-11","summary":"Accord deliver for task-11"}
+{"ts":"2026-06-27T23:04:03Z","event":"accord.delivered","id":"task-10","summary":"Accord deliver for task-10"}
+{"ts":"2026-06-27T23:27:58Z","event":"task.created","id":"task-12","summary":"Scaffold pi-tandem extension area and adapter spec"}
+{"ts":"2026-06-27T23:30:04Z","event":"accord.ready","id":"task-12","summary":"Accord ready for task-12"}
+{"ts":"2026-06-27T23:30:04Z","event":"task.created","id":"task-13","summary":"Implement CLI-backed pi-tandem extension MVP"}
+{"ts":"2026-06-27T23:30:04Z","event":"accord.ready","id":"task-13","summary":"Accord ready for task-13"}
+{"ts":"2026-06-27T23:30:04Z","event":"task.created","id":"task-14","summary":"Project-local install and smoke pi-tandem"}
+{"ts":"2026-06-27T23:30:05Z","event":"accord.ready","id":"task-14","summary":"Accord ready for task-14"}
+{"ts":"2026-06-27T23:30:05Z","event":"task.created","id":"task-15","summary":"Promote pi-tandem to canonical Pi config"}
+{"ts":"2026-06-27T23:30:05Z","event":"accord.ready","id":"task-15","summary":"Accord ready for task-15"}
+{"ts":"2026-06-27T23:45:33Z","event":"accord.accepted","id":"task-10","summary":"Accord accept for task-10"}
+{"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-10","summary":"Integrated selectable Verdigris TUI theme with example theme selector, docs, validation, and smoke coverage."}
+{"ts":"2026-06-27T23:45:33Z","event":"accord.accepted","id":"task-11","summary":"Accord accept for task-11"}
+{"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-11","summary":"Integrated Brainfile-style Board state subviews with richer full-width rows, docs, validation, and smoke coverage."}

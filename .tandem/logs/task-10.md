@@ -2,12 +2,11 @@
 id: task-10
 type: task
 title: "Prototype Verdigris TUI theme"
-state: "in-progress"
 priority: "medium"
 relatedFiles: ["tandem-tui/src/tui/theme.rs", "tandem-tui/src/tui.rs", "tandem-tui/README.md", "tandem-tui/plan/spec.md"]
 tags: ["tui", "theme", "verdigris", "visual-design"]
 createdAt: "2026-06-27T15:02:47Z"
-updatedAt: "2026-06-27T22:49:30Z"
+updatedAt: "2026-06-27T23:45:33Z"
 subtasks:
   - id: task-10-1
     title: "Map Verdigris palette roles to Tandem TUI theme keys"
@@ -19,14 +18,26 @@ subtasks:
     title: "Smoke visually in tdm tui and document usage"
     completed: false
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "herd:tui-verdigris-theme"
   claimedAt: "2026-06-27T22:49:30Z"
+  deliveredAt: "2026-06-27T23:04:03Z"
   deliverables: ["code:tandem-tui/src/tui/theme.rs:Verdigris theme or loader support", "docs:tandem-tui/README.md:Verdigris usage and palette notes"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
   constraints: ["Use the local Verdigris/Pi sources in the task description as palette guidance.", "Keep terminal readability and no-color fallback intact."]
-  updatedAt: "2026-06-27T22:49:30Z"
+  summary: "Implemented selectable Verdigris TUI theme prototype in commit 4d4f5e8."
+  evidence: ["Validation passed in /home/ivan/dev/projects/tandem-task10-verdigris: cargo fmt --check; cargo test; cargo build; git diff --check HEAD~1..HEAD.", "PTY smoke copied tandem-tui/examples/themes/verdigris.toml to .tandem/theme.toml and found both 'built-in verdigris' and NO_COLOR 'built-in terminal/no-color'."]
+  filesChanged: ["tandem-tui/src/tui/theme.rs", "tandem-tui/examples/themes/verdigris.toml", "tandem-tui/README.md", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md"]
+  reviewer: "orchestrator"
+  note: "Reviewed and integrated Verdigris theme branch; final cargo validation and PTY smoke passed."
+  updatedAt: "2026-06-27T23:45:33Z"
+completedAt: "2026-06-27T23:45:33Z"
+completion:
+  summary: "Integrated selectable Verdigris TUI theme with example theme selector, docs, validation, and smoke coverage."
+  filesChanged: ["tandem-tui/src/tui/theme.rs", "tandem-tui/examples/themes/verdigris.toml", "tandem-tui/README.md", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md"]
+  validation: "cargo fmt --check && cargo test && cargo build; git diff --check; Verdigris theme PTY smoke and NO_COLOR smoke"
+  reviewer: "orchestrator"
 ---
 
 ## Description

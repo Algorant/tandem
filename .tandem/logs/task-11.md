@@ -2,12 +2,11 @@
 id: task-11
 type: task
 title: "Adopt Brainfile-style Board state subviews"
-state: "in-progress"
 priority: "high"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/src/tui/theme.rs", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md"]
 tags: ["tui", "board", "layout", "brainfile-inspired", "subviews"]
 createdAt: "2026-06-27T15:02:47Z"
-updatedAt: "2026-06-27T22:49:30Z"
+updatedAt: "2026-06-27T23:45:33Z"
 subtasks:
   - id: task-11-1
     title: "Replace multi-column Board layout with selected-state subview list"
@@ -22,14 +21,26 @@ subtasks:
     title: "Consider reusable subview model for other top-level panes"
     completed: false
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "herd:tui-board-subviews"
   claimedAt: "2026-06-27T22:49:30Z"
+  deliveredAt: "2026-06-27T23:04:00Z"
   deliverables: ["code:tandem-tui/src/tui.rs:single-state Board subview layout", "docs:tandem-tui/plan/spec.md:Board subview layout direction"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
   constraints: ["Borrow the interaction model, not Brainfile terminology; keep Tandem state/accord/review vocabulary.", "Do not add a persistent done column."]
-  updatedAt: "2026-06-27T22:49:30Z"
+  summary: "Implemented Board state subviews with full-width selected-state rows in commit 39f6cd2."
+  evidence: ["Validation passed in /home/ivan/dev/projects/tandem-task11-board-subviews: cd tandem-tui && cargo fmt --check && cargo test && cargo build; git diff --check HEAD~1..HEAD.", "PTY smoke in /tmp/tandem-board-subview-smoke.QFuQPe covered h/l state subview switching, quick-add via a, and H/L move behavior; final list showed Smoke subview task in in-progress after H then L."]
+  filesChanged: ["README.md", "plan/spec.md", "plan/todo.md", "tandem-tui/README.md", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md", "tandem-tui/src/tui.rs"]
+  reviewer: "orchestrator"
+  note: "Reviewed and integrated Board subviews branch; final cargo validation and PTY smoke passed."
+  updatedAt: "2026-06-27T23:45:33Z"
+completedAt: "2026-06-27T23:45:33Z"
+completion:
+  summary: "Integrated Brainfile-style Board state subviews with richer full-width rows, docs, validation, and smoke coverage."
+  filesChanged: ["README.md", "plan/spec.md", "plan/todo.md", "tandem-tui/README.md", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md", "tandem-tui/src/tui.rs"]
+  validation: "cargo fmt --check && cargo test && cargo build; git diff --check; Board subview quick-add/move PTY smoke"
+  reviewer: "orchestrator"
 ---
 
 ## Description
