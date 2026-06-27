@@ -35,3 +35,23 @@
 {"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-4","summary":"Integrated top-level TUI view switching with Board, Review, Logs, Rules, and Decisions tabs, numeric/mouse tab switching, and read-only placeholder/count views while preserving Board mutations."}
 {"ts":"2026-06-27T05:49:31Z","event":"accord.accepted","id":"task-8","summary":"Accord accept for task-8"}
 {"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-8","summary":"Integrated TUI theme foundation with default-dark palette, workspace .tandem/theme.toml overrides, no-color fallback, and themed Board/status/badge styling."}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-5","summary":"Accord claim for task-5"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-5","summary":"Moved task-5 from todo to in-progress"}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-6","summary":"Accord claim for task-6"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-6","summary":"Moved task-6 from todo to in-progress"}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-7","summary":"Accord claim for task-7"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-7","summary":"Moved task-7 from todo to in-progress"}
+{"ts":"2026-06-27T15:02:47Z","event":"task.created","id":"task-10","summary":"Prototype Verdigris TUI theme"}
+{"ts":"2026-06-27T15:02:47Z","event":"accord.ready","id":"task-10","summary":"Accord ready for task-10"}
+{"ts":"2026-06-27T15:02:47Z","event":"task.created","id":"task-11","summary":"Adopt Brainfile-style Board state subviews"}
+{"ts":"2026-06-27T15:02:47Z","event":"accord.ready","id":"task-11","summary":"Accord ready for task-11"}
+{"ts":"2026-06-27T15:04:57Z","event":"accord.delivered","id":"task-6","summary":"Accord deliver for task-6"}
+{"ts":"2026-06-27T15:04:59Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T15:12:04Z","event":"accord.delivered","id":"task-5","summary":"Accord deliver for task-5"}
+{"ts":"2026-06-27T16:06:08Z","event":"task.completed","id":"task-1","summary":"Initial dogfood/test task used to verify Tandem board setup in this repo."}
+{"ts":"2026-06-27T16:36:15Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T16:36:40Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T16:56:48Z","event":"accord.accepted","id":"task-5","summary":"Accord accept for task-5"}
+{"ts":"2026-06-27T16:56:48Z","event":"task.completed","id":"task-5","summary":"Integrated Review queue TUI pane with validation and smoke coverage."}
+{"ts":"2026-06-27T16:56:48Z","event":"accord.accepted","id":"task-6","summary":"Accord accept for task-6"}
+{"ts":"2026-06-27T16:56:48Z","event":"task.completed","id":"task-6","summary":"Integrated Logs TUI pane with recency list, detail, search, events, validation, and smoke coverage."}
