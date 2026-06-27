@@ -13,13 +13,17 @@ use crossterm::{
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::Modifier,
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
     Frame, Terminal,
 };
 
 use super::*;
+
+mod theme;
+
+use theme::{StatusTone, TuiTheme};
 
 pub(crate) fn run_tui() -> Result<(), CliError> {
     let workspace = discover_workspace()?;
@@ -107,6 +111,9 @@ struct TuiApp {
     states: Vec<String>,
     configured_states: Vec<String>,
     docs: Vec<Document>,
+    theme: TuiTheme,
+    theme_source: String,
+    theme_warnings: Vec<String>,
     selected_state: usize,
     selected_item: usize,
     focus: FocusPane,
@@ -125,6 +132,9 @@ impl TuiApp {
             states: Vec::new(),
             configured_states: Vec::new(),
             docs: Vec::new(),
+            theme: TuiTheme::default_dark(),
+            theme_source: String::new(),
+            theme_warnings: Vec::new(),
             selected_state: 0,
             selected_item: 0,
             focus: FocusPane::Board,
@@ -142,16 +152,35 @@ impl TuiApp {
         let mut docs = read_documents(&self.workspace.board_dir, DocumentLocation::Board)?;
         sort_documents(&mut docs);
         let configured_states = read_workspace_states(&self.workspace)?;
+        let theme_load = TuiTheme::load_for_workspace(&self.workspace);
         self.title = read_workspace_title(&self.workspace)?;
         self.states = states_with_board_docs(configured_states.clone(), &docs);
         self.configured_states = configured_states;
         self.docs = docs;
+        self.theme = theme_load.theme;
+        self.theme_source = theme_load.source;
+        self.theme_warnings = theme_load.warnings;
         self.clamp_selection();
+        let theme_note = if self.theme_warnings.is_empty() {
+            format!("theme {}", self.theme.source_label(&self.theme_source))
+        } else {
+            format!(
+                "theme {} ({} warning{})",
+                self.theme.source_label(&self.theme_source),
+                self.theme_warnings.len(),
+                if self.theme_warnings.len() == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            )
+        };
         self.status = format!(
-            "Loaded {} active document{} from {}",
+            "Loaded {} active document{} from {} · {}",
             self.docs.len(),
             if self.docs.len() == 1 { "" } else { "s" },
-            display_path(&self.workspace.board_dir)
+            display_path(&self.workspace.board_dir),
+            theme_note
         );
         Ok(())
     }
@@ -584,7 +613,7 @@ impl TuiApp {
 
     fn detail_line_count(&self) -> usize {
         self.selected_doc()
-            .map(detail_lines_for_doc)
+            .map(|doc| detail_lines_for_doc(doc, &self.theme))
             .map(|lines| lines.len())
             .unwrap_or(1)
     }
@@ -592,6 +621,7 @@ impl TuiApp {
     fn draw(&mut self, frame: &mut Frame<'_>) {
         self.hits.clear();
         let area = frame.area();
+        frame.render_widget(Block::default().style(self.theme.app_style()), area);
         if area.width < 45 || area.height < 12 {
             self.draw_tiny(frame, area);
             return;
@@ -624,8 +654,8 @@ impl TuiApp {
         let message = Paragraph::new(vec![
             Line::from(Span::styled(
                 "Tandem TUI needs a larger terminal",
-                Style::default()
-                    .fg(Color::Yellow)
+                self.theme
+                    .status_style(StatusTone::Warning)
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from(format!(
@@ -634,7 +664,14 @@ impl TuiApp {
             )),
             Line::from("Press q to quit after resizing if needed."),
         ])
-        .block(Block::default().borders(Borders::ALL).title(" tdm tui "))
+        .style(self.theme.panel_style())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" tdm tui ")
+                .border_style(self.theme.border_style(true))
+                .style(self.theme.panel_style()),
+        )
         .wrap(Wrap { trim: true });
         frame.render_widget(message, area);
     }
@@ -652,18 +689,20 @@ impl TuiApp {
             .unwrap_or_else(|| "no selected item".to_string());
         let header = Paragraph::new(vec![
             Line::from(vec![
-                Span::styled(
-                    self.title.clone(),
-                    Style::default()
-                        .fg(Color::Cyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
+                Span::styled(self.title.clone(), self.theme.title_style()),
                 Span::raw("  "),
-                Span::styled(counts, Style::default().fg(Color::Gray)),
+                Span::styled(counts, self.theme.muted_style()),
             ]),
-            Line::from(Span::styled(selected, Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled(selected, self.theme.muted_style())),
         ])
-        .block(Block::default().borders(Borders::ALL).title(" Tandem "));
+        .style(self.theme.panel_style())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Tandem ")
+                .border_style(self.theme.border_style(false))
+                .style(self.theme.panel_style()),
+        );
         frame.render_widget(header, area);
     }
 
@@ -673,15 +712,15 @@ impl TuiApp {
             .map(Line::from)
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
-            .block(Block::default().borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(self.theme.border_style(false))
+                    .style(self.theme.panel_style()),
+            )
             .select(0)
-            .style(Style::default().fg(Color::DarkGray))
-            .highlight_style(
-                Style::default()
-                    .fg(Color::White)
-                    .bg(Color::Blue)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .style(self.theme.tab_style())
+            .highlight_style(self.theme.tab_selected_style());
         frame.render_widget(tabs, area);
     }
 
@@ -713,12 +752,8 @@ impl TuiApp {
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
             .select(self.selected_state)
-            .style(Style::default().fg(Color::DarkGray))
-            .highlight_style(
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            );
+            .style(self.theme.tab_style())
+            .highlight_style(self.theme.state_tab_selected_style());
         frame.render_widget(tabs, chunks[0]);
         self.draw_state_list(frame, chunks[1], self.selected_state, false);
     }
@@ -743,11 +778,11 @@ impl TuiApp {
         let items = if docs.is_empty() {
             vec![ListItem::new(Line::from(Span::styled(
                 "(empty)",
-                Style::default().fg(Color::DarkGray),
+                self.theme.muted_style(),
             )))]
         } else {
             docs.iter()
-                .map(|doc| list_item_for_doc(doc))
+                .map(|doc| list_item_for_doc(doc, &self.theme))
                 .collect::<Vec<_>>()
         };
 
@@ -762,24 +797,16 @@ impl TuiApp {
             )
         };
         let selected = state_index == self.selected_state;
-        let border_style = if selected {
-            Style::default().fg(Color::Cyan)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
         let list = List::new(items)
+            .style(self.theme.panel_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(border_style),
+                    .border_style(self.theme.border_style(selected))
+                    .style(self.theme.panel_style()),
             )
-            .highlight_style(
-                Style::default()
-                    .fg(Color::White)
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .highlight_style(self.theme.selected_style())
             .highlight_symbol("▸ ");
 
         if selected && count > 0 {
@@ -797,27 +824,28 @@ impl TuiApp {
             action: HitAction::FocusDetail,
         });
 
-        let focus_style = if self.focus == FocusPane::Detail {
-            Style::default().fg(Color::Magenta)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
+        let focused = self.focus == FocusPane::Detail;
         let (title, lines) = match self.selected_doc() {
-            Some(doc) => (format!(" Detail {} ", doc.id()), detail_lines_for_doc(doc)),
+            Some(doc) => (
+                format!(" Detail {} ", doc.id()),
+                detail_lines_for_doc(doc, &self.theme),
+            ),
             None => (
                 " Detail ".to_string(),
                 vec![Line::from(Span::styled(
                     "No item selected in this state.",
-                    Style::default().fg(Color::DarkGray),
+                    self.theme.muted_style(),
                 ))],
             ),
         };
         let detail = Paragraph::new(lines)
+            .style(self.theme.panel_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(focus_style),
+                    .border_style(self.theme.border_style(focused))
+                    .style(self.theme.panel_style()),
             )
             .scroll((self.detail_scroll, 0))
             .wrap(Wrap { trim: false });
@@ -826,7 +854,10 @@ impl TuiApp {
 
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         let (hints, style) = if let Some(input) = self.quick_add.as_ref() {
-            (quick_add_status(input), Style::default().fg(Color::Yellow))
+            (
+                quick_add_status(input),
+                self.theme.status_style(StatusTone::Warning),
+            )
         } else {
             let focus = match self.focus {
                 FocusPane::Board => "board",
@@ -837,7 +868,7 @@ impl TuiApp {
                     "{focus} · q quit · r reload · a add task · h/l state · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
                     self.status
                 ),
-                Style::default().fg(Color::DarkGray),
+                self.theme.status_style(status_tone_for_message(&self.status)),
             )
         };
         let footer = Paragraph::new(Line::from(Span::styled(hints, style)));
@@ -850,7 +881,7 @@ impl TuiApp {
         let help = Paragraph::new(vec![
             Line::from(Span::styled(
                 "Tandem TUI Board shell",
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                self.theme.title_style(),
             )),
             Line::from(""),
             Line::from("q / Ctrl-C        Quit safely"),
@@ -866,9 +897,16 @@ impl TuiApp {
             Line::from("1..5              Show planned view status"),
             Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
             Line::from(""),
-            Line::from("This slice supports Board mutations for quick-add and moving tasks between configured states. Review/Logs/Rules/Decisions views, theme files, and richer mouse hit maps remain planned."),
+            Line::from("This slice supports Board mutations for quick-add and moving tasks between configured states. Built-in defaults and .tandem/theme.toml workspace overrides are active; user theme discovery and richer mouse hit maps remain planned."),
         ])
-        .block(Block::default().borders(Borders::ALL).title(" Help "))
+        .style(self.theme.panel_style())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Help ")
+                .border_style(self.theme.border_style(true))
+                .style(self.theme.panel_style()),
+        )
         .wrap(Wrap { trim: true });
         frame.render_widget(help, popup);
     }
@@ -1083,7 +1121,7 @@ fn move_task_to_state(
     })
 }
 
-fn list_item_for_doc(doc: &Document) -> ListItem<'static> {
+fn list_item_for_doc(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
     let priority = doc.field("priority").unwrap_or("-");
     let accord = accord_status(doc).unwrap_or("-");
     let review = review_status(doc).unwrap_or("-");
@@ -1093,137 +1131,108 @@ fn list_item_for_doc(doc: &Document) -> ListItem<'static> {
         Line::from(vec![
             Span::styled(
                 format!("{:<4}", truncate(priority, 4).to_uppercase()),
-                priority_style(priority),
+                theme.priority_style(priority),
             ),
             Span::raw(" "),
-            Span::styled(
-                format!("[{}] ", doc.doc_type()),
-                Style::default().fg(Color::DarkGray),
-            ),
+            Span::styled(format!("[{}] ", doc.doc_type()), theme.muted_style()),
             Span::styled(
                 truncate(doc.title(), 56),
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
+                theme.text_style().add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
-            Span::styled(format!("@{assignee} "), Style::default().fg(Color::Gray)),
-            Span::styled(format!("A:{accord} "), accord_style(accord)),
-            Span::styled(format!("R:{review} "), review_style(review)),
-            Span::styled(tags.to_string(), Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{} ", doc.id()),
+                theme.status_style(StatusTone::Accent),
+            ),
+            Span::styled(format!("@{assignee} "), theme.muted_style()),
+            Span::styled(format!("A:{accord} "), theme.accord_style(accord)),
+            Span::styled(format!("R:{review} "), theme.review_style(review)),
+            Span::styled(tags.to_string(), theme.muted_style()),
         ]),
     ])
 }
 
-fn detail_lines_for_doc(doc: &Document) -> Vec<Line<'static>> {
+fn detail_lines_for_doc(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     lines.push(Line::from(vec![
-        Span::styled("Title: ", label_style()),
-        Span::styled(doc.title().to_string(), Style::default().fg(Color::White)),
+        Span::styled("Title: ", theme.label_style()),
+        Span::styled(doc.title().to_string(), theme.text_style()),
     ]));
-    lines.push(detail_field_line("ID", doc.id()));
-    lines.push(detail_field_line("Type", doc.doc_type()));
-    push_optional_detail_line(&mut lines, "State", doc.field("state"));
-    push_optional_detail_line(&mut lines, "Priority", doc.field("priority"));
-    push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"));
-    push_optional_detail_line(&mut lines, "Due", doc.field("dueDate"));
-    push_optional_detail_line(&mut lines, "Tags", doc.field("tags"));
-    push_optional_detail_line(&mut lines, "Accord", accord_status(doc));
-    push_optional_detail_line(&mut lines, "Review", review_status(doc));
-    push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"));
-    lines.push(detail_field_line("Path", &display_path(&doc.path)));
+    lines.push(detail_field_line("ID", doc.id(), theme));
+    lines.push(detail_field_line("Type", doc.doc_type(), theme));
+    push_optional_detail_line(&mut lines, "State", doc.field("state"), theme);
+    push_optional_detail_line(&mut lines, "Priority", doc.field("priority"), theme);
+    push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
+    push_optional_detail_line(&mut lines, "Due", doc.field("dueDate"), theme);
+    push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
+    push_optional_detail_line(&mut lines, "Accord", accord_status(doc), theme);
+    push_optional_detail_line(&mut lines, "Review", review_status(doc), theme);
+    push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
+    lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "Body",
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+        theme
+            .markdown_heading_style()
+            .add_modifier(Modifier::UNDERLINED),
     )));
     if doc.body.trim().is_empty() {
-        lines.push(Line::from(Span::styled(
-            "(empty)",
-            Style::default().fg(Color::DarkGray),
-        )));
+        lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
         for line in doc.body.lines() {
-            lines.push(markdownish_line(line));
+            lines.push(markdownish_line(line, theme));
         }
     }
     lines
 }
 
-fn detail_field_line(label: &str, value: &str) -> Line<'static> {
+fn detail_field_line(label: &str, value: &str, theme: &TuiTheme) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("{label}: "), label_style()),
-        Span::raw(value.to_string()),
+        Span::styled(format!("{label}: "), theme.label_style()),
+        Span::styled(value.to_string(), theme.text_style()),
     ])
 }
 
-fn push_optional_detail_line(lines: &mut Vec<Line<'static>>, label: &str, value: Option<&str>) {
+fn push_optional_detail_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    value: Option<&str>,
+    theme: &TuiTheme,
+) {
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
-        lines.push(detail_field_line(label, value));
+        lines.push(detail_field_line(label, value, theme));
     }
 }
 
-fn markdownish_line(line: &str) -> Line<'static> {
+fn markdownish_line(line: &str, theme: &TuiTheme) -> Line<'static> {
     let trimmed = line.trim_start();
     if trimmed.starts_with('#') {
         Line::from(Span::styled(
             line.to_string(),
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
+            theme.markdown_heading_style(),
         ))
     } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        Line::from(Span::styled(
-            line.to_string(),
-            Style::default().fg(Color::Gray),
-        ))
+        Line::from(Span::styled(line.to_string(), theme.markdown_list_style()))
     } else if trimmed.starts_with("```") {
-        Line::from(Span::styled(
-            line.to_string(),
-            Style::default().fg(Color::Yellow),
-        ))
+        Line::from(Span::styled(line.to_string(), theme.markdown_code_style()))
     } else {
-        Line::from(line.to_string())
+        Line::from(Span::styled(line.to_string(), theme.text_style()))
     }
 }
 
-fn label_style() -> Style {
-    Style::default()
-        .fg(Color::DarkGray)
-        .add_modifier(Modifier::BOLD)
-}
-
-fn priority_style(priority: &str) -> Style {
-    match priority.to_ascii_lowercase().as_str() {
-        "critical" => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
-        "high" => Style::default().fg(Color::LightRed),
-        "medium" | "med" => Style::default().fg(Color::Yellow),
-        "low" => Style::default().fg(Color::DarkGray),
-        _ => Style::default().fg(Color::Gray),
-    }
-}
-
-fn accord_style(status: &str) -> Style {
-    match status {
-        "accepted" => Style::default().fg(Color::Green),
-        "delivered" => Style::default().fg(Color::Magenta),
-        "claimed" => Style::default().fg(Color::Blue),
-        "blocked" | "failed" => Style::default().fg(Color::Red),
-        "rework" => Style::default().fg(Color::Yellow),
-        _ => Style::default().fg(Color::Gray),
-    }
-}
-
-fn review_style(status: &str) -> Style {
-    match status {
-        "accepted" => Style::default().fg(Color::Green),
-        "pending" => Style::default().fg(Color::Yellow),
-        "changes-requested" | "failed" => Style::default().fg(Color::Red),
-        _ => Style::default().fg(Color::Gray),
+fn status_tone_for_message(message: &str) -> StatusTone {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("error") || lower.contains("failed") || lower.contains("failure") {
+        StatusTone::Error
+    } else if lower.contains("warning") || lower.contains("canceled") || lower.contains("needs") {
+        StatusTone::Warning
+    } else if lower.contains("created") || lower.contains("moved") || lower.contains("loaded") {
+        StatusTone::Success
+    } else if lower.contains("active") {
+        StatusTone::Accent
+    } else {
+        StatusTone::Muted
     }
 }
 
