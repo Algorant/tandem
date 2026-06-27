@@ -1,0 +1,27 @@
+{"ts":"2026-06-27T03:42:16Z","event":"task.created","id":"task-1","summary":"dogfood tandem in this repo"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-2","summary":"Implement first TUI board mutation flow"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-2","summary":"Accord ready for task-2"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-3","summary":"Add TUI quick-add task flow"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-3","summary":"Accord ready for task-3"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-4","summary":"Add top-level TUI view switching"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-4","summary":"Accord ready for task-4"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-5","summary":"Implement Review queue view"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-5","summary":"Accord ready for task-5"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-6","summary":"Implement Logs view list/show/search"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-6","summary":"Accord ready for task-6"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-7","summary":"Implement Rules and Decisions TUI views"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-7","summary":"Accord ready for task-7"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-8","summary":"Implement TUI theme loading and visual language"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-8","summary":"Accord ready for task-8"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-9","summary":"Harden TUI runtime interactions and rendering"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-9","summary":"Accord ready for task-9"}
+{"ts":"2026-06-27T04:04:32Z","event":"accord.claimed","id":"task-2","summary":"Accord claim for task-2"}
+{"ts":"2026-06-27T04:04:32Z","event":"task.moved","id":"task-2","summary":"Moved task-2 from todo to in-progress"}
+{"ts":"2026-06-27T04:12:05Z","event":"accord.delivered","id":"task-2","summary":"Accord deliver for task-2"}
+{"ts":"2026-06-27T04:35:47Z","event":"accord.accepted","id":"task-2","summary":"Accord accept for task-2"}
+{"ts":"2026-06-27T04:35:47Z","event":"task.completed","id":"task-2","summary":"Implemented first TUI board mutation: H/L moves selected tasks between configured states, reloads, and surfaces errors in the status line."}
+{"ts":"2026-06-27T04:36:07Z","event":"accord.claimed","id":"task-3","summary":"Accord claim for task-3"}
+{"ts":"2026-06-27T04:36:07Z","event":"task.moved","id":"task-3","summary":"Moved task-3 from todo to in-progress"}
+{"ts":"2026-06-27T04:46:09Z","event":"accord.delivered","id":"task-3","summary":"Accord deliver for task-3"}
+{"ts":"2026-06-27T04:56:59Z","event":"accord.accepted","id":"task-3","summary":"Accord accept for task-3"}
+{"ts":"2026-06-27T04:56:59Z","event":"task.completed","id":"task-3","summary":"Implemented TUI quick-add: a opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, then reloads/selects the new task."}

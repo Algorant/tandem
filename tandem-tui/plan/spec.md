@@ -706,8 +706,9 @@ tdm tui
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
-  - renders a Board-first, read-only shell from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
+  - renders a Board-first shell from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
   - supports keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
+  - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - enables crossterm mouse capture for basic column/detail clicks and wheel navigation; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
@@ -730,7 +731,7 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slice is intentionally smaller and read-only: it establishes the Ratatui/crossterm event loop, renders the Board view from active documents, supports navigation/details/reload/quit, and leaves mutations plus the other top-level views for subsequent slices.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render the Board view from active documents, support navigation/details/reload/quit, and now include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Additional mutations plus the other top-level views remain for subsequent slices.
 
 The full first TUI MVP should include:
 
@@ -1073,12 +1074,13 @@ Work actions:
 
 | Key | Action |
 | --- | --- |
-| `n` | new item quick add |
+| `a` | quick-add task in the selected/default configured state (current slice) |
+| `n` | new item quick add (planned keymap may be reconciled with `a`) |
 | `N` | new item in editor |
 | `e` | edit selected item in `$EDITOR` |
 | `m` | move/change state |
 | `p` | change priority |
-| `a` | accord action menu (assign/claim/deliver) |
+| `A` | accord action menu (assign/claim/deliver; planned) |
 | `v` | validation/review action menu |
 | `c` | complete/archive, if allowed |
 | `R` | reopen/restore in logs, if enabled after v0 |
@@ -1474,7 +1476,7 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tdm tui`.
-- Started with a read-only Ratatui/crossterm Board shell that renders active board documents, navigation, details, reload, help, and safe quit.
+- Started with a Ratatui/crossterm Board shell that renders active board documents, navigation, details, reload, help, safe quit, quick-add via `a`, and move-state mutation via `H`/`L`.
 - Render Board, Review, Logs, Rules, and Decisions views.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.

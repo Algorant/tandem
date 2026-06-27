@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::io;
 use std::time::Duration;
 
@@ -93,10 +94,18 @@ struct HitRegion {
     action: HitAction,
 }
 
+#[derive(Debug, Clone)]
+struct QuickAddInput {
+    state: String,
+    title: String,
+    fallback_note: Option<String>,
+}
+
 struct TuiApp {
     workspace: Workspace,
     title: String,
     states: Vec<String>,
+    configured_states: Vec<String>,
     docs: Vec<Document>,
     selected_state: usize,
     selected_item: usize,
@@ -104,6 +113,7 @@ struct TuiApp {
     detail_scroll: u16,
     status: String,
     show_help: bool,
+    quick_add: Option<QuickAddInput>,
     hits: Vec<HitRegion>,
 }
 
@@ -113,6 +123,7 @@ impl TuiApp {
             workspace,
             title: String::new(),
             states: Vec::new(),
+            configured_states: Vec::new(),
             docs: Vec::new(),
             selected_state: 0,
             selected_item: 0,
@@ -120,6 +131,7 @@ impl TuiApp {
             detail_scroll: 0,
             status: String::new(),
             show_help: false,
+            quick_add: None,
             hits: Vec::new(),
         };
         app.reload()?;
@@ -131,7 +143,8 @@ impl TuiApp {
         sort_documents(&mut docs);
         let configured_states = read_workspace_states(&self.workspace)?;
         self.title = read_workspace_title(&self.workspace)?;
-        self.states = states_with_board_docs(configured_states, &docs);
+        self.states = states_with_board_docs(configured_states.clone(), &docs);
+        self.configured_states = configured_states;
         self.docs = docs;
         self.clamp_selection();
         self.status = format!(
@@ -170,6 +183,11 @@ impl TuiApp {
             return Ok(true);
         }
 
+        if self.quick_add.is_some() {
+            self.handle_quick_add_key(key);
+            return Ok(false);
+        }
+
         if self.show_help {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -185,6 +203,9 @@ impl TuiApp {
                 Ok(()) => {}
                 Err(error) => self.status = format!("Reload failed: {}", error.message),
             },
+            KeyCode::Char('a') => self.start_quick_add(),
+            KeyCode::Char('H') => self.move_selected_task_by_delta(-1),
+            KeyCode::Char('L') => self.move_selected_task_by_delta(1),
             KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter => self.toggle_focus(),
             KeyCode::Char('1') => self.status = "Board view is active".to_string(),
             KeyCode::Char('2') => {
@@ -240,6 +261,192 @@ impl TuiApp {
             KeyCode::Right | KeyCode::Char('l') => self.next_state(),
             _ => {}
         }
+    }
+
+    fn handle_quick_add_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.quick_add = None;
+                self.status = "Quick add canceled.".to_string();
+            }
+            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => self.finish_quick_add(),
+            KeyCode::Char('m') | KeyCode::Char('j')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.finish_quick_add()
+            }
+            KeyCode::Backspace => {
+                if let Some(input) = self.quick_add.as_mut() {
+                    input.title.pop();
+                }
+                self.refresh_quick_add_status();
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(input) = self.quick_add.as_mut() {
+                    input.title.clear();
+                }
+                self.refresh_quick_add_status();
+            }
+            KeyCode::Char(ch)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if let Some(input) = self.quick_add.as_mut() {
+                    input.title.push(ch);
+                }
+                self.refresh_quick_add_status();
+            }
+            _ => {}
+        }
+    }
+
+    fn start_quick_add(&mut self) {
+        let (state, fallback_note) = quick_add_state_for_selection(
+            &self.configured_states,
+            &self.states,
+            self.selected_state,
+        );
+        self.quick_add = Some(QuickAddInput {
+            state,
+            title: String::new(),
+            fallback_note,
+        });
+        self.focus = FocusPane::Board;
+        self.refresh_quick_add_status();
+    }
+
+    fn refresh_quick_add_status(&mut self) {
+        if let Some(input) = self.quick_add.as_ref() {
+            self.status = quick_add_status(input);
+        }
+    }
+
+    fn finish_quick_add(&mut self) {
+        let Some(input) = self.quick_add.as_ref() else {
+            return;
+        };
+        let title = input.title.trim().to_string();
+        if title.is_empty() {
+            self.status = format!(
+                "Quick add needs a title. Add task in {}: type title, Enter create, Esc cancel",
+                input.state
+            );
+            return;
+        }
+        let state = input.state.clone();
+        self.quick_add = None;
+
+        match create_basic_task(&self.workspace, &title, &state) {
+            Ok(outcome) => {
+                let reload_error = match self.reload() {
+                    Ok(()) => {
+                        self.select_document_by_id(&outcome.id);
+                        None
+                    }
+                    Err(error) => Some(error.message),
+                };
+                self.status = format!(
+                    "Created {} in {}: {}{}",
+                    outcome.id,
+                    outcome.state,
+                    outcome.title,
+                    reload_error
+                        .map(|message| format!("; reload failed: {message}"))
+                        .unwrap_or_default()
+                );
+            }
+            Err(error) => {
+                let reload_note = match self.reload() {
+                    Ok(()) => String::new(),
+                    Err(reload_error) => format!(" Reload failed: {}", reload_error.message),
+                };
+                self.status = format!("Add error: {}{}", error.message, reload_note);
+            }
+        }
+    }
+
+    fn move_selected_task_by_delta(&mut self, delta: isize) {
+        let Some((doc_id, current_state)) = self
+            .selected_doc()
+            .map(|doc| (doc.id().to_string(), doc.field("state").map(str::to_string)))
+        else {
+            self.status = "No selected item to move.".to_string();
+            return;
+        };
+
+        let target_state = match adjacent_configured_state(
+            &self.configured_states,
+            current_state.as_deref(),
+            delta,
+        ) {
+            Ok(state) => state,
+            Err(message) => {
+                self.status = message;
+                return;
+            }
+        };
+
+        self.move_selected_task_to_state(&doc_id, &target_state);
+    }
+
+    fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
+        match move_task_to_state(&self.workspace, doc_id, target_state) {
+            Ok(outcome) => {
+                let reload_error = match self.reload() {
+                    Ok(()) => {
+                        self.select_document_by_id(&outcome.id);
+                        None
+                    }
+                    Err(error) => Some(error.message),
+                };
+                self.status = if outcome.changed {
+                    format!(
+                        "Moved {}: {} -> {}{}",
+                        outcome.id,
+                        outcome.from,
+                        outcome.to,
+                        reload_error
+                            .map(|message| format!("; reload failed: {message}"))
+                            .unwrap_or_default()
+                    )
+                } else {
+                    format!("{} is already in state {}", outcome.id, outcome.to)
+                };
+            }
+            Err(error) => {
+                let reload_note = match self.reload() {
+                    Ok(()) => {
+                        self.select_document_by_id(doc_id);
+                        String::new()
+                    }
+                    Err(reload_error) => format!(" Reload failed: {}", reload_error.message),
+                };
+                self.status = format!("Move error: {}{}", error.message, reload_note);
+            }
+        }
+    }
+
+    fn select_document_by_id(&mut self, id: &str) -> bool {
+        for state_index in 0..self.states.len() {
+            let Some(state_name) = self.states.get(state_index) else {
+                continue;
+            };
+            let mut item_index = 0;
+            for doc in &self.docs {
+                if document_state_label(doc) == state_name.as_str() {
+                    if doc.id() == id {
+                        self.selected_state = state_index;
+                        self.selected_item = item_index;
+                        self.detail_scroll = 0;
+                        self.clamp_selection();
+                        return true;
+                    }
+                    item_index += 1;
+                }
+            }
+        }
+        self.clamp_selection();
+        false
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
@@ -618,18 +825,22 @@ impl TuiApp {
     }
 
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
-        let focus = match self.focus {
-            FocusPane::Board => "board",
-            FocusPane::Detail => "detail",
+        let (hints, style) = if let Some(input) = self.quick_add.as_ref() {
+            (quick_add_status(input), Style::default().fg(Color::Yellow))
+        } else {
+            let focus = match self.focus {
+                FocusPane::Board => "board",
+                FocusPane::Detail => "detail",
+            };
+            (
+                format!(
+                    "{focus} · q quit · r reload · a add task · h/l state · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    self.status
+                ),
+                Style::default().fg(Color::DarkGray),
+            )
         };
-        let hints = format!(
-            "{focus} · q quit · r reload · h/l state · j/k item/scroll · tab/enter detail · ? help · {}",
-            self.status
-        );
-        let footer = Paragraph::new(Line::from(Span::styled(
-            hints,
-            Style::default().fg(Color::DarkGray),
-        )));
+        let footer = Paragraph::new(Line::from(Span::styled(hints, style)));
         frame.render_widget(footer, area);
     }
 
@@ -644,15 +855,18 @@ impl TuiApp {
             Line::from(""),
             Line::from("q / Ctrl-C        Quit safely"),
             Line::from("r                 Reload .tandem/board"),
+            Line::from("a                 Quick-add task in selected/default configured state"),
             Line::from("h/l or ←/→        Move between states"),
+            Line::from("H/L               Move selected task to previous/next configured state"),
             Line::from("j/k or ↑/↓        Move between items, or scroll detail when focused"),
             Line::from("g/G               First/last item or detail line"),
             Line::from("tab / enter       Toggle Board vs Detail focus"),
             Line::from("mouse wheel       Move selection or scroll detail"),
             Line::from("click column/detail Select state or focus detail"),
             Line::from("1..5              Show planned view status"),
+            Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
             Line::from(""),
-            Line::from("This slice is read-only: board mutations, Review/Logs/Rules/Decisions views, theme files, and richer mouse hit maps remain planned."),
+            Line::from("This slice supports Board mutations for quick-add and moving tasks between configured states. Review/Logs/Rules/Decisions views, theme files, and richer mouse hit maps remain planned."),
         ])
         .block(Block::default().borders(Borders::ALL).title(" Help "))
         .wrap(Wrap { trim: true });
@@ -688,6 +902,185 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
+}
+
+fn quick_add_state_for_selection(
+    configured_states: &[String],
+    visible_states: &[String],
+    selected_state: usize,
+) -> (String, Option<String>) {
+    let fallback = configured_states
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "todo".to_string());
+    let Some(selected) = visible_states.get(selected_state) else {
+        return (fallback, Some("no selected state".to_string()));
+    };
+    if configured_states.iter().any(|state| state == selected) {
+        (selected.clone(), None)
+    } else {
+        (
+            fallback,
+            Some(format!(
+                "selected bucket `{selected}` is not a configured state"
+            )),
+        )
+    }
+}
+
+fn quick_add_status(input: &QuickAddInput) -> String {
+    let fallback = input
+        .fallback_note
+        .as_ref()
+        .map(|note| format!(" ({note})"))
+        .unwrap_or_default();
+    let title = if input.title.is_empty() {
+        "<title>".to_string()
+    } else {
+        input.title.clone()
+    };
+    format!(
+        "Add task in {}{}: {} · Enter create · Esc cancel",
+        input.state, fallback, title
+    )
+}
+
+#[derive(Debug)]
+struct QuickAddOutcome {
+    id: String,
+    state: String,
+    title: String,
+}
+
+fn create_basic_task(
+    workspace: &Workspace,
+    title: &str,
+    state: &str,
+) -> Result<QuickAddOutcome, CliError> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(CliError::usage("task title must not be empty"));
+    }
+    validate_state(workspace, state)?;
+
+    let task_id = next_sequential_id(workspace, "task")?;
+    let now = current_timestamp();
+    let task_path = workspace.board_dir.join(format!("{task_id}.md"));
+    let content = format!(
+        "---\nid: {task_id}\ntype: task\ntitle: {}\nstate: {}\ncreatedAt: {}\nupdatedAt: {}\n---\n\n",
+        yaml_double_quote(title),
+        yaml_double_quote(state),
+        yaml_double_quote(&now),
+        yaml_double_quote(&now)
+    );
+    write_atomic(&task_path, &content)?;
+    append_event(workspace, "task.created", &task_id, title)?;
+
+    Ok(QuickAddOutcome {
+        id: task_id,
+        state: state.to_string(),
+        title: title.to_string(),
+    })
+}
+
+fn adjacent_configured_state(
+    configured_states: &[String],
+    current_state: Option<&str>,
+    delta: isize,
+) -> Result<String, String> {
+    if configured_states.is_empty() {
+        return Err("No configured states are available for task moves.".to_string());
+    }
+    if configured_states.len() == 1 {
+        return Err(format!(
+            "Only one configured state (`{}`); selected task cannot move left/right.",
+            configured_states[0]
+        ));
+    }
+
+    let current = current_state
+        .map(str::trim)
+        .filter(|state| !state.is_empty())
+        .unwrap_or("unfiled");
+    let Some(current_index) = configured_states.iter().position(|state| state == current) else {
+        return Err(format!(
+            "Selected item is in `{current}`, which is not a configured state ({}).",
+            configured_states.join(", ")
+        ));
+    };
+
+    let target_index = current_index as isize + delta;
+    if target_index < 0 {
+        Err(format!(
+            "Selected item is already in the first configured state `{current}`."
+        ))
+    } else if target_index >= configured_states.len() as isize {
+        Err(format!(
+            "Selected item is already in the last configured state `{current}`."
+        ))
+    } else {
+        Ok(configured_states[target_index as usize].clone())
+    }
+}
+
+#[derive(Debug)]
+struct MoveStateOutcome {
+    id: String,
+    from: String,
+    to: String,
+    changed: bool,
+}
+
+fn move_task_to_state(
+    workspace: &Workspace,
+    id: &str,
+    state: &str,
+) -> Result<MoveStateOutcome, CliError> {
+    validate_state(workspace, state)?;
+
+    let doc = find_board_document(workspace, id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can be moved in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    validate_task_document_for_mutation(workspace, &doc)?;
+
+    let doc_id = doc.id().to_string();
+    let previous_state = doc.field("state").unwrap_or("-").to_string();
+    if previous_state == state {
+        return Ok(MoveStateOutcome {
+            id: doc_id,
+            from: previous_state,
+            to: state.to_string(),
+            changed: false,
+        });
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut updates = BTreeMap::new();
+    updates.insert("state".to_string(), state.to_string());
+    updates.insert("updatedAt".to_string(), now);
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        workspace,
+        "task.moved",
+        &doc_id,
+        &format!("Moved {doc_id} from {previous_state} to {state}"),
+    )?;
+
+    Ok(MoveStateOutcome {
+        id: doc_id,
+        from: previous_state,
+        to: state.to_string(),
+        changed: true,
+    })
 }
 
 fn list_item_for_doc(doc: &Document) -> ListItem<'static> {
@@ -897,5 +1290,52 @@ mod tests {
     fn document_without_state_uses_unfiled_label() {
         let doc = doc_with_state("decision-1", None);
         assert_eq!(document_state_label(&doc), "unfiled");
+    }
+
+    #[test]
+    fn quick_add_uses_selected_configured_state() {
+        let configured = vec!["todo".to_string(), "in-progress".to_string()];
+        let visible = vec![
+            "todo".to_string(),
+            "blocked".to_string(),
+            "in-progress".to_string(),
+        ];
+        assert_eq!(
+            quick_add_state_for_selection(&configured, &visible, 2),
+            ("in-progress".to_string(), None)
+        );
+    }
+
+    #[test]
+    fn quick_add_falls_back_for_unconfigured_state() {
+        let configured = vec!["todo".to_string(), "in-progress".to_string()];
+        let visible = vec!["unfiled".to_string()];
+        let (state, note) = quick_add_state_for_selection(&configured, &visible, 0);
+        assert_eq!(state, "todo");
+        assert!(note.unwrap().contains("not a configured state"));
+    }
+
+    #[test]
+    fn adjacent_configured_state_moves_left_and_right() {
+        let states = vec![
+            "todo".to_string(),
+            "in-progress".to_string(),
+            "review".to_string(),
+        ];
+        assert_eq!(
+            adjacent_configured_state(&states, Some("in-progress"), -1).unwrap(),
+            "todo"
+        );
+        assert_eq!(
+            adjacent_configured_state(&states, Some("in-progress"), 1).unwrap(),
+            "review"
+        );
+    }
+
+    #[test]
+    fn adjacent_configured_state_rejects_unconfigured_state() {
+        let states = vec!["todo".to_string(), "review".to_string()];
+        let error = adjacent_configured_state(&states, Some("blocked"), 1).unwrap_err();
+        assert!(error.contains("not a configured state"));
     }
 }

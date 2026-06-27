@@ -23,7 +23,7 @@ The CLI/TUI area does **not** own the underlying protocol semantics. Protocol ru
 
 ## Current status
 
-Planning/specification plus implementation mode. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. The current known CLI surface is considered complete unless new feature requests or bugs appear. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations use raw-source, minimal-diff patches. Completion writes nested `completion` metadata, accord actions write canonical validation/timestamp metadata, and read paths tolerate earlier flat completion fields. The initial `tdm tui` implementation uses Ratatui plus crossterm to render a read-only Board-first shell with state/item navigation, selected-item details, reload, keyboard quit, and basic mouse wheel/click handling. Board mutations and the Review/Logs/Rules/Decisions views are the next implementation focus.
+Planning/specification plus implementation mode. A Rust binary package now lives in this directory and builds a `tdm` binary with `init`, `list`, `show`, `add`, `move`, `complete`, `search`, read-only `log`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, and `decision list|show|add` coverage. The current known CLI surface is considered complete unless new feature requests or bugs appear. Frontmatter reads use the approved `yaml-rust2` dependency while command mutations use raw-source, minimal-diff patches. Completion writes nested `completion` metadata, accord actions write canonical validation/timestamp metadata, and read paths tolerate earlier flat completion fields. The initial `tdm tui` implementation uses Ratatui plus crossterm to render a Board-first shell with state/item navigation, selected-item details, reload, keyboard quit, basic mouse wheel/click handling, and first Board mutations: `a` quick-adds a task in the selected/default configured state, while `H`/`L` moves the selected task to the previous/next configured state and reloads the board. Additional Board mutations and the Review/Logs/Rules/Decisions views are the next implementation focus.
 
 ## Build/run
 
@@ -79,7 +79,7 @@ No drift is allowed. If this README contradicts parent or protocol docs, fix the
 - CLI design and the current known CLI v0 implementation came before TUI implementation; future CLI work should be explicit new features or bug fixes.
 - V0 TUI invocation: `tdm tui` only.
 - TUI implementation target: Rust + Ratatui with crossterm terminal events/backend.
-- `tdm tui` currently starts with a Board-first read-only shell; broader MVP views and mutations are the active focus.
+- `tdm tui` currently starts with a Board-first shell; `a` quick-adds a task, `H`/`L` moves the selected task to the previous/next configured state, and broader MVP views/mutations remain the active focus.
 - Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.

@@ -102,6 +102,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented the initial direct crossterm event loop with alternate-screen setup, raw mode, mouse capture, reload, help, and safe cleanup on quit.
 - [x] Rendered active `.tandem/board` documents by configured state, including an `unfiled` bucket for state-less active documents.
 - [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
+- [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
+- [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 
 ## Current tasks
 
@@ -123,7 +125,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Next recommended steps
 
-1. Extend the Board shell from read-only navigation into the first mutation flow, likely move/change state or quick add.
+1. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 2. Add real Review/Logs/Rules/Decisions views on the same app shell.
 3. Draft final theme, mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 4. Keep parent and area docs synchronized as TUI implementation continues.
@@ -133,8 +135,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 - [ ] Render Board, Review, Logs, Rules, and Decisions views.
 - [x] Navigate states/items and view details.
-- [ ] Add items from the Board view.
-- [ ] Move items between states.
+- [x] Add items from the Board view.
+- [x] Move items between states.
 - [ ] Edit items from the TUI.
 - [ ] Complete items to logs.
 - [ ] Run accord actions from detail/review flows.
@@ -151,7 +153,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Does not assume a persistent completion state.
 - [ ] Makes the simple filtered Review queue obvious.
 - [x] Makes accord state obvious at a basic status-badge level.
-- [ ] Supports board mutations immediately.
+- [x] Supports board mutations immediately.
 - [ ] Supports themes.
 - [ ] Supports mouse selection and scroll.
 - [ ] Handles external file edits without crashing.
