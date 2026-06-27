@@ -82,8 +82,69 @@ enum FocusPane {
     Detail,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TuiView {
+    Board,
+    Review,
+    Logs,
+    Rules,
+    Decisions,
+}
+
+impl TuiView {
+    const ALL: [Self; 5] = [
+        Self::Board,
+        Self::Review,
+        Self::Logs,
+        Self::Rules,
+        Self::Decisions,
+    ];
+
+    fn index(self) -> usize {
+        match self {
+            Self::Board => 0,
+            Self::Review => 1,
+            Self::Logs => 2,
+            Self::Rules => 3,
+            Self::Decisions => 4,
+        }
+    }
+
+    fn from_digit(ch: char) -> Option<Self> {
+        match ch {
+            '1' => Some(Self::Board),
+            '2' => Some(Self::Review),
+            '3' => Some(Self::Logs),
+            '4' => Some(Self::Rules),
+            '5' => Some(Self::Decisions),
+            _ => None,
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Board => "Board",
+            Self::Review => "Review",
+            Self::Logs => "Logs",
+            Self::Rules => "Rules",
+            Self::Decisions => "Decisions",
+        }
+    }
+
+    fn tab_label(self) -> &'static str {
+        match self {
+            Self::Board => "1 Board",
+            Self::Review => "2 Review",
+            Self::Logs => "3 Logs",
+            Self::Rules => "4 Rules",
+            Self::Decisions => "5 Decisions",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum HitAction {
+    SwitchView(TuiView),
     SelectState(usize),
     FocusDetail,
 }
@@ -104,9 +165,13 @@ struct QuickAddInput {
 struct TuiApp {
     workspace: Workspace,
     title: String,
+    view: TuiView,
     states: Vec<String>,
     configured_states: Vec<String>,
     docs: Vec<Document>,
+    logs: Vec<Document>,
+    rules: RulesByCategory,
+    load_errors: Vec<String>,
     selected_state: usize,
     selected_item: usize,
     focus: FocusPane,
@@ -122,9 +187,13 @@ impl TuiApp {
         let mut app = Self {
             workspace,
             title: String::new(),
+            view: TuiView::Board,
             states: Vec::new(),
             configured_states: Vec::new(),
             docs: Vec::new(),
+            logs: Vec::new(),
+            rules: empty_rules(),
+            load_errors: Vec::new(),
             selected_state: 0,
             selected_item: 0,
             focus: FocusPane::Board,
@@ -143,15 +212,51 @@ impl TuiApp {
         sort_documents(&mut docs);
         let configured_states = read_workspace_states(&self.workspace)?;
         self.title = read_workspace_title(&self.workspace)?;
+
+        let mut load_errors = Vec::new();
+        let mut logs = match read_documents(&self.workspace.logs_dir, DocumentLocation::Logs) {
+            Ok(logs) => logs,
+            Err(error) => {
+                load_errors.push(format!("Logs load failed: {}", error.message));
+                Vec::new()
+            }
+        };
+        logs.sort_by(|a, b| {
+            b.field("completedAt")
+                .unwrap_or("")
+                .cmp(a.field("completedAt").unwrap_or(""))
+                .then_with(|| a.id().cmp(b.id()))
+        });
+
+        let rules = match read_rules(&self.workspace.config_path) {
+            Ok(rules) => rules,
+            Err(error) => {
+                load_errors.push(format!("Rules load failed: {}", error.message));
+                empty_rules()
+            }
+        };
+
         self.states = states_with_board_docs(configured_states.clone(), &docs);
         self.configured_states = configured_states;
         self.docs = docs;
+        self.logs = logs;
+        self.rules = rules;
+        self.load_errors = load_errors;
         self.clamp_selection();
         self.status = format!(
-            "Loaded {} active document{} from {}",
+            "Loaded {} active document{} from {}{}",
             self.docs.len(),
             if self.docs.len() == 1 { "" } else { "s" },
-            display_path(&self.workspace.board_dir)
+            display_path(&self.workspace.board_dir),
+            if self.load_errors.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    "; {} load warning{}",
+                    self.load_errors.len(),
+                    if self.load_errors.len() == 1 { "" } else { "s" }
+                )
+            }
         );
         Ok(())
     }
@@ -196,6 +301,13 @@ impl TuiApp {
             return Ok(false);
         }
 
+        if let KeyCode::Char(ch) = key.code {
+            if let Some(view) = TuiView::from_digit(ch) {
+                self.switch_view(view);
+                return Ok(false);
+            }
+        }
+
         match key.code {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char('?') => self.show_help = true,
@@ -203,38 +315,95 @@ impl TuiApp {
                 Ok(()) => {}
                 Err(error) => self.status = format!("Reload failed: {}", error.message),
             },
-            KeyCode::Char('a') => self.start_quick_add(),
-            KeyCode::Char('H') => self.move_selected_task_by_delta(-1),
-            KeyCode::Char('L') => self.move_selected_task_by_delta(1),
-            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter => self.toggle_focus(),
-            KeyCode::Char('1') => self.status = "Board view is active".to_string(),
-            KeyCode::Char('2') => {
-                self.status =
-                    "Review view is planned; Board shell is active in this slice".to_string()
+            KeyCode::Char('a') if self.view == TuiView::Board => self.start_quick_add(),
+            KeyCode::Char('a') => {
+                self.status = "Quick add is available in Board view; press 1 for Board.".to_string()
             }
-            KeyCode::Char('3') => {
-                self.status =
-                    "Logs view is planned; Board shell is active in this slice".to_string()
+            KeyCode::Char('H') if self.view == TuiView::Board => {
+                self.move_selected_task_by_delta(-1)
             }
-            KeyCode::Char('4') => {
-                self.status =
-                    "Rules view is planned; Board shell is active in this slice".to_string()
+            KeyCode::Char('L') if self.view == TuiView::Board => {
+                self.move_selected_task_by_delta(1)
             }
-            KeyCode::Char('5') => {
-                self.status =
-                    "Decisions view is planned; Board shell is active in this slice".to_string()
+            KeyCode::Char('H') | KeyCode::Char('L') => {
+                self.status = "Task move is available in Board view; press 1 for Board.".to_string()
+            }
+            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter if self.view == TuiView::Board => {
+                self.toggle_focus()
+            }
+            KeyCode::Tab => self.next_view(),
+            KeyCode::BackTab => self.previous_view(),
+            KeyCode::Enter => {
+                self.status = format!(
+                    "{} view is read-only in this slice; press 1 for Board actions.",
+                    self.view.label()
+                )
             }
             KeyCode::Esc => {
-                if self.focus == FocusPane::Detail {
+                if self.view == TuiView::Board && self.focus == FocusPane::Detail {
                     self.focus = FocusPane::Board;
                 }
             }
-            _ => match self.focus {
-                FocusPane::Board => self.handle_board_key(key),
-                FocusPane::Detail => self.handle_detail_key(key),
+            _ => match self.view {
+                TuiView::Board => match self.focus {
+                    FocusPane::Board => self.handle_board_key(key),
+                    FocusPane::Detail => self.handle_detail_key(key),
+                },
+                _ => self.handle_placeholder_key(key),
             },
         }
         Ok(false)
+    }
+
+    fn switch_view(&mut self, view: TuiView) {
+        self.view = view;
+        self.status = match view {
+            TuiView::Board => {
+                "Board view active. Use a to quick-add and H/L to move tasks.".to_string()
+            }
+            TuiView::Review => format!(
+                "Review view active (read-only placeholder): {} item{} need attention.",
+                self.review_items().len(),
+                if self.review_items().len() == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ),
+            TuiView::Logs => format!(
+                "Logs view active (read-only placeholder): {} completed item{} loaded.",
+                self.logs.len(),
+                if self.logs.len() == 1 { "" } else { "s" }
+            ),
+            TuiView::Rules => format!(
+                "Rules view active (read-only placeholder): {} project rule{} loaded.",
+                self.rules_total(),
+                if self.rules_total() == 1 { "" } else { "s" }
+            ),
+            TuiView::Decisions => format!(
+                "Decisions view active (read-only placeholder): {} decision{} loaded.",
+                self.decision_docs().len(),
+                if self.decision_docs().len() == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            ),
+        };
+    }
+
+    fn next_view(&mut self) {
+        let next = (self.view.index() + 1) % TuiView::ALL.len();
+        self.switch_view(TuiView::ALL[next]);
+    }
+
+    fn previous_view(&mut self) {
+        let previous = if self.view.index() == 0 {
+            TuiView::ALL.len() - 1
+        } else {
+            self.view.index() - 1
+        };
+        self.switch_view(TuiView::ALL[previous]);
     }
 
     fn handle_board_key(&mut self, key: KeyEvent) {
@@ -259,6 +428,14 @@ impl TuiApp {
             KeyCode::End | KeyCode::Char('G') => self.detail_scroll_to_end(),
             KeyCode::Left | KeyCode::Char('h') => self.previous_state(),
             KeyCode::Right | KeyCode::Char('l') => self.next_state(),
+            _ => {}
+        }
+    }
+
+    fn handle_placeholder_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
+            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
             _ => {}
         }
     }
@@ -450,6 +627,10 @@ impl TuiApp {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
+        if self.quick_add.is_some() || self.show_help {
+            return;
+        }
+
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let hit = self
@@ -460,22 +641,27 @@ impl TuiApp {
                     .cloned();
                 if let Some(hit) = hit {
                     match hit.action {
-                        HitAction::SelectState(index) => {
+                        HitAction::SwitchView(view) => self.switch_view(view),
+                        HitAction::SelectState(index) if self.view == TuiView::Board => {
                             self.selected_state = index.min(self.states.len().saturating_sub(1));
                             self.selected_item = 0;
                             self.detail_scroll = 0;
                             self.focus = FocusPane::Board;
                             self.clamp_selection();
                         }
-                        HitAction::FocusDetail => self.focus = FocusPane::Detail,
+                        HitAction::SelectState(_) => {}
+                        HitAction::FocusDetail if self.view == TuiView::Board => {
+                            self.focus = FocusPane::Detail
+                        }
+                        HitAction::FocusDetail => {}
                     }
                 }
             }
-            MouseEventKind::ScrollDown => match self.focus {
+            MouseEventKind::ScrollDown if self.view == TuiView::Board => match self.focus {
                 FocusPane::Board => self.next_item(),
                 FocusPane::Detail => self.scroll_detail_down(3),
             },
-            MouseEventKind::ScrollUp => match self.focus {
+            MouseEventKind::ScrollUp if self.view == TuiView::Board => match self.focus {
                 FocusPane::Board => self.previous_item(),
                 FocusPane::Detail => self.scroll_detail_up(3),
             },
@@ -589,6 +775,24 @@ impl TuiApp {
             .unwrap_or(1)
     }
 
+    fn review_items(&self) -> Vec<(&Document, String)> {
+        self.docs
+            .iter()
+            .filter_map(|doc| review_attention_reason(doc).map(|reason| (doc, reason)))
+            .collect()
+    }
+
+    fn decision_docs(&self) -> Vec<&Document> {
+        self.docs
+            .iter()
+            .filter(|doc| doc.doc_type() == "decision")
+            .collect()
+    }
+
+    fn rules_total(&self) -> usize {
+        self.rules.values().map(Vec::len).sum()
+    }
+
     fn draw(&mut self, frame: &mut Frame<'_>) {
         self.hits.clear();
         let area = frame.area();
@@ -611,8 +815,18 @@ impl TuiApp {
 
         self.draw_header(frame, chunks[0]);
         self.draw_view_tabs(frame, chunks[1]);
-        self.draw_board(frame, chunks[2]);
-        self.draw_detail(frame, chunks[3]);
+        if self.view == TuiView::Board {
+            self.draw_board(frame, chunks[2]);
+            self.draw_detail(frame, chunks[3]);
+        } else {
+            let view_area = Rect {
+                x: chunks[2].x,
+                y: chunks[2].y,
+                width: chunks[2].width,
+                height: chunks[2].height.saturating_add(chunks[3].height),
+            };
+            self.draw_placeholder_view(frame, view_area);
+        }
         self.draw_footer(frame, chunks[4]);
 
         if self.show_help {
@@ -640,16 +854,26 @@ impl TuiApp {
     }
 
     fn draw_header(&self, frame: &mut Frame<'_>, area: Rect) {
-        let counts = self
-            .states
-            .iter()
-            .map(|state| format!("{state} {}", self.docs_for_state(state).len()))
-            .collect::<Vec<_>>()
-            .join(" · ");
-        let selected = self
-            .selected_doc()
-            .map(|doc| format!("selected {}", doc.id()))
-            .unwrap_or_else(|| "no selected item".to_string());
+        let counts = format!(
+            "Board {} · Review {} · Logs {} · Rules {} · Decisions {}",
+            self.docs.len(),
+            self.review_items().len(),
+            self.logs.len(),
+            self.rules_total(),
+            self.decision_docs().len()
+        );
+        let context = match self.view {
+            TuiView::Board => self
+                .selected_doc()
+                .map(|doc| format!("selected {}", doc.id()))
+                .unwrap_or_else(|| "no selected item".to_string()),
+            TuiView::Review => "read-only queue placeholder; review actions come later".to_string(),
+            TuiView::Logs => "read-only logs placeholder; list/show/search come later".to_string(),
+            TuiView::Rules => "read-only rules placeholder; add/edit/delete come later".to_string(),
+            TuiView::Decisions => {
+                "read-only decisions placeholder; browsing/actions come later".to_string()
+            }
+        };
         let header = Paragraph::new(vec![
             Line::from(vec![
                 Span::styled(
@@ -659,22 +883,29 @@ impl TuiApp {
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::raw("  "),
+                Span::styled(
+                    format!("{} view", self.view.label()),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw("  "),
                 Span::styled(counts, Style::default().fg(Color::Gray)),
             ]),
-            Line::from(Span::styled(selected, Style::default().fg(Color::DarkGray))),
+            Line::from(Span::styled(context, Style::default().fg(Color::DarkGray))),
         ])
         .block(Block::default().borders(Borders::ALL).title(" Tandem "));
         frame.render_widget(header, area);
     }
 
-    fn draw_view_tabs(&self, frame: &mut Frame<'_>, area: Rect) {
-        let titles = ["Board", "Review", "Logs", "Rules", "Decisions"]
+    fn draw_view_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let titles = TuiView::ALL
             .into_iter()
-            .map(Line::from)
+            .map(|view| Line::from(view.tab_label()))
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
             .block(Block::default().borders(Borders::ALL))
-            .select(0)
+            .select(self.view.index())
             .style(Style::default().fg(Color::DarkGray))
             .highlight_style(
                 Style::default()
@@ -683,6 +914,248 @@ impl TuiApp {
                     .add_modifier(Modifier::BOLD),
             );
         frame.render_widget(tabs, area);
+        self.register_view_tab_hits(area);
+    }
+
+    fn register_view_tab_hits(&mut self, area: Rect) {
+        if area.width <= 2 || area.height <= 2 {
+            return;
+        }
+        let mut x = area.x.saturating_add(1);
+        let right = area.x.saturating_add(area.width).saturating_sub(1);
+        let y = area.y.saturating_add(1);
+        for view in TuiView::ALL {
+            let width = (view.tab_label().chars().count() as u16).saturating_add(2);
+            if x >= right {
+                break;
+            }
+            let clamped_width = width.min(right.saturating_sub(x));
+            if clamped_width > 0 {
+                self.hits.push(HitRegion {
+                    rect: Rect {
+                        x,
+                        y,
+                        width: clamped_width,
+                        height: 1,
+                    },
+                    action: HitAction::SwitchView(view),
+                });
+            }
+            x = x.saturating_add(width);
+        }
+    }
+
+    fn draw_placeholder_view(&self, frame: &mut Frame<'_>, area: Rect) {
+        let (title, lines) = match self.view {
+            TuiView::Board => (" Board ".to_string(), Vec::new()),
+            TuiView::Review => self.review_placeholder_lines(),
+            TuiView::Logs => self.logs_placeholder_lines(),
+            TuiView::Rules => self.rules_placeholder_lines(),
+            TuiView::Decisions => self.decisions_placeholder_lines(),
+        };
+        let paragraph = Paragraph::new(lines)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .wrap(Wrap { trim: false });
+        frame.render_widget(paragraph, area);
+    }
+
+    fn review_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
+        let items = self.review_items();
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "Review queue placeholder",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!(
+                "{} active item{} need attention.",
+                items.len(),
+                if items.len() == 1 { "" } else { "s" }
+            )),
+            Line::from(
+                "Includes delivered accords, pending/changes-requested reviews, blocked/rework/failed accords, and accepted active items.",
+            ),
+            Line::from(""),
+        ];
+        append_load_error_lines(&mut lines, &self.load_errors);
+        if items.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No review placeholder rows.",
+                Style::default().fg(Color::DarkGray),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "Attention rows:",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for (doc, reason) in items.into_iter().take(10) {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
+                    Span::styled(truncate(doc.title(), 48), Style::default().fg(Color::White)),
+                    Span::raw(" — "),
+                    Span::styled(reason, Style::default().fg(Color::Yellow)),
+                ]));
+            }
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Read-only in task-4; later workers can add review actions on this view state.",
+            Style::default().fg(Color::DarkGray),
+        )));
+        (" Review ".to_string(), lines)
+    }
+
+    fn logs_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "Logs placeholder",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!(
+                "{} completed log{} loaded from {}.",
+                self.logs.len(),
+                if self.logs.len() == 1 { "" } else { "s" },
+                display_path(&self.workspace.logs_dir)
+            )),
+            Line::from(""),
+        ];
+        append_load_error_lines(&mut lines, &self.load_errors);
+        if self.logs.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No completed logs found.",
+                Style::default().fg(Color::DarkGray),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "Recent logs:",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for doc in self.logs.iter().take(10) {
+                let completed = doc
+                    .field("completedAt")
+                    .unwrap_or("unknown completion time");
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
+                    Span::styled(completed.to_string(), Style::default().fg(Color::Gray)),
+                    Span::raw(" — "),
+                    Span::styled(truncate(doc.title(), 48), Style::default().fg(Color::White)),
+                ]));
+            }
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Read-only in task-4; future work can wire list/show/search interactions here.",
+            Style::default().fg(Color::DarkGray),
+        )));
+        (" Logs ".to_string(), lines)
+    }
+
+    fn rules_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "Rules placeholder",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!(
+                "{} project rule{} loaded from {}.",
+                self.rules_total(),
+                if self.rules_total() == 1 { "" } else { "s" },
+                display_path(&self.workspace.config_path)
+            )),
+            Line::from(""),
+        ];
+        append_load_error_lines(&mut lines, &self.load_errors);
+        for category in ["always", "never", "prefer", "context"] {
+            let items = self.rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
+            lines.push(Line::from(vec![
+                Span::styled(format!("{category}: "), label_style()),
+                Span::raw(format!(
+                    "{} rule{}",
+                    items.len(),
+                    if items.len() == 1 { "" } else { "s" }
+                )),
+            ]));
+            for rule in items.iter().take(3) {
+                let source = rule
+                    .source
+                    .as_ref()
+                    .map(|source| format!(" ({source})"))
+                    .unwrap_or_default();
+                lines.push(Line::from(format!(
+                    "  #{} {}{}",
+                    rule.id,
+                    truncate(&rule.rule, 72),
+                    source
+                )));
+            }
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Read-only in task-4; future work can wire add/edit/delete actions here.",
+            Style::default().fg(Color::DarkGray),
+        )));
+        (" Rules ".to_string(), lines)
+    }
+
+    fn decisions_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
+        let decisions = self.decision_docs();
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "Decisions placeholder",
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!(
+                "{} active decision document{} loaded.",
+                decisions.len(),
+                if decisions.len() == 1 { "" } else { "s" }
+            )),
+            Line::from(
+                "Decision documents stay first-class and do not need a lifecycle state in v0.",
+            ),
+            Line::from(""),
+        ];
+        append_load_error_lines(&mut lines, &self.load_errors);
+        if decisions.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No decision documents found on the active board.",
+                Style::default().fg(Color::DarkGray),
+            )));
+        } else {
+            lines.push(Line::from(Span::styled(
+                "Decision documents:",
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            )));
+            for doc in decisions.into_iter().take(10) {
+                lines.push(Line::from(vec![
+                    Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
+                    Span::styled(truncate(doc.title(), 64), Style::default().fg(Color::White)),
+                ]));
+            }
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Read-only in task-4; future work can add decision browsing and actions here.",
+            Style::default().fg(Color::DarkGray),
+        )));
+        (" Decisions ".to_string(), lines)
     }
 
     fn draw_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -827,14 +1300,23 @@ impl TuiApp {
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         let (hints, style) = if let Some(input) = self.quick_add.as_ref() {
             (quick_add_status(input), Style::default().fg(Color::Yellow))
-        } else {
+        } else if self.view == TuiView::Board {
             let focus = match self.focus {
                 FocusPane::Board => "board",
                 FocusPane::Detail => "detail",
             };
             (
                 format!(
-                    "{focus} · q quit · r reload · a add task · h/l state · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    "{focus} · 1..5 views · q quit · r reload · a add task · h/l state · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    self.status
+                ),
+                Style::default().fg(Color::DarkGray),
+            )
+        } else {
+            (
+                format!(
+                    "{} · 1..5 switch views · tab/shift-tab next/prev view · h/l view · r reload · q quit · ? help · {}",
+                    self.view.label(),
                     self.status
                 ),
                 Style::default().fg(Color::DarkGray),
@@ -849,24 +1331,26 @@ impl TuiApp {
         frame.render_widget(Clear, popup);
         let help = Paragraph::new(vec![
             Line::from(Span::styled(
-                "Tandem TUI Board shell",
+                "Tandem TUI view shell",
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             )),
             Line::from(""),
             Line::from("q / Ctrl-C        Quit safely"),
-            Line::from("r                 Reload .tandem/board"),
-            Line::from("a                 Quick-add task in selected/default configured state"),
-            Line::from("h/l or ←/→        Move between states"),
-            Line::from("H/L               Move selected task to previous/next configured state"),
-            Line::from("j/k or ↑/↓        Move between items, or scroll detail when focused"),
-            Line::from("g/G               First/last item or detail line"),
-            Line::from("tab / enter       Toggle Board vs Detail focus"),
-            Line::from("mouse wheel       Move selection or scroll detail"),
-            Line::from("click column/detail Select state or focus detail"),
-            Line::from("1..5              Show planned view status"),
+            Line::from("r                 Reload board/log/rule data"),
+            Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
+            Line::from("click top tabs    Switch views with the mouse"),
+            Line::from("tab / enter       Toggle Board vs Detail focus while in Board"),
+            Line::from("tab / shift-tab   Next/previous view outside Board"),
+            Line::from("a                 Board quick-add task in selected/default state"),
+            Line::from("h/l or ←/→        Board: move between states; placeholders: switch views"),
+            Line::from("H/L               Board: move selected task to previous/next configured state"),
+            Line::from("j/k or ↑/↓        Board: move items, or scroll detail when focused"),
+            Line::from("g/G               Board: first/last item or detail line"),
+            Line::from("mouse wheel       Board: move selection or scroll detail"),
+            Line::from("click column/detail Board: select state or focus detail"),
             Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
             Line::from(""),
-            Line::from("This slice supports Board mutations for quick-add and moving tasks between configured states. Review/Logs/Rules/Decisions views, theme files, and richer mouse hit maps remain planned."),
+            Line::from("This slice adds real top-level view state. Board keeps quick-add and H/L moves; Review/Logs/Rules/Decisions are read-only placeholders/counts for later workers."),
         ])
         .block(Block::default().borders(Borders::ALL).title(" Help "))
         .wrap(Wrap { trim: true });
@@ -902,6 +1386,50 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
+}
+
+fn review_attention_reason(doc: &Document) -> Option<String> {
+    match accord_status(doc) {
+        Some("delivered") => return Some("accord delivered".to_string()),
+        Some("blocked") => return Some("accord blocked".to_string()),
+        Some("failed") => return Some("accord failed".to_string()),
+        Some("rework") => return Some("accord in rework".to_string()),
+        Some("accepted") => return Some("accord accepted; not completed".to_string()),
+        _ => {}
+    }
+
+    match review_status(doc) {
+        Some("pending") => Some("review pending".to_string()),
+        Some("changes-requested") => Some("changes requested".to_string()),
+        Some("rejected") => Some("review rejected".to_string()),
+        Some("failed") => Some("review failed".to_string()),
+        _ if doc
+            .field("blockers")
+            .map(parse_field_values)
+            .map(|blockers| !blockers.is_empty())
+            .unwrap_or(false) =>
+        {
+            Some("has blockers".to_string())
+        }
+        _ => None,
+    }
+}
+
+fn append_load_error_lines(lines: &mut Vec<Line<'static>>, load_errors: &[String]) {
+    if load_errors.is_empty() {
+        return;
+    }
+    lines.push(Line::from(Span::styled(
+        "Load warnings:",
+        Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+    )));
+    for error in load_errors {
+        lines.push(Line::from(Span::styled(
+            error.clone(),
+            Style::default().fg(Color::Red),
+        )));
+    }
+    lines.push(Line::from(""));
 }
 
 fn quick_add_state_for_selection(
@@ -1290,6 +1818,37 @@ mod tests {
     fn document_without_state_uses_unfiled_label() {
         let doc = doc_with_state("decision-1", None);
         assert_eq!(document_state_label(&doc), "unfiled");
+    }
+
+    #[test]
+    fn numeric_keys_map_to_top_level_views() {
+        assert_eq!(TuiView::from_digit('1'), Some(TuiView::Board));
+        assert_eq!(TuiView::from_digit('2'), Some(TuiView::Review));
+        assert_eq!(TuiView::from_digit('3'), Some(TuiView::Logs));
+        assert_eq!(TuiView::from_digit('4'), Some(TuiView::Rules));
+        assert_eq!(TuiView::from_digit('5'), Some(TuiView::Decisions));
+        assert_eq!(TuiView::from_digit('6'), None);
+    }
+
+    #[test]
+    fn review_attention_reason_covers_delivered_and_pending_items() {
+        let mut delivered = doc_with_state("task-1", Some("review"));
+        delivered
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        assert_eq!(
+            review_attention_reason(&delivered).as_deref(),
+            Some("accord delivered")
+        );
+
+        let mut pending = doc_with_state("task-2", Some("review"));
+        pending
+            .fields
+            .insert("review.status".to_string(), "pending".to_string());
+        assert_eq!(
+            review_attention_reason(&pending).as_deref(),
+            Some("review pending")
+        );
     }
 
     #[test]
