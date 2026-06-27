@@ -2,12 +2,12 @@
 id: task-11
 type: task
 title: "Adopt Brainfile-style Board state subviews"
-state: todo
+state: "in-progress"
 priority: "high"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/src/tui/theme.rs", "tandem-tui/plan/spec.md", "tandem-tui/plan/todo.md"]
 tags: ["tui", "board", "layout", "brainfile-inspired", "subviews"]
 createdAt: "2026-06-27T15:02:47Z"
-updatedAt: "2026-06-27T15:02:47Z"
+updatedAt: "2026-06-27T22:49:30Z"
 subtasks:
   - id: task-11-1
     title: "Replace multi-column Board layout with selected-state subview list"
@@ -22,12 +22,14 @@ subtasks:
     title: "Consider reusable subview model for other top-level panes"
     completed: false
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:tui-board-subviews"
+  claimedAt: "2026-06-27T22:49:30Z"
   deliverables: ["code:tandem-tui/src/tui.rs:single-state Board subview layout", "docs:tandem-tui/plan/spec.md:Board subview layout direction"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
   constraints: ["Borrow the interaction model, not Brainfile terminology; keep Tandem state/accord/review vocabulary.", "Do not add a persistent done column."]
-  updatedAt: "2026-06-27T15:02:47Z"
+  updatedAt: "2026-06-27T22:49:30Z"
 ---
 
 ## Description

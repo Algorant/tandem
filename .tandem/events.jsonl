@@ -58,3 +58,7 @@
 {"ts":"2026-06-27T19:11:55Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
 {"ts":"2026-06-27T22:45:02Z","event":"accord.accepted","id":"task-7","summary":"Accord accept for task-7"}
 {"ts":"2026-06-27T22:45:02Z","event":"task.completed","id":"task-7","summary":"Integrated Rules and Decisions TUI panes with separate source modules, validation, and smoke coverage."}
+{"ts":"2026-06-27T22:49:30Z","event":"accord.claimed","id":"task-10","summary":"Accord claim for task-10"}
+{"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-10","summary":"Moved task-10 from todo to in-progress"}
+{"ts":"2026-06-27T22:49:30Z","event":"accord.claimed","id":"task-11","summary":"Accord claim for task-11"}
+{"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-11","summary":"Moved task-11 from todo to in-progress"}

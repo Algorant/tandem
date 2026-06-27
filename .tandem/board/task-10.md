@@ -2,12 +2,12 @@
 id: task-10
 type: task
 title: "Prototype Verdigris TUI theme"
-state: todo
+state: "in-progress"
 priority: "medium"
 relatedFiles: ["tandem-tui/src/tui/theme.rs", "tandem-tui/src/tui.rs", "tandem-tui/README.md", "tandem-tui/plan/spec.md"]
 tags: ["tui", "theme", "verdigris", "visual-design"]
 createdAt: "2026-06-27T15:02:47Z"
-updatedAt: "2026-06-27T15:02:47Z"
+updatedAt: "2026-06-27T22:49:30Z"
 subtasks:
   - id: task-10-1
     title: "Map Verdigris palette roles to Tandem TUI theme keys"
@@ -19,12 +19,14 @@ subtasks:
     title: "Smoke visually in tdm tui and document usage"
     completed: false
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:tui-verdigris-theme"
+  claimedAt: "2026-06-27T22:49:30Z"
   deliverables: ["code:tandem-tui/src/tui/theme.rs:Verdigris theme or loader support", "docs:tandem-tui/README.md:Verdigris usage and palette notes"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
   constraints: ["Use the local Verdigris/Pi sources in the task description as palette guidance.", "Keep terminal readability and no-color fallback intact."]
-  updatedAt: "2026-06-27T15:02:47Z"
+  updatedAt: "2026-06-27T22:49:30Z"
 ---
 
 ## Description
