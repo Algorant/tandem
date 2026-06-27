@@ -707,8 +707,8 @@ tdm tui
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
   - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` and mouse tab clicks switch views.
-  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
-  - keeps Board keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
+  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns.
+  - keeps Board keyboard and mouse navigation across state subviews/items, richer Brainfile-style rows, selected-item detail scrolling, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders Review as a real read-only filtered queue of active items needing attention, with selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
   - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
@@ -716,7 +716,7 @@ tdm tui
   - renders Decisions as a selectable active decision list with selected metadata/body/path detail and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
   - loads the built-in `default-dark` semantic palette, or selectable built-in `verdigris` when `.tandem/theme.toml` sets `base = "verdigris"`, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies workspace theme selection/overrides from `.tandem/theme.toml` using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active built-in palette remains in use.
-  - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
+  - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
   - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
@@ -738,7 +738,7 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board state subview navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
 
 The full first TUI MVP should include:
 
@@ -768,12 +768,11 @@ Projects may configure state names. The TUI should not assume a persistent compl
 
 Board view should support:
 
-- state/column tabs or columns depending on layout width
-- task/decision cards
-- compact and expanded card modes
-- priority, type, tags, parent, blocker, assignee, due date badges
-- accord status badges
-- review status badges
+- state subview tabs with counts for configured states plus any active unfiled/unknown-state buckets
+- one selected-state list at a time, using the full Board content width instead of simultaneous narrow columns
+- dense task/decision rows with priority, type, title, right-ish ID, accord/review badges, and checklist progress where available
+- metadata rows for tags, assignee, due date, blockers, related-file count, updated timestamp, and path where useful
+- compact and expanded/detail modes
 - selection and multi-select later
 - click actions when mouse mode is enabled
 
@@ -885,10 +884,11 @@ For terminals >= ~120 columns:
 ```text
 ┌ Project title ──────────────── health/status/search ┐
 ├ Board | Review | Logs | Rules | Decisions ──────────┤
-│ todo             in-progress          review         │
-│ ┌───────────┐    ┌───────────┐       ┌───────────┐  │
-│ │ cards     │    │ cards     │       │ cards     │  │
-│ └───────────┘    └───────────┘       └───────────┘  │
+│ TO DO 2   IN PROGRESS 1   REVIEW 3                  │
+│ ┌ REVIEW · selected state 3/3 · 3 items ───────────┐ │
+│ │ [HIGH] Implement review flow [A:delivered] task-8│ │
+│ │ #tui #review · @pi · updated 2026-06-27 · path   │ │
+│ └──────────────────────────────────────────────────┘ │
 ├──────────────── selected detail / status ───────────┤
 │ key hints / command mode / status messages           │
 └──────────────────────────────────────────────────────┘
@@ -898,16 +898,16 @@ For terminals >= ~120 columns:
 
 For ~80-119 columns:
 
-- state tabs at top
-- single list for selected state
-- right or lower detail pane if enough room
+- same Board state subview tabs at top
+- single list for the selected state
+- lower detail pane in the current implementation; right-side detail can be revisited later
 
 ### Narrow layout
 
 For ~50-79 columns:
 
-- stacked global list grouped by state
-- detail opens full-screen or as expandable cards
+- keep the selected-state subview model rather than horizontal columns
+- detail opens lower/full-screen or as expandable cards
 - no horizontal board assumptions
 
 ### Tiny terminal behavior
@@ -1045,7 +1045,7 @@ Required interactions:
 - double-click or enter/click to expand detail
 - scroll lists with mouse wheel
 - click action buttons in detail/review/log views
-- click column/state picker in move mode
+- click Board state tabs and state picker controls in move mode
 - click confirmation buttons
 
 Deferred interactions:
@@ -1094,7 +1094,7 @@ Navigation:
 | Key | Action |
 | --- | --- |
 | `j/k` or arrows | move selection |
-| `h/l` or left/right | move column/tab |
+| `h/l` or left/right | move Board state subview or current view tab |
 | `g/G` | top/bottom |
 | `ctrl-d/u` | half-page down/up |
 | `enter` | expand/open |
@@ -1506,7 +1506,7 @@ Manual smoke:
 
 - Launch through `tdm tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs.
-- Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, selectable built-in `verdigris` styling, and workspace `.tandem/theme.toml` color overrides.
+- Board renders active board documents as count-labeled state subviews with a full-width selected-state list, richer rows, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, selectable built-in `verdigris` styling, and workspace `.tandem/theme.toml` color overrides.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.
 - Render safe Review action buttons/mutations and remaining Board/accord/completion workflows on top of the existing view shell.

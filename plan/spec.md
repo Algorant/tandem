@@ -83,7 +83,7 @@ CLI/TUI:
 - First CLI implementation language is Rust inside `tandem-tui/`; the current implementation remains one `tdm` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.
 - `tdm decision` supports `list`, `show`, and `add`.
 - The TUI launches as `tdm tui` only in v0.
-- First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue.
+- First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue. The current Board layout uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI uses canonical command names and long flags only; no short aliases.
 - Theme config loads in this order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, workspace TOML override at `.tandem/theme.toml`.
 - Defer templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, and fixtures.
@@ -111,6 +111,6 @@ Parent docs are the coordination source of truth. When a naming, scope, architec
 5. Draft the detailed `tdm` command reference from the locked CLI surface.
 6. Keep the existing `tandem-tui/` Rust package layout stable unless implementation pressure proves a change is needed.
 7. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
-8. Continue the first Ratatui/crossterm TUI MVP from the current read-only Board shell toward board mutations and the remaining top-level views.
+8. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
 9. Add TUI accord/review/completion flows.
 10. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.

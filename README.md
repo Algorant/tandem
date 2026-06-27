@@ -39,7 +39,7 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - First implementation: Rust inside `tandem-tui/`, currently as one `tdm` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a Ratatui/crossterm TUI module.
 - CLI output: human-readable by default using compact tables/detail blocks; all read commands support `--json` envelope objects.
 - TUI invocation: `tdm tui` only in v0.
-- First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering.
+- First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI aliases: none; canonical commands and long flags only.
 - V0 repo shape: implementation stays under `tandem-tui/`; no root Rust workspace, schemas, or fixtures.
 - Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.

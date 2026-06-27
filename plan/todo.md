@@ -25,6 +25,8 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [x] Accepted protocol v0 draft for implementation.
 - [x] Implemented and hardened the current known v0 `tdm` CLI surface inside `tandem-tui/`.
 - [x] Started the first Ratatui/crossterm `tdm tui` implementation with a read-only Board shell under `tandem-tui/src/tui.rs`.
+- [x] Expanded `tdm tui` to Board, Review, Logs, Rules, and Decisions views with initial Board, Rules, Decisions, and Logs interactions.
+- [x] Reworked the Board into count-labeled state subviews with a full-width selected-state list and richer rows while preserving quick-add and `H`/`L` task moves.
 
 ## Current tasks
 
@@ -41,9 +43,9 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 
 ## Next recommended steps
 
-1. Extend the first `tdm tui` Board shell into board mutations, starting with one small flow such as move/change state or quick add.
-2. Add the remaining TUI top-level views: Review, Logs, Rules, and Decisions.
-3. Keep schemas and fixtures out of v0; use inline examples in docs.
+1. Add safe Review action buttons/mutations, likely accord accept/rework and completion/archive prompts.
+2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
+3. Finish user theme discovery and remaining TUI polish without adding schemas or fixtures in v0.
 4. Keep area READMEs, specs, and todos synchronized as TUI implementation continues.
 5. Migrate/dogfood Tandem documents after the TUI can manage them safely.
 

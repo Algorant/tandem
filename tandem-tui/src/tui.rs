@@ -156,6 +156,7 @@ impl TuiView {
 enum HitAction {
     SwitchView(TuiView),
     SelectState(usize),
+    SelectBoardItem(usize, usize),
     FocusDetail,
     FocusReviewList,
     SelectReviewItem(usize),
@@ -456,7 +457,7 @@ impl TuiApp {
         }
         self.status = match view {
             TuiView::Board => {
-                "Board view active. Use a to quick-add and H/L to move tasks.".to_string()
+                "Board view active. Use h/l or mouse tabs for state subviews, a to quick-add, and H/L to move tasks.".to_string()
             }
             TuiView::Review => {
                 let count = self.review_items().len();
@@ -885,6 +886,17 @@ impl TuiApp {
                             self.clamp_selection();
                         }
                         HitAction::SelectState(_) => {}
+                        HitAction::SelectBoardItem(state_index, item_index)
+                            if self.view == TuiView::Board =>
+                        {
+                            self.selected_state =
+                                state_index.min(self.states.len().saturating_sub(1));
+                            self.selected_item = item_index;
+                            self.detail_scroll = 0;
+                            self.focus = FocusPane::Board;
+                            self.clamp_selection();
+                        }
+                        HitAction::SelectBoardItem(_, _) => {}
                         HitAction::FocusDetail if self.view == TuiView::Board => {
                             self.focus = FocusPane::Detail
                         }
@@ -1155,6 +1167,19 @@ impl TuiApp {
             .get(self.selected_state)
             .map(|state| self.docs_for_state(state).len())
             .unwrap_or(0)
+    }
+
+    fn selected_state_progress(&self) -> String {
+        let Some(state) = self.states.get(self.selected_state) else {
+            return "NO STATE 0/0".to_string();
+        };
+        let count = self.selected_state_count();
+        let position = if count == 0 {
+            0
+        } else {
+            self.selected_item.min(count - 1) + 1
+        };
+        format!("{} {position}/{count}", display_state_label(state))
     }
 
     fn selected_doc(&self) -> Option<&Document> {
@@ -1676,19 +1701,7 @@ impl TuiApp {
     }
 
     fn draw_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        if area.width >= 100 && self.states.len() > 1 {
-            let constraints =
-                vec![Constraint::Ratio(1, self.states.len() as u32); self.states.len()];
-            let columns = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(constraints)
-                .split(area);
-            for index in 0..self.states.len() {
-                self.draw_state_list(frame, columns[index], index, true);
-            }
-        } else {
-            self.draw_state_tabs(frame, area);
-        }
+        self.draw_state_tabs(frame, area);
     }
 
     fn draw_state_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -1696,26 +1709,49 @@ impl TuiApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(1)])
             .split(area);
-        let titles = self
-            .states
+        let subviews = board_subview_tabs(&self.states, &self.docs);
+        let titles = subviews
             .iter()
-            .map(|state| Line::from(format!(" {state} ({}) ", self.docs_for_state(state).len())))
+            .map(|tab| Line::from(state_tab_title(&tab.state, tab.count)))
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
             .select(self.selected_state)
             .style(self.theme.tab_style())
             .highlight_style(self.theme.state_tab_selected_style());
         frame.render_widget(tabs, chunks[0]);
-        self.draw_state_list(frame, chunks[1], self.selected_state, false);
+        self.register_state_tab_hits(chunks[0], &subviews);
+        self.draw_state_list(frame, chunks[1], self.selected_state);
     }
 
-    fn draw_state_list(
-        &mut self,
-        frame: &mut Frame<'_>,
-        area: Rect,
-        state_index: usize,
-        compact_title: bool,
-    ) {
+    fn register_state_tab_hits(&mut self, area: Rect, subviews: &[BoardSubviewTab]) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let mut x = area.x;
+        let right = area.x.saturating_add(area.width);
+        for (index, tab) in subviews.iter().enumerate() {
+            let width =
+                (state_tab_title(&tab.state, tab.count).chars().count() as u16).saturating_add(1);
+            if x >= right {
+                break;
+            }
+            let clamped_width = width.min(right.saturating_sub(x));
+            if clamped_width > 0 {
+                self.hits.push(HitRegion {
+                    rect: Rect {
+                        x,
+                        y: area.y,
+                        width: clamped_width,
+                        height: 1,
+                    },
+                    action: HitAction::SelectState(index),
+                });
+            }
+            x = x.saturating_add(width);
+        }
+    }
+
+    fn draw_state_list(&mut self, frame: &mut Frame<'_>, area: Rect, state_index: usize) {
         self.hits.push(HitRegion {
             rect: area,
             action: HitAction::SelectState(state_index),
@@ -1726,46 +1762,70 @@ impl TuiApp {
         };
         let docs = self.docs_for_state(state_name);
         let count = docs.len();
+        let content_width = area.width.saturating_sub(4) as usize;
         let items = if docs.is_empty() {
             vec![ListItem::new(Line::from(Span::styled(
-                "(empty)",
+                "No active items in this state. Press a to quick-add here.",
                 self.theme.muted_style(),
             )))]
         } else {
             docs.iter()
-                .map(|doc| list_item_for_doc(doc, &self.theme))
+                .map(|doc| list_item_for_doc(doc, &self.theme, content_width))
                 .collect::<Vec<_>>()
         };
 
-        let title = if compact_title {
-            format!(" {state_name} ({count}) ")
-        } else {
-            format!(
-                " State: {state_name} ({}/{}) · {count} item{} ",
-                state_index + 1,
-                self.states.len(),
-                if count == 1 { "" } else { "s" }
-            )
-        };
-        let selected = state_index == self.selected_state;
+        let title = format!(
+            " {} · selected state {}/{} · {} item{} ",
+            display_state_label(state_name),
+            state_index + 1,
+            self.states.len(),
+            count,
+            if count == 1 { "" } else { "s" }
+        );
         let list = List::new(items)
             .style(self.theme.panel_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(self.theme.border_style(selected))
+                    .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )
             .highlight_style(self.theme.selected_style())
             .highlight_symbol("▸ ");
 
-        if selected && count > 0 {
+        if count > 0 {
             let mut state = ListState::default();
             state.select(Some(self.selected_item.min(count - 1)));
             frame.render_stateful_widget(list, area, &mut state);
+            self.register_board_row_hits(area, state_index, count);
         } else {
             frame.render_widget(list, area);
+        }
+    }
+
+    fn register_board_row_hits(&mut self, area: Rect, state_index: usize, count: usize) {
+        if area.width <= 2 || area.height <= 2 {
+            return;
+        }
+        let left = area.x.saturating_add(1);
+        let top = area.y.saturating_add(1);
+        let width = area.width.saturating_sub(2);
+        let bottom = area.y.saturating_add(area.height).saturating_sub(1);
+        for index in 0..count {
+            let y = top.saturating_add((index as u16).saturating_mul(2));
+            if y >= bottom {
+                break;
+            }
+            self.hits.push(HitRegion {
+                rect: Rect {
+                    x: left,
+                    y,
+                    width,
+                    height: 2.min(bottom.saturating_sub(y)),
+                },
+                action: HitAction::SelectBoardItem(state_index, index),
+            });
         }
     }
 
@@ -1825,7 +1885,8 @@ impl TuiApp {
             };
             (
                 format!(
-                    "{focus} · 1..5 views · q quit · r reload · a add task · h/l state · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · h/l state subview · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    self.selected_state_progress(),
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1901,7 +1962,7 @@ impl TuiApp {
             Line::from("tab / enter       Toggle list/detail focus in Board, Review, and Logs"),
             Line::from("tab / shift-tab   Next/previous view outside Board/Review/Logs"),
             Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
-            Line::from("h/l or ←/→        Board: move states; Review/Logs: switch views; Rules: switch category"),
+            Line::from("h/l or ←/→        Board: switch state subviews; Review/Logs: switch views; Rules: switch category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
             Line::from("j/k or ↑/↓        Board/Review/Logs/Rules/Decisions: move items, or scroll detail when focused"),
             Line::from("g/G               First/last item in the active list/detail"),
@@ -1910,11 +1971,11 @@ impl TuiApp {
             Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
             Line::from("Esc               Logs: clear search filter; prompts: cancel"),
             Line::from("mouse wheel       Board/Review/Logs/Rules/Decisions: move selection or scroll detail"),
-            Line::from("click list/detail Board/Review/Logs: select/focus panes"),
+            Line::from("click tabs/list/detail Board/Review/Logs: switch subviews, select, or focus panes"),
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in defaults and .tandem/theme.toml workspace overrides are active; user theme discovery and richer action buttons remain planned."),
+            Line::from("Board state subviews, quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in defaults and .tandem/theme.toml workspace overrides are active; user theme discovery and richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -2183,36 +2244,233 @@ fn move_task_to_state(
     })
 }
 
-fn list_item_for_doc(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BoardSubviewTab {
+    state: String,
+    count: usize,
+}
+
+fn board_subview_tabs(states: &[String], docs: &[Document]) -> Vec<BoardSubviewTab> {
+    states
+        .iter()
+        .map(|state| BoardSubviewTab {
+            state: state.clone(),
+            count: docs
+                .iter()
+                .filter(|doc| document_state_label(doc) == state.as_str())
+                .count(),
+        })
+        .collect()
+}
+
+fn state_tab_title(state: &str, count: usize) -> String {
+    format!(" {} {} ", display_state_label(state), count)
+}
+
+fn display_state_label(state: &str) -> String {
+    state
+        .trim()
+        .replace('-', " ")
+        .replace('_', " ")
+        .to_uppercase()
+}
+
+fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> ListItem<'static> {
     let priority = doc.field("priority").unwrap_or("-");
-    let accord = accord_status(doc).unwrap_or("-");
-    let review = review_status(doc).unwrap_or("-");
-    let assignee = doc.field("assignee").unwrap_or("-");
-    let tags = doc.field("tags").unwrap_or("");
+    let priority_badge = priority_badge(priority);
+    let type_badge = format!("[{}]", doc.doc_type());
+    let mut badges = Vec::new();
+    if let Some(accord) = accord_status(doc).filter(|status| !status.trim().is_empty()) {
+        badges.push((format!("[A:{accord}]"), theme.accord_style(accord)));
+    }
+    if let Some(review) = review_status(doc).filter(|status| !status.trim().is_empty()) {
+        badges.push((format!("[R:{review}]"), theme.review_style(review)));
+    }
+    if let Some((completed, total)) = subtask_progress(doc) {
+        let tone = if completed == total {
+            StatusTone::Success
+        } else {
+            StatusTone::Warning
+        };
+        badges.push((format!("[{completed}/{total}]"), theme.status_style(tone)));
+    }
+
+    let badge_width = badges
+        .iter()
+        .map(|(badge, _)| text_width(badge))
+        .sum::<usize>()
+        + badges.len().saturating_sub(1);
+    let badge_prefix_width = if badges.is_empty() { 0 } else { 1 };
+    let fixed_width = text_width(&priority_badge)
+        + 1
+        + text_width(&type_badge)
+        + 1
+        + badge_prefix_width
+        + badge_width
+        + 1
+        + text_width(doc.id());
+    let title_width = content_width.saturating_sub(fixed_width).max(12);
+    let title = truncate(doc.title(), title_width);
+    let used_before_id = text_width(&priority_badge)
+        + 1
+        + text_width(&type_badge)
+        + 1
+        + text_width(&title)
+        + badge_prefix_width
+        + badge_width;
+    let spacer_width = content_width
+        .saturating_sub(used_before_id + text_width(doc.id()))
+        .max(1);
+
+    let mut title_spans = vec![
+        Span::styled(priority_badge, theme.priority_style(priority)),
+        Span::raw(" "),
+        Span::styled(type_badge, theme.muted_style()),
+        Span::raw(" "),
+        Span::styled(title, theme.text_style().add_modifier(Modifier::BOLD)),
+    ];
+    if !badges.is_empty() {
+        title_spans.push(Span::raw(" "));
+        for (index, (badge, style)) in badges.into_iter().enumerate() {
+            if index > 0 {
+                title_spans.push(Span::raw(" "));
+            }
+            title_spans.push(Span::styled(badge, style));
+        }
+    }
+    title_spans.push(Span::raw(" ".repeat(spacer_width)));
+    title_spans.push(Span::styled(
+        doc.id().to_string(),
+        theme.status_style(StatusTone::Accent),
+    ));
+
     ListItem::new(vec![
-        Line::from(vec![
-            Span::styled(
-                format!("{:<4}", truncate(priority, 4).to_uppercase()),
-                theme.priority_style(priority),
-            ),
-            Span::raw(" "),
-            Span::styled(format!("[{}] ", doc.doc_type()), theme.muted_style()),
-            Span::styled(
-                truncate(doc.title(), 56),
-                theme.text_style().add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("{} ", doc.id()),
-                theme.status_style(StatusTone::Accent),
-            ),
-            Span::styled(format!("@{assignee} "), theme.muted_style()),
-            Span::styled(format!("A:{accord} "), theme.accord_style(accord)),
-            Span::styled(format!("R:{review} "), theme.review_style(review)),
-            Span::styled(tags.to_string(), theme.muted_style()),
-        ]),
+        Line::from(title_spans),
+        Line::from(board_metadata_spans(doc, theme)),
     ])
+}
+
+fn priority_badge(priority: &str) -> String {
+    let label = match priority.trim().to_ascii_lowercase().as_str() {
+        "critical" | "urgent" => "CRIT".to_string(),
+        "high" => "HIGH".to_string(),
+        "medium" | "med" => "MED".to_string(),
+        "low" => "LOW".to_string(),
+        "" | "-" | "none" => "NONE".to_string(),
+        other => other.chars().take(4).collect::<String>().to_uppercase(),
+    };
+    format!("[{label:<4}]")
+}
+
+fn board_metadata_spans(doc: &Document, theme: &TuiTheme) -> Vec<Span<'static>> {
+    let mut segments: Vec<(String, Style)> = Vec::new();
+
+    if let Some(tags) = doc.field("tags").map(parse_field_values) {
+        let tags = tags
+            .into_iter()
+            .map(|tag| format!("#{tag}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if !tags.is_empty() {
+            segments.push((tags, theme.status_style(StatusTone::Accent)));
+        }
+    }
+
+    if let Some(assignee) = doc
+        .field("assignee")
+        .or_else(|| doc.field("accord.assignee"))
+        .filter(|assignee| !assignee.trim().is_empty() && *assignee != "-")
+    {
+        segments.push((format!("@{assignee}"), theme.muted_style()));
+    }
+
+    if let Some(due) = doc
+        .field("dueDate")
+        .filter(|due| !due.trim().is_empty() && *due != "-")
+    {
+        segments.push((format!("due {}", truncate(due, 16)), theme.muted_style()));
+    }
+
+    if let Some(updated) = doc
+        .field("updatedAt")
+        .filter(|updated| !updated.trim().is_empty())
+    {
+        segments.push((
+            format!("updated {}", compact_timestamp(updated)),
+            theme.muted_style(),
+        ));
+    }
+
+    let related_files = doc
+        .field("relatedFiles")
+        .map(parse_field_values)
+        .unwrap_or_default();
+    if !related_files.is_empty() {
+        segments.push((
+            format!("files {}", related_files.len()),
+            theme.muted_style(),
+        ));
+    }
+
+    let blockers = doc
+        .field("blockers")
+        .map(parse_field_values)
+        .unwrap_or_default();
+    if !blockers.is_empty() {
+        segments.push((
+            format!("blocked by {}", blockers.len()),
+            theme.status_style(StatusTone::Warning),
+        ));
+    }
+
+    segments.push((truncate(&display_path(&doc.path), 48), theme.muted_style()));
+
+    join_metadata_segments(segments, theme)
+}
+
+fn join_metadata_segments(segments: Vec<(String, Style)>, theme: &TuiTheme) -> Vec<Span<'static>> {
+    if segments.is_empty() {
+        return vec![Span::styled("no metadata".to_string(), theme.muted_style())];
+    }
+
+    let mut spans = Vec::new();
+    for (index, (text, style)) in segments.into_iter().enumerate() {
+        if index > 0 {
+            spans.push(Span::styled(" · ", theme.muted_style()));
+        }
+        spans.push(Span::styled(text, style));
+    }
+    spans
+}
+
+fn subtask_progress(doc: &Document) -> Option<(usize, usize)> {
+    let mut completed = 0;
+    let mut total = 0;
+    for (key, value) in &doc.fields {
+        if key.starts_with("subtasks.") && key.ends_with(".completed") {
+            total += 1;
+            if matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "true" | "yes" | "done" | "1"
+            ) {
+                completed += 1;
+            }
+        }
+    }
+    (total > 0).then_some((completed, total))
+}
+
+fn compact_timestamp(value: &str) -> String {
+    let value = value.trim();
+    if value.len() >= 16 && value.as_bytes().get(10) == Some(&b'T') {
+        format!("{} {}", &value[..10], &value[11..16])
+    } else {
+        truncate(value, 16)
+    }
+}
+
+fn text_width(value: &str) -> usize {
+    value.chars().count()
 }
 
 fn detail_lines_for_doc(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
@@ -2445,5 +2703,50 @@ mod tests {
         let states = vec!["todo".to_string(), "review".to_string()];
         let error = adjacent_configured_state(&states, Some("blocked"), 1).unwrap_err();
         assert!(error.contains("not a configured state"));
+    }
+
+    #[test]
+    fn board_subview_tabs_count_visible_states() {
+        let docs = vec![
+            doc_with_state("task-1", Some("todo")),
+            doc_with_state("task-2", Some("todo")),
+            doc_with_state("task-3", Some("review")),
+        ];
+        let states = vec![
+            "todo".to_string(),
+            "in-progress".to_string(),
+            "review".to_string(),
+        ];
+        let tabs = board_subview_tabs(&states, &docs);
+        assert_eq!(
+            tabs,
+            vec![
+                BoardSubviewTab {
+                    state: "todo".to_string(),
+                    count: 2,
+                },
+                BoardSubviewTab {
+                    state: "in-progress".to_string(),
+                    count: 0,
+                },
+                BoardSubviewTab {
+                    state: "review".to_string(),
+                    count: 1,
+                },
+            ]
+        );
+        assert_eq!(state_tab_title("in-progress", 3), " IN PROGRESS 3 ");
+    }
+
+    #[test]
+    fn subtask_progress_counts_completed_checklist_items() {
+        let mut doc = doc_with_state("task-1", Some("todo"));
+        doc.fields
+            .insert("subtasks.0.completed".to_string(), "true".to_string());
+        doc.fields
+            .insert("subtasks.1.completed".to_string(), "false".to_string());
+        doc.fields
+            .insert("subtasks.2.completed".to_string(), "1".to_string());
+        assert_eq!(subtask_progress(&doc), Some((2, 3)));
     }
 }

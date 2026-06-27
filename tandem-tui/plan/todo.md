@@ -125,6 +125,11 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - selected-log detail pane with completion summary, completed timestamp, files changed, validation, reviewer, accord/review status, accord detail/evidence, body, path, and event context
   - `/` search prompt with Enter apply and Esc cancel/clear
   - empty/no-match states and safe per-log/event load warnings
+- [x] Reworked the Board from simultaneous columns into Brainfile-style state subviews:
+  - configured states render as count-labeled tabs with mouse selection
+  - the active state gets the full Board list area
+  - rows include richer priority, title, accord/review, checklist, tag, assignee, updated, file-count, path, and right-ish ID metadata
+  - quick-add, `H`/`L` task moves, detail focus, theme styling, and mouse wheel/click behavior remain active
 
 ## Current tasks
 
@@ -158,7 +163,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 - [x] Render Board, Review, Logs, Rules, and Decisions views at shell/placeholder level.
 - [x] Render the Review queue as a filtered list with inspection detail.
-- [x] Navigate states/items and view details.
+- [x] Navigate state subviews/items and view details.
 - [x] Add items from the Board view.
 - [x] Move items between states.
 - [ ] Edit items from the TUI.
@@ -168,7 +173,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Browse active decisions and add basic title/body decisions.
 - [x] Show and search logs.
 - [x] Load and apply built-in plus workspace override themes.
-- [ ] Support mouse selection, scrolling, tab switching, and action buttons by default (tab switching is implemented; action buttons remain).
+- [x] Support mouse selection, scrolling, and tab/subview switching by default.
+- [ ] Add action-button click interactions.
 - [ ] Confirm drag/drop is absent from v0 interactions.
 - [ ] Watch/reload file changes.
 - [ ] Surface parse and write errors safely.
@@ -180,6 +186,6 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Makes accord state obvious at a basic status-badge level.
 - [x] Supports board mutations immediately.
 - [x] Supports built-in plus workspace override themes.
-- [ ] Supports mouse selection and scroll.
+- [x] Supports mouse selection and scroll.
 - [ ] Handles external file edits without crashing.
 - [x] Keeps logs useful, searchable, and inspectable.
