@@ -115,6 +115,11 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - status-line warnings for unknown keys or invalid colors
   - `NO_COLOR`/`TANDEM_NO_COLOR` terminal fallback
   - Board styling for headers, tabs, borders, selection, priority, accord, review, details, and status lines
+- [x] Implemented the TUI Logs browser:
+  - recency-sorted completed-log list from `.tandem/logs/`
+  - selected-log detail pane with completion summary, completed timestamp, files changed, validation, reviewer, accord/review status, accord detail/evidence, body, path, and event context
+  - `/` search prompt with Enter apply and Esc cancel/clear
+  - empty/no-match states and safe per-log/event load warnings
 
 ## Current tasks
 
@@ -137,7 +142,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Next recommended steps
 
-1. Implement full Logs/Rules/Decisions workflows on the existing top-level view shell, and later add safe Review action buttons/mutations on top of the current read-only queue.
+1. Implement full Rules/Decisions workflows on the existing top-level view shell, and later add safe Review action buttons/mutations on top of the current read-only queue.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 4. Keep parent and area docs synchronized as TUI implementation continues.
@@ -154,7 +159,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [ ] Complete items to logs.
 - [ ] Run accord actions from detail/review flows.
 - [ ] Add/edit/delete rules.
-- [ ] Show and search logs.
+- [x] Show and search logs.
 - [x] Load and apply built-in plus workspace override themes.
 - [ ] Support mouse selection, scrolling, tab switching, and action buttons by default (tab switching is implemented; action buttons remain).
 - [ ] Confirm drag/drop is absent from v0 interactions.
@@ -170,4 +175,4 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Supports built-in plus workspace override themes.
 - [ ] Supports mouse selection and scroll.
 - [ ] Handles external file edits without crashing.
-- [ ] Keeps logs useful, searchable, and inspectable.
+- [x] Keeps logs useful, searchable, and inspectable.

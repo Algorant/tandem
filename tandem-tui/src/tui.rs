@@ -21,6 +21,7 @@ use ratatui::{
 
 use super::*;
 
+mod logs;
 mod review;
 mod theme;
 
@@ -155,6 +156,9 @@ enum HitAction {
     FocusReviewList,
     SelectReviewItem(usize),
     FocusReviewDetail,
+    SelectLog(usize),
+    FocusLogList,
+    FocusLogDetail,
 }
 
 #[derive(Debug, Clone)]
@@ -178,6 +182,7 @@ struct TuiApp {
     configured_states: Vec<String>,
     docs: Vec<Document>,
     logs: Vec<Document>,
+    log_events: logs::LogEventsById,
     rules: RulesByCategory,
     load_errors: Vec<String>,
     theme: TuiTheme,
@@ -186,9 +191,13 @@ struct TuiApp {
     selected_state: usize,
     selected_item: usize,
     selected_review_item: usize,
+    selected_log: usize,
     focus: FocusPane,
     detail_scroll: u16,
     review_detail_scroll: u16,
+    log_detail_scroll: u16,
+    log_search_filter: String,
+    log_search_input: Option<String>,
     status: String,
     show_help: bool,
     quick_add: Option<QuickAddInput>,
@@ -205,6 +214,7 @@ impl TuiApp {
             configured_states: Vec::new(),
             docs: Vec::new(),
             logs: Vec::new(),
+            log_events: logs::LogEventsById::new(),
             rules: empty_rules(),
             load_errors: Vec::new(),
             theme: TuiTheme::default_dark(),
@@ -213,9 +223,13 @@ impl TuiApp {
             selected_state: 0,
             selected_item: 0,
             selected_review_item: 0,
+            selected_log: 0,
             focus: FocusPane::Board,
             detail_scroll: 0,
             review_detail_scroll: 0,
+            log_detail_scroll: 0,
+            log_search_filter: String::new(),
+            log_search_input: None,
             status: String::new(),
             show_help: false,
             quick_add: None,
@@ -233,19 +247,10 @@ impl TuiApp {
         self.title = read_workspace_title(&self.workspace)?;
 
         let mut load_errors = Vec::new();
-        let mut logs = match read_documents(&self.workspace.logs_dir, DocumentLocation::Logs) {
-            Ok(logs) => logs,
-            Err(error) => {
-                load_errors.push(format!("Logs load failed: {}", error.message));
-                Vec::new()
-            }
-        };
-        logs.sort_by(|a, b| {
-            b.field("completedAt")
-                .unwrap_or("")
-                .cmp(a.field("completedAt").unwrap_or(""))
-                .then_with(|| a.id().cmp(b.id()))
-        });
+        let log_load = logs::load_logs(&self.workspace.logs_dir);
+        load_errors.extend(log_load.warnings);
+        let (log_events, event_warnings) = logs::load_log_events(&self.workspace.events_path);
+        load_errors.extend(event_warnings);
 
         let rules = match read_rules(&self.workspace.config_path) {
             Ok(rules) => rules,
@@ -258,7 +263,8 @@ impl TuiApp {
         self.states = states_with_board_docs(configured_states.clone(), &docs);
         self.configured_states = configured_states;
         self.docs = docs;
-        self.logs = logs;
+        self.logs = log_load.docs;
+        self.log_events = log_events;
         self.rules = rules;
         self.load_errors = load_errors;
         self.theme = theme_load.theme;
@@ -331,6 +337,11 @@ impl TuiApp {
             return Ok(false);
         }
 
+        if self.log_search_input.is_some() {
+            self.handle_log_search_key(key);
+            return Ok(false);
+        }
+
         if self.show_help {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
@@ -366,11 +377,16 @@ impl TuiApp {
             KeyCode::Char('H') | KeyCode::Char('L') => {
                 self.status = "Task move is available in Board view; press 1 for Board.".to_string()
             }
+            KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
+            KeyCode::Char('/') => {
+                self.status = "Search is available in Logs view; press 3 for Logs.".to_string()
+            }
             KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter
                 if matches!(self.view, TuiView::Board | TuiView::Review) =>
             {
                 self.toggle_focus()
             }
+            KeyCode::Enter if self.view == TuiView::Logs => self.toggle_focus(),
             KeyCode::Tab => self.next_view(),
             KeyCode::BackTab => self.previous_view(),
             KeyCode::Enter => {
@@ -379,13 +395,13 @@ impl TuiApp {
                     self.view.label()
                 )
             }
-            KeyCode::Esc => {
-                if matches!(self.view, TuiView::Board | TuiView::Review)
-                    && self.focus == FocusPane::Detail
-                {
-                    self.focus = FocusPane::Board;
+            KeyCode::Esc => match self.view {
+                TuiView::Board | TuiView::Review if self.focus == FocusPane::Detail => {
+                    self.focus = FocusPane::Board
                 }
-            }
+                TuiView::Logs => self.clear_log_filter_or_focus(),
+                _ => {}
+            },
             _ => match self.view {
                 TuiView::Board => match self.focus {
                     FocusPane::Board => self.handle_board_key(key),
@@ -395,6 +411,7 @@ impl TuiApp {
                     FocusPane::Board => self.handle_review_key(key),
                     FocusPane::Detail => self.handle_review_detail_key(key),
                 },
+                TuiView::Logs => self.handle_logs_key(key),
                 _ => self.handle_placeholder_key(key),
             },
         }
@@ -408,6 +425,9 @@ impl TuiApp {
         }
         if view == TuiView::Review {
             self.clamp_review_selection();
+        }
+        if view == TuiView::Logs {
+            self.clamp_selection();
         }
         self.status = match view {
             TuiView::Board => {
@@ -424,11 +444,7 @@ impl TuiApp {
                     if count == 1 { "" } else { "s" }
                 )
             }
-            TuiView::Logs => format!(
-                "Logs view active (read-only placeholder): {} completed item{} loaded.",
-                self.logs.len(),
-                if self.logs.len() == 1 { "" } else { "s" }
-            ),
+            TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
                 "Rules view active (read-only placeholder): {} project rule{} loaded.",
                 self.rules_total(),
@@ -509,6 +525,82 @@ impl TuiApp {
             KeyCode::End | KeyCode::Char('G') => self.review_detail_scroll_to_end(),
             KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
             KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            _ => {}
+        }
+    }
+
+    fn handle_logs_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => match self.focus {
+                FocusPane::Board => self.previous_log(),
+                FocusPane::Detail => self.scroll_log_detail_up(1),
+            },
+            KeyCode::Down | KeyCode::Char('j') => match self.focus {
+                FocusPane::Board => self.next_log(),
+                FocusPane::Detail => self.scroll_log_detail_down(1),
+            },
+            KeyCode::PageUp | KeyCode::Char('u') => match self.focus {
+                FocusPane::Board => self.previous_log_page(),
+                FocusPane::Detail => self.scroll_log_detail_up(6),
+            },
+            KeyCode::PageDown | KeyCode::Char('d') => match self.focus {
+                FocusPane::Board => self.next_log_page(),
+                FocusPane::Detail => self.scroll_log_detail_down(6),
+            },
+            KeyCode::Home | KeyCode::Char('g') => match self.focus {
+                FocusPane::Board => {
+                    self.selected_log = 0;
+                    self.log_detail_scroll = 0;
+                }
+                FocusPane::Detail => self.log_detail_scroll = 0,
+            },
+            KeyCode::End | KeyCode::Char('G') => match self.focus {
+                FocusPane::Board => self.last_log(),
+                FocusPane::Detail => self.log_detail_scroll_to_end(),
+            },
+            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
+            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            _ => {}
+        }
+    }
+
+    fn handle_log_search_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.log_search_input = None;
+                if self.log_search_filter.is_empty() {
+                    self.status = "Log search canceled.".to_string();
+                } else {
+                    self.status = self.logs_status_message();
+                }
+            }
+            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => self.finish_log_search(),
+            KeyCode::Char('m') | KeyCode::Char('j')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.finish_log_search()
+            }
+            KeyCode::Backspace => {
+                if let Some(input) = self.log_search_input.as_mut() {
+                    input.pop();
+                }
+                self.refresh_log_search_status();
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(input) = self.log_search_input.as_mut() {
+                    input.clear();
+                }
+                self.refresh_log_search_status();
+            }
+            KeyCode::Char(ch)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if let Some(input) = self.log_search_input.as_mut() {
+                    input.push(ch);
+                }
+                self.refresh_log_search_status();
+            }
             _ => {}
         }
     }
@@ -623,6 +715,46 @@ impl TuiApp {
         }
     }
 
+    fn start_log_search(&mut self) {
+        self.log_search_input = Some(self.log_search_filter.clone());
+        self.focus = FocusPane::Board;
+        self.refresh_log_search_status();
+    }
+
+    fn refresh_log_search_status(&mut self) {
+        let query = self.log_search_input.as_deref().unwrap_or("");
+        self.status = format!(
+            "Search logs: {} · type filter, Enter apply, Esc cancel",
+            if query.is_empty() { "<query>" } else { query }
+        );
+    }
+
+    fn finish_log_search(&mut self) {
+        let query = self
+            .log_search_input
+            .take()
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        self.log_search_filter = query;
+        self.selected_log = 0;
+        self.log_detail_scroll = 0;
+        self.clamp_selection();
+        self.status = self.logs_status_message();
+    }
+
+    fn clear_log_filter_or_focus(&mut self) {
+        if !self.log_search_filter.is_empty() {
+            self.log_search_filter.clear();
+            self.selected_log = 0;
+            self.log_detail_scroll = 0;
+            self.status = "Cleared Logs search filter.".to_string();
+            self.clamp_selection();
+        } else if self.focus == FocusPane::Detail {
+            self.focus = FocusPane::Board;
+        }
+    }
+
     fn move_selected_task_by_delta(&mut self, delta: isize) {
         let Some((doc_id, current_state)) = self
             .selected_doc()
@@ -708,7 +840,7 @@ impl TuiApp {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
-        if self.quick_add.is_some() || self.show_help {
+        if self.quick_add.is_some() || self.log_search_input.is_some() || self.show_help {
             return;
         }
 
@@ -750,6 +882,21 @@ impl TuiApp {
                             self.focus = FocusPane::Detail
                         }
                         HitAction::FocusReviewDetail => {}
+                        HitAction::SelectLog(index) if self.view == TuiView::Logs => {
+                            self.selected_log = index;
+                            self.log_detail_scroll = 0;
+                            self.focus = FocusPane::Board;
+                            self.clamp_selection();
+                        }
+                        HitAction::SelectLog(_) => {}
+                        HitAction::FocusLogList if self.view == TuiView::Logs => {
+                            self.focus = FocusPane::Board
+                        }
+                        HitAction::FocusLogList => {}
+                        HitAction::FocusLogDetail if self.view == TuiView::Logs => {
+                            self.focus = FocusPane::Detail
+                        }
+                        HitAction::FocusLogDetail => {}
                     }
                 }
             }
@@ -768,6 +915,14 @@ impl TuiApp {
             MouseEventKind::ScrollUp if self.view == TuiView::Review => match self.focus {
                 FocusPane::Board => self.previous_review_item(),
                 FocusPane::Detail => self.scroll_review_detail_up(3),
+            },
+            MouseEventKind::ScrollDown if self.view == TuiView::Logs => match self.focus {
+                FocusPane::Board => self.next_log(),
+                FocusPane::Detail => self.scroll_log_detail_down(3),
+            },
+            MouseEventKind::ScrollUp if self.view == TuiView::Logs => match self.focus {
+                FocusPane::Board => self.previous_log(),
+                FocusPane::Detail => self.scroll_log_detail_up(3),
             },
             _ => {}
         }
@@ -818,6 +973,42 @@ impl TuiApp {
         if count > 0 {
             self.selected_item = count - 1;
             self.detail_scroll = 0;
+        }
+    }
+
+    fn previous_log(&mut self) {
+        if self.selected_log > 0 {
+            self.selected_log -= 1;
+            self.log_detail_scroll = 0;
+        }
+    }
+
+    fn next_log(&mut self) {
+        let count = self.filtered_logs().len();
+        if self.selected_log + 1 < count {
+            self.selected_log += 1;
+            self.log_detail_scroll = 0;
+        }
+    }
+
+    fn previous_log_page(&mut self) {
+        self.selected_log = self.selected_log.saturating_sub(5);
+        self.log_detail_scroll = 0;
+    }
+
+    fn next_log_page(&mut self) {
+        let count = self.filtered_logs().len();
+        if count > 0 {
+            self.selected_log = (self.selected_log + 5).min(count - 1);
+            self.log_detail_scroll = 0;
+        }
+    }
+
+    fn last_log(&mut self) {
+        let count = self.filtered_logs().len();
+        if count > 0 {
+            self.selected_log = count - 1;
+            self.log_detail_scroll = 0;
         }
     }
 
@@ -873,6 +1064,22 @@ impl TuiApp {
         self.review_detail_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
     }
 
+    fn scroll_log_detail_up(&mut self, amount: u16) {
+        self.log_detail_scroll = self.log_detail_scroll.saturating_sub(amount);
+    }
+
+    fn scroll_log_detail_down(&mut self, amount: u16) {
+        let max_scroll = self.log_detail_line_count().saturating_sub(1) as u16;
+        self.log_detail_scroll = self
+            .log_detail_scroll
+            .saturating_add(amount)
+            .min(max_scroll);
+    }
+
+    fn log_detail_scroll_to_end(&mut self) {
+        self.log_detail_scroll = self.log_detail_line_count().saturating_sub(1) as u16;
+    }
+
     fn clamp_selection(&mut self) {
         if self.states.is_empty() {
             self.states.push("todo".to_string());
@@ -889,6 +1096,15 @@ impl TuiApp {
         let max_scroll = self.detail_line_count().saturating_sub(1) as u16;
         self.detail_scroll = self.detail_scroll.min(max_scroll);
         self.clamp_review_selection();
+
+        let log_count = self.filtered_logs().len();
+        if log_count == 0 {
+            self.selected_log = 0;
+        } else if self.selected_log >= log_count {
+            self.selected_log = log_count - 1;
+        }
+        let max_log_scroll = self.log_detail_line_count().saturating_sub(1) as u16;
+        self.log_detail_scroll = self.log_detail_scroll.min(max_log_scroll);
     }
 
     fn clamp_review_selection(&mut self) {
@@ -928,6 +1144,44 @@ impl TuiApp {
             .map(|doc| detail_lines_for_doc(doc, &self.theme))
             .map(|lines| lines.len())
             .unwrap_or(1)
+    }
+
+    fn filtered_logs(&self) -> Vec<&Document> {
+        logs::filter_logs(&self.logs, &self.log_search_filter)
+    }
+
+    fn selected_log(&self) -> Option<&Document> {
+        self.filtered_logs().into_iter().nth(self.selected_log)
+    }
+
+    fn log_events_for(&self, id: &str) -> &[logs::LogEvent] {
+        self.log_events.get(id).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    fn log_detail_line_count(&self) -> usize {
+        self.selected_log()
+            .map(|doc| logs::detail_lines_for_log(doc, self.log_events_for(doc.id()), &self.theme))
+            .map(|lines| lines.len())
+            .unwrap_or(1)
+    }
+
+    fn logs_status_message(&self) -> String {
+        let visible = self.filtered_logs().len();
+        if self.log_search_filter.is_empty() {
+            format!(
+                "Logs view active: {} completed item{} loaded. Press / to search, j/k to select, Enter for detail focus.",
+                self.logs.len(),
+                if self.logs.len() == 1 { "" } else { "s" }
+            )
+        } else {
+            format!(
+                "Logs filter `{}` matched {} of {} completed item{}; Esc clears filter.",
+                self.log_search_filter,
+                visible,
+                self.logs.len(),
+                if self.logs.len() == 1 { "" } else { "s" }
+            )
+        }
     }
 
     fn review_items(&self) -> Vec<review::ReviewQueueItem> {
@@ -989,6 +1243,8 @@ impl TuiApp {
             };
             if self.view == TuiView::Review {
                 self.draw_review(frame, view_area);
+            } else if self.view == TuiView::Logs {
+                self.draw_logs(frame, view_area);
             } else {
                 self.draw_placeholder_view(frame, view_area);
             }
@@ -1044,7 +1300,23 @@ impl TuiApp {
                 .selected_review_item()
                 .map(|item| format!("selected {} · {}", item.id(), item.reason_summary()))
                 .unwrap_or_else(|| "review queue is empty".to_string()),
-            TuiView::Logs => "read-only logs placeholder; list/show/search come later".to_string(),
+            TuiView::Logs => {
+                let filter = if self.log_search_filter.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · filter `{}`", self.log_search_filter)
+                };
+                self.selected_log()
+                    .map(|doc| {
+                        format!(
+                            "selected {} completed {}{}",
+                            doc.id(),
+                            doc.field("completedAt").unwrap_or("unknown"),
+                            filter
+                        )
+                    })
+                    .unwrap_or_else(|| format!("no completed log selected{filter}"))
+            }
             TuiView::Rules => "read-only rules placeholder; add/edit/delete come later".to_string(),
             TuiView::Decisions => {
                 "read-only decisions placeholder; browsing/actions come later".to_string()
@@ -1136,15 +1408,158 @@ impl TuiApp {
         );
     }
 
+    fn draw_logs(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width >= 100 {
+            let chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(42), Constraint::Percentage(58)])
+                .split(area);
+            self.draw_log_list(frame, chunks[0]);
+            self.draw_log_detail(frame, chunks[1]);
+        } else {
+            let detail_height = (area.height / 2).max(6);
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(5), Constraint::Length(detail_height)])
+                .split(area);
+            self.draw_log_list(frame, chunks[0]);
+            self.draw_log_detail(frame, chunks[1]);
+        }
+    }
+
+    fn draw_log_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusLogList,
+        });
+
+        let filtered = self.filtered_logs();
+        let count = filtered.len();
+        let title = if self.log_search_filter.is_empty() {
+            format!(" Logs ({count}/{}) ", self.logs.len())
+        } else {
+            format!(
+                " Logs filter `{}` ({count}/{}) ",
+                self.log_search_filter,
+                self.logs.len()
+            )
+        };
+        let items = if self.logs.is_empty() {
+            vec![ListItem::new(Line::from(Span::styled(
+                format!(
+                    "No completed logs found in {}.",
+                    display_path(&self.workspace.logs_dir)
+                ),
+                self.theme.muted_style(),
+            )))]
+        } else if filtered.is_empty() {
+            vec![ListItem::new(Line::from(Span::styled(
+                format!(
+                    "No logs match `{}`. Press Esc to clear.",
+                    self.log_search_filter
+                ),
+                self.theme.muted_style(),
+            )))]
+        } else {
+            filtered
+                .iter()
+                .map(|doc| logs::list_item_for_log(doc, &self.theme))
+                .collect::<Vec<_>>()
+        };
+
+        let list = List::new(items)
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(self.theme.border_style(self.focus == FocusPane::Board))
+                    .style(self.theme.panel_style()),
+            )
+            .highlight_style(self.theme.selected_style())
+            .highlight_symbol("▸ ");
+
+        if count > 0 {
+            let mut state = ListState::default();
+            state.select(Some(self.selected_log.min(count - 1)));
+            frame.render_stateful_widget(list, area, &mut state);
+            drop(filtered);
+            self.register_log_row_hits(area, count);
+        } else {
+            frame.render_widget(list, area);
+        }
+    }
+
+    fn register_log_row_hits(&mut self, area: Rect, count: usize) {
+        if area.width <= 2 || area.height <= 2 {
+            return;
+        }
+        let left = area.x.saturating_add(1);
+        let top = area.y.saturating_add(1);
+        let width = area.width.saturating_sub(2);
+        let bottom = area.y.saturating_add(area.height).saturating_sub(1);
+        for index in 0..count {
+            let y = top.saturating_add((index as u16).saturating_mul(2));
+            if y >= bottom {
+                break;
+            }
+            self.hits.push(HitRegion {
+                rect: Rect {
+                    x: left,
+                    y,
+                    width,
+                    height: 2.min(bottom.saturating_sub(y)),
+                },
+                action: HitAction::SelectLog(index),
+            });
+        }
+    }
+
+    fn draw_log_detail(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusLogDetail,
+        });
+
+        let focused = self.focus == FocusPane::Detail;
+        let (title, lines) = match self.selected_log() {
+            Some(doc) => (
+                format!(" Log detail {} ", doc.id()),
+                logs::detail_lines_for_log(doc, self.log_events_for(doc.id()), &self.theme),
+            ),
+            None if self.logs.is_empty() => (
+                " Log detail ".to_string(),
+                vec![Line::from(Span::styled(
+                    "No completed logs are available yet. Complete a task to create one.",
+                    self.theme.muted_style(),
+                ))],
+            ),
+            None => (
+                " Log detail ".to_string(),
+                vec![Line::from(Span::styled(
+                    "No log matches the current filter.",
+                    self.theme.muted_style(),
+                ))],
+            ),
+        };
+        let detail = Paragraph::new(lines)
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(self.theme.border_style(focused))
+                    .style(self.theme.panel_style()),
+            )
+            .scroll((self.log_detail_scroll, 0))
+            .wrap(Wrap { trim: false });
+        frame.render_widget(detail, area);
+    }
+
     fn draw_placeholder_view(&self, frame: &mut Frame<'_>, area: Rect) {
         let (title, lines) = match self.view {
             TuiView::Board => (" Board ".to_string(), Vec::new()),
-            TuiView::Review => (
-                " Review ".to_string(),
-                vec![Line::from(
-                    "Review queue renders in the dedicated Review view.",
-                )],
-            ),
+            TuiView::Review => self.review_placeholder_lines(),
             TuiView::Logs => self.logs_placeholder_lines(),
             TuiView::Rules => self.rules_placeholder_lines(),
             TuiView::Decisions => self.decisions_placeholder_lines(),
@@ -1160,10 +1575,19 @@ impl TuiApp {
         frame.render_widget(paragraph, area);
     }
 
+    fn review_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
+        (
+            " Review ".to_string(),
+            vec![Line::from(
+                "Review queue renders in the dedicated Review view.",
+            )],
+        )
+    }
+
     fn logs_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
         let mut lines = vec![
             Line::from(Span::styled(
-                "Logs placeholder",
+                "Logs fallback",
                 Style::default()
                     .fg(Color::Cyan)
                     .add_modifier(Modifier::BOLD),
@@ -1203,7 +1627,7 @@ impl TuiApp {
         }
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "Read-only in task-4; future work can wire list/show/search interactions here.",
+            "Logs list/detail/search render in the primary Logs view; this fallback should rarely appear.",
             Style::default().fg(Color::DarkGray),
         )));
         (" Logs ".to_string(), lines)
@@ -1439,6 +1863,11 @@ impl TuiApp {
                 quick_add_status(input),
                 self.theme.status_style(StatusTone::Warning),
             )
+        } else if self.log_search_input.is_some() {
+            (
+                self.status.clone(),
+                self.theme.status_style(StatusTone::Warning),
+            )
         } else if self.view == TuiView::Board {
             let focus = match self.focus {
                 FocusPane::Board => "board",
@@ -1459,6 +1888,23 @@ impl TuiApp {
             (
                 format!(
                     "Review {focus} · 1..5 views · q quit · r reload · j/k item/scroll · tab/enter detail · h/l view · read-only hints · ? help · {}",
+                    self.status
+                ),
+                self.theme.status_style(status_tone_for_message(&self.status)),
+            )
+        } else if self.view == TuiView::Logs {
+            let focus = match self.focus {
+                FocusPane::Board => "list",
+                FocusPane::Detail => "detail",
+            };
+            let filter = if self.log_search_filter.is_empty() {
+                String::new()
+            } else {
+                format!("filter `{}` · Esc clear · ", self.log_search_filter)
+            };
+            (
+                format!(
+                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · Enter focus detail/list · h/l view · r reload · q quit · {}",
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1490,19 +1936,21 @@ impl TuiApp {
             Line::from("r                 Reload board/log/rule data"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / enter       Toggle list/detail focus in Board or Review"),
+            Line::from("tab / enter       Toggle list/detail focus in Board and Review"),
             Line::from("tab / shift-tab   Next/previous view outside Board/Review"),
             Line::from("a                 Board quick-add task in selected/default state"),
-            Line::from("h/l or ←/→        Board: move between states; Review/placeholders: switch views"),
+            Line::from("h/l or ←/→        Board: move between states; Review/Logs/placeholders: switch views"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
-            Line::from("j/k or ↑/↓        Board/Review: move items, or scroll detail when focused"),
-            Line::from("g/G               Board/Review: first/last item or detail line"),
-            Line::from("mouse wheel       Board/Review: move selection or scroll detail"),
-            Line::from("click column/detail Board: select state or focus detail"),
-            Line::from("click Review row/detail Select a review item or focus inspection detail"),
+            Line::from("j/k or ↑/↓        Board/Review/Logs: move items, or scroll detail when focused"),
+            Line::from("g/G               Board/Review/Logs: first/last item or detail line"),
+            Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
+            Line::from("Esc               Logs: clear search filter; Quick add/search prompts: cancel"),
+            Line::from("mouse wheel       Board/Review/Logs: move selection or scroll detail"),
+            Line::from("click list/detail Board/Review/Logs: select/focus panes"),
             Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
+            Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("This slice adds a real read-only Review queue with inspection hints while preserving Board quick-add/H/L moves. Built-in defaults and .tandem/theme.toml workspace overrides are active; Logs/Rules/Decisions workflows, user theme discovery, and richer action buttons remain planned."),
+            Line::from("This slice keeps Board quick-add/H/L moves, adds a real read-only Review queue with inspection hints, and adds a first-class Logs browser with recency list, detail pane, search/filter, and event context. Built-in defaults and .tandem/theme.toml workspace overrides are active; Rules/Decisions workflows, user theme discovery, and richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -1545,6 +1993,34 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
+}
+
+#[cfg(test)]
+fn review_attention_reason(doc: &Document) -> Option<String> {
+    match accord_status(doc) {
+        Some("delivered") => return Some("accord delivered".to_string()),
+        Some("blocked") => return Some("accord blocked".to_string()),
+        Some("failed") => return Some("accord failed".to_string()),
+        Some("rework") => return Some("accord in rework".to_string()),
+        Some("accepted") => return Some("accord accepted; not completed".to_string()),
+        _ => {}
+    }
+
+    match review_status(doc) {
+        Some("pending") => Some("review pending".to_string()),
+        Some("changes-requested") => Some("changes requested".to_string()),
+        Some("rejected") => Some("review rejected".to_string()),
+        Some("failed") => Some("review failed".to_string()),
+        _ if doc
+            .field("blockers")
+            .map(parse_field_values)
+            .map(|blockers| !blockers.is_empty())
+            .unwrap_or(false) =>
+        {
+            Some("has blockers".to_string())
+        }
+        _ => None,
+    }
 }
 
 fn append_load_error_lines(lines: &mut Vec<Line<'static>>, load_errors: &[String]) {
@@ -1940,17 +2416,18 @@ mod tests {
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
         assert_eq!(
-            review::queue_items(&[delivered])[0].reason_summary(),
-            "A:delivered, state:review"
+            review_attention_reason(&delivered).as_deref(),
+            Some("accord delivered")
         );
 
         let mut pending = doc_with_state("task-2", Some("review"));
         pending
             .fields
             .insert("review.status".to_string(), "pending".to_string());
-        assert!(review::queue_items(&[pending])[0]
-            .reason_summary()
-            .contains("R:pending"));
+        assert_eq!(
+            review_attention_reason(&pending).as_deref(),
+            Some("review pending")
+        );
     }
 
     #[test]

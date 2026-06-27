@@ -711,8 +711,9 @@ tdm tui
   - keeps Board keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders Review as a real read-only filtered queue of active items needing attention, with selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
-  - shows Logs, Rules, and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
-  - loads the built-in `default-dark` semantic palette, applies it to Board headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
+  - shows Rules and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
+  - loads the built-in `default-dark` semantic palette, applies it to Board, Review, and Logs headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies a workspace theme override from `.tandem/theme.toml` using the documented simple TOML-style color keys; invalid or unknown keys become status-line warnings while the default palette remains active.
   - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
@@ -736,7 +737,7 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints; Logs/Rules/Decisions currently remain read-only placeholders/counts for subsequent workflow slices.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints, and Logs now has list/show/search behavior over completed work. Rules/Decisions currently remain read-only placeholders/counts; their full workflows remain for subsequent slices.
 
 The full first TUI MVP should include:
 
@@ -1499,9 +1500,10 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tdm tui`.
-- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review now has a read-only filtered queue and inspection detail, while Logs/Rules/Decisions currently have read-only placeholders/counts.
+- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review now has a read-only filtered queue and inspection detail, Logs has list/detail/search, and Rules/Decisions currently have read-only placeholders/counts.
 - Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, and workspace `.tandem/theme.toml` color overrides.
-- Render full Review, Logs, Rules, and Decisions workflows on top of the existing view shell.
+- Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
+- Render full Review, Rules, and Decisions workflows on top of the existing view shell.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.
 - Include mouse selection, scrolling, tab switching, and action-button clicks enabled by default.
