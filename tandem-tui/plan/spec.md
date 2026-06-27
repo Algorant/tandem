@@ -710,7 +710,8 @@ tdm tui
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state.
   - keeps Board keyboard navigation across states/items, selected-item detail scrolling, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
-  - shows Review, Logs, Rules, and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
+  - renders Review as a real read-only filtered queue of active items needing attention, with selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
+  - shows Logs, Rules, and Decisions as read-only placeholders with counts/load warnings so later slices can add full workflows on stable view state.
   - loads the built-in `default-dark` semantic palette, applies it to Board headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies a workspace theme override from `.tandem/theme.toml` using the documented simple TOML-style color keys; invalid or unknown keys become status-line warnings while the default palette remains active.
   - enables crossterm mouse capture for basic tab, column/detail, and wheel interactions; drag/drop remains absent.
@@ -735,7 +736,7 @@ tdm tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review/Logs/Rules/Decisions currently start as read-only placeholders/counts; full workflows remain for subsequent slices.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints; Logs/Rules/Decisions currently remain read-only placeholders/counts for subsequent workflow slices.
 
 The full first TUI MVP should include:
 
@@ -815,12 +816,13 @@ Actions: [accept] [request changes] [complete] [edit] [copy id]
 A dedicated filtered list showing items needing attention:
 
 - accord delivered
-- review pending
+- review pending or in review state
+- review changes-requested, rejected, or failed
 - validation failed
-- blocked items
+- blocked items and blocked/failed/rework accords
 - accepted but not completed
 
-This should answer: “What needs me?” without imposing hard-coded workflow sections in v0. Sorting should start simple, such as priority first, then most recently updated or delivered.
+This should answer: “What needs me?” without imposing hard-coded workflow sections in v0. Sorting should start simple, such as priority first, then most recently updated or delivered. The current implementation is read-only: it renders a selectable queue plus detail pane with reason badges/lines, accord/review/state/priority metadata, blockers, delivered summaries/evidence/files where present, and CLI action hints for accept/rework/block/fail/complete flows.
 
 ### 3. Logs view
 
@@ -1497,7 +1499,7 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tdm tui`.
-- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review/Logs/Rules/Decisions currently have read-only placeholders/counts.
+- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs; Review now has a read-only filtered queue and inspection detail, while Logs/Rules/Decisions currently have read-only placeholders/counts.
 - Board renders active board documents with navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, and workspace `.tandem/theme.toml` color overrides.
 - Render full Review, Logs, Rules, and Decisions workflows on top of the existing view shell.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.

@@ -21,6 +21,7 @@ use ratatui::{
 
 use super::*;
 
+mod review;
 mod theme;
 
 use theme::{StatusTone, TuiTheme};
@@ -151,6 +152,9 @@ enum HitAction {
     SwitchView(TuiView),
     SelectState(usize),
     FocusDetail,
+    FocusReviewList,
+    SelectReviewItem(usize),
+    FocusReviewDetail,
 }
 
 #[derive(Debug, Clone)]
@@ -181,8 +185,10 @@ struct TuiApp {
     theme_warnings: Vec<String>,
     selected_state: usize,
     selected_item: usize,
+    selected_review_item: usize,
     focus: FocusPane,
     detail_scroll: u16,
+    review_detail_scroll: u16,
     status: String,
     show_help: bool,
     quick_add: Option<QuickAddInput>,
@@ -206,8 +212,10 @@ impl TuiApp {
             theme_warnings: Vec::new(),
             selected_state: 0,
             selected_item: 0,
+            selected_review_item: 0,
             focus: FocusPane::Board,
             detail_scroll: 0,
+            review_detail_scroll: 0,
             status: String::new(),
             show_help: false,
             quick_add: None,
@@ -358,7 +366,9 @@ impl TuiApp {
             KeyCode::Char('H') | KeyCode::Char('L') => {
                 self.status = "Task move is available in Board view; press 1 for Board.".to_string()
             }
-            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter if self.view == TuiView::Board => {
+            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter
+                if matches!(self.view, TuiView::Board | TuiView::Review) =>
+            {
                 self.toggle_focus()
             }
             KeyCode::Tab => self.next_view(),
@@ -370,7 +380,9 @@ impl TuiApp {
                 )
             }
             KeyCode::Esc => {
-                if self.view == TuiView::Board && self.focus == FocusPane::Detail {
+                if matches!(self.view, TuiView::Board | TuiView::Review)
+                    && self.focus == FocusPane::Detail
+                {
                     self.focus = FocusPane::Board;
                 }
             }
@@ -378,6 +390,10 @@ impl TuiApp {
                 TuiView::Board => match self.focus {
                     FocusPane::Board => self.handle_board_key(key),
                     FocusPane::Detail => self.handle_detail_key(key),
+                },
+                TuiView::Review => match self.focus {
+                    FocusPane::Board => self.handle_review_key(key),
+                    FocusPane::Detail => self.handle_review_detail_key(key),
                 },
                 _ => self.handle_placeholder_key(key),
             },
@@ -387,19 +403,27 @@ impl TuiApp {
 
     fn switch_view(&mut self, view: TuiView) {
         self.view = view;
+        if view != TuiView::Board {
+            self.focus = FocusPane::Board;
+        }
+        if view == TuiView::Review {
+            self.clamp_review_selection();
+        }
         self.status = match view {
             TuiView::Board => {
                 "Board view active. Use a to quick-add and H/L to move tasks.".to_string()
             }
-            TuiView::Review => format!(
-                "Review view active (read-only placeholder): {} item{} need attention.",
-                self.review_items().len(),
-                if self.review_items().len() == 1 {
-                    ""
-                } else {
-                    "s"
-                }
-            ),
+            TuiView::Review => {
+                let count = self.review_items().len();
+                let selected = self
+                    .selected_review_item()
+                    .map(|item| format!(" Selected {}.", item.id()))
+                    .unwrap_or_default();
+                format!(
+                    "Review view active: {count} item{} need attention.{selected} Use j/k to navigate and tab/enter for detail.",
+                    if count == 1 { "" } else { "s" }
+                )
+            }
             TuiView::Logs => format!(
                 "Logs view active (read-only placeholder): {} completed item{} loaded.",
                 self.logs.len(),
@@ -458,6 +482,33 @@ impl TuiApp {
             KeyCode::End | KeyCode::Char('G') => self.detail_scroll_to_end(),
             KeyCode::Left | KeyCode::Char('h') => self.previous_state(),
             KeyCode::Right | KeyCode::Char('l') => self.next_state(),
+            _ => {}
+        }
+    }
+
+    fn handle_review_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => self.previous_review_item(),
+            KeyCode::Down | KeyCode::Char('j') => self.next_review_item(),
+            KeyCode::Home | KeyCode::Char('g') => self.selected_review_item = 0,
+            KeyCode::End | KeyCode::Char('G') => self.last_review_item(),
+            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
+            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            _ => {}
+        }
+        self.clamp_review_selection();
+    }
+
+    fn handle_review_detail_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => self.scroll_review_detail_up(1),
+            KeyCode::Down | KeyCode::Char('j') => self.scroll_review_detail_down(1),
+            KeyCode::PageUp | KeyCode::Char('u') => self.scroll_review_detail_up(6),
+            KeyCode::PageDown | KeyCode::Char('d') => self.scroll_review_detail_down(6),
+            KeyCode::Home | KeyCode::Char('g') => self.review_detail_scroll = 0,
+            KeyCode::End | KeyCode::Char('G') => self.review_detail_scroll_to_end(),
+            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
+            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
             _ => {}
         }
     }
@@ -684,6 +735,21 @@ impl TuiApp {
                             self.focus = FocusPane::Detail
                         }
                         HitAction::FocusDetail => {}
+                        HitAction::FocusReviewList if self.view == TuiView::Review => {
+                            self.focus = FocusPane::Board
+                        }
+                        HitAction::FocusReviewList => {}
+                        HitAction::SelectReviewItem(index) if self.view == TuiView::Review => {
+                            self.selected_review_item = index;
+                            self.review_detail_scroll = 0;
+                            self.focus = FocusPane::Board;
+                            self.clamp_review_selection();
+                        }
+                        HitAction::SelectReviewItem(_) => {}
+                        HitAction::FocusReviewDetail if self.view == TuiView::Review => {
+                            self.focus = FocusPane::Detail
+                        }
+                        HitAction::FocusReviewDetail => {}
                     }
                 }
             }
@@ -694,6 +760,14 @@ impl TuiApp {
             MouseEventKind::ScrollUp if self.view == TuiView::Board => match self.focus {
                 FocusPane::Board => self.previous_item(),
                 FocusPane::Detail => self.scroll_detail_up(3),
+            },
+            MouseEventKind::ScrollDown if self.view == TuiView::Review => match self.focus {
+                FocusPane::Board => self.next_review_item(),
+                FocusPane::Detail => self.scroll_review_detail_down(3),
+            },
+            MouseEventKind::ScrollUp if self.view == TuiView::Review => match self.focus {
+                FocusPane::Board => self.previous_review_item(),
+                FocusPane::Detail => self.scroll_review_detail_up(3),
             },
             _ => {}
         }
@@ -760,6 +834,45 @@ impl TuiApp {
         self.detail_scroll = self.detail_line_count().saturating_sub(1) as u16;
     }
 
+    fn previous_review_item(&mut self) {
+        if self.selected_review_item > 0 {
+            self.selected_review_item -= 1;
+            self.review_detail_scroll = 0;
+        }
+    }
+
+    fn next_review_item(&mut self) {
+        let count = self.review_items().len();
+        if self.selected_review_item + 1 < count {
+            self.selected_review_item += 1;
+            self.review_detail_scroll = 0;
+        }
+    }
+
+    fn last_review_item(&mut self) {
+        let count = self.review_items().len();
+        if count > 0 {
+            self.selected_review_item = count - 1;
+            self.review_detail_scroll = 0;
+        }
+    }
+
+    fn scroll_review_detail_up(&mut self, amount: u16) {
+        self.review_detail_scroll = self.review_detail_scroll.saturating_sub(amount);
+    }
+
+    fn scroll_review_detail_down(&mut self, amount: u16) {
+        let max_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
+        self.review_detail_scroll = self
+            .review_detail_scroll
+            .saturating_add(amount)
+            .min(max_scroll);
+    }
+
+    fn review_detail_scroll_to_end(&mut self) {
+        self.review_detail_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
+    }
+
     fn clamp_selection(&mut self) {
         if self.states.is_empty() {
             self.states.push("todo".to_string());
@@ -775,6 +888,18 @@ impl TuiApp {
         }
         let max_scroll = self.detail_line_count().saturating_sub(1) as u16;
         self.detail_scroll = self.detail_scroll.min(max_scroll);
+        self.clamp_review_selection();
+    }
+
+    fn clamp_review_selection(&mut self) {
+        let count = review::queue_len(&self.docs);
+        if count == 0 {
+            self.selected_review_item = 0;
+        } else if self.selected_review_item >= count {
+            self.selected_review_item = count - 1;
+        }
+        let max_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
+        self.review_detail_scroll = self.review_detail_scroll.min(max_scroll);
     }
 
     fn selected_state_count(&self) -> usize {
@@ -805,11 +930,17 @@ impl TuiApp {
             .unwrap_or(1)
     }
 
-    fn review_items(&self) -> Vec<(&Document, String)> {
-        self.docs
-            .iter()
-            .filter_map(|doc| review_attention_reason(doc).map(|reason| (doc, reason)))
-            .collect()
+    fn review_items(&self) -> Vec<review::ReviewQueueItem> {
+        review::queue_items(&self.docs)
+    }
+
+    fn selected_review_item(&self) -> Option<review::ReviewQueueItem> {
+        review::selected_item(&self.docs, self.selected_review_item)
+    }
+
+    fn review_detail_line_count(&self) -> usize {
+        let item = self.selected_review_item();
+        review::detail_line_count(item.as_ref(), &self.theme)
     }
 
     fn decision_docs(&self) -> Vec<&Document> {
@@ -856,7 +987,11 @@ impl TuiApp {
                 width: chunks[2].width,
                 height: chunks[2].height.saturating_add(chunks[3].height),
             };
-            self.draw_placeholder_view(frame, view_area);
+            if self.view == TuiView::Review {
+                self.draw_review(frame, view_area);
+            } else {
+                self.draw_placeholder_view(frame, view_area);
+            }
         }
         self.draw_footer(frame, chunks[4]);
 
@@ -905,7 +1040,10 @@ impl TuiApp {
                 .selected_doc()
                 .map(|doc| format!("selected {}", doc.id()))
                 .unwrap_or_else(|| "no selected item".to_string()),
-            TuiView::Review => "read-only queue placeholder; review actions come later".to_string(),
+            TuiView::Review => self
+                .selected_review_item()
+                .map(|item| format!("selected {} · {}", item.id(), item.reason_summary()))
+                .unwrap_or_else(|| "review queue is empty".to_string()),
             TuiView::Logs => "read-only logs placeholder; list/show/search come later".to_string(),
             TuiView::Rules => "read-only rules placeholder; add/edit/delete come later".to_string(),
             TuiView::Decisions => {
@@ -983,10 +1121,30 @@ impl TuiApp {
         }
     }
 
+    fn draw_review(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let items = self.review_items();
+        review::render_review(
+            frame,
+            area,
+            &items,
+            self.selected_review_item,
+            self.focus,
+            self.review_detail_scroll,
+            &self.theme,
+            &self.load_errors,
+            &mut self.hits,
+        );
+    }
+
     fn draw_placeholder_view(&self, frame: &mut Frame<'_>, area: Rect) {
         let (title, lines) = match self.view {
             TuiView::Board => (" Board ".to_string(), Vec::new()),
-            TuiView::Review => self.review_placeholder_lines(),
+            TuiView::Review => (
+                " Review ".to_string(),
+                vec![Line::from(
+                    "Review queue renders in the dedicated Review view.",
+                )],
+            ),
             TuiView::Logs => self.logs_placeholder_lines(),
             TuiView::Rules => self.rules_placeholder_lines(),
             TuiView::Decisions => self.decisions_placeholder_lines(),
@@ -1000,55 +1158,6 @@ impl TuiApp {
             )
             .wrap(Wrap { trim: false });
         frame.render_widget(paragraph, area);
-    }
-
-    fn review_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
-        let items = self.review_items();
-        let mut lines = vec![
-            Line::from(Span::styled(
-                "Review queue placeholder",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(format!(
-                "{} active item{} need attention.",
-                items.len(),
-                if items.len() == 1 { "" } else { "s" }
-            )),
-            Line::from(
-                "Includes delivered accords, pending/changes-requested reviews, blocked/rework/failed accords, and accepted active items.",
-            ),
-            Line::from(""),
-        ];
-        append_load_error_lines(&mut lines, &self.load_errors);
-        if items.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "No review placeholder rows.",
-                Style::default().fg(Color::DarkGray),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                "Attention rows:",
-                Style::default()
-                    .fg(Color::White)
-                    .add_modifier(Modifier::BOLD),
-            )));
-            for (doc, reason) in items.into_iter().take(10) {
-                lines.push(Line::from(vec![
-                    Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
-                    Span::styled(truncate(doc.title(), 48), Style::default().fg(Color::White)),
-                    Span::raw(" — "),
-                    Span::styled(reason, Style::default().fg(Color::Yellow)),
-                ]));
-            }
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "Read-only in task-4; later workers can add review actions on this view state.",
-            Style::default().fg(Color::DarkGray),
-        )));
-        (" Review ".to_string(), lines)
     }
 
     fn logs_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
@@ -1342,6 +1451,18 @@ impl TuiApp {
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
             )
+        } else if self.view == TuiView::Review {
+            let focus = match self.focus {
+                FocusPane::Board => "queue",
+                FocusPane::Detail => "detail",
+            };
+            (
+                format!(
+                    "Review {focus} · 1..5 views · q quit · r reload · j/k item/scroll · tab/enter detail · h/l view · read-only hints · ? help · {}",
+                    self.status
+                ),
+                self.theme.status_style(status_tone_for_message(&self.status)),
+            )
         } else {
             (
                 format!(
@@ -1369,18 +1490,19 @@ impl TuiApp {
             Line::from("r                 Reload board/log/rule data"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / enter       Toggle Board vs Detail focus while in Board"),
-            Line::from("tab / shift-tab   Next/previous view outside Board"),
+            Line::from("tab / enter       Toggle list/detail focus in Board or Review"),
+            Line::from("tab / shift-tab   Next/previous view outside Board/Review"),
             Line::from("a                 Board quick-add task in selected/default state"),
-            Line::from("h/l or ←/→        Board: move between states; placeholders: switch views"),
+            Line::from("h/l or ←/→        Board: move between states; Review/placeholders: switch views"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
-            Line::from("j/k or ↑/↓        Board: move items, or scroll detail when focused"),
-            Line::from("g/G               Board: first/last item or detail line"),
-            Line::from("mouse wheel       Board: move selection or scroll detail"),
+            Line::from("j/k or ↑/↓        Board/Review: move items, or scroll detail when focused"),
+            Line::from("g/G               Board/Review: first/last item or detail line"),
+            Line::from("mouse wheel       Board/Review: move selection or scroll detail"),
             Line::from("click column/detail Board: select state or focus detail"),
+            Line::from("click Review row/detail Select a review item or focus inspection detail"),
             Line::from("Quick add         Type a title, Enter creates, Esc cancels"),
             Line::from(""),
-            Line::from("This slice adds top-level views plus Board quick-add/H/L moves. Built-in defaults and .tandem/theme.toml workspace overrides are active; Review/Logs/Rules/Decisions workflows, user theme discovery, and richer mouse hit maps remain planned."),
+            Line::from("This slice adds a real read-only Review queue with inspection hints while preserving Board quick-add/H/L moves. Built-in defaults and .tandem/theme.toml workspace overrides are active; Logs/Rules/Decisions workflows, user theme discovery, and richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -1423,33 +1545,6 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
-}
-
-fn review_attention_reason(doc: &Document) -> Option<String> {
-    match accord_status(doc) {
-        Some("delivered") => return Some("accord delivered".to_string()),
-        Some("blocked") => return Some("accord blocked".to_string()),
-        Some("failed") => return Some("accord failed".to_string()),
-        Some("rework") => return Some("accord in rework".to_string()),
-        Some("accepted") => return Some("accord accepted; not completed".to_string()),
-        _ => {}
-    }
-
-    match review_status(doc) {
-        Some("pending") => Some("review pending".to_string()),
-        Some("changes-requested") => Some("changes requested".to_string()),
-        Some("rejected") => Some("review rejected".to_string()),
-        Some("failed") => Some("review failed".to_string()),
-        _ if doc
-            .field("blockers")
-            .map(parse_field_values)
-            .map(|blockers| !blockers.is_empty())
-            .unwrap_or(false) =>
-        {
-            Some("has blockers".to_string())
-        }
-        _ => None,
-    }
 }
 
 fn append_load_error_lines(lines: &mut Vec<Line<'static>>, load_errors: &[String]) {
@@ -1845,18 +1940,17 @@ mod tests {
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
         assert_eq!(
-            review_attention_reason(&delivered).as_deref(),
-            Some("accord delivered")
+            review::queue_items(&[delivered])[0].reason_summary(),
+            "A:delivered, state:review"
         );
 
         let mut pending = doc_with_state("task-2", Some("review"));
         pending
             .fields
             .insert("review.status".to_string(), "pending".to_string());
-        assert_eq!(
-            review_attention_reason(&pending).as_deref(),
-            Some("review pending")
-        );
+        assert!(review::queue_items(&[pending])[0]
+            .reason_summary()
+            .contains("R:pending"));
     }
 
     #[test]

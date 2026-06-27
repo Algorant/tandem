@@ -105,6 +105,10 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 - [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; read-only placeholder/count views for non-Board areas while preserving Board quick-add and move flows.
+- [x] Implemented a real read-only Review queue view:
+  - filters active items needing attention: delivered accords, pending/in-review items, changes-requested/rejected/failed reviews, blocked/failed/rework accords, accepted active accords, validation failures, and blockers
+  - sorts priority first, then most recently delivered/updated
+  - renders selectable queue rows plus inspection detail with reason badges/lines, accord/review/state/priority metadata, blockers, delivered evidence/files, and CLI action hints
 - [x] Implemented the first TUI theme foundation without new dependencies:
   - built-in `default-dark` semantic palette
   - workspace `.tandem/theme.toml` overrides for `[colors]`, `[priority]`, `[badges.accord]`, and `[badges.review]`
@@ -133,7 +137,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Next recommended steps
 
-1. Implement full Review/Logs/Rules/Decisions workflows on the existing top-level view shell.
+1. Implement full Logs/Rules/Decisions workflows on the existing top-level view shell, and later add safe Review action buttons/mutations on top of the current read-only queue.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Finish full user theme discovery and any additional built-in palettes, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 4. Keep parent and area docs synchronized as TUI implementation continues.
@@ -142,6 +146,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 ## First TUI MVP checklist
 
 - [x] Render Board, Review, Logs, Rules, and Decisions views at shell/placeholder level.
+- [x] Render the Review queue as a filtered list with inspection detail.
 - [x] Navigate states/items and view details.
 - [x] Add items from the Board view.
 - [x] Move items between states.
@@ -159,7 +164,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 ## Acceptance criteria for first usable TUI
 
 - [x] Does not assume a persistent completion state.
-- [ ] Makes the simple filtered Review queue obvious.
+- [x] Makes the simple filtered Review queue obvious.
 - [x] Makes accord state obvious at a basic status-badge level.
 - [x] Supports board mutations immediately.
 - [x] Supports built-in plus workspace override themes.
