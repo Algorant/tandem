@@ -2,12 +2,12 @@
 id: task-24
 type: task
 title: "Research Tandem documentation platform and static site approach"
-state: todo
+state: "in-progress"
 priority: "medium"
 relatedFiles: ["README.md", "plan/spec.md", "protocol/plan/spec.md", "tandem-tui/plan/spec.md", "extensions/plan/spec.md", "plan/docs-platform-research.md"]
 tags: ["docs", "research", "static-site", "github-pages"]
 createdAt: "2026-06-28T03:45:11Z"
-updatedAt: "2026-06-28T03:45:21Z"
+updatedAt: "2026-06-28T04:42:04Z"
 subtasks:
   - id: task-24-1
     title: "Define evaluation criteria for simplicity, aesthetics, Markdown workflow, static output, and repo fit"
@@ -28,13 +28,14 @@ subtasks:
     title: "Create follow-up implementation tasks if the recommendation is accepted"
     completed: false
 accord:
-  status: "ready"
-  assignee: "pi"
+  status: "claimed"
+  assignee: "herd:task24-docs-platform-research"
+  claimedAt: "2026-06-28T04:42:04Z"
   deliverables: ["docs:plan/docs-platform-research.md:recommendation memo comparing candidate documentation/static-site platforms", "proposal:docs information architecture covering project overview, protocol/spec, CLI, TUI, extensions, and usage guides", "deployment:GitHub Pages-compatible static site path with local preview and maintenance workflow", "tasks:follow-up implementation tasks if the recommendation is accepted"]
   validation:
     commands: ["test -f plan/docs-platform-research.md"]
   constraints: ["Research only; do not implement or add a docs generator in this task unless explicitly redirected.", "Do not assume a preferred ecosystem; evaluate best-fit options against Tandem's workflow.", "Keep recommendations simple, low-maintenance, Markdown-friendly, aesthetic, and compatible with static deployment."]
-  updatedAt: "2026-06-28T03:45:21Z"
+  updatedAt: "2026-06-28T04:42:04Z"
 ---
 
 ## Description

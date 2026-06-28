@@ -2,12 +2,12 @@
 id: task-9
 type: task
 title: "Harden TUI runtime interactions and rendering"
-state: todo
+state: "in-progress"
 priority: "medium"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["tui", "keyboard", "mouse", "markdown"]
 createdAt: "2026-06-27T03:59:00Z"
-updatedAt: "2026-06-28T03:32:31Z"
+updatedAt: "2026-06-28T04:46:25Z"
 subtasks:
   - id: task-9-1
     title: "Implement hot reload and safe external edit/error handling"

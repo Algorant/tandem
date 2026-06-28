@@ -141,3 +141,12 @@
 {"ts":"2026-06-28T03:45:21Z","event":"accord.ready","id":"task-24","summary":"Accord ready for task-24"}
 {"ts":"2026-06-28T04:30:03Z","event":"task.created","id":"task-25","summary":"Remove top-level Review pane from TUI"}
 {"ts":"2026-06-28T04:30:10Z","event":"accord.ready","id":"task-25","summary":"Accord ready for task-25"}
+{"ts":"2026-06-28T04:41:29Z","event":"accord.claimed","id":"task-23","summary":"Accord claim for task-23"}
+{"ts":"2026-06-28T04:42:04Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from todo to in-progress"}
+{"ts":"2026-06-28T04:42:04Z","event":"accord.claimed","id":"task-24","summary":"Accord claim for task-24"}
+{"ts":"2026-06-28T04:42:04Z","event":"task.moved","id":"task-24","summary":"Moved task-24 from todo to in-progress"}
+{"ts":"2026-06-28T04:46:25Z","event":"task.moved","id":"task-9","summary":"Moved task-9 from todo to in-progress"}
+{"ts":"2026-06-28T04:49:08Z","event":"task.created","id":"task-26","summary":"Sync workflow state and accord status transitions"}
+{"ts":"2026-06-28T04:49:08Z","event":"accord.ready","id":"task-26","summary":"Accord ready for task-26"}
+{"ts":"2026-06-28T05:05:18Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T05:05:18Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
