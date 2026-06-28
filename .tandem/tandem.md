@@ -7,12 +7,12 @@ states:
     title: To Do
   - id: in-progress
     title: In Progress
-  - id: review
-    title: Review
+  - id: validation
+    title: Validation
 rules:
   always:
     - id: 1
-      rule: "Keep Tandem task tags lowercase/kebab-case and useful for `tdm list --tag` filtering; tags are convention-only and not a replacement for protocol fields."
+      rule: "Keep Tandem task tags lowercase/kebab-case and useful for `tandem list --tag` filtering; tags are convention-only and not a replacement for protocol fields."
       source: "task-22"
   never: []
   prefer:

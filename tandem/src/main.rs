@@ -10,7 +10,9 @@ use yaml_rust2::{Yaml, YamlLoader};
 mod tui;
 
 const PROTOCOL_VERSION: &str = "0.1.0";
-const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "review"];
+const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
+const LEGACY_REVIEW_STATE: &str = "review";
+const VALIDATION_STATE: &str = "validation";
 const ACCORD_STATUSES: &[&str] = &[
     "ready",
     "claimed",
@@ -866,7 +868,7 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
 
     let workspace_type = "workspace";
     let config = format!(
-        "---\nprotocolVersion: {PROTOCOL_VERSION}\ntype: {workspace_type}\ntitle: {}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: review\n    title: Review\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {}\n",
+        "---\nprotocolVersion: {PROTOCOL_VERSION}\ntype: {workspace_type}\ntitle: {}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: validation\n    title: Validation\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {}\n",
         yaml_double_quote(title),
         title
     );
@@ -879,7 +881,7 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
     println!("Board:  {}", display_path(&tandem_dir.join("board")));
     println!("Logs:   {}", display_path(&tandem_dir.join("logs")));
     println!("Events: {}", display_path(&tandem_dir.join("events.jsonl")));
-    println!("States: todo, in-progress, review");
+    println!("States: todo, in-progress, validation");
 
     Ok(())
 }
@@ -1012,8 +1014,18 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
     let now = current_timestamp();
     let mut updates = BTreeMap::new();
     updates.insert("state".to_string(), state.to_string());
-    updates.insert("updatedAt".to_string(), now);
-    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    updates.insert("updatedAt".to_string(), now.clone());
+    let mut patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let mut synced_accord_event = None;
+    if state == "in-progress" && accord_status(&doc) == Some("ready") {
+        let mut accord = AccordRecord::from_document(&doc, &now);
+        accord.status = "claimed".to_string();
+        if accord.claimed_at.is_none() {
+            accord.claimed_at = Some(now.clone());
+        }
+        patched = patch_accord_content(&patched, &accord)?;
+        synced_accord_event = Some("accord.claimed");
+    }
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
     append_event(
@@ -1022,10 +1034,21 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
         doc.id(),
         &format!("Moved {} from {previous_state} to {state}", doc.id()),
     )?;
+    if let Some(event_name) = synced_accord_event {
+        append_event(
+            &workspace,
+            event_name,
+            doc.id(),
+            &format!("Synchronized accord claim for {} after move", doc.id()),
+        )?;
+    }
 
     println!("Moved {}", doc.id());
     println!("From: {previous_state}");
     println!("To:   {state}");
+    if synced_accord_event.is_some() {
+        println!("Accord: ready -> claimed");
+    }
     println!("Path: {}", display_path(&doc.path));
     Ok(())
 }
@@ -1138,10 +1161,9 @@ fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
             if doc.location == DocumentLocation::Logs {
                 options.state.is_none()
             } else {
-                options
-                    .state
-                    .as_deref()
-                    .map_or(true, |state| doc.field("state") == Some(state))
+                options.state.as_deref().map_or(true, |state| {
+                    state_matches_filter(doc.field("state"), state)
+                })
             }
         })
         .filter_map(|doc| search_match(doc, &options.query))
@@ -1266,6 +1288,12 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
     let patched = patch_accord_content(&content, &accord)?;
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now);
+    let previous_state = doc.field("state").unwrap_or("-").to_string();
+    let synced_state = accord_state_sync_target(status, &previous_state);
+    if let Some(state) = synced_state {
+        validate_state(&workspace, state)?;
+        updates.insert("state".to_string(), state.to_string());
+    }
     let patched = patch_frontmatter_content(&patched, &updates, &[])?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
@@ -1278,6 +1306,9 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
     )?;
 
     print_accord_update(doc.id(), &previous_status, status, event_name, &doc.path);
+    if let Some(state) = synced_state {
+        println!("State:  {previous_state} -> {state}");
+    }
     Ok(())
 }
 
@@ -1911,10 +1942,9 @@ fn unescape_double_quoted(value: &str) -> String {
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
     docs.into_iter()
         .filter(|doc| {
-            options
-                .state
-                .as_deref()
-                .map_or(true, |state| doc.field("state") == Some(state))
+            options.state.as_deref().map_or(true, |state| {
+                state_matches_filter(doc.field("state"), state)
+            })
         })
         .filter(|doc| {
             options
@@ -1953,6 +1983,47 @@ fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document>
                 .map_or(true, |review| review_status(doc) == Some(review))
         })
         .collect()
+}
+
+fn accord_state_sync_target<'a>(accord_status: &str, current_state: &'a str) -> Option<&'a str> {
+    match accord_status {
+        "claimed" if current_state == "todo" => Some("in-progress"),
+        "delivered" | "accepted"
+            if matches!(current_state, "todo" | "in-progress" | LEGACY_REVIEW_STATE) =>
+        {
+            Some(VALIDATION_STATE)
+        }
+        "rework" if matches!(current_state, VALIDATION_STATE | LEGACY_REVIEW_STATE) => {
+            Some("in-progress")
+        }
+        _ => None,
+    }
+}
+
+fn state_matches_filter(actual: Option<&str>, requested: &str) -> bool {
+    actual == Some(requested)
+        || (requested == VALIDATION_STATE && actual == Some(LEGACY_REVIEW_STATE))
+        || (requested == LEGACY_REVIEW_STATE && actual == Some(VALIDATION_STATE))
+}
+
+fn is_known_or_legacy_state(states: &[String], state: &str) -> bool {
+    states.iter().any(|known| known == state)
+        || (state == LEGACY_REVIEW_STATE && states.iter().any(|known| known == VALIDATION_STATE))
+        || (state == VALIDATION_STATE && states.iter().any(|known| known == LEGACY_REVIEW_STATE))
+}
+
+fn display_known_states(states: &[String]) -> String {
+    let mut display = states.to_vec();
+    if states.iter().any(|state| state == VALIDATION_STATE)
+        && !states.iter().any(|state| state == LEGACY_REVIEW_STATE)
+    {
+        display.push(format!("{LEGACY_REVIEW_STATE} (legacy alias)"));
+    } else if states.iter().any(|state| state == LEGACY_REVIEW_STATE)
+        && !states.iter().any(|state| state == VALIDATION_STATE)
+    {
+        display.push(format!("{VALIDATION_STATE} (preferred alias)"));
+    }
+    display.join(", ")
 }
 
 fn accord_status(doc: &Document) -> Option<&str> {
@@ -2009,10 +2080,10 @@ fn validate_task_document_for_mutation(
         match doc.field("state") {
             Some(state) if !state.trim().is_empty() => {
                 let states = read_workspace_states(workspace)?;
-                if !states.iter().any(|known| known == state) {
+                if !is_known_or_legacy_state(&states, state) {
                     errors.push(format!(
                         "unknown state `{state}`; known states: {}",
-                        states.join(", ")
+                        display_known_states(&states)
                     ));
                 }
             }
@@ -3289,12 +3360,12 @@ fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
         return Err(CliError::usage("state must not be empty"));
     }
     let states = read_workspace_states(workspace)?;
-    if states.iter().any(|known| known == state) {
+    if is_known_or_legacy_state(&states, state) {
         Ok(())
     } else {
         Err(CliError::user(format!(
             "Validation failed: unknown state `{state}`; known states: {}",
-            states.join(", ")
+            display_known_states(&states)
         )))
     }
 }
@@ -3848,12 +3919,39 @@ rules:
     fn patches_frontmatter_without_touching_body() {
         let input = "---\nid: task-1\nstate: todo\ntitle: Old\n---\n\nBody\n";
         let mut updates = BTreeMap::new();
-        updates.insert("state".to_string(), "review".to_string());
+        updates.insert("state".to_string(), "validation".to_string());
         updates.insert("updatedAt".to_string(), "2026-06-26T00:00:00Z".to_string());
         let output = patch_frontmatter_content(input, &updates, &[]).unwrap();
-        assert!(output.contains("state: \"review\"\n"));
+        assert!(output.contains("state: \"validation\"\n"));
         assert!(output.contains("updatedAt: \"2026-06-26T00:00:00Z\"\n"));
         assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn validation_state_filter_accepts_legacy_review_alias() {
+        assert!(state_matches_filter(Some("validation"), "validation"));
+        assert!(state_matches_filter(Some("review"), "validation"));
+        assert!(state_matches_filter(Some("validation"), "review"));
+        assert!(!state_matches_filter(Some("todo"), "validation"));
+    }
+
+    #[test]
+    fn configured_review_state_accepts_preferred_validation_writes() {
+        let legacy_states = vec![
+            "todo".to_string(),
+            "in-progress".to_string(),
+            "review".to_string(),
+        ];
+        assert!(is_known_or_legacy_state(&legacy_states, "validation"));
+        assert!(display_known_states(&legacy_states).contains("validation (preferred alias)"));
+
+        let current_states = vec![
+            "todo".to_string(),
+            "in-progress".to_string(),
+            "validation".to_string(),
+        ];
+        assert!(is_known_or_legacy_state(&current_states, "review"));
+        assert!(display_known_states(&current_states).contains("review (legacy alias)"));
     }
 
     #[test]

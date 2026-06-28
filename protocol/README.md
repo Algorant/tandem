@@ -50,7 +50,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 ## Locked v0 protocol decisions
 
 - Protocol version: `0.1.0` for the first v0 draft.
-- Canonical workflow field: `state`; default states: `todo`, `in-progress`, `review`.
+- Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
 - New work items: `type: task`, sequential IDs such as `task-1`.
 - First-class document types: `task` and `decision`; decision docs do not need a lifecycle field in v0; custom types are config-only.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.

@@ -2,9 +2,9 @@
 
 Tandem is a draft local-first protocol and toolchain for human/agent project coordination.
 
-It takes inspiration from Brainfile's file-based task board model, but leans harder into collaborative workflows: humans and agents agree on work through **accords**, move delivered work through review, and preserve completed work in useful logs.
+It takes inspiration from Brainfile's file-based task board model, but leans harder into collaborative workflows: humans and agents agree on work through **accords**, move delivered work through validation, and preserve completed work in useful logs.
 
-Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around review, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. The v0 `tandem` CLI surface is implemented and considered complete for the current known scope; forward implementation focus is the Rust/Ratatui TUI plus lightweight agent/editor integrations over `tandem`.
+Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around validation/review metadata, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. The v0 `tandem` CLI surface is implemented and considered complete for the current known scope; forward implementation focus is the Rust/Ratatui TUI plus lightweight agent/editor integrations over `tandem`.
 
 ## Monorepo layout
 
@@ -32,7 +32,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 
 - Protocol version: `0.1.0` for the first v0 draft.
 - Protocol fields: `state`/`states`, `type: task`, sequential `task-N` IDs.
-- Default states: `todo`, `in-progress`, `review`.
+- Default states: `todo`, `in-progress`, `validation` (existing `state: review` files are legacy-compatible reads).
 - Document types: `task` and `decision`; custom types are config-only.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in `.tandem/events.jsonl`.
@@ -42,7 +42,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - First implementation: Rust inside `tandem/`, currently as one `tandem` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a Ratatui/crossterm TUI module.
 - CLI output: human-readable by default using compact tables/detail blocks; all read commands support `--json` envelope objects.
 - TUI invocation: `tandem tui` only in v0.
-- First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
+- First TUI MVP: board mutations, Board/Logs/Rules/Decisions views plus Board Validation flow, theme support, mouse enabled by default without drag/drop, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI aliases: none; canonical commands and long flags only.
 - V0 repo shape: CLI/TUI implementation stays under `tandem/`; agent/editor adapters live under `extensions/`; no root Rust workspace, schemas, or fixtures.
 - Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
