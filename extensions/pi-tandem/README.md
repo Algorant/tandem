@@ -46,7 +46,7 @@ Maps to:
 tandem accord ready|claim|deliver|accept|rework|block|fail <id> ...
 ```
 
-Use this for work-agreement lifecycle transitions. Agents should not accept or complete work unless explicitly instructed by the user/orchestrator.
+Use this for work-agreement lifecycle transitions. Deliver finished agent work into the Validation workflow state (`state: validation`) for acceptance/rework decisions. Agents should not accept or complete work unless explicitly instructed by the user/orchestrator; automated validation evidence is not the same as human/product acceptance.
 
 ### `tandem_log`
 
@@ -140,4 +140,4 @@ Do not promote this extension into `~/.pi/agent/extensions` until a separate rev
 
 ## Prompt guidance
 
-The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. See `pi-tandem.md` for the human-readable agent guidance.
+The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, and to keep workflow state distinct from `review:` metadata and accord status. See `pi-tandem.md` for the human-readable agent guidance.

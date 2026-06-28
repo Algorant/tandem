@@ -66,7 +66,7 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
-Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, and warns agents not to accept/complete accord work unless explicitly instructed.
+Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
 
 ## Testing
 
@@ -79,7 +79,7 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_BIN`/`TANDEM_BIN` is set and the local debug binary is missing, it builds `tandem` first.
+`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_BIN` is set and the local debug binary is missing, it builds `tandem` first.
 
 `pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing `.pi` state: it creates `.pi/extensions/pi-tandem/index.ts`, starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status` against the repo workspace, and cleans up.
 

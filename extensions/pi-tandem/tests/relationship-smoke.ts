@@ -41,7 +41,7 @@ async function runProcessOk(command: string, args: string[], cwd: string): Promi
 }
 
 async function ensureTandem(): Promise<string> {
-	const envBin = process.env.TANDEM_BIN || process.env.TANDEM_BIN;
+	const envBin = process.env.TANDEM_BIN;
 	if (envBin) return envBin;
 	if (!existsSync(localTandem)) {
 		console.log("Building local tandem for relationship smoke test...");
@@ -146,8 +146,8 @@ try {
 
 	const followUpOutput = await runTandem(tandem, buildTaskArgs({
 		action: "add",
-		title: "Review relationship guidance",
-		state: "review",
+		title: "Validate relationship guidance",
+		state: "validation",
 		parent: parentId,
 		blockers: [childId],
 		references: [decisionId, blockerId],

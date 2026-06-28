@@ -33,7 +33,7 @@ async function runProcess(command: string, args: string[], cwd: string): Promise
 }
 
 async function ensureTandem(): Promise<string> {
-	const envBin = process.env.TANDEM_BIN || process.env.TANDEM_BIN;
+	const envBin = process.env.TANDEM_BIN;
 	if (envBin) return envBin;
 	if (!existsSync(localTandem)) {
 		console.log("Building local tandem for smoke test...");

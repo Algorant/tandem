@@ -36,9 +36,10 @@ After creating linked work, inspect with `tandem_task show` and `tandem_search`.
 ## Lifecycle cautions
 
 - Claim or deliver only when assigned/asked.
-- Do not accept accords, complete tasks, or archive work unless the user/orchestrator explicitly asks.
+- Move delivered work to the `validation` workflow state for acceptance, rejection, requested changes, or human/product judgment. Treat existing `state: review` files as legacy reads, not the preferred new state.
+- Do not accept accords, complete tasks, or archive work unless the user/orchestrator explicitly asks; automated validation evidence is not human/product acceptance.
 - Treat logs as first-class completed-work history, not as a trash folder.
-- Keep review state, accord state, and task state distinct.
+- Keep workflow state, accord status, and `review:` metadata distinct. Review metadata remains the place for reviewer decisions/status.
 
 ## Bootstrap behavior
 

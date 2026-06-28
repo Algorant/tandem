@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 // pi-tandem is intentionally a lightweight adapter over the installed `tandem` CLI.
-// Tandem protocol parsing/mutation behavior belongs in the tandem CLI, not here.
+// Tandem protocol parsing/mutation behavior belongs in tandem/tandem, not here.
 
 type ToolContent = { type: "text"; text: string };
 type ToolResult = { content: ToolContent[]; details?: Record<string, unknown>; isError?: boolean };
@@ -510,11 +510,11 @@ export const tandemTaskParameters = Type.Object({
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
-	return /\b(tandem|tandem|durable coordination|task board|accord|work agreement|review queue|project rules|completed logs?)\b/i.test(prompt);
+	return /\b(tandem|durable coordination|task board|accord|work agreement|validation|review queue|project rules|completed logs?)\b/i.test(prompt);
 }
 
 export default function piTandem(pi: ExtensionAPI) {
@@ -543,6 +543,7 @@ export default function piTandem(pi: ExtensionAPI) {
 			"Prefer tandem_task read actions with the default JSON output for reliable task inspection.",
 			"When decomposing work, set relationship fields explicitly: parent for hierarchy, blockers for hard dependencies, references for related tasks/decisions/logs, relatedFiles for repo paths, and subtasks for lightweight checklists.",
 			"Create or inspect parent and blocker documents before referencing them; tandem validates parent/blockers strictly, while references are related context and only warn if unresolved.",
+			"Prefer state=validation for delivered work awaiting human/product judgment; existing state=review is a legacy alias only.",
 			"Do not use tandem_task complete unless the user or orchestrator explicitly asks to archive completed work.",
 		],
 		parameters: tandemTaskParameters,
@@ -562,6 +563,7 @@ export default function piTandem(pi: ExtensionAPI) {
 		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (ready, claim, deliver, accept, rework, block, fail).",
 		promptGuidelines: [
 			"Use tandem_accord for accord state changes instead of direct frontmatter edits.",
+			"Deliver finished agent work into the Validation workflow state for acceptance/rework decisions; do not treat automated validation evidence as human acceptance.",
 			"Do not accept, complete, or otherwise finalize Tandem work unless the user/orchestrator explicitly asks for that lifecycle transition.",
 		],
 		parameters: Type.Object({

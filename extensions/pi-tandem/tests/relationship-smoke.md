@@ -10,7 +10,7 @@ Purpose: validate that pi-tandem guidance/tool schemas make Tandem relationship 
 - a decision referenced by the parent/children;
 - a fixture-prep child task with `parentId`, `references`, `relatedFiles`, and `subtasks`;
 - an implementation child task with `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks`;
-- a review follow-up task blocked by the implementation child.
+- a validation follow-up task blocked by the implementation child.
 
 It then verifies the generated Markdown contains `parentId`, `blockers`, `references`, `relatedFiles`, and parent-based subtask IDs, and verifies `tandem search` can find tasks by relationship metadata.
 
