@@ -41,7 +41,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Drafted accord lifecycle.
 - [x] Drafted review model.
 - [x] Drafted completion/logs/events model.
-- [x] Drafted protocol-facing CLI surface using `tdm`.
+- [x] Drafted protocol-facing CLI surface using `tandem`.
 - [x] Added `protocol/README.md` for protocol-area documentation.
 - [x] Added implementation-facing v0 field reference for workspace config, task documents, decision documents, accords, reviews, completion metadata, logs, and rules.
 - [x] Added minimal audit event envelope and event name catalog.
@@ -56,7 +56,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 
 ## Next recommended steps
 
-1. Implement the first `tdm` CLI slice in `../tandem-tui/`: `init`, `list`, and `show`.
+1. Implement the first `tandem` CLI slice in `../tandem/`: `init`, `list`, and `show`.
 2. Tighten protocol examples only when implementation discovers ambiguous behavior.
 3. Keep schemas, fixtures, and protocol implementation layout out of v0 unless explicitly approved.
 

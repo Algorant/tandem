@@ -4,12 +4,12 @@ Use `pi-tandem` when a project has `.tandem/tandem.md` or when the user asks for
 
 ## Prefer the tools
 
-- Use `tdm_status` to check `tdm` and workspace health.
-- Use `tdm_task` for task list/show/add/move/complete.
-- Use `tdm_accord` for ready/claim/deliver/accept/rework/block/fail transitions.
-- Use `tdm_log` and `tdm_search` for completed-work history and project search.
-- Use `tdm_rules` for project rules.
-- Use `tdm_decision` for first-class decision documents.
+- Use `tandem_status` to check `tandem` and workspace health.
+- Use `tandem_task` for task list/show/add/move/complete.
+- Use `tandem_accord` for ready/claim/deliver/accept/rework/block/fail transitions.
+- Use `tandem_log` and `tandem_search` for completed-work history and project search.
+- Use `tandem_rules` for project rules.
+- Use `tandem_decision` for first-class decision documents.
 
 Avoid editing `.tandem/board/*.md`, `.tandem/logs/*.md`, or `.tandem/tandem.md` directly unless the user asks for raw source repair or the CLI cannot perform the needed action.
 
@@ -26,12 +26,12 @@ When decomposing or linking work, set Tandem relationship fields explicitly inst
 Example tool pattern:
 
 ```text
-tdm_task action=add title="Ship relationship UI" relatedFiles=["tandem-tui/src/tui.rs"] subtasks=["Define display", "Review copy"]
-tdm_decision action=add title="Relationship display policy" references=["task-1"]
-tdm_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem-tui/src/tui.rs", "protocol/plan/spec.md"] subtasks=["Show parent", "Show blockers", "Show references"]
+tandem_task action=add title="Ship relationship UI" relatedFiles=["tandem/src/tui.rs"] subtasks=["Define display", "Review copy"]
+tandem_decision action=add title="Relationship display policy" references=["task-1"]
+tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"] subtasks=["Show parent", "Show blockers", "Show references"]
 ```
 
-After creating linked work, inspect with `tdm_task show` and `tdm_search`. If relationship fields are present in the document but hard to see in CLI/TUI output, report that as a display UX gap; do not invent replacement fields.
+After creating linked work, inspect with `tandem_task show` and `tandem_search`. If relationship fields are present in the document but hard to see in CLI/TUI output, report that as a display UX gap; do not invent replacement fields.
 
 ## Lifecycle cautions
 
@@ -42,8 +42,8 @@ After creating linked work, inspect with `tdm_task show` and `tdm_search`. If re
 
 ## Bootstrap behavior
 
-If no workspace exists, ask before creating one. This MVP diagnoses missing workspaces but does not hide initialization policy inside the extension; use `tdm init --title <title>` only after user intent is clear.
+If no workspace exists, ask before creating one. This MVP diagnoses missing workspaces but does not hide initialization policy inside the extension; use `tandem init --title <title>` only after user intent is clear.
 
 ## Adapter boundary
 
-`pi-tandem` calls `tdm` through argument arrays. Tandem protocol behavior belongs in the Rust CLI/protocol docs, not in TypeScript adapter logic.
+`pi-tandem` calls `tandem` through argument arrays. Tandem protocol behavior belongs in the Rust CLI/protocol docs, not in TypeScript adapter logic.

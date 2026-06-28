@@ -3,11 +3,11 @@
 Status: draft
 Date: 2026-06-28
 
-The `extensions/` area is the home for Tandem agent/editor integrations. It is the third major child area of the monorepo alongside `protocol/` and `tandem-tui/`.
+The `extensions/` area is the home for Tandem agent/editor integrations. It is the third major child area of the monorepo alongside `protocol/` and `tandem/`.
 
 ## Scope
 
-Extension work should make Tandem easier to use from agents and editors while keeping Tandem behavior centralized in the protocol and `tdm` CLI.
+Extension work should make Tandem easier to use from agents and editors while keeping Tandem behavior centralized in the protocol and `tandem` CLI.
 
 Current area responsibilities:
 
@@ -30,24 +30,24 @@ Out of scope for this area:
 The default architecture is:
 
 ```text
-LLM / Pi / editor → extension adapter → execFile("tdm", args) → .tandem files
+LLM / Pi / editor → extension adapter → execFile("tandem", args) → .tandem files
 ```
 
-Adapters should use argument arrays via `execFile` or equivalent APIs and must not shell-interpolate user input. Read paths should prefer `tdm --json` where the CLI supports it. Mutation paths may preserve human-readable CLI output until `tdm` exposes structured mutation results.
+Adapters should use argument arrays via `execFile` or equivalent APIs and must not shell-interpolate user input. Read paths should prefer `tandem --json` where the CLI supports it. Mutation paths may preserve human-readable CLI output until `tandem` exposes structured mutation results.
 
 ## Current adapter: pi-tandem
 
 `extensions/pi-tandem/` provides a Pi extension modelled after the local `pi-web-tools` style:
 
 - no provider logic and no protocol mutation logic in TypeScript;
-- one small command runner around installed `tdm`;
+- one small command runner around installed `tandem`;
 - Pi tool registrations for tasks, accords, logs, rules, decisions, search, and status;
 - `/tandem help|status` diagnostics;
-- prompt guidance that prefers `tdm_*` tools when a `.tandem/tandem.md` workspace exists or durable coordination is requested.
+- prompt guidance that prefers `tandem_*` tools when a `.tandem/tandem.md` workspace exists or durable coordination is requested.
 
 ## Testing strategy
 
-1. Build or install `tdm`.
+1. Build or install `tandem`.
 2. Run adapter static checks, currently `bun --check extensions/pi-tandem/index.ts`.
 3. Run local smoke tests, currently `bun extensions/pi-tandem/tests/smoke.ts`.
 4. Project-local Pi loading can be tested later by copying/symlinking to `.pi/extensions/pi-tandem/index.ts` or by launching Pi with `-e extensions/pi-tandem/index.ts`.

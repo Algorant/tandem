@@ -19,7 +19,7 @@ tandem/
 │   └── plan/
 │       ├── spec.md
 │       └── todo.md
-├── tandem-tui/
+├── tandem/
 │   ├── README.md
 │   └── plan/
 │       ├── spec.md
@@ -42,12 +42,12 @@ tandem/
 - Repository: `tandem`
 - Project data directory: `.tandem/`
 - Project config file: `.tandem/tandem.md`
-- CLI binary: `tdm`
-- TUI source area: `tandem-tui/`
+- CLI binary: `tandem`
+- TUI source area: `tandem/`
 - Integrations area: `extensions/`
 - Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
-- User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes unless explicitly revisited
+- User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes unless explicitly revisited
 
 ## Core idea
 
@@ -67,11 +67,11 @@ Keep protocol and CLI/TUI work together while the idea is still forming. Split l
 Current areas:
 
 - `protocol/` — the protocol/spec source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile.
-- `tandem-tui/` — CLI + TUI design and implementation. The user-facing CLI is `tdm`; the current v0 CLI surface is implemented as a single Rust binary crate, and forward implementation focus is the interactive Rust + Ratatui/crossterm TUI.
-- `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tdm` CLI.
+- `tandem/` — CLI + TUI design and implementation. The user-facing CLI is `tandem`; the current v0 CLI surface is implemented as a single Rust binary crate, and forward implementation focus is the interactive Rust + Ratatui/crossterm TUI.
+- `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tandem` CLI.
 - `plan/` — parent project coordination and cross-cutting decisions.
 
-Do not overdesign the repository. For v0, keep CLI/TUI implementation under `tandem-tui/`, keep integrations under `extensions/`, and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
+Do not overdesign the repository. For v0, keep CLI/TUI implementation under `tandem/`, keep integrations under `extensions/`, and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
 
 ## Locked v0 decisions
 
@@ -91,23 +91,23 @@ Protocol:
 CLI/TUI:
 
 - v0 commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
-- `tdm log` includes `list`, `show`, `search`; `tdm rules` includes `list`, `add`, `edit`, `delete`; `tdm accord` includes `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- `tandem log` includes `list`, `show`, `search`; `tandem rules` includes `list`, `add`, `edit`, `delete`; `tandem accord` includes `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - Human-readable output is default using compact tables for list/search and labeled detail blocks for show/log/decision; all read commands support `--json` envelope objects.
-- First CLI implementation language is Rust inside `tandem-tui/`; the current implementation remains one `tdm` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.
-- `tdm decision` supports `list`, `show`, and `add`.
-- The TUI launches as `tdm tui` only in v0.
+- First CLI implementation language is Rust inside `tandem/`; the current implementation remains one `tandem` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.
+- `tandem decision` supports `list`, `show`, and `add`.
+- The TUI launches as `tandem tui` only in v0.
 - First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue. The current Board layout uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI uses canonical command names and long flags only; no short aliases.
 - Theme config loads in this order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
 - Defer templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, and fixtures.
 - Markdown planning docs stay canonical for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
-- `td` is reserved for future/internal tool prefixes; `tdm` remains the user-facing CLI.
+- `td` is reserved for future/internal tool prefixes; `tandem` remains the user-facing CLI.
 
 Extensions:
 
 - `extensions/pi-tandem` is the first v0 integration.
-- `pi-tandem` is a thin Pi adapter over installed `tdm`, not a TypeScript Tandem protocol implementation.
-- Extension tools must use `execFile`/argument arrays, prefer `tdm --json` read paths where supported, preserve human-readable mutation output, and provide diagnostics for missing `tdm`, missing `.tandem`, unsupported CLI surface, and command failures.
+- `pi-tandem` is a thin Pi adapter over installed `tandem`, not a TypeScript Tandem protocol implementation.
+- Extension tools must use `execFile`/argument arrays, prefer `tandem --json` read paths where supported, preserve human-readable mutation output, and provide diagnostics for missing `tandem`, missing `.tandem`, unsupported CLI surface, and command failures.
 - Project-local extension testing comes before any global Pi config promotion.
 
 
@@ -116,8 +116,8 @@ Extensions:
 1. Reconcile Tandem protocol against live Brainfile protocol plus the local v3 proposal.
 2. Build a feature parity/improvement matrix for live Brainfile CLI/TUI.
 3. Stabilize protocol vocabulary and lifecycle.
-4. Draft the detailed `tdm` command reference from the locked CLI surface.
-5. Keep the existing `tandem-tui/` Rust package layout stable unless implementation pressure proves a change is needed.
+4. Draft the detailed `tandem` command reference from the locked CLI surface.
+5. Keep the existing `tandem/` Rust package layout stable unless implementation pressure proves a change is needed.
 6. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
 7. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
 8. Add TUI accord/review/completion flows.

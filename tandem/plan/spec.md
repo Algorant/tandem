@@ -3,18 +3,18 @@
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: CLI v0 surface complete for current known scope; forward focus Rust + Ratatui/crossterm TUI inside `tandem-tui/`
+Implementation target: CLI v0 surface complete for current known scope; forward focus Rust + Ratatui/crossterm TUI inside `tandem/`
 
 Naming:
 
 - Product/protocol: **Tandem**
-- CLI/TUI source directory: `tandem-tui/`
-- CLI binary: `tdm`
+- CLI/TUI source directory: `tandem/`
+- CLI binary: `tandem`
 - CLI design and current known CLI v0 implementation precede TUI implementation; future CLI work should be explicit new features or bug fixes
-- V0 TUI invocation: `tdm tui` only
-- User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
+- V0 TUI invocation: `tandem tui` only
+- User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
-This document describes the user-facing `tdm` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
+This document describes the user-facing `tandem` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
 The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The CLI v0 surface is now implemented for the current known scope; the active implementation focus is a more capable, responsive, themeable, mouse-aware TUI.
 
@@ -48,7 +48,7 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 
 ## Design principles
 
-- **CLI first, TUI now:** the `tdm` command workflows are implemented for the current known v0 scope; focus new work on the interactive TUI unless fixing CLI bugs or adding requested CLI features.
+- **CLI first, TUI now:** the `tandem` command workflows are implemented for the current known v0 scope; focus new work on the interactive TUI unless fixing CLI bugs or adding requested CLI features.
 - **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
 - **Logs are real:** completed work is browsable, searchable, inspectable, and useful; restore/reopen behavior can come after the v0 log read scope.
 - **Review is central:** delivered work should naturally flow to review, validation, acceptance, rework, and completion.
@@ -65,18 +65,18 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 The v0 CLI command families are settled:
 
 ```text
-tdm init
-tdm list
-tdm show <id>
-tdm add ...
-tdm move <id> --state <state>
-tdm complete <id>
-tdm log list|show|search
-tdm search <query>
-tdm accord ready|claim|deliver|accept|rework|block|fail
-tdm rules list|add|edit|delete
-tdm decision list|show|add
-tdm tui
+tandem init
+tandem list
+tandem show <id>
+tandem add ...
+tandem move <id> --state <state>
+tandem complete <id>
+tandem log list|show|search
+tandem search <query>
+tandem accord ready|claim|deliver|accept|rework|block|fail
+tandem rules list|add|edit|delete
+tandem decision list|show|add
+tandem tui
 ```
 
 Command behavior rules:
@@ -87,14 +87,14 @@ Command behavior rules:
 - V0 uses canonical command names and long flags only; abbreviated flags or alias commands are not part of v0.
 - All read commands support `--json`: `list`, `show`, `search`, `log list`, `log show`, `log search`, `rules list`, `decision list`, and `decision show`.
 - `--json` responses use an envelope object: `{ "ok": true, "data": ..., "warnings": [] }`.
-- `tdm log` is limited to `list`, `show`, and `search` in v0.
-- `tdm rules` supports `list`, `add`, `edit`, and `delete` in v0.
-- `tdm accord` supports `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, and `fail` in v0.
-- `tdm decision` supports `list`, `show`, and `add` in v0.
-- The TUI launches through `tdm tui` only in v0; no standalone TUI binary is part of v0.
-- `tdm complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
-- The first implementation language is Rust, implemented inside `tandem-tui/`.
-- The current implementation package is a Rust binary crate in `tandem-tui/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
+- `tandem log` is limited to `list`, `show`, and `search` in v0.
+- `tandem rules` supports `list`, `add`, `edit`, and `delete` in v0.
+- `tandem accord` supports `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, and `fail` in v0.
+- `tandem decision` supports `list`, `show`, and `add` in v0.
+- The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
+- `tandem complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
+- The first implementation language is Rust, implemented inside `tandem/`.
+- The current implementation package is a Rust binary crate in `tandem/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
 Deferred from v0:
 
@@ -106,7 +106,7 @@ Deferred from v0:
 - Brainfile conversion commands are not required for v0.
 - Schemas, fixtures, and root Rust workspace layout are not part of v0.
 
-## `tdm` v0 command reference
+## `tandem` v0 command reference
 
 This section is the implementation-facing CLI reference for v0. Syntax examples use canonical command names and long flags only. V0 commands auto-discover the `.tandem/` workspace from the current directory; an explicit workspace-path override is not part of the locked v0 surface.
 
@@ -138,14 +138,14 @@ This section is the implementation-facing CLI reference for v0. Syntax examples 
   - warnings do not make a command fail unless paired with a structural error.
 - Error wording prefixes recoverable categories where possible: `Parse failure`, `Validation failed`, `Write conflict`, `Write failure`, and `Event append failure`. Event append failures note that the file mutation may already be on disk and needs inspection/repair.
 
-### `tdm init`
+### `tandem init`
 
 - Purpose: create a new Tandem workspace in the current project.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tdm init --title <title> [--force]
+tandem init --title <title> [--force]
 ```
 
 - Required inputs:
@@ -157,14 +157,14 @@ tdm init --title <title> [--force]
   - fails if a workspace already exists and `--force` is not present.
   - fails on file creation or write errors.
 
-### `tdm list`
+### `tandem list`
 
 - Purpose: list active task and decision documents from the board.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--accord <status>] [--review <status>] [--json]
+tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--accord <status>] [--review <status>] [--json]
 ```
 
 - Required inputs: none.
@@ -210,14 +210,14 @@ task-8  review       med   Add decision view             pi        delivered   p
 - Exit/error notes:
   - fails on missing workspace, invalid filter value, or parse/structure errors.
 
-### `tdm show`
+### `tandem show`
 
 - Purpose: show one active or completed document by ID.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm show <id> [--json]
+tandem show <id> [--json]
 ```
 
 - Required inputs:
@@ -252,14 +252,14 @@ tdm show <id> [--json]
 - Exit/error notes:
   - fails when the ID is not found in active board documents or completed logs.
 
-### `tdm add`
+### `tandem add`
 
 - Purpose: create a new task in an active state.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tdm add --title <title> [--state <state>] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
+tandem add --title <title> [--state <state>] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
 ```
 
 - Required inputs:
@@ -271,14 +271,14 @@ tdm add --title <title> [--state <state>] [--description <text>] [--priority <pr
 - Exit/error notes:
   - fails on invalid state, invalid referenced parent/blocker, structure errors, or failed write.
 
-### `tdm move`
+### `tandem move`
 
 - Purpose: move an active task to another active state.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tdm move <id> --state <state>
+tandem move <id> --state <state>
 ```
 
 - Required inputs:
@@ -288,14 +288,14 @@ tdm move <id> --state <state>
 - Exit/error notes:
   - fails if the task is not active, the ID resolves to a non-task document, the state is unknown, structural validation fails, or the write fails.
 
-### `tdm complete`
+### `tandem complete`
 
 - Purpose: complete an active task, archive it to logs, and append an audit event.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tdm complete <id> --summary <text> [--file-changed <path>] [--validation <text>] [--reviewer <name>]
+tandem complete <id> --summary <text> [--file-changed <path>] [--validation <text>] [--reviewer <name>]
 ```
 
 - Required inputs:
@@ -323,16 +323,16 @@ Event: task.completed
   - warns but does not fail for missing accepted review or accepted accord in v0.
   - fails when the ID is missing, the document is not completable, the document is already completed, blockers remain unresolved, structure validation fails, or the move/write fails.
 
-### `tdm log`
+### `tandem log`
 
-#### `tdm log list`
+#### `tandem log list`
 
 - Purpose: list completed log documents.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm log list [--limit <count>] [--json]
+tandem log list [--limit <count>] [--json]
 ```
 
 - Required inputs: none.
@@ -369,14 +369,14 @@ task-7  2026-06-26 15:00     Implement theme loader   accepted  Theme loader com
 }
 ```
 
-#### `tdm log show`
+#### `tandem log show`
 
 - Purpose: show one completed log document.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm log show <id> [--json]
+tandem log show <id> [--json]
 ```
 
 - Required inputs:
@@ -412,14 +412,14 @@ tdm log show <id> [--json]
 }
 ```
 
-#### `tdm log search`
+#### `tandem log search`
 
 - Purpose: search completed logs only.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm log search <query> [--json]
+tandem log search <query> [--json]
 ```
 
 - Required inputs:
@@ -447,14 +447,14 @@ tdm log search <query> [--json]
 }
 ```
 
-### `tdm search`
+### `tandem search`
 
 - Purpose: search active documents and completed logs.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm search <query> [--state <state>] [--type <type>] [--json]
+tandem search <query> [--state <state>] [--type <type>] [--json]
 ```
 
 - Required inputs:
@@ -494,7 +494,7 @@ tdm search <query> [--state <state>] [--type <type>] [--json]
 }
 ```
 
-### `tdm accord`
+### `tandem accord`
 
 - Purpose: manage the work agreement attached to a task.
 - Kind: mutation.
@@ -502,13 +502,13 @@ tdm search <query> [--state <state>] [--type <type>] [--json]
 Subcommands:
 
 ```text
-tdm accord ready <id> [--assignee <name>] [--deliverable <spec>] [--validation <command>] [--constraint <text>]
-tdm accord claim <id> --assignee <name>
-tdm accord deliver <id> --summary <text> [--evidence <text>] [--file-changed <path>]
-tdm accord accept <id> [--reviewer <name>] [--note <text>]
-tdm accord rework <id> --note <text>
-tdm accord block <id> --reason <text>
-tdm accord fail <id> --reason <text>
+tandem accord ready <id> [--assignee <name>] [--deliverable <spec>] [--validation <command>] [--constraint <text>]
+tandem accord claim <id> --assignee <name>
+tandem accord deliver <id> --summary <text> [--evidence <text>] [--file-changed <path>]
+tandem accord accept <id> [--reviewer <name>] [--note <text>]
+tandem accord rework <id> --note <text>
+tandem accord block <id> --reason <text>
+tandem accord fail <id> --reason <text>
 ```
 
 - Required inputs:
@@ -526,24 +526,24 @@ tdm accord fail <id> --reason <text>
 Examples:
 
 ```text
-tdm accord ready task-7 --assignee pi --deliverable file:src/tui/theme.rs:Theme loader --validation "cargo test"
-tdm accord deliver task-7 --summary "Theme loader implemented" --evidence "cargo test passed" --file-changed src/tui/theme.rs
-tdm accord rework task-7 --note "Please add no-color fallback."
+tandem accord ready task-7 --assignee pi --deliverable file:src/tui/theme.rs:Theme loader --validation "cargo test"
+tandem accord deliver task-7 --summary "Theme loader implemented" --evidence "cargo test passed" --file-changed src/tui/theme.rs
+tandem accord rework task-7 --note "Please add no-color fallback."
 ```
 
 - Exit/error notes:
   - fails if the task is missing, the target is not an active task, existing task/accord/review structure is invalid, the requested accord transition is invalid, required inputs are missing, or the write fails.
 
-### `tdm rules`
+### `tandem rules`
 
-#### `tdm rules list`
+#### `tandem rules list`
 
 - Purpose: list project rules.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm rules list [--category <category>] [--json]
+tandem rules list [--category <category>] [--json]
 ```
 
 - Required inputs: none.
@@ -578,33 +578,33 @@ tdm rules list [--category <category>] [--json]
 - Syntax:
 
 ```text
-tdm rules add --category <category> --rule <text> [--source <id>]
-tdm rules edit --category <category> --id <rule-id> --rule <text> [--source <id>]
-tdm rules delete --category <category> --id <rule-id>
+tandem rules add --category <category> --rule <text> [--source <id>]
+tandem rules edit --category <category> --id <rule-id> --rule <text> [--source <id>]
+tandem rules delete --category <category> --id <rule-id>
 ```
 
 - Human output shape: one-line success plus category and rule ID.
 - Examples:
 
 ```text
-tdm rules add --category always --rule "Run tests before completing tasks." --source decision-1
-tdm rules edit --category always --id 1 --rule "Run tests before completing task changes."
-tdm rules delete --category always --id 1
+tandem rules add --category always --rule "Run tests before completing tasks." --source decision-1
+tandem rules edit --category always --id 1 --rule "Run tests before completing task changes."
+tandem rules delete --category always --id 1
 ```
 
 - Exit/error notes:
   - fails on invalid category, missing rule ID, missing rule text, unresolved required source if treated as structural, or write failure.
 
-### `tdm decision`
+### `tandem decision`
 
-#### `tdm decision list`
+#### `tandem decision list`
 
 - Purpose: list decision documents.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm decision list [--json]
+tandem decision list [--json]
 ```
 
 - Required inputs: none.
@@ -632,14 +632,14 @@ tdm decision list [--json]
 }
 ```
 
-#### `tdm decision show`
+#### `tandem decision show`
 
 - Purpose: show one decision document.
 - Kind: read.
 - Syntax:
 
 ```text
-tdm decision show <id> [--json]
+tandem decision show <id> [--json]
 ```
 
 - Required inputs:
@@ -666,14 +666,14 @@ tdm decision show <id> [--json]
 }
 ```
 
-#### `tdm decision add`
+#### `tandem decision add`
 
 - Purpose: create a decision document.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tdm decision add --title <title> [--body <markdown>] [--reference <ref>] [--tag <tag>]
+tandem decision add --title <title> [--body <markdown>] [--reference <ref>] [--tag <tag>]
 ```
 
 - Required inputs:
@@ -686,27 +686,27 @@ tdm decision add --title <title> [--body <markdown>] [--reference <ref>] [--tag 
 - Example:
 
 ```text
-tdm decision add --title "Use styled-basic Markdown in v0" --body "## Decision\nUse styled-basic rendering first." --reference task-7
+tandem decision add --title "Use styled-basic Markdown in v0" --body "## Decision\nUse styled-basic rendering first." --reference task-7
 ```
 
 - Exit/error notes:
   - fails on missing title, invalid references that are structural errors, or failed write.
 
-### `tdm tui`
+### `tandem tui`
 
 - Purpose: launch the interactive terminal UI.
 - Kind: interactive.
 - Syntax:
 
 ```text
-tdm tui
+tandem tui
 ```
 
 - Required inputs: none.
 - Optional inputs: none in v0.
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
 - Current implementation slice:
-  - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
+  - launches a Ratatui/crossterm alternate-screen app from the existing `tandem tui` command.
   - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` are the keyboard view switchers, and mouse tab clicks remain explicit pointer navigation.
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns.
   - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, sparse one-line rows, reload, help, and safe quit.
@@ -748,7 +748,7 @@ The full first TUI MVP should include:
 - Board mutations: add item, move state, edit item, complete to logs, update priority/tags/assignee where supported, and toggle subtasks.
 - Accord actions: ready, claim, deliver, accept, rework, block, fail.
 - Rules actions: list, add, edit, delete.
-- Decision browsing and basic decision actions matching `tdm decision list|show|add`.
+- Decision browsing and basic decision actions matching `tandem decision list|show|add`.
 - First-class logs with list/show/search behavior.
 - Theme support in the first MVP, not a later polish pass.
 - Mouse support is enabled by default in the first MVP for selection, scrolling, tabs, and action buttons; drag/drop is not in v0.
@@ -1039,7 +1039,7 @@ failed = "#e36f63"
 unknown = "#928374"
 ```
 
-Checked-in examples live in `tandem-tui/examples/themes/default-dark.toml` and `tandem-tui/examples/themes/verdigris.toml`. Install them as user themes with `mkdir -p ~/.config/tandem/themes` and `cp tandem-tui/examples/themes/*.toml ~/.config/tandem/themes/`. A manual PTY smoke should confirm the status line reports either `theme built-in verdigris + .../.tandem/theme.toml` or `theme user theme <name> (.../themes/<name>.toml) + .../.tandem/theme.toml`; invalid themes should show non-fatal theme warning counts.
+Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tandem/examples/themes/verdigris.toml`. Install them as user themes with `mkdir -p ~/.config/tandem/themes` and `cp tandem/examples/themes/*.toml ~/.config/tandem/themes/`. A manual PTY smoke should confirm the status line reports either `theme built-in verdigris + .../.tandem/theme.toml` or `theme user theme <name> (.../themes/<name>.toml) + .../.tandem/theme.toml`; invalid themes should show non-fatal theme warning counts.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris or a user theme is selected.
 
@@ -1248,13 +1248,13 @@ The CLI and TUI should treat Tandem files as hand-written documents, not generat
 
 These v0 command families mutate files and must follow the minimal-diff behavior:
 
-- `tdm init`: creates new workspace files; no prior source exists, but generated files should be stable and readable.
-- `tdm add`: writes one new task file and updates only required workspace/event state.
-- `tdm move`: updates only an active task document's `state` and mutation timestamp fields that actually change.
-- `tdm complete`: moves the document to logs, adds nested `completion` metadata, removes active-only fields only when required, and appends a separate event.
-- `tdm accord ...`: updates only the `accord` subtree plus the task `updatedAt`; claim/deliver timestamps are written inside `accord`.
-- `tdm rules add|edit|delete`: patches only the relevant rule category in workspace frontmatter.
-- `tdm decision add`: writes one new decision file and appends a creation event.
+- `tandem init`: creates new workspace files; no prior source exists, but generated files should be stable and readable.
+- `tandem add`: writes one new task file and updates only required workspace/event state.
+- `tandem move`: updates only an active task document's `state` and mutation timestamp fields that actually change.
+- `tandem complete`: moves the document to logs, adds nested `completion` metadata, removes active-only fields only when required, and appends a separate event.
+- `tandem accord ...`: updates only the `accord` subtree plus the task `updatedAt`; claim/deliver timestamps are written inside `accord`.
+- `tandem rules add|edit|delete`: patches only the relevant rule category in workspace frontmatter.
+- `tandem decision add`: writes one new decision file and appends a creation event.
 - TUI quick edits and action buttons must call the same mutation behavior as CLI commands.
 
 ### Writes, timestamps, and events
@@ -1276,7 +1276,7 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 
 ## Implementation boundaries
 
-The current implementation layout is a single Rust binary crate in `tandem-tui/` that builds `tdm`. It uses manual CLI parsing, raw-source mutation patches, the approved `yaml-rust2` dependency for frontmatter reads, and Ratatui/crossterm for the first TUI event loop and rendering layer. Do not assume or introduce a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a CLI parsing dependency without an explicit decision.
+The current implementation layout is a single Rust binary crate in `tandem/` that builds `tandem`. It uses manual CLI parsing, raw-source mutation patches, the approved `yaml-rust2` dependency for frontmatter reads, and Ratatui/crossterm for the first TUI event loop and rendering layer. Do not assume or introduce a root Rust workspace, a multi-crate layout, a standalone shared implementation package, or a CLI parsing dependency without an explicit decision.
 
 The behavioral boundaries should stay clear:
 
@@ -1293,11 +1293,11 @@ The behavioral boundaries should stay clear:
 
 ### CLI responsibilities
 
-- expose scriptable `tdm` commands
+- expose scriptable `tandem` commands
 - map command inputs to protocol behavior
 - provide predictable human-readable output and `--json` structured output for all read commands
 - report clear errors and policy failures
-- launch the TUI through `tdm tui` in v0
+- launch the TUI through `tandem tui` in v0
 
 ### TUI responsibilities
 
@@ -1508,13 +1508,13 @@ Manual smoke:
 
 - Specify options and output shape for the locked v0 command families.
 - Define `--json` behavior for all read commands.
-- Define warnings and policy checks for `tdm complete`.
-- Define detailed options and output for `tdm decision list|show|add`.
-- Keep implementation layout inside `tandem-tui/` and dependency choices open until coding begins.
+- Define warnings and policy checks for `tandem complete`.
+- Define detailed options and output for `tandem decision list|show|add`.
+- Keep implementation layout inside `tandem/` and dependency choices open until coding begins.
 
 ### Phase 1: v0 CLI implementation
 
-- Implement in Rust inside `tandem-tui/`.
+- Implement in Rust inside `tandem/`.
 - Implement workspace discovery and document reading.
 - Implement v0 read commands: `list`, `show`, `log list`, `log show`, `log search`, `search`, read-oriented `rules`, and read-oriented `decision` operations.
 - Implement v0 mutations: `init`, `add`, `move`, `complete`, `accord`, `rules`, and decision operations.
@@ -1522,7 +1522,7 @@ Manual smoke:
 
 ### Phase 2: First TUI MVP
 
-- Launch through `tdm tui`.
+- Launch through `tandem tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs.
 - Board renders active board documents as count-labeled state subviews with a full-width selected-state list, sparse one-line rows with real chip/badge styling, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark`/`verdigris` theme styling, user theme discovery from config dirs, and workspace `.tandem/theme.toml` selection/color overrides.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.

@@ -492,7 +492,7 @@ impl DecisionPrompt {
             Self::Add { title, body, step } => vec![
                 Line::from(Span::styled("Create a basic decision", theme.title_style())),
                 Line::from(Span::styled(
-                    "Matches `tdm decision add --title <title> --body <markdown>` without references/tags.",
+                    "Matches `tandem decision add --title <title> --body <markdown>` without references/tags.",
                     theme.muted_style(),
                 )),
                 Line::from(""),

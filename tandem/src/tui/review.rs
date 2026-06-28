@@ -517,7 +517,7 @@ fn detail_lines(item: &ReviewQueueItem, theme: &TuiTheme) -> Vec<Line<'static>> 
         theme.muted_style(),
     )));
     lines.push(Line::from(Span::styled(
-        "tdm accord accept|rework|block|fail <id>; tdm complete <id> --summary <text>",
+        "tandem accord accept|rework|block|fail <id>; tandem complete <id> --summary <text>",
         theme.text_style(),
     )));
     lines.push(Line::from(Span::styled(

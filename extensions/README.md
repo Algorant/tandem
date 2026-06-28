@@ -2,7 +2,7 @@
 
 This area contains agent/editor integrations for Tandem.
 
-Current scope is intentionally narrow: integrations should adapt existing Tandem control surfaces, especially the installed `tdm` CLI, instead of reimplementing Tandem protocol parsing or mutation behavior.
+Current scope is intentionally narrow: integrations should adapt existing Tandem control surfaces, especially the installed `tandem` CLI, instead of reimplementing Tandem protocol parsing or mutation behavior.
 
 ## Layout
 
@@ -25,12 +25,12 @@ extensions/
 
 ## Current integrations
 
-- `pi-tandem/` — a lightweight Pi extension that exposes `tdm_*` tools and `/tandem` diagnostics over an installed `tdm` CLI.
+- `pi-tandem/` — a lightweight Pi extension that exposes `tandem_*` tools and `/tandem` diagnostics over an installed `tandem` CLI.
 
 ## Adapter principle
 
 ```text
-LLM / editor agent → integration adapter → tdm CLI → .tandem workspace
+LLM / editor agent → integration adapter → tandem CLI → .tandem workspace
 ```
 
 Adapters may own:
@@ -46,7 +46,7 @@ Adapters must not own:
 - Markdown/frontmatter mutation behavior.
 - Alternate task, accord, rule, decision, or log parsers beyond trivial CLI JSON output handling.
 
-Those behaviors belong in `protocol/` and the `tdm` implementation under `tandem-tui/`.
+Those behaviors belong in `protocol/` and the `tandem` implementation under `tandem/`.
 
 ## Testing and promotion
 

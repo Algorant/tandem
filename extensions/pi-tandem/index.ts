@@ -14,8 +14,8 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
-// pi-tandem is intentionally a lightweight adapter over the installed `tdm` CLI.
-// Tandem protocol parsing/mutation behavior belongs in tandem-tui/tdm, not here.
+// pi-tandem is intentionally a lightweight adapter over the installed `tandem` CLI.
+// Tandem protocol parsing/mutation behavior belongs in the tandem CLI, not here.
 
 type ToolContent = { type: "text"; text: string };
 type ToolResult = { content: ToolContent[]; details?: Record<string, unknown>; isError?: boolean };
@@ -107,14 +107,14 @@ export type SearchToolParams = CwdFlag & ReadJsonFlag & {
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-const TDM_BIN_ENV_KEYS = ["TANDEM_TDM_BIN", "TDM_BIN"] as const;
+const TANDEM_BIN_ENV_KEYS = ["TANDEM_BIN"] as const;
 
-function tdmBinary(): string {
-	for (const key of TDM_BIN_ENV_KEYS) {
+function tandemBinary(): string {
+	for (const key of TANDEM_BIN_ENV_KEYS) {
 		const value = process.env[key]?.trim();
 		if (value) return value;
 	}
-	return "tdm";
+	return "tandem";
 }
 
 function normalizeError(err: unknown): string {
@@ -179,12 +179,12 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		return args;
 	}
 	if (action === "show") {
-		const args = ["show", requireString(params.id, "tdm_task show requires id")];
+		const args = ["show", requireString(params.id, "tandem_task show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (action === "add") {
-		const args = ["add", "--title", requireString(params.title, "tdm_task add requires title")];
+		const args = ["add", "--title", requireString(params.title, "tandem_task add requires title")];
 		addOptionalFlag(args, "--state", params.state);
 		addOptionalFlag(args, "--description", params.description);
 		addOptionalFlag(args, "--priority", params.priority);
@@ -199,20 +199,20 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		return args;
 	}
 	if (action === "move") {
-		return ["move", requireString(params.id, "tdm_task move requires id"), "--state", requireString(params.state, "tdm_task move requires state")];
+		return ["move", requireString(params.id, "tandem_task move requires id"), "--state", requireString(params.state, "tandem_task move requires state")];
 	}
 	if (action === "complete") {
-		const args = ["complete", requireString(params.id, "tdm_task complete requires id"), "--summary", requireString(params.summary, "tdm_task complete requires summary")];
+		const args = ["complete", requireString(params.id, "tandem_task complete requires id"), "--summary", requireString(params.summary, "tandem_task complete requires summary")];
 		addRepeatedFlag(args, "--file-changed", params.filesChanged);
 		addOptionalFlag(args, "--validation", params.validation);
 		addOptionalFlag(args, "--reviewer", params.reviewer);
 		return args;
 	}
-	throw new Error(`unsupported tdm_task action: ${String(action)}`);
+	throw new Error(`unsupported tandem_task action: ${String(action)}`);
 }
 
 export function buildAccordArgs(params: AccordToolParams): string[] {
-	const args = ["accord", params.action, requireString(params.id, "tdm_accord requires id")];
+	const args = ["accord", params.action, requireString(params.id, "tandem_accord requires id")];
 	addOptionalFlag(args, "--assignee", params.assignee);
 	addOptionalFlag(args, "--summary", params.summary);
 	addOptionalFlag(args, "--reviewer", params.reviewer);
@@ -229,21 +229,21 @@ export function buildAccordArgs(params: AccordToolParams): string[] {
 export function buildLogArgs(params: LogToolParams): string[] {
 	if (params.action === "list") {
 		const args = ["log", "list"];
-		if (params.limit !== undefined) args.push("--limit", String(requirePositiveInteger(params.limit, "tdm_log list limit must be a positive integer")));
+		if (params.limit !== undefined) args.push("--limit", String(requirePositiveInteger(params.limit, "tandem_log list limit must be a positive integer")));
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "show") {
-		const args = ["log", "show", requireString(params.id, "tdm_log show requires id")];
+		const args = ["log", "show", requireString(params.id, "tandem_log show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "search") {
-		const args = ["log", "search", requireString(params.query, "tdm_log search requires query")];
+		const args = ["log", "search", requireString(params.query, "tandem_log search requires query")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
-	throw new Error(`unsupported tdm_log action: ${String(params.action)}`);
+	throw new Error(`unsupported tandem_log action: ${String(params.action)}`);
 }
 
 export function buildRulesArgs(params: RulesToolParams): string[] {
@@ -254,19 +254,19 @@ export function buildRulesArgs(params: RulesToolParams): string[] {
 		return args;
 	}
 	if (params.action === "add") {
-		const args = ["rules", "add", "--category", requireString(params.category, "tdm_rules add requires category"), "--rule", requireString(params.rule, "tdm_rules add requires rule")];
+		const args = ["rules", "add", "--category", requireString(params.category, "tandem_rules add requires category"), "--rule", requireString(params.rule, "tandem_rules add requires rule")];
 		addOptionalFlag(args, "--source", params.source);
 		return args;
 	}
 	if (params.action === "edit") {
-		const args = ["rules", "edit", "--category", requireString(params.category, "tdm_rules edit requires category"), "--id", String(requirePositiveInteger(params.id, "tdm_rules edit requires a positive id")), "--rule", requireString(params.rule, "tdm_rules edit requires rule")];
+		const args = ["rules", "edit", "--category", requireString(params.category, "tandem_rules edit requires category"), "--id", String(requirePositiveInteger(params.id, "tandem_rules edit requires a positive id")), "--rule", requireString(params.rule, "tandem_rules edit requires rule")];
 		addOptionalFlag(args, "--source", params.source);
 		return args;
 	}
 	if (params.action === "delete") {
-		return ["rules", "delete", "--category", requireString(params.category, "tdm_rules delete requires category"), "--id", String(requirePositiveInteger(params.id, "tdm_rules delete requires a positive id"))];
+		return ["rules", "delete", "--category", requireString(params.category, "tandem_rules delete requires category"), "--id", String(requirePositiveInteger(params.id, "tandem_rules delete requires a positive id"))];
 	}
-	throw new Error(`unsupported tdm_rules action: ${String(params.action)}`);
+	throw new Error(`unsupported tandem_rules action: ${String(params.action)}`);
 }
 
 export function buildDecisionArgs(params: DecisionToolParams): string[] {
@@ -276,22 +276,22 @@ export function buildDecisionArgs(params: DecisionToolParams): string[] {
 		return args;
 	}
 	if (params.action === "show") {
-		const args = ["decision", "show", requireString(params.id, "tdm_decision show requires id")];
+		const args = ["decision", "show", requireString(params.id, "tandem_decision show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "add") {
-		const args = ["decision", "add", "--title", requireString(params.title, "tdm_decision add requires title")];
+		const args = ["decision", "add", "--title", requireString(params.title, "tandem_decision add requires title")];
 		addOptionalFlag(args, "--body", params.body);
 		addRepeatedFlag(args, "--reference", params.references);
 		addRepeatedFlag(args, "--tag", params.tags);
 		return args;
 	}
-	throw new Error(`unsupported tdm_decision action: ${String(params.action)}`);
+	throw new Error(`unsupported tandem_decision action: ${String(params.action)}`);
 }
 
 export function buildSearchArgs(params: SearchToolParams): string[] {
-	const args = ["search", requireString(params.query, "tdm_search requires query")];
+	const args = ["search", requireString(params.query, "tandem_search requires query")];
 	addOptionalFlag(args, "--state", params.state);
 	addOptionalFlag(args, "--type", params.type);
 	if (wantsJson(params)) args.push("--json");
@@ -321,21 +321,21 @@ function parseJsonIfPossible(text: string): unknown | undefined {
 function classifyFailure(result: RunResult): string {
 	const combined = `${result.stderr}\n${result.stdout}\n${result.error ?? ""}`.trim();
 	if (/ENOENT|not found/i.test(result.error ?? "")) {
-		return `Missing tdm CLI: could not execute ${JSON.stringify(result.command)}. Build/install tandem-tui so \`tdm\` is on PATH, or set ${TDM_BIN_ENV_KEYS.join("/")} to the binary path.`;
+		return `Missing tandem CLI: could not execute ${JSON.stringify(result.command)}. Build/install tandem so \`tandem\` is on PATH, or set ${TANDEM_BIN_ENV_KEYS.join("/")} to the binary path.`;
 	}
-	if (/No Tandem workspace found|\.tandem/i.test(combined) && /tdm init/i.test(combined)) {
-		return "Missing Tandem workspace: no .tandem/tandem.md was discovered from this cwd. Run `tdm init --title <title>` only after the user wants a workspace.";
+	if (/No Tandem workspace found|\.tandem/i.test(combined) && /tandem init/i.test(combined)) {
+		return "Missing Tandem workspace: no .tandem/tandem.md was discovered from this cwd. Run `tandem init --title <title>` only after the user wants a workspace.";
 	}
 	if (/unknown .*flag|unknown .*subcommand|unknown command/i.test(combined)) {
-		return "Unsupported tdm CLI surface: the installed `tdm` may be older than pi-tandem expects, or this wrapper passed a flag/subcommand not supported by the current CLI.";
+		return "Unsupported tandem CLI surface: the installed `tandem` may be older than pi-tandem expects, or this wrapper passed a flag/subcommand not supported by the current CLI.";
 	}
-	if (result.timedOut) return "tdm command timed out before it completed.";
-	if (result.aborted) return "tdm command was aborted before it completed.";
-	return "tdm command failed.";
+	if (result.timedOut) return "tandem command timed out before it completed.";
+	if (result.aborted) return "tandem command was aborted before it completed.";
+	return "tandem command failed.";
 }
 
-function runTdm(args: string[], cwd: string, signal?: AbortSignal, timeoutMs?: number): Promise<RunResult> {
-	const command = tdmBinary();
+function runTandem(args: string[], cwd: string, signal?: AbortSignal, timeoutMs?: number): Promise<RunResult> {
+	const command = tandemBinary();
 	return new Promise((resolveRun) => {
 		let settled = false;
 		const child = execFile(command, args, {
@@ -374,7 +374,7 @@ function runTdm(args: string[], cwd: string, signal?: AbortSignal, timeoutMs?: n
 				args,
 				cwd,
 				command,
-				error: "tdm command aborted",
+				error: "tandem command aborted",
 				aborted: true,
 			});
 		};
@@ -389,7 +389,7 @@ async function truncateForTool(text: string): Promise<{ text: string; truncation
 	if (!truncation.truncated) return { text: truncation.content };
 
 	const tempDir = await mkdtemp(join(tmpdir(), "pi-tandem-"));
-	const fullOutputPath = join(tempDir, "tdm-output.txt");
+	const fullOutputPath = join(tempDir, "tandem-output.txt");
 	await writeFile(fullOutputPath, text, "utf8");
 	const suffix = `\n\n[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). Full output saved to: ${fullOutputPath}]`;
 	return { text: `${truncation.content}${suffix}`, truncation, fullOutputPath };
@@ -438,38 +438,38 @@ async function formatRunResult(label: string, result: RunResult): Promise<ToolRe
 	};
 }
 
-async function executeTdmTool(label: string, args: string[], baseCwd: string, params: CwdFlag, signal?: AbortSignal, onUpdate?: (update: ToolResult) => void): Promise<ToolResult> {
+async function executeTandemTool(label: string, args: string[], baseCwd: string, params: CwdFlag, signal?: AbortSignal, onUpdate?: (update: ToolResult) => void): Promise<ToolResult> {
 	const cwd = resolveCwd(baseCwd, params.cwd);
-	onUpdate?.({ content: [{ type: "text", text: `tdm ${args.join(" ")}` }], details: { cwd, args } });
-	const result = await runTdm(args, cwd, signal, params.timeoutMs);
+	onUpdate?.({ content: [{ type: "text", text: `tandem ${args.join(" ")}` }], details: { cwd, args } });
+	const result = await runTandem(args, cwd, signal, params.timeoutMs);
 	return formatRunResult(label, result);
 }
 
 async function buildStatusText(baseCwd: string, params: CwdFlag = {}, signal?: AbortSignal): Promise<ToolResult> {
 	const cwd = resolveCwd(baseCwd, params.cwd);
 	const workspaceRoot = findWorkspaceRoot(cwd);
-	const help = await runTdm(["--help"], cwd, signal, params.timeoutMs);
-	const lines = ["# pi-tandem status", "", `cwd: ${cwd}`, `tdm binary: ${tdmBinary()}`];
+	const help = await runTandem(["--help"], cwd, signal, params.timeoutMs);
+	const lines = ["# pi-tandem status", "", `cwd: ${cwd}`, `tandem binary: ${tandemBinary()}`];
 	lines.push(workspaceRoot ? `workspace: ${workspaceRoot}` : "workspace: not found (.tandem/tandem.md missing from cwd or parents)");
 	if (!help.ok) {
 		const diagnostic = classifyFailure(help);
 		lines.push("", diagnostic);
 		return { content: [{ type: "text", text: lines.join("\n") }], details: { cwd, workspaceRoot, help, diagnostic }, isError: true };
 	}
-	lines.push("tdm: available");
+	lines.push("tandem: available");
 	if (workspaceRoot) {
-		const list = await runTdm(["list", "--json"], cwd, signal, params.timeoutMs);
+		const list = await runTandem(["list", "--json"], cwd, signal, params.timeoutMs);
 		if (list.ok) {
 			const parsed = parseJsonIfPossible(list.stdout) as { data?: { counts?: unknown } } | undefined;
-			lines.push("tdm list --json: ok");
+			lines.push("tandem list --json: ok");
 			if (parsed?.data?.counts) lines.push(`counts: ${JSON.stringify(parsed.data.counts)}`);
 			return { content: [{ type: "text", text: lines.join("\n") }], details: { cwd, workspaceRoot, help, list, parsedJson: parsed } };
 		}
 		const diagnostic = classifyFailure(list);
-		lines.push("", `tdm list --json failed: ${diagnostic}`);
+		lines.push("", `tandem list --json failed: ${diagnostic}`);
 		return { content: [{ type: "text", text: lines.join("\n") }], details: { cwd, workspaceRoot, help, list, diagnostic }, isError: true };
 	}
-	lines.push("hint: run `tdm init --title <title>` only after the user wants this directory to become a Tandem workspace.");
+	lines.push("hint: run `tandem init --title <title>` only after the user wants this directory to become a Tandem workspace.");
 	return { content: [{ type: "text", text: lines.join("\n") }], details: { cwd, workspaceRoot, help } };
 }
 
@@ -479,10 +479,10 @@ const cwdSchema = {
 };
 
 const jsonSchema = {
-	json: Type.Optional(Type.Boolean({ description: "For read actions, request `tdm --json` output. Defaults to true." })),
+	json: Type.Optional(Type.Boolean({ description: "For read actions, request `tandem --json` output. Defaults to true." })),
 };
 
-export const tdmTaskParameters = Type.Object({
+export const tandemTaskParameters = Type.Object({
 	...cwdSchema,
 	...jsonSchema,
 	action: StringEnum(["list", "show", "add", "move", "complete"] as const),
@@ -496,36 +496,36 @@ export const tdmTaskParameters = Type.Object({
 	assignee: Type.Optional(Type.String()),
 	dueDate: Type.Optional(Type.String()),
 	parent: Type.Optional(Type.String({ description: "Existing Tandem document ID to write as parentId for child/supertask hierarchy. Create or inspect the parent first." })),
-	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tdm add fail." })),
+	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tandem add fail." })),
 	references: Type.Optional(Type.Array(Type.String(), { description: "Related Tandem document IDs such as decisions, sibling tasks, or logs. Prefer existing IDs; missing IDs are warnings, not hard blockers." })),
 	relatedFiles: Type.Optional(Type.Array(Type.String(), { description: "Project-relative file paths relevant to the task for implementation or review context." })),
 	subtasks: Type.Optional(Type.Array(Type.String(), { description: "Lightweight checklist item titles. Use child tasks with parent when work needs its own owner, accord, review, or blockers." })),
 	accord: Type.Optional(Type.String()),
 	review: Type.Optional(Type.String()),
 	filesChanged: Type.Optional(Type.Array(Type.String())),
-	summary: Type.Optional(Type.String({ description: "Required for action=complete; maps to `tdm complete --summary`." })),
+	summary: Type.Optional(Type.String({ description: "Required for action=complete; maps to `tandem complete --summary`." })),
 	validation: Type.Optional(Type.String()),
 	reviewer: Type.Optional(Type.String()),
 });
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tdm_status, tdm_task, tdm_accord, tdm_log, tdm_rules, tdm_decision, tdm_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tdm CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- When creating related work, use tdm_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tdm_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tdm_log and tdm_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
-	return /\b(tandem|tdm|durable coordination|task board|accord|work agreement|review queue|project rules|completed logs?)\b/i.test(prompt);
+	return /\b(tandem|tandem|durable coordination|task board|accord|work agreement|review queue|project rules|completed logs?)\b/i.test(prompt);
 }
 
 export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
-		name: "tdm_status",
+		name: "tandem_status",
 		label: "Tandem Status",
-		description: "Diagnose the installed `tdm` CLI and the nearest `.tandem` workspace.",
-		promptSnippet: "Use tdm_status to inspect Tandem/tdm health before durable project coordination or when .tandem diagnostics are needed.",
+		description: "Diagnose the installed `tandem` CLI and the nearest `.tandem` workspace.",
+		promptSnippet: "Use tandem_status to inspect Tandem/tandem health before durable project coordination or when .tandem diagnostics are needed.",
 		promptGuidelines: [
-			"Use tdm_status when entering a Tandem repo, when `.tandem/tandem.md` may exist, or before bootstrapping durable coordination.",
-			"If tdm_status reports no workspace, ask before initializing a new Tandem workspace; do not create `.tandem` state implicitly.",
+			"Use tandem_status when entering a Tandem repo, when `.tandem/tandem.md` may exist, or before bootstrapping durable coordination.",
+			"If tandem_status reports no workspace, ask before initializing a new Tandem workspace; do not create `.tandem` state implicitly.",
 		],
 		parameters: Type.Object({ ...cwdSchema }),
 		async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -534,34 +534,34 @@ export default function piTandem(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
-		name: "tdm_task",
+		name: "tandem_task",
 		label: "Tandem Task",
-		description: "Run task-oriented `tdm` commands: list, show, add, move, or complete. Read actions default to `--json`; mutations preserve human-readable CLI output.",
-		promptSnippet: "Use tdm_task for Tandem task list/show/add/move/complete operations instead of editing .tandem files directly.",
+		description: "Run task-oriented `tandem` commands: list, show, add, move, or complete. Read actions default to `--json`; mutations preserve human-readable CLI output.",
+		promptSnippet: "Use tandem_task for Tandem task list/show/add/move/complete operations instead of editing .tandem files directly.",
 		promptGuidelines: [
-			"Use tdm_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
-			"Prefer tdm_task read actions with the default JSON output for reliable task inspection.",
+			"Use tandem_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
+			"Prefer tandem_task read actions with the default JSON output for reliable task inspection.",
 			"When decomposing work, set relationship fields explicitly: parent for hierarchy, blockers for hard dependencies, references for related tasks/decisions/logs, relatedFiles for repo paths, and subtasks for lightweight checklists.",
-			"Create or inspect parent and blocker documents before referencing them; tdm validates parent/blockers strictly, while references are related context and only warn if unresolved.",
-			"Do not use tdm_task complete unless the user or orchestrator explicitly asks to archive completed work.",
+			"Create or inspect parent and blocker documents before referencing them; tandem validates parent/blockers strictly, while references are related context and only warn if unresolved.",
+			"Do not use tandem_task complete unless the user or orchestrator explicitly asks to archive completed work.",
 		],
-		parameters: tdmTaskParameters,
+		parameters: tandemTaskParameters,
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_task", buildTaskArgs(params as TaskToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_task", buildTaskArgs(params as TaskToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_task argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_task argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
 
 	pi.registerTool({
-		name: "tdm_accord",
+		name: "tandem_accord",
 		label: "Tandem Accord",
-		description: "Run `tdm accord ready|claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
-		promptSnippet: "Use tdm_accord for Tandem work-agreement lifecycle actions (ready, claim, deliver, accept, rework, block, fail).",
+		description: "Run `tandem accord ready|claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
+		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (ready, claim, deliver, accept, rework, block, fail).",
 		promptGuidelines: [
-			"Use tdm_accord for accord state changes instead of direct frontmatter edits.",
+			"Use tandem_accord for accord state changes instead of direct frontmatter edits.",
 			"Do not accept, complete, or otherwise finalize Tandem work unless the user/orchestrator explicitly asks for that lifecycle transition.",
 		],
 		parameters: Type.Object({
@@ -581,20 +581,20 @@ export default function piTandem(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_accord", buildAccordArgs(params as AccordToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_accord", buildAccordArgs(params as AccordToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_accord argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_accord argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
 
 	pi.registerTool({
-		name: "tdm_log",
+		name: "tandem_log",
 		label: "Tandem Logs",
-		description: "Run completed-work log reads: `tdm log list|show|search`. Defaults to JSON output.",
-		promptSnippet: "Use tdm_log for Tandem completed-work history list/show/search.",
+		description: "Run completed-work log reads: `tandem log list|show|search`. Defaults to JSON output.",
+		promptSnippet: "Use tandem_log for Tandem completed-work history list/show/search.",
 		promptGuidelines: [
-			"Use tdm_log for completed Tandem work instead of manually reading `.tandem/logs` unless raw source inspection is required.",
+			"Use tandem_log for completed Tandem work instead of manually reading `.tandem/logs` unless raw source inspection is required.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -606,20 +606,20 @@ export default function piTandem(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_log", buildLogArgs(params as LogToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_log", buildLogArgs(params as LogToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_log argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_log argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
 
 	pi.registerTool({
-		name: "tdm_rules",
+		name: "tandem_rules",
 		label: "Tandem Rules",
-		description: "Run `tdm rules list|add|edit|delete`. List defaults to JSON; mutations preserve human-readable CLI output.",
-		promptSnippet: "Use tdm_rules to inspect or update Tandem project rules through tdm.",
+		description: "Run `tandem rules list|add|edit|delete`. List defaults to JSON; mutations preserve human-readable CLI output.",
+		promptSnippet: "Use tandem_rules to inspect or update Tandem project rules through tandem.",
 		promptGuidelines: [
-			"Use tdm_rules for Tandem project rules rather than editing `.tandem/tandem.md` by hand.",
+			"Use tandem_rules for Tandem project rules rather than editing `.tandem/tandem.md` by hand.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -632,20 +632,20 @@ export default function piTandem(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_rules", buildRulesArgs(params as RulesToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_rules", buildRulesArgs(params as RulesToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_rules argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_rules argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
 
 	pi.registerTool({
-		name: "tdm_decision",
+		name: "tandem_decision",
 		label: "Tandem Decisions",
-		description: "Run `tdm decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output.",
-		promptSnippet: "Use tdm_decision for Tandem decision document list/show/add operations.",
+		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output.",
+		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations.",
 		promptGuidelines: [
-			"Use tdm_decision for first-class Tandem decision documents; do not model decisions as task lifecycle state.",
+			"Use tandem_decision for first-class Tandem decision documents; do not model decisions as task lifecycle state.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -659,20 +659,20 @@ export default function piTandem(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_decision", buildDecisionArgs(params as DecisionToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_decision", buildDecisionArgs(params as DecisionToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_decision argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_decision argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
 
 	pi.registerTool({
-		name: "tdm_search",
+		name: "tandem_search",
 		label: "Tandem Search",
-		description: "Run `tdm search <query>` across active Tandem documents and completed logs. Defaults to JSON output.",
-		promptSnippet: "Use tdm_search for project work search across active Tandem documents and logs.",
+		description: "Run `tandem search <query>` across active Tandem documents and completed logs. Defaults to JSON output.",
+		promptSnippet: "Use tandem_search for project work search across active Tandem documents and logs.",
 		promptGuidelines: [
-			"Use tdm_search before ad hoc file grep when the user asks about Tandem tasks, decisions, accords, rules, reviews, or logs.",
+			"Use tandem_search before ad hoc file grep when the user asks about Tandem tasks, decisions, accords, rules, reviews, or logs.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -683,9 +683,9 @@ export default function piTandem(pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
-				return await executeTdmTool("tdm_search", buildSearchArgs(params as SearchToolParams), ctx.cwd, params, signal, onUpdate);
+				return await executeTandemTool("tandem_search", buildSearchArgs(params as SearchToolParams), ctx.cwd, params, signal, onUpdate);
 			} catch (err) {
-				return { content: [{ type: "text", text: `tdm_search argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+				return { content: [{ type: "text", text: `tandem_search argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
 			}
 		},
 	});
@@ -697,11 +697,11 @@ export default function piTandem(pi: ExtensionAPI) {
 			if (subcommand === "help") {
 				const text = [
 					"pi-tandem commands:",
-					"/tandem status  Diagnose tdm and the nearest .tandem workspace.",
+					"/tandem status  Diagnose tandem and the nearest .tandem workspace.",
 					"/tandem help    Show this help.",
 					"",
-					"LLM-callable tools: tdm_status, tdm_task, tdm_accord, tdm_log, tdm_rules, tdm_decision, tdm_search.",
-					"Adapter rule: these tools call the installed tdm CLI; they do not reimplement Tandem protocol behavior.",
+					"LLM-callable tools: tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search.",
+					"Adapter rule: these tools call the installed tandem CLI; they do not reimplement Tandem protocol behavior.",
 				].join("\n");
 				ctx.ui.setWidget("pi-tandem", text.split("\n"));
 				ctx.ui.notify("pi-tandem help shown", "info");

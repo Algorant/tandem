@@ -2,14 +2,14 @@
 #
 # Use as a user theme:
 #   mkdir -p ~/.config/tandem/themes
-#   cp tandem-tui/examples/themes/verdigris.toml ~/.config/tandem/themes/verdigris.toml
+#   cp tandem/examples/themes/verdigris.toml ~/.config/tandem/themes/verdigris.toml
 #
 # Select from a workspace without copying the full theme:
 #   printf 'theme = "verdigris"\n' > .tandem/theme.toml
 #
 # To evaluate the repository default from the repository root:
-#   cp tandem-tui/examples/themes/verdigris.toml .tandem/theme.toml
-#   cd tandem-tui && cargo run -- tui
+#   cp tandem/examples/themes/verdigris.toml .tandem/theme.toml
+#   cd tandem && cargo run -- tui
 #
 # NO_COLOR=1 or TANDEM_NO_COLOR=1 keeps Tandem in the terminal/no-color fallback.
 base = "verdigris"

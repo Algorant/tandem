@@ -8,9 +8,9 @@ This todo tracks agent/editor integration work under `extensions/`.
 ## Accomplished
 
 - [x] Added `extensions/` as the third major child area for Tandem integrations.
-- [x] Documented the adapter principle: extensions call `tdm`; protocol behavior stays in `protocol/` and `tandem-tui/`.
+- [x] Documented the adapter principle: extensions call `tandem`; protocol behavior stays in `protocol/` and `tandem/`.
 - [x] Created the initial `pi-tandem/` Pi extension scaffold.
-- [x] Implemented a CLI-backed `pi-tandem` MVP with `tdm_*` tools and `/tandem` diagnostics.
+- [x] Implemented a CLI-backed `pi-tandem` MVP with `tandem_*` tools and `/tandem` diagnostics.
 - [x] Added a local smoke test that exercises the wrapper command mappings through a temporary `.tandem` workspace.
 
 ## Current tasks
@@ -28,4 +28,4 @@ This todo tracks agent/editor integration work under `extensions/`.
 ## Open questions
 
 - Should future integrations live under `extensions/<target>/` with the same README/spec/todo standard, or should tiny integrations be allowed as single files after review?
-- Should `tdm` eventually expose structured mutation output so adapters can return richer details without parsing human text?
+- Should `tandem` eventually expose structured mutation output so adapters can return richer details without parsing human text?

@@ -19,11 +19,11 @@ The protocol area owns:
 - local v3 proposal reconciliation from `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`
 - post-v0 schema/fixture definitions only if explicitly useful later
 
-The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem-tui/`.
+The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem/`.
 
 ## Current status
 
-Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or fixtures exist, and schemas/fixtures are not part of v0. Implementation begins in `../tandem-tui/`; protocol docs should change only for implementation feedback, bug fixes, or explicit product decisions.
+Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or fixtures exist, and schemas/fixtures are not part of v0. Implementation begins in `../tandem/`; protocol docs should change only for implementation feedback, bug fixes, or explicit product decisions.
 
 ## Documentation
 
@@ -37,7 +37,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 ## Key current decisions
 
 - Product/protocol name: **Tandem**
-- CLI binary: `tdm`
+- CLI binary: `tandem`
 - Protocol data directory: `.tandem/`
 - Config file: `.tandem/tandem.md`
 - Work agreement object: `accord`

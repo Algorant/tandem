@@ -5,10 +5,10 @@ Last updated: 2026-06-28
 
 ## Accomplished
 
-- [x] Defined `pi-tandem` as a lightweight Pi adapter over installed `tdm`.
-- [x] Added `tdm_status`, `tdm_task`, `tdm_accord`, `tdm_log`, `tdm_rules`, `tdm_decision`, and `tdm_search` tools.
+- [x] Defined `pi-tandem` as a lightweight Pi adapter over installed `tandem`.
+- [x] Added `tandem_status`, `tandem_task`, `tandem_accord`, `tandem_log`, `tandem_rules`, `tandem_decision`, and `tandem_search` tools.
 - [x] Added `/tandem help|status` command.
-- [x] Added diagnostics for missing `tdm`, missing `.tandem`, unsupported CLI surface, timeout/abort, and command failures.
+- [x] Added diagnostics for missing `tandem`, missing `.tandem`, unsupported CLI surface, timeout/abort, and command failures.
 - [x] Added prompt snippets/guidelines and workspace-aware prompt guidance.
 - [x] Added smoke test coverage for CLI-backed wrapper mappings.
 - [x] Added repo read smoke coverage for this workspace's `.tandem` board.
@@ -23,10 +23,10 @@ Last updated: 2026-06-28
 ## Next recommended steps
 
 1. Review the project-local smoke results and decide whether they satisfy task-14.
-2. Decide whether a dedicated `tdm_init`/workspace tool is needed or whether workspace bootstrap should remain a manual CLI action.
+2. Decide whether a dedicated `tandem_init`/workspace tool is needed or whether workspace bootstrap should remain a manual CLI action.
 3. Promote accepted extension code into canonical Pi config in a separate task.
 
 ## Open questions
 
-- Should mutation commands gain JSON output in `tdm`, letting this adapter return structured mutation details without parsing human output?
-- Should Pi UI autocomplete offer task IDs from `tdm list --json`?
+- Should mutation commands gain JSON output in `tandem`, letting this adapter return structured mutation details without parsing human output?
+- Should Pi UI autocomplete offer task IDs from `tandem list --json`?

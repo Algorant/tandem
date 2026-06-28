@@ -3,15 +3,15 @@
 Status: MVP implementation
 Date: 2026-06-28
 
-`pi-tandem` is a Pi extension that adapts an installed `tdm` CLI into Pi tools. It follows the local `pi-web-tools` convention: a small TypeScript adapter over a CLI, not a duplicated implementation of the underlying system.
+`pi-tandem` is a Pi extension that adapts an installed `tandem` CLI into Pi tools. It follows the local `pi-web-tools` convention: a small TypeScript adapter over a CLI, not a duplicated implementation of the underlying system.
 
 ## Goals
 
-- Let Pi agents inspect and mutate Tandem work through first-class `tdm_*` tools.
-- Prefer structured `tdm --json` read paths where available.
+- Let Pi agents inspect and mutate Tandem work through first-class `tandem_*` tools.
+- Prefer structured `tandem --json` read paths where available.
 - Preserve useful human-readable CLI output for mutation paths.
 - Provide clear diagnostics when the CLI or workspace is unavailable or incompatible.
-- Nudge agents toward `tdm_*` tools whenever `.tandem/tandem.md` exists or durable coordination is requested.
+- Nudge agents toward `tandem_*` tools whenever `.tandem/tandem.md` exists or durable coordination is requested.
 
 ## Non-goals
 
@@ -22,11 +22,11 @@ Date: 2026-06-28
 
 ## Command runner
 
-The adapter resolves the `tdm` binary in this order:
+The adapter resolves the `tandem` binary in this order:
 
-1. `TANDEM_TDM_BIN`
-2. `TDM_BIN`
-3. `tdm` on `$PATH`
+1. `TANDEM_BIN`
+2. `TANDEM_BIN`
+3. `tandem` on `$PATH`
 
 It runs commands with `execFile(command, args, { cwd })` and never shell-interpolates user input. Tool parameters are translated into argument arrays only.
 
@@ -34,13 +34,13 @@ It runs commands with `execFile(command, args, { cwd })` and never shell-interpo
 
 Current MVP tools:
 
-- `tdm_status` — `tdm --help`, workspace discovery, and optional `tdm list --json` health check.
-- `tdm_task` — `list`, `show`, `add`, `move`, `complete`.
-- `tdm_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
-- `tdm_log` — `list`, `show`, `search`.
-- `tdm_rules` — `list`, `add`, `edit`, `delete`.
-- `tdm_decision` — `list`, `show`, `add`.
-- `tdm_search` — active/log search.
+- `tandem_status` — `tandem --help`, workspace discovery, and optional `tandem list --json` health check.
+- `tandem_task` — `list`, `show`, `add`, `move`, `complete`.
+- `tandem_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- `tandem_log` — `list`, `show`, `search`.
+- `tandem_rules` — `list`, `add`, `edit`, `delete`.
+- `tandem_decision` — `list`, `show`, `add`.
+- `tandem_search` — active/log search.
 
 Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details.
 
@@ -52,7 +52,7 @@ Read actions default `json: true` and append `--json` only where the current CLI
 
 The adapter classifies:
 
-- missing `tdm` executable;
+- missing `tandem` executable;
 - missing `.tandem/tandem.md` workspace;
 - unsupported flags/subcommands from old or mismatched CLIs;
 - command timeout/abort;
@@ -66,7 +66,7 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
-Guidance emphasizes using `tdm_*` tools rather than direct `.tandem` edits, and warns agents not to accept/complete accord work unless explicitly instructed.
+Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, and warns agents not to accept/complete accord work unless explicitly instructed.
 
 ## Testing
 
@@ -79,16 +79,16 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_TDM_BIN`/`TDM_BIN` is set and the local debug binary is missing, it builds `tandem-tui` first.
+`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_BIN`/`TANDEM_BIN` is set and the local debug binary is missing, it builds `tandem` first.
 
 `pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing `.pi` state: it creates `.pi/extensions/pi-tandem/index.ts`, starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status` against the repo workspace, and cleans up.
 
-`relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tdm`, then verifies persisted `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks` plus search visibility.
+`relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tandem`, then verifies persisted `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks` plus search visibility.
 
 Manual Pi smoke after review:
 
 ```text
-TANDEM_TDM_BIN="$PWD/tandem-tui/target/debug/tdm" pi -e ./extensions/pi-tandem/index.ts
+TANDEM_BIN="$PWD/tandem/target/debug/tandem" pi -e ./extensions/pi-tandem/index.ts
 /tandem status
 ```
 
@@ -97,4 +97,4 @@ TANDEM_TDM_BIN="$PWD/tandem-tui/target/debug/tdm" pi -e ./extensions/pi-tandem/i
 - Add compact custom renderers only if raw text/JSON output is too noisy.
 - Add richer autocomplete or task-id pickers if Pi UI APIs prove useful.
 - Promote to canonical global Pi config in a separate task after local acceptance.
-- Prefer adding structured mutation output to `tdm` before adding parsing to this adapter.
+- Prefer adding structured mutation output to `tandem` before adding parsing to this adapter.

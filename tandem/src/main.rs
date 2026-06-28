@@ -275,21 +275,21 @@ fn run() -> Result<(), CliError> {
 }
 
 fn print_help() {
-    println!("tdm - Tandem CLI");
+    println!("tandem - Tandem CLI");
     println!();
     println!("Usage:");
-    println!("  tdm init --title <title>");
-    println!("  tdm list [--state <state>] [--type <type>] [--json]");
-    println!("  tdm show <id> [--json]");
-    println!("  tdm add --title <title> [--state <state>] [--description <text>]");
-    println!("  tdm move <id> --state <state>");
-    println!("  tdm complete <id> --summary <text>");
-    println!("  tdm search <query> [--state <state>] [--type <type>] [--json]");
-    println!("  tdm log list|show|search ...");
-    println!("  tdm accord ready|claim|deliver|accept|rework|block|fail ...");
-    println!("  tdm rules list|add|edit|delete ...");
-    println!("  tdm decision list|show|add ...");
-    println!("  tdm tui");
+    println!("  tandem init --title <title>");
+    println!("  tandem list [--state <state>] [--type <type>] [--json]");
+    println!("  tandem show <id> [--json]");
+    println!("  tandem add --title <title> [--state <state>] [--description <text>]");
+    println!("  tandem move <id> --state <state>");
+    println!("  tandem complete <id> --summary <text>");
+    println!("  tandem search <query> [--state <state>] [--type <type>] [--json]");
+    println!("  tandem log list|show|search ...");
+    println!("  tandem accord ready|claim|deliver|accept|rework|block|fail ...");
+    println!("  tandem rules list|add|edit|delete ...");
+    println!("  tandem decision list|show|add ...");
+    println!("  tandem tui");
 }
 
 fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
@@ -1158,7 +1158,7 @@ fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
 
 fn cmd_log(args: &[String]) -> Result<(), CliError> {
     let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage("tdm log requires list, show, or search"));
+        return Err(CliError::usage("tandem log requires list, show, or search"));
     };
     match subcommand.as_str() {
         "list" => cmd_log_list(parse_log_list_args(rest)?),
@@ -1221,7 +1221,7 @@ fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
 fn cmd_accord(args: &[String]) -> Result<(), CliError> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::usage(
-            "tdm accord requires ready, claim, deliver, accept, rework, block, or fail",
+            "tandem accord requires ready, claim, deliver, accept, rework, block, or fail",
         ));
     };
     let status = match action.as_str() {
@@ -1284,7 +1284,7 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
 fn cmd_rules(args: &[String]) -> Result<(), CliError> {
     let Some((subcommand, rest)) = args.split_first() else {
         return Err(CliError::usage(
-            "tdm rules requires list, add, edit, or delete",
+            "tandem rules requires list, add, edit, or delete",
         ));
     };
     match subcommand.as_str() {
@@ -1423,7 +1423,9 @@ fn cmd_rules_delete(options: RuleDeleteOptions) -> Result<(), CliError> {
 
 fn cmd_decision(args: &[String]) -> Result<(), CliError> {
     let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage("tdm decision requires list, show, or add"));
+        return Err(CliError::usage(
+            "tandem decision requires list, show, or add",
+        ));
     };
     match subcommand.as_str() {
         "list" => cmd_decision_list(parse_json_only_args(rest, "decision list")?),
@@ -1560,7 +1562,7 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
 fn cmd_tui(args: &[String]) -> Result<(), CliError> {
     if !args.is_empty() {
         return Err(CliError::usage(
-            "tdm tui does not accept options in this implementation slice",
+            "tandem tui does not accept options in this implementation slice",
         ));
     }
 
@@ -1592,7 +1594,7 @@ fn discover_workspace() -> Result<Workspace, CliError> {
     }
 
     Err(CliError::user(
-        "No Tandem workspace found. Run `tdm init --title <title>` first.",
+        "No Tandem workspace found. Run `tandem init --title <title>` first.",
     ))
 }
 
@@ -2156,7 +2158,7 @@ fn validate_accord_transition(action: &str, previous_status: &str) -> Result<(),
             if previous_status == "accepted" && action != "ready" =>
         {
             Err(CliError::user(
-                "accepted accord cannot transition without resetting with `tdm accord ready`".to_string(),
+                "accepted accord cannot transition without resetting with `tandem accord ready`".to_string(),
             ))
         }
         _ => Ok(()),

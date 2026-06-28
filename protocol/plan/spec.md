@@ -8,7 +8,7 @@ This document sketches the Tandem protocol: a Brainfile-inspired file format tha
 
 The protocol is the spec/source of truth for Tandem's local-first project coordination files. It is not an implementation package or crate layout.
 
-Acceptance stamp: the v0 draft is complete enough to implement `tdm init`, `tdm list`, `tdm show`, and subsequent v0 mutations. Future protocol edits should come from implementation feedback or explicit product decisions, not abstract planning churn.
+Acceptance stamp: the v0 draft is complete enough to implement `tandem init`, `tandem list`, `tandem show`, and subsequent v0 mutations. Future protocol edits should come from implementation feedback or explicit product decisions, not abstract planning churn.
 
 ## Baseline inputs
 
@@ -50,12 +50,12 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Repository: `tandem`
 - Protocol data directory: `.tandem/`
 - Protocol config file: `.tandem/tandem.md`
-- CLI binary: `tdm`
-- CLI/TUI work directory in this monorepo: `tandem-tui/`
-- User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
+- CLI binary: `tandem`
+- CLI/TUI work directory in this monorepo: `tandem/`
+- User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 - Work-agreement object replacing Brainfile's `contract` concept: `accord`
 
-`tdm` is intentionally short enough for daily terminal use while still reading as Tandem. `td` is reserved for future/internal tool prefixes unless explicitly revisited.
+`tandem` is intentionally short enough for daily terminal use while still reading as Tandem. `td` is reserved for future/internal tool prefixes unless explicitly revisited.
 
 ## Goals
 
@@ -229,7 +229,7 @@ Workspace config lives in `.tandem/tandem.md` frontmatter.
 | --- | --- | --- | --- |
 | `protocolVersion` | yes | error | Must be `0.1.0` for this v0 draft. |
 | `title` | yes | error | Human-readable workspace title. |
-| `states` | yes | error | Array of workflow states. `tdm init` writes `todo`, `in-progress`, `review`. Duplicate IDs are errors. Missing defaults are warnings if no active task uses them. |
+| `states` | yes | error | Array of workflow states. `tandem init` writes `todo`, `in-progress`, `review`. Duplicate IDs are errors. Missing defaults are warnings if no active task uses them. |
 | `completion` | no | warning | Completion policy hints. V0 warns but does not block when review/accord acceptance is missing. |
 | `types` | no | error if malformed | Defines first-class and custom document type metadata. Custom types are config-only in v0. |
 | `rules` | no | error if malformed | Rule groups `always`, `never`, `prefer`, `context`; each entry is a rule object. |
@@ -793,7 +793,7 @@ Reference checks should build an ID index from both `.tandem/board/` and `.tande
 
 ### Completion-policy validation
 
-Completion-policy findings are warnings in v0. `tdm complete` should warn when review or accord acceptance is missing, then allow completion unless structural errors are present.
+Completion-policy findings are warnings in v0. `tandem complete` should warn when review or accord acceptance is missing, then allow completion unless structural errors are present.
 
 ## Mutation semantics
 
@@ -927,24 +927,24 @@ Tools may build typed projections for querying and validation, but the raw Markd
 
 ## Protocol-facing CLI surface sketch
 
-Using `tdm` as the working CLI binary name:
+Using `tandem` as the working CLI binary name:
 
 ```text
-tdm init
-tdm list
-tdm show <id>
-tdm add --title ... --state todo
-tdm move <id> --state review
-tdm complete <id> --summary ...
-tdm log list|show|search
-tdm search <query>
-tdm accord ready|claim|deliver|accept|rework|block|fail
-tdm rules list|add|edit|delete
-tdm decision list|show|add
-tdm tui
+tandem init
+tandem list
+tandem show <id>
+tandem add --title ... --state todo
+tandem move <id> --state review
+tandem complete <id> --summary ...
+tandem log list|show|search
+tandem search <query>
+tandem accord ready|claim|deliver|accept|rework|block|fail
+tandem rules list|add|edit|delete
+tandem decision list|show|add
+tandem tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem-tui/`.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`.
 
 ## Brainfile design mapping/reference only
 

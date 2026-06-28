@@ -1635,7 +1635,7 @@ impl TuiApp {
     fn draw_tiny(&self, frame: &mut Frame<'_>, area: Rect) {
         let message = Paragraph::new(vec![
             Line::from(Span::styled(
-                "Tandem TUI needs a larger terminal",
+                "Tandem CLI/TUI needs a larger terminal",
                 self.theme
                     .status_style(StatusTone::Warning)
                     .add_modifier(Modifier::BOLD),
@@ -1650,7 +1650,7 @@ impl TuiApp {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" tdm tui ")
+                .title(" tandem tui ")
                 .border_style(self.theme.border_style(true))
                 .style(self.theme.panel_style()),
         )
@@ -2259,7 +2259,7 @@ impl TuiApp {
         frame.render_widget(Clear, popup);
         let help = Paragraph::new(vec![
             Line::from(Span::styled(
-                "Tandem TUI view shell",
+                "Tandem CLI/TUI view shell",
                 self.theme.title_style(),
             )),
             Line::from(""),
@@ -3349,25 +3349,25 @@ fn accord_next_action(status: &str) -> &'static str {
 
 fn accord_cli_hint(id: &str, status: &str) -> String {
     match normalized_accord_status(status).as_str() {
-        "ready" => format!("tdm accord claim {id} --assignee <name>"),
+        "ready" => format!("tandem accord claim {id} --assignee <name>"),
         "claimed" => format!(
-            "tdm accord deliver {id} --summary <text> [--evidence <text>] [--file-changed <path>]"
+            "tandem accord deliver {id} --summary <text> [--evidence <text>] [--file-changed <path>]"
         ),
         "delivered" => format!(
-            "tdm accord accept {id} [--reviewer <name>] [--note <text>] OR tdm accord rework {id} --note <text>"
+            "tandem accord accept {id} [--reviewer <name>] [--note <text>] OR tandem accord rework {id} --note <text>"
         ),
         "accepted" => format!(
-            "tdm complete {id} --summary <text> [--validation <text>] [--reviewer <name>]"
+            "tandem complete {id} --summary <text> [--validation <text>] [--reviewer <name>]"
         ),
-        "rework" => format!("tdm accord deliver {id} --summary <text> [--evidence <text>]"),
+        "rework" => format!("tandem accord deliver {id} --summary <text> [--evidence <text>]"),
         "blocked" => format!(
-            "tdm accord ready {id} [--assignee <name>] OR tdm accord fail {id} --reason <text>"
+            "tandem accord ready {id} [--assignee <name>] OR tandem accord fail {id} --reason <text>"
         ),
-        "failed" => format!("tdm accord ready {id} [--assignee <name>]"),
+        "failed" => format!("tandem accord ready {id} [--assignee <name>]"),
         "missing" | "" => format!(
-            "tdm accord ready {id} [--assignee <name>] [--deliverable <spec>] [--validation <command>]"
+            "tandem accord ready {id} [--assignee <name>] [--deliverable <spec>] [--validation <command>]"
         ),
-        _ => format!("tdm show {id}  # inspect accord metadata before mutating"),
+        _ => format!("tandem show {id}  # inspect accord metadata before mutating"),
     }
 }
 
@@ -4072,7 +4072,7 @@ mod tests {
 
     #[test]
     fn reload_preserves_selected_document_by_id_after_external_state_change() {
-        let root = unique_test_dir("tandem-tui-reload-preserve");
+        let root = unique_test_dir("tandem-reload-preserve");
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Task one", "todo");
         write_task_doc(&workspace, "task-2", "Task two", "review");
@@ -4095,7 +4095,7 @@ mod tests {
 
     #[test]
     fn reload_surfaces_parse_errors_without_panicking() {
-        let root = unique_test_dir("tandem-tui-reload-error");
+        let root = unique_test_dir("tandem-reload-error");
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Task one", "todo");
 
@@ -4119,7 +4119,7 @@ mod tests {
 
     #[test]
     fn idle_hot_reload_detects_external_board_file_changes() {
-        let root = unique_test_dir("tandem-tui-auto-reload");
+        let root = unique_test_dir("tandem-auto-reload");
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Task one", "todo");
 
@@ -4139,7 +4139,7 @@ mod tests {
     fn run_editor_command_smoke_appends_to_document() {
         use std::os::unix::fs::PermissionsExt;
 
-        let root = unique_test_dir("tandem-tui-editor-smoke");
+        let root = unique_test_dir("tandem-editor-smoke");
         fs::create_dir_all(&root).unwrap();
         let script = root.join("editor-smoke.sh");
         let doc = root.join("task-1.md");
@@ -4248,7 +4248,7 @@ mod tests {
                 .contains("Next: Inspect the delivery, then accept it or request rework.")));
         assert!(texts
             .iter()
-            .any(|text| text.contains("CLI hint: tdm accord accept task-1")));
+            .any(|text| text.contains("CLI hint: tandem accord accept task-1")));
         assert!(texts.iter().any(|text| text
             .contains("TUI accord mutations are planned; this Board detail pane is read-only.")));
         assert!(texts.contains(&"Description".to_string()));
