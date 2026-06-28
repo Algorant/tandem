@@ -2,12 +2,11 @@
 id: task-9
 type: task
 title: "Harden TUI runtime interactions and rendering"
-state: "in-progress"
 priority: "medium"
 relatedFiles: ["tandem/src/tui.rs", "tandem/plan/spec.md"]
 tags: ["tui", "keyboard", "mouse", "markdown"]
 createdAt: "2026-06-27T03:59:00Z"
-updatedAt: "2026-06-28T04:46:25Z"
+updatedAt: "2026-06-28T17:30:32Z"
 subtasks:
   - id: task-9-1
     title: "Implement hot reload and safe external edit/error handling"
@@ -30,6 +29,9 @@ accord:
     commands: ["cd tandem && cargo fmt --check", "cd tandem && cargo test", "cd tandem && cargo build"]
   constraints: ["Keep keyboard-first behavior; drag/drop stays out of v0."]
   updatedAt: "2026-06-28T03:32:31Z"
+completedAt: "2026-06-28T17:30:32Z"
+completion:
+  summary: "Rescoped broad TUI runtime tracker: hot reload and Markdown rendering are complete; remaining mouse/action-button and keybinding/help work is split into task-42 and task-43."
 ---
 
 ## Description
