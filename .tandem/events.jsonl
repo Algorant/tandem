@@ -202,13 +202,31 @@
 {"ts":"2026-06-28T17:09:00Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"accord.accepted","id":"task-23","summary":"Accord accept for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"task.completed","id":"task-23","summary":"Accepted Board row visual polish: priority/tag/accord chips, subtle selected row, expanded Tags/Summary/Files/Checklist sections with spacing, and preserved Tab/Enter behavior."}
+{"ts":"2026-06-28T17:26:15Z","event":"accord.claimed","id":"task-36","summary":"Accord claim for task-36"}
+{"ts":"2026-06-28T17:26:18Z","event":"accord.claimed","id":"task-37","summary":"Accord claim for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"accord.delivered","id":"task-37","summary":"Accord deliver for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"task.completed","id":"task-37","summary":"Created the initial docs/ Markdown skeleton as canonical documentation source."}
+{"ts":"2026-06-28T17:27:14Z","event":"accord.claimed","id":"task-38","summary":"Accord claim for task-38"}
+{"ts":"2026-06-28T17:29:31Z","event":"accord.delivered","id":"task-38","summary":"Accord deliver for task-38"}
+{"ts":"2026-06-28T17:29:31Z","event":"task.completed","id":"task-38","summary":"Created minimal site/ Astro Starlight project."}
 {"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-42","summary":"Implement TUI mouse hit-map and action buttons"}
 {"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-43","summary":"Finalize TUI keybinding and help discoverability"}
 {"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-44","summary":"Reuse workflow-state and accord sync in TUI mutations"}
 {"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-45","summary":"Add state/accord divergence warnings and tests"}
+{"ts":"2026-06-28T17:30:14Z","event":"accord.claimed","id":"task-39","summary":"Accord claim for task-39"}
 {"ts":"2026-06-28T17:30:32Z","event":"task.completed","id":"task-9","summary":"Rescoped broad TUI runtime tracker: hot reload and Markdown rendering are complete; remaining mouse/action-button and keybinding/help work is split into task-42 and task-43."}
 {"ts":"2026-06-28T17:30:32Z","event":"task.completed","id":"task-26","summary":"Rescoped broad workflow/accord synchronization tracker: CLI mapping and conservative baseline are captured; remaining TUI mutation reuse and divergence warning/test work is split into task-44 and task-45."}
+{"ts":"2026-06-28T17:30:44Z","event":"accord.delivered","id":"task-39","summary":"Accord deliver for task-39"}
+{"ts":"2026-06-28T17:30:44Z","event":"task.completed","id":"task-39","summary":"Wired docs/ Markdown source into the Astro Starlight site via sync step."}
+{"ts":"2026-06-28T17:30:58Z","event":"accord.claimed","id":"task-40","summary":"Accord claim for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"accord.delivered","id":"task-40","summary":"Accord deliver for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"task.completed","id":"task-40","summary":"Documented docs local preview and build workflow."}
+{"ts":"2026-06-28T17:32:11Z","event":"accord.claimed","id":"task-41","summary":"Accord claim for task-41"}
+{"ts":"2026-06-28T17:32:31Z","event":"accord.delivered","id":"task-41","summary":"Accord deliver for task-41"}
+{"ts":"2026-06-28T17:32:31Z","event":"task.completed","id":"task-41","summary":"Added GitHub Pages deployment workflow for docs site."}
 {"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-25","summary":"Removed the top-level Review pane from TUI navigation/rendering/help/status paths while preserving review metadata and Board Validation state."}
 {"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-30","summary":"Implemented Board Validation flow hints in the TUI for delivered work awaiting accept/rework/complete and kept blocked/failed/rework as cross-cutting signals outside Validation placement."}
 {"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-31","summary":"Refreshed CLI/TUI documentation for Validation as a Board workflow state and removed stale top-level Review pane language from current docs."}
 {"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-32","summary":"Logged accepted pi-tandem Validation guidance after Validation blockers were resolved."}
+{"ts":"2026-06-28T17:34:29Z","event":"accord.delivered","id":"task-36","summary":"Accord deliver for task-36"}
+{"ts":"2026-06-28T17:34:29Z","event":"task.completed","id":"task-36","summary":"Implemented Tandem docs site foundation across docs/, site/, and GitHub Pages workflow."}
