@@ -183,3 +183,22 @@
 {"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-29","summary":"Accord accept for task-29"}
 {"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-29","summary":"Updated CLI defaults and state handling to prefer validation while tolerating legacy review aliases and syncing common accord transitions."}
 {"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-32","summary":"Accord accept for task-32"}
+{"ts":"2026-06-28T16:09:13Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T16:15:40Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:16:37Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:17:06Z","event":"task.created","id":"task-35","summary":"Differentiate research and spike tasks in the TUI"}
+{"ts":"2026-06-28T16:53:06Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T16:55:02Z","event":"accord.delivered","id":"task-24","summary":"Accord deliver for task-24"}
+{"ts":"2026-06-28T16:55:02Z","event":"accord.accepted","id":"task-24","summary":"Accord accept for task-24"}
+{"ts":"2026-06-28T16:55:02Z","event":"task.completed","id":"task-24","summary":"Accepted Tandem docs platform research: Astro Starlight primary, Zensical secondary, with docs/ Markdown source feeding a site/ Astro/Starlight static site for GitHub Pages deployment."}
+{"ts":"2026-06-28T16:55:19Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-36","summary":"Implement Tandem docs site foundation"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-37","summary":"Create docs Markdown skeleton"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-38","summary":"Create Astro Starlight site project"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-39","summary":"Wire docs source into Astro site"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-40","summary":"Document docs local preview and build workflow"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-41","summary":"Add GitHub Pages deployment workflow for docs site"}
+{"ts":"2026-06-28T17:08:22Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T17:09:00Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T17:12:04Z","event":"accord.accepted","id":"task-23","summary":"Accord accept for task-23"}
+{"ts":"2026-06-28T17:12:04Z","event":"task.completed","id":"task-23","summary":"Accepted Board row visual polish: priority/tag/accord chips, subtle selected row, expanded Tags/Summary/Files/Checklist sections with spacing, and preserved Tab/Enter behavior."}

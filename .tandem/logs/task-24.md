@@ -2,12 +2,12 @@
 id: task-24
 type: task
 title: "Research Tandem documentation platform and static site approach"
-state: "in-progress"
 priority: "medium"
-relatedFiles: ["README.md", "plan/spec.md", "protocol/plan/spec.md", "tandem/plan/spec.md", "extensions/plan/spec.md", "plan/docs-platform-research.md"]
+relatedFiles: ["README.md", "plan/spec.md", "protocol/plan/spec.md", "tandem/plan/spec.md", "extensions/plan/spec.md"]
 tags: ["docs", "research", "static-site", "github-pages"]
+references: ["task-35"]
 createdAt: "2026-06-28T03:45:11Z"
-updatedAt: "2026-06-28T04:42:04Z"
+updatedAt: "2026-06-28T16:55:02Z"
 subtasks:
   - id: task-24-1
     title: "Define evaluation criteria for simplicity, aesthetics, Markdown workflow, static output, and repo fit"
@@ -16,7 +16,7 @@ subtasks:
     title: "Compare a focused shortlist without assuming a tool bias"
     completed: false
   - id: task-24-3
-    title: "Recommend one primary platform plus one fallback"
+    title: "Recommend one primary platform plus one secondary option"
     completed: false
   - id: task-24-4
     title: "Propose initial Tandem docs information architecture"
@@ -28,14 +28,24 @@ subtasks:
     title: "Create follow-up implementation tasks if the recommendation is accepted"
     completed: false
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "herd:task24-docs-platform-research"
   claimedAt: "2026-06-28T04:42:04Z"
-  deliverables: ["docs:plan/docs-platform-research.md:recommendation memo comparing candidate documentation/static-site platforms", "proposal:docs information architecture covering project overview, protocol/spec, CLI, TUI, extensions, and usage guides", "deployment:GitHub Pages-compatible static site path with local preview and maintenance workflow", "tasks:follow-up implementation tasks if the recommendation is accepted"]
+  deliveredAt: "2026-06-28T16:55:02Z"
+  deliverables: ["proposal:recommend Astro Starlight as the primary documentation platform and Zensical as the secondary option", "proposal:docs information architecture covering project overview, protocol/spec, CLI, TUI, extensions, and usage guides", "deployment:GitHub Pages-compatible static site path with local preview and maintenance workflow", "tasks:follow-up implementation tasks if the recommendation is accepted"]
   validation:
-    commands: ["test -f plan/docs-platform-research.md"]
+    commands: ["tandem show task-24"]
   constraints: ["Research only; do not implement or add a docs generator in this task unless explicitly redirected.", "Do not assume a preferred ecosystem; evaluate best-fit options against Tandem's workflow.", "Keep recommendations simple, low-maintenance, Markdown-friendly, aesthetic, and compatible with static deployment."]
-  updatedAt: "2026-06-28T04:42:04Z"
+  summary: "Accepted docs platform direction: Astro Starlight primary, Zensical secondary; research findings live on the task rather than a separate memo."
+  evidence: ["Human accepted task-24 recommendation direction and requested implementation scoping."]
+  filesChanged: [".tandem/board/task-24.md"]
+  reviewer: "ivan"
+  note: "Accepted research direction: use docs/ as Markdown source and site/ as Astro/Starlight static-site project; deploy generated static output through GitHub Pages."
+  updatedAt: "2026-06-28T16:55:02Z"
+completedAt: "2026-06-28T16:55:02Z"
+completion:
+  summary: "Accepted Tandem docs platform research: Astro Starlight primary, Zensical secondary, with docs/ Markdown source feeding a site/ Astro/Starlight static site for GitHub Pages deployment."
+  validation: "Research accepted by human review; implementation to be scoped as follow-up work."
 ---
 
 ## Description
@@ -51,13 +61,14 @@ User direction:
 
 Research questions:
 1. Which documentation/static-site paradigm best fits Tandem's workflow and repo shape?
-2. What shortlist of tools should be considered, and why? Include common options such as Docusaurus, VitePress, Astro Starlight, MkDocs Material, mdBook, and any clearly better fit discovered during research.
+2. What shortlist of tools should be considered, and why? Include common options such as Docusaurus, VitePress, Astro Starlight, Zensical, mdBook, and any clearly better fit discovered during research.
 3. What docs information architecture should Tandem use initially?
 4. How should generated/static docs deploy through a simple GitHub Pages-compatible path?
 5. What should be deferred to avoid maintenance burden or premature automation?
 
 Acceptance direction:
-- Recommend one primary platform and one fallback.
-- Include the reasoning, tradeoffs, maintenance workflow, and deploy model.
+- Recommend one primary platform and one secondary option.
+- Current recommendation: Astro Starlight as the primary option; Zensical as the secondary option for a Material-for-MkDocs-compatible path.
+- Include the reasoning, tradeoffs, maintenance workflow, and deploy model directly on this task or in follow-up planning docs; do not require a separate research memo file.
 - Propose an initial docs tree/section structure for Tandem.
 - Produce follow-up implementation tasks if the recommendation is accepted.

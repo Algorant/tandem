@@ -2099,13 +2099,15 @@ impl TuiApp {
         } else {
             let show_doc_type = docs.iter().any(|doc| doc.doc_type() != "task");
             docs.iter()
-                .map(|doc| {
+                .enumerate()
+                .map(|(index, doc)| {
                     list_item_for_doc(
                         doc,
                         &self.theme,
                         content_width,
                         show_doc_type,
                         self.expanded_board_doc_id.as_deref() == Some(doc.id()),
+                        index == self.selected_item,
                     )
                 })
                 .collect::<Vec<_>>()
@@ -2139,7 +2141,7 @@ impl TuiApp {
                 .iter()
                 .map(|doc| {
                     if self.expanded_board_doc_id.as_deref() == Some(doc.id()) {
-                        inline_preview_height(doc)
+                        inline_preview_height(doc, content_width)
                     } else {
                         1
                     }
@@ -3023,6 +3025,7 @@ fn list_item_for_doc(
     content_width: usize,
     show_doc_type: bool,
     expanded: bool,
+    selected: bool,
 ) -> ListItem<'static> {
     ListItem::new(board_item_lines_for_doc(
         doc,
@@ -3030,6 +3033,7 @@ fn list_item_for_doc(
         content_width,
         show_doc_type,
         expanded,
+        selected,
     ))
 }
 
@@ -3039,6 +3043,7 @@ fn board_item_lines_for_doc(
     content_width: usize,
     show_doc_type: bool,
     expanded: bool,
+    selected: bool,
 ) -> Vec<Line<'static>> {
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in the detail pane. Add chips here only when they change the next
@@ -3105,10 +3110,12 @@ fn board_item_lines_for_doc(
     if chip_width > 0 || doc_type_width > 0 {
         title_spans.push(Span::raw(" "));
     }
-    title_spans.push(Span::styled(
-        title,
-        theme.text_style().add_modifier(Modifier::BOLD),
-    ));
+    let title_style = if selected {
+        theme.board_selected_title_style()
+    } else {
+        theme.text_style().add_modifier(Modifier::BOLD)
+    };
+    title_spans.push(Span::styled(title, title_style));
     title_spans.push(Span::raw(" ".repeat(spacer_width)));
     title_spans.push(Span::styled(doc.id().to_string(), theme.muted_style()));
 
@@ -3149,18 +3156,11 @@ fn status_chip(status: &str) -> String {
 }
 
 fn chip_text(label: &str) -> String {
-    format!(" {label} ")
+    format!(" {label:<4} ")
 }
 
-fn inline_preview_height(doc: &Document) -> u16 {
-    let mut height = 2;
-    if doc.field("tags").is_some() {
-        height += 1;
-    }
-    if doc.field("relatedFiles").is_some() {
-        height += 1;
-    }
-    height
+fn inline_preview_height(doc: &Document, content_width: usize) -> u16 {
+    inline_preview_lines_for_doc(doc, &TuiTheme::default_dark(), content_width).len() as u16
 }
 
 fn inline_preview_lines_for_doc(
@@ -3168,20 +3168,82 @@ fn inline_preview_lines_for_doc(
     theme: &TuiTheme,
     content_width: usize,
 ) -> Vec<Line<'static>> {
+    const INLINE_PREVIEW_MAX_LINES: usize = 25;
+
+    let files = doc
+        .field("relatedFiles")
+        .map(|files| format_inline_list(files, ""))
+        .unwrap_or_default();
+    let subtasks = board_subtasks(doc);
+    let checklist_progress = subtask_progress(doc);
+
+    let has_tags = doc.field("tags").is_some();
+    let mut fixed_lines = 1; // footer
+    if has_tags {
+        fixed_lines += 1;
+    }
+    if !files.is_empty() {
+        fixed_lines += 1 + files.len();
+    }
+    if !subtasks.is_empty() {
+        fixed_lines += 1 + subtasks.len();
+    }
+    let separator_lines = usize::from(has_tags) // Tags → Summary
+        + usize::from(!files.is_empty()) // Summary → Files
+        + usize::from(!subtasks.is_empty()) // Files/Summary → Checklist
+        + 1; // content → footer
+    let summary_capacity = INLINE_PREVIEW_MAX_LINES
+        .saturating_sub(fixed_lines + separator_lines + 1)
+        .max(3);
+
     let mut lines = Vec::new();
     if let Some(tags) = doc.field("tags") {
-        lines.push(inline_preview_field("tags", tags, theme, content_width));
+        let tags = format_hash_list(tags);
+        lines.extend(inline_preview_key_value(
+            "Tags",
+            &tags,
+            theme,
+            content_width,
+        ));
+        lines.push(Line::from(""));
     }
-    let excerpt = body_excerpt(&doc.body, content_width.saturating_sub(10).max(24));
-    lines.push(inline_preview_field(
-        "summary",
-        &excerpt,
+
+    lines.push(inline_preview_heading("Summary", theme));
+    lines.extend(inline_preview_paragraph(
+        &body_summary(&doc.body),
         theme,
         content_width,
+        summary_capacity,
     ));
-    if let Some(files) = doc.field("relatedFiles") {
-        lines.push(inline_preview_field("files", files, theme, content_width));
+
+    if !files.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(inline_preview_heading("Files", theme));
+        for file in files {
+            lines.push(Line::from(vec![
+                Span::styled("   • ", theme.muted_style()),
+                Span::styled(file, theme.text_style()),
+            ]));
+        }
     }
+
+    if !subtasks.is_empty() {
+        lines.push(Line::from(""));
+        let (completed, total) = checklist_progress.unwrap_or((0, subtasks.len()));
+        lines.push(inline_preview_heading(
+            &format!("Checklist {completed}/{total}"),
+            theme,
+        ));
+        for subtask in subtasks {
+            let marker = if subtask.completed { "[x]" } else { "[ ]" };
+            lines.push(Line::from(vec![
+                Span::styled(format!("   {marker} "), theme.muted_style()),
+                Span::styled(subtask.title, theme.text_style()),
+            ]));
+        }
+    }
+
+    lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "   Enter collapse · Tab detail pane · e edit",
         theme.muted_style(),
@@ -3189,31 +3251,140 @@ fn inline_preview_lines_for_doc(
     lines
 }
 
-fn inline_preview_field(
+fn inline_preview_heading(label: &str, theme: &TuiTheme) -> Line<'static> {
+    Line::from(Span::styled(format!("   {label}"), theme.label_style()))
+}
+
+fn inline_preview_key_value(
     label: &str,
     value: &str,
     theme: &TuiTheme,
     content_width: usize,
-) -> Line<'static> {
+) -> Vec<Line<'static>> {
     let prefix = format!("   {label}: ");
-    let value_width = content_width.saturating_sub(text_width(&prefix)).max(8);
-    Line::from(vec![
-        Span::styled(prefix, theme.label_style()),
-        Span::styled(truncate(value, value_width), theme.muted_style()),
-    ])
+    let value_width = content_width.saturating_sub(text_width(&prefix)).max(12);
+    let wrapped = wrap_words(value, value_width);
+    wrapped
+        .into_iter()
+        .enumerate()
+        .map(|(index, chunk)| {
+            if index == 0 {
+                Line::from(vec![
+                    Span::styled(prefix.clone(), theme.label_style()),
+                    Span::styled(chunk, theme.text_style()),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::raw(" ".repeat(text_width(&prefix))),
+                    Span::styled(chunk, theme.text_style()),
+                ])
+            }
+        })
+        .collect()
 }
 
-fn body_excerpt(body: &str, width: usize) -> String {
-    let mut text = body
+fn inline_preview_paragraph(
+    value: &str,
+    theme: &TuiTheme,
+    content_width: usize,
+    max_lines: usize,
+) -> Vec<Line<'static>> {
+    let indent = "   ";
+    let value_width = content_width.saturating_sub(text_width(indent)).max(24);
+    let mut wrapped = wrap_words(value, value_width);
+    if wrapped.len() > max_lines {
+        wrapped.truncate(max_lines);
+        if let Some(last) = wrapped.last_mut() {
+            *last = truncate(last, value_width.saturating_sub(1).max(8));
+        }
+    }
+    wrapped
+        .into_iter()
+        .map(|chunk| {
+            Line::from(vec![
+                Span::raw(indent),
+                Span::styled(chunk, theme.text_style()),
+            ])
+        })
+        .collect()
+}
+
+fn format_hash_list(value: &str) -> String {
+    format_inline_list(value, "#").join(" ")
+}
+
+fn format_inline_list(value: &str, prefix: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    let values = if trimmed.starts_with('[') && trimmed.ends_with(']') {
+        trimmed
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .map(clean_inline_list_item)
+            .filter(|item| !item.is_empty())
+            .collect::<Vec<_>>()
+    } else {
+        trimmed
+            .split(',')
+            .map(clean_inline_list_item)
+            .filter(|item| !item.is_empty())
+            .collect::<Vec<_>>()
+    };
+
+    if values.is_empty() {
+        vec![trimmed.to_string()]
+    } else {
+        values
+            .into_iter()
+            .map(|item| format!("{prefix}{item}"))
+            .collect()
+    }
+}
+
+fn clean_inline_list_item(value: &str) -> String {
+    value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim()
+        .to_string()
+}
+
+fn wrap_words(value: &str, width: usize) -> Vec<String> {
+    let width = width.max(12);
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in value.split_whitespace() {
+        let separator = usize::from(!current.is_empty());
+        if !current.is_empty() && text_width(&current) + separator + text_width(word) > width {
+            lines.push(current);
+            current = String::new();
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+    if current.is_empty() {
+        lines.push(String::new());
+    } else {
+        lines.push(current);
+    }
+    lines
+}
+
+fn body_summary(body: &str) -> String {
+    let text = body
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .collect::<Vec<_>>()
         .join(" ");
     if text.is_empty() {
-        text = "(no body text)".to_string();
+        "(no body text)".to_string()
+    } else {
+        text
     }
-    truncate(&text, width)
 }
 
 fn board_should_surface_accord_status(status: &str) -> bool {
@@ -3234,20 +3405,48 @@ fn board_should_surface_review_status(status: &str) -> bool {
     )
 }
 
-fn subtask_progress(doc: &Document) -> Option<(usize, usize)> {
-    let mut completed = 0;
-    let mut total = 0;
+#[derive(Debug, Clone)]
+struct BoardSubtask {
+    title: String,
+    completed: bool,
+}
+
+fn board_subtasks(doc: &Document) -> Vec<BoardSubtask> {
+    let mut by_index: BTreeMap<usize, BoardSubtask> = BTreeMap::new();
     for (key, value) in &doc.fields {
-        if key.starts_with("subtasks.") && key.ends_with(".completed") {
-            total += 1;
-            if matches!(
-                value.trim().to_ascii_lowercase().as_str(),
-                "true" | "yes" | "done" | "1"
-            ) {
-                completed += 1;
-            }
+        let Some(rest) = key.strip_prefix("subtasks.") else {
+            continue;
+        };
+        let Some((index, field)) = rest.split_once('.') else {
+            continue;
+        };
+        let Ok(index) = index.parse::<usize>() else {
+            continue;
+        };
+        let entry = by_index.entry(index).or_insert_with(|| BoardSubtask {
+            title: format!("subtask {}", index + 1),
+            completed: false,
+        });
+        match field {
+            "title" => entry.title = value.to_string(),
+            "completed" => entry.completed = is_completed_value(value),
+            _ => {}
         }
     }
+    by_index.into_values().collect()
+}
+
+fn is_completed_value(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "true" | "yes" | "done" | "1"
+    )
+}
+
+fn subtask_progress(doc: &Document) -> Option<(usize, usize)> {
+    let subtasks = board_subtasks(doc);
+    let total = subtasks.len();
+    let completed = subtasks.iter().filter(|subtask| subtask.completed).count();
     (total > 0).then_some((completed, total))
 }
 
@@ -3836,7 +4035,7 @@ mod tests {
         doc.fields
             .insert("accord.status".to_string(), "ready".to_string());
 
-        let lines = board_item_lines_for_doc(&doc, &theme, 120, false, false);
+        let lines = board_item_lines_for_doc(&doc, &theme, 120, false, false, false);
         let title = line_text(&lines[0]);
 
         assert_eq!(lines.len(), 1);
@@ -3860,14 +4059,25 @@ mod tests {
             .insert("tags".to_string(), "[\"tui\", \"board\"]".to_string());
         doc.fields.insert(
             "relatedFiles".to_string(),
-            "[\"tandem/src/tui.rs\"]".to_string(),
+            "[\"tandem/src/tui.rs\", \"tandem/src/tui/theme.rs\"]".to_string(),
         );
-        doc.body =
-            "## Description\n\nUse one large Board pane by default and keep metadata inline."
-                .to_string();
+        doc.fields.insert(
+            "subtasks.0.title".to_string(),
+            "Keep tags clean".to_string(),
+        );
+        doc.fields
+            .insert("subtasks.0.completed".to_string(), "true".to_string());
+        doc.fields.insert(
+            "subtasks.1.title".to_string(),
+            "Add checklist preview".to_string(),
+        );
+        doc.fields
+            .insert("subtasks.1.completed".to_string(), "false".to_string());
+        doc.body = "## Description\n\nUse one large Board pane by default and keep metadata inline. This expanded row should read as a paragraph instead of a terse metadata dump."
+            .to_string();
 
-        let collapsed = board_item_lines_for_doc(&doc, &theme, 96, false, false);
-        let expanded = board_item_lines_for_doc(&doc, &theme, 96, false, true);
+        let collapsed = board_item_lines_for_doc(&doc, &theme, 96, false, false, false);
+        let expanded = board_item_lines_for_doc(&doc, &theme, 96, false, true, false);
         let expanded_text = expanded
             .iter()
             .map(line_text)
@@ -3876,9 +4086,17 @@ mod tests {
 
         assert_eq!(collapsed.len(), 1);
         assert!(expanded.len() > collapsed.len());
-        assert!(expanded_text.contains("tags:"));
-        assert!(expanded_text.contains("summary:"));
-        assert!(expanded_text.contains("files:"));
+        assert!(expanded_text.contains("Tags: #tui #board"));
+        assert!(!expanded_text.contains("[\"tui\""));
+        assert!(expanded_text.contains("Summary"));
+        assert!(expanded_text.contains("This expanded row should read"));
+        assert!(expanded_text.contains("paragraph instead of a terse metadata dump"));
+        assert!(expanded_text.contains("Files"));
+        assert!(expanded_text.contains("• tandem/src/tui.rs"));
+        assert!(expanded_text.contains("• tandem/src/tui/theme.rs"));
+        assert!(expanded_text.contains("Checklist 1/2"));
+        assert!(expanded_text.contains("[x] Keep tags clean"));
+        assert!(expanded_text.contains("[ ] Add checklist preview"));
         assert!(!expanded_text.contains("updatedAt"));
     }
 
@@ -3892,9 +4110,10 @@ mod tests {
             .insert("priority".to_string(), "low".to_string());
 
         let default_context =
-            line_text(&board_item_lines_for_doc(&task, &theme, 96, false, false)[0]);
-        let mixed_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, true, false)[0]);
-        assert!(default_context.contains(" LOW  Default work"));
+            line_text(&board_item_lines_for_doc(&task, &theme, 96, false, false, false)[0]);
+        let mixed_context =
+            line_text(&board_item_lines_for_doc(&task, &theme, 96, true, false, false)[0]);
+        assert!(default_context.contains(" LOW   Default work"));
         assert!(!default_context.contains("task Default work"));
         assert!(mixed_context.contains("task"));
         assert!(mixed_context.contains(" LOW "));
@@ -3911,7 +4130,7 @@ mod tests {
             .fields
             .insert("title".to_string(), "Choose layout".to_string());
         let non_default =
-            line_text(&board_item_lines_for_doc(&decision, &theme, 96, false, false)[0]);
+            line_text(&board_item_lines_for_doc(&decision, &theme, 96, false, false, false)[0]);
         assert!(non_default.contains("decision"));
         assert!(non_default.contains(" LOW "));
         assert!(non_default.contains("Choose layout"));

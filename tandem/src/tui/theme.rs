@@ -356,9 +356,13 @@ impl TuiTheme {
 
     pub(super) fn board_selected_style(&self) -> Style {
         if self.no_color {
-            return Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
+            return Style::default().add_modifier(Modifier::BOLD);
         }
-        Style::default().bg(self.colors.selected_bg)
+        Style::default()
+    }
+
+    pub(super) fn board_selected_title_style(&self) -> Style {
+        self.style(self.colors.accent, Some(self.colors.panel), Modifier::BOLD)
     }
 
     pub(super) fn board_doc_type_style(&self) -> Style {
@@ -968,9 +972,10 @@ mod tests {
         assert_eq!(theme.priority.medium, Color::Rgb(96, 165, 250));
         assert_eq!(theme.priority.high, Color::Rgb(248, 113, 113));
         assert_eq!(theme.board_selected_style().fg, None);
+        assert_eq!(theme.board_selected_style().bg, None);
         assert_eq!(
-            theme.board_selected_style().bg,
-            Some(theme.colors.selected_bg)
+            theme.board_selected_title_style().fg,
+            Some(theme.colors.accent)
         );
     }
 
