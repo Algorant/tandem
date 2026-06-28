@@ -482,6 +482,32 @@ const jsonSchema = {
 	json: Type.Optional(Type.Boolean({ description: "For read actions, request `tdm --json` output. Defaults to true." })),
 };
 
+export const tdmTaskParameters = Type.Object({
+	...cwdSchema,
+	...jsonSchema,
+	action: StringEnum(["list", "show", "add", "move", "complete"] as const),
+	id: Type.Optional(Type.String()),
+	title: Type.Optional(Type.String()),
+	state: Type.Optional(Type.String()),
+	type: Type.Optional(Type.String({ description: "Filter document type for list, usually task or decision." })),
+	description: Type.Optional(Type.String()),
+	priority: Type.Optional(Type.String()),
+	tags: Type.Optional(Type.Array(Type.String())),
+	assignee: Type.Optional(Type.String()),
+	dueDate: Type.Optional(Type.String()),
+	parent: Type.Optional(Type.String()),
+	blockers: Type.Optional(Type.Array(Type.String())),
+	references: Type.Optional(Type.Array(Type.String())),
+	relatedFiles: Type.Optional(Type.Array(Type.String())),
+	subtasks: Type.Optional(Type.Array(Type.String())),
+	accord: Type.Optional(Type.String()),
+	review: Type.Optional(Type.String()),
+	filesChanged: Type.Optional(Type.Array(Type.String())),
+	summary: Type.Optional(Type.String({ description: "Required for action=complete; maps to `tdm complete --summary`." })),
+	validation: Type.Optional(Type.String()),
+	reviewer: Type.Optional(Type.String()),
+});
+
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
 	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tdm_status, tdm_task, tdm_accord, tdm_log, tdm_rules, tdm_decision, tdm_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tdm CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use tdm_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tdm_log and tdm_search for completed-work history instead of treating logs as trash/archive only.\n`;
@@ -517,30 +543,7 @@ export default function piTandem(pi: ExtensionAPI) {
 			"Prefer tdm_task read actions with the default JSON output for reliable task inspection.",
 			"Do not use tdm_task complete unless the user or orchestrator explicitly asks to archive completed work.",
 		],
-		parameters: Type.Object({
-			...cwdSchema,
-			...jsonSchema,
-			action: StringEnum(["list", "show", "add", "move", "complete"] as const),
-			id: Type.Optional(Type.String()),
-			title: Type.Optional(Type.String()),
-			state: Type.Optional(Type.String()),
-			type: Type.Optional(Type.String({ description: "Filter document type for list, usually task or decision." })),
-			description: Type.Optional(Type.String()),
-			priority: Type.Optional(Type.String()),
-			tags: Type.Optional(Type.Array(Type.String())),
-			assignee: Type.Optional(Type.String()),
-			dueDate: Type.Optional(Type.String()),
-			parent: Type.Optional(Type.String()),
-			blockers: Type.Optional(Type.Array(Type.String())),
-			references: Type.Optional(Type.Array(Type.String())),
-			relatedFiles: Type.Optional(Type.Array(Type.String())),
-			subtasks: Type.Optional(Type.Array(Type.String())),
-			accord: Type.Optional(Type.String()),
-			review: Type.Optional(Type.String()),
-			filesChanged: Type.Optional(Type.Array(Type.String())),
-			validation: Type.Optional(Type.String()),
-			reviewer: Type.Optional(Type.String()),
-		}),
+		parameters: tdmTaskParameters,
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
 				return await executeTdmTool("tdm_task", buildTaskArgs(params as TaskToolParams), ctx.cwd, params, signal, onUpdate);

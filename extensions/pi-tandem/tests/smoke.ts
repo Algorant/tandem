@@ -10,6 +10,7 @@ import {
 	buildRulesArgs,
 	buildSearchArgs,
 	buildTaskArgs,
+	tdmTaskParameters,
 } from "../index";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,13 @@ function parseId(output: string): string {
 	assert(match, `could not parse ID from output:\n${output}`);
 	return match[1];
 }
+
+const taskSchemaProperties = (tdmTaskParameters as any).properties ?? {};
+assert(taskSchemaProperties.summary, "tdm_task schema should expose summary for complete actions");
+
+const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
+assert(completeArgs.includes("--summary"), "tdm_task complete builder should pass --summary");
+assert(completeArgs.includes("Schema smoke"), "tdm_task complete builder should include summary value");
 
 const tdm = await ensureTdm();
 const workspace = await mkdtemp(join(tmpdir(), "pi-tandem-smoke-"));
