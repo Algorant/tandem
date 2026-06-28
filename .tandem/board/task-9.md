@@ -5,9 +5,9 @@ title: "Harden TUI runtime interactions and rendering"
 state: todo
 priority: "medium"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
-tags: ["tui", "polish", "mouse", "markdown", "mvp"]
+tags: ["tui", "keyboard", "mouse", "markdown"]
 createdAt: "2026-06-27T03:59:00Z"
-updatedAt: "2026-06-27T03:59:00Z"
+updatedAt: "2026-06-28T02:22:39Z"
 subtasks:
   - id: task-9-1
     title: "Finalize fixed v0 keybinding table"

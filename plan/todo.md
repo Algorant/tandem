@@ -43,6 +43,15 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [ ] Track any remaining open naming/vocabulary decisions after detailed spec updates.
 - [ ] Test `pi-tandem` as a project-local Pi extension before any global Pi config promotion.
 
+## Task tag convention
+
+Use task tags as lightweight delegation/filter hints, not as protocol schema.
+
+- Put one primary area tag first: `protocol`, `tui`, `pi-tandem`, `docs`, `config`, `rules`, or `ui`.
+- Add only a few capability/workflow tags when they help filtering, such as `accord`, `review`, `logs`, `editor`, `relationships`, `delegation`, `taxonomy`, `smoke`, or `validation`.
+- Concrete TUI facet tags like `theme`, `keyboard`, `mouse`, and `markdown` are fine when they route work better than a broad `tui` tag alone.
+- Keep tags lowercase/kebab-case and avoid meta tags like `mvp` or `polish` unless they materially help delegation.
+
 ## Next recommended steps
 
 1. Add safe Review action buttons/mutations, likely accord accept/rework and completion/archive prompts.

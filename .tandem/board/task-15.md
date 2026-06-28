@@ -4,9 +4,9 @@ type: task
 title: "Promote pi-tandem to canonical Pi config"
 state: todo
 priority: "low"
-tags: ["pi-extension", "pi-tandem"]
+tags: ["pi-tandem", "config"]
 createdAt: "2026-06-27T23:30:05Z"
-updatedAt: "2026-06-27T23:30:05Z"
+updatedAt: "2026-06-28T02:22:39Z"
 accord:
   status: "ready"
   deliverables: ["config:/home/ivan/.dotfiles/pi/.pi/agent/extensions/pi-tandem:global extension copy", "config:/home/ivan/.dotfiles/pi/.pi/agent/config-manifest.json:manifest entries"]
