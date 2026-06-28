@@ -73,16 +73,19 @@ Guidance emphasizes using `tdm_*` tools rather than direct `.tandem` edits, and 
 Static/smoke commands:
 
 ```text
-bun --check extensions/pi-tandem/index.ts
+bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/smoke.ts
+bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 ```
 
-The smoke test creates a temporary Tandem workspace and exercises the wrapper argument builders against the real `tdm` CLI. If no `TANDEM_TDM_BIN`/`TDM_BIN` is set and the local debug binary is missing, it builds `tandem-tui` first.
+`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_TDM_BIN`/`TDM_BIN` is set and the local debug binary is missing, it builds `tandem-tui` first.
+
+`pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing `.pi` state: it creates `.pi/extensions/pi-tandem/index.ts`, starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status` against the repo workspace, and cleans up.
 
 Manual Pi smoke after review:
 
 ```text
-pi -e extensions/pi-tandem/index.ts
+TANDEM_TDM_BIN="$PWD/tandem-tui/target/debug/tdm" pi -e ./extensions/pi-tandem/index.ts
 /tandem status
 ```
 
