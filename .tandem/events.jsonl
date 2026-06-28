@@ -150,3 +150,8 @@
 {"ts":"2026-06-28T04:49:08Z","event":"accord.ready","id":"task-26","summary":"Accord ready for task-26"}
 {"ts":"2026-06-28T05:05:18Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
 {"ts":"2026-06-28T05:05:18Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T12:51:19Z","event":"task.created","id":"task-27","summary":"Create first Tandem CLI/TUI release"}
+{"ts":"2026-06-28T12:51:19Z","event":"accord.ready","id":"task-27","summary":"Accord ready for task-27"}
+{"ts":"2026-06-28T12:51:19Z","event":"task.updated","id":"task-15","summary":"Marked task-15 blocked by task-27 CLI/TUI release."}
+{"ts":"2026-06-28T12:57:29Z","event":"accord.claimed","id":"task-27","summary":"Accord claim for task-27"}
+{"ts":"2026-06-28T12:57:29Z","event":"task.moved","id":"task-27","summary":"Moved task-27 from todo to in-progress"}
