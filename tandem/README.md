@@ -45,12 +45,12 @@ Use `cargo run -- <command>` during early development. The package binary name i
 
 ## Release and install target
 
-Current release recommendation: `tandem` package version `0.1.0`, `tandem` binary, annotated git tag `tandem-v0.1.0`.
+Current release recommendation: `tandem` package version `0.2.0`, `tandem` binary, annotated git tag `tandem-v0.2.0`.
 
 After that tag is approved and pushed, downstream integrations such as `pi-tandem` should install the CLI with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.1.0 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.0 --path tandem --locked
 ```
 
 For local checkout installs before a tag is published:
@@ -133,7 +133,7 @@ In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`
 - CLI design and the current known CLI v0 implementation came before TUI implementation; future CLI work should be explicit new features or bug fixes.
 - V0 TUI invocation: `tandem tui` only.
 - TUI implementation target: Rust + Ratatui with crossterm terminal events/backend.
-- `tandem tui` currently has top-level Board, Logs, Rules, and Decisions tabs. `1`..`5` are the keyboard view switchers, mouse tab clicks switch views explicitly, and local navigation keys stay inside the active view. Board has state subview tabs with counts, a full-width selected-state list with richer rows, `a` quick-add, `H`/`L` moves for the selected task, and `e` opens the selected active task document in `$EDITOR`; Review can also open its selected active task with `e`. Logs lists completed work by recency, supports local list/detail browsing, filters with `/` then Enter/Esc, and remains read-only for editor-open behavior. Rules lists grouped categories and supports add/edit/delete prompts in `src/tui/rules.rs`; Tab has no top-level fallback there. Decisions lists active decisions, supports list/body focus, shows selected metadata/body/path, and supports a basic title/body add prompt in `src/tui/decisions.rs`; `$EDITOR` editing for decisions/custom documents is deferred. Built-in `default-dark` and `verdigris` presets apply by default/selection, user themes are discovered from `~/.config/tandem/themes/*.toml` or `$XDG_CONFIG_HOME/tandem/themes/*.toml`, `.tandem/theme.toml` can select a built-in or user theme, and documented color keys can override the selected palette.
+- `tandem tui` currently has top-level Board, Logs, Rules, and Decisions tabs. `1`..`4` are the keyboard view switchers, mouse tab clicks switch views explicitly, and local navigation keys stay inside the active view. Board has state subview tabs with counts, a full-width selected-state list with richer rows, `a` quick-add, `H`/`L` moves for the selected task, and `e` opens the selected active task document in `$EDITOR`. Logs lists completed work by recency, supports local list/detail browsing, filters with `/` then Enter/Esc, and remains read-only for editor-open behavior. Rules lists grouped categories and supports add/edit/delete prompts in `src/tui/rules.rs`; Tab has no top-level fallback there. Decisions lists active decisions, supports list/body focus, shows selected metadata/body/path, and supports a basic title/body add prompt in `src/tui/decisions.rs`; `$EDITOR` editing for decisions/custom documents is deferred. Built-in `default-dark` and `verdigris` presets apply by default/selection, user themes are discovered from `~/.config/tandem/themes/*.toml` or `$XDG_CONFIG_HOME/tandem/themes/*.toml`, `.tandem/theme.toml` can select a built-in or user theme, and documented color keys can override the selected palette.
 - Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
 - Do not assume a persistent `done` column.
 - Make review, accord status, validation, and logs prominent.

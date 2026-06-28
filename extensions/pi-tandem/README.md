@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- `tandem` installed on `$PATH`, or `TANDEM_BIN`/`TANDEM_BIN` set to the binary path.
+- `tandem` installed on `$PATH`, or `TANDEM_BIN` set to the binary path.
 - A Tandem workspace (`.tandem/tandem.md`) for normal task/log/rule/decision operations.
 - Pi extension runtime dependencies supplied by Pi (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `typebox`).
 

@@ -1,34 +1,38 @@
 # Tandem CLI/TUI release notes
 
-## v0.1.0 (recommended tag: `tandem-v0.1.0`)
+## v0.2.0 (recommended tag: `tandem-v0.2.0`)
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
-This is the first installable Tandem CLI/TUI release target. It is intended to unblock downstream integrations, including `pi-tandem`, with a stable `tandem` binary rather than an unreleased workspace build.
+This release is intended to support global `pi-tandem` testing against a tagged `tandem` CLI. It includes the renamed `tandem` binary, Validation workflow updates, Board/TUI polish, task/log reconciliation, and the initial docs-site foundation.
 
 ### Current capabilities
 
 - CLI commands: `init`, `list`, `show`, `add`, `move`, `complete`, `search`, `log list|show|search`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, and `tui`.
 - JSON read paths for supported read commands using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
 - Markdown/YAML-frontmatter Tandem workspace support under `.tandem/`, with active work in `.tandem/board/`, completed logs in `.tandem/logs/`, and audit events in `.tandem/events.jsonl`.
-- Raw-source minimal-diff mutations for task movement, completion metadata, accord lifecycle, rules, and decisions.
-- Ratatui/crossterm TUI with Board, Review, Logs, Rules, and Decisions tabs.
-- Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), manual reload (`r`), and `$EDITOR` open for selected active tasks (`e`).
+- Default workflow states are `todo`, `in-progress`, and `validation`; legacy `state: review` reads are tolerated.
+- Conservative state/accord synchronization for common CLI transitions.
+- Ratatui/crossterm TUI with top-level Board, Logs, Rules, and Decisions tabs.
+- Board Validation flow for delivered work, with action hints for approve, request changes, and complete/log flows.
+- Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), manual reload (`r`), inline expanded row previews (`Enter`), optional detail pane (`Tab`), and `$EDITOR` open for selected active tasks (`e`).
 - Idle file-change hot reload with selection preservation where possible and safe warning/error surfacing for reload parse/load issues.
-- Review queue, completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
+- Completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
 - Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, and workspace selection/overrides from `.tandem/theme.toml`.
 - Mouse tab/click/scroll support and fixed keyboard defaults.
+- Initial `docs/` Markdown source tree and `site/` Astro Starlight docs site with GitHub Pages workflow.
 
 ### Known limitations
 
-- No published artifact or GitHub release automation is defined in the repository yet.
+- No binary artifacts are published; install from the git tag with Cargo.
 - No root Rust workspace or split crates; install commands must target `--path tandem`.
 - No `tandem --version` command yet; version confirmation is currently from `tandem/Cargo.toml`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
-- TUI gaps remain for richer Board mutations, Review action mutations/buttons, decision reference/tag prompt parity, richer action buttons, and `$EDITOR` support for decisions/custom documents.
+- TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
 - Keybindings are fixed defaults; custom keymap config is deferred.
 - Markdown rendering is styled basics only.
 - Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope for v0.
+- Docs-site build currently succeeds but may emit a Starlight warning about `Entry docs → 404 was not found`; this is non-blocking for the generated static output and should be tracked as docs-site polish.
 
 ### Install target for `pi-tandem`
 
@@ -40,7 +44,7 @@ This is the first installable Tandem CLI/TUI release target. It is intended to u
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.1.0 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.0 --path tandem --locked
 ```
 
 If installing from a local checkout before the tag is pushed, use:
@@ -55,22 +59,29 @@ For Pi smoke tests without installing globally, set an explicit binary path:
 TANDEM_BIN="$PWD/tandem/target/release/tandem" pi -e ./extensions/pi-tandem/index.ts
 ```
 
-### Release blocker and proposed commands
-
-This repository currently has no committed release policy, no existing release tags, and no documented credential/artifact publishing settings. Per task constraints, do not create or push the tag or GitHub release without parent/human approval.
-
-Recommended release sequence after approval:
+### Release validation commands
 
 ```text
 cd tandem
 cargo fmt --check
 cargo test
 cargo build --release
+cd ../site
+npm ci
+npm run build
+npm audit --audit-level=high
 cd ..
+bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
+TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
+TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
+TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 git diff --check
-git status --short
-git tag -a tandem-v0.1.0 -m "Release tandem v0.1.0"
-git push origin tandem-v0.1.0
-# Optional, if GitHub CLI auth/release policy is approved:
-gh release create tandem-v0.1.0 --title "tandem v0.1.0" --notes-file tandem/RELEASE.md
+```
+
+### Release commands
+
+```text
+git tag -a tandem-v0.2.0 -m "Release tandem v0.2.0"
+git push origin main
+git push origin tandem-v0.2.0
 ```
