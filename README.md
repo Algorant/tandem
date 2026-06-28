@@ -4,7 +4,7 @@ Tandem is a draft local-first protocol and toolchain for human/agent project coo
 
 It takes inspiration from Brainfile's file-based task board model, but leans harder into collaborative workflows: humans and agents agree on work through **accords**, move delivered work through review, and preserve completed work in useful logs.
 
-Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around review, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. The v0 `tdm` CLI surface is implemented and considered complete for the current known scope; forward implementation focus is the Rust/Ratatui TUI.
+Current design baseline: use Brainfile as inspiration for the general protocol/CLI/TUI shape, adapt it into Tandem terminology, and fold in the local Brainfile v3 direction around review, completion/archive, and first-class logs. Tandem does not require Brainfile import/migration or ongoing Brainfile nomenclature compatibility. The v0 `tdm` CLI surface is implemented and considered complete for the current known scope; forward implementation focus is the Rust/Ratatui TUI plus lightweight agent/editor integrations over `tdm`.
 
 ## Monorepo layout
 
@@ -12,6 +12,7 @@ Current design baseline: use Brainfile as inspiration for the general protocol/C
 plan/          Parent project planning and cross-cutting todos
 protocol/      Tandem protocol/specification work
 tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
+extensions/    Agent/editor integrations such as the pi-tandem adapter
 ```
 
 ## Naming
@@ -22,6 +23,8 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - Project config file: `.tandem/tandem.md`
 - CLI binary: `tdm`
 - CLI/TUI directory: `tandem-tui/`
+- Integrations directory: `extensions/`
+- Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
 - User-facing CLI: `tdm`; reserved future/internal prefix: `td`
 
@@ -41,9 +44,10 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - TUI invocation: `tdm tui` only in v0.
 - First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI aliases: none; canonical commands and long flags only.
-- V0 repo shape: implementation stays under `tandem-tui/`; no root Rust workspace, schemas, or fixtures.
+- V0 repo shape: CLI/TUI implementation stays under `tandem-tui/`; agent/editor adapters live under `extensions/`; no root Rust workspace, schemas, or fixtures.
 - Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
 - Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
+- `extensions/pi-tandem` is a lightweight Pi adapter over an installed `tdm` CLI. It uses safe argument arrays, prefers `tdm --json` read paths, and does not duplicate Tandem protocol parsing/mutation logic.
 
 ## Current docs
 
@@ -56,3 +60,9 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - `tandem-tui/README.md` — CLI/TUI area README
 - `tandem-tui/plan/spec.md` — CLI/TUI draft
 - `tandem-tui/plan/todo.md` — CLI/TUI todo
+- `extensions/README.md` — integrations area README
+- `extensions/plan/spec.md` — integrations draft
+- `extensions/plan/todo.md` — integrations todo
+- `extensions/pi-tandem/README.md` — Pi extension adapter README
+- `extensions/pi-tandem/plan/spec.md` — Pi adapter spec
+- `extensions/pi-tandem/plan/todo.md` — Pi adapter todo

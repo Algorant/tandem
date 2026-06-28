@@ -1,9 +1,9 @@
 # Tandem Project Plan
 
 Status: draft  
-Date: 2026-06-26
+Date: 2026-06-28
 
-Tandem is a simple monorepo for a local-first human/agent coordination protocol and its CLI/TUI tooling.
+Tandem is a simple monorepo for a local-first human/agent coordination protocol, its CLI/TUI tooling, and lightweight agent/editor integrations.
 
 ## Project shape
 
@@ -19,11 +19,21 @@ tandem/
 │   └── plan/
 │       ├── spec.md
 │       └── todo.md
-└── tandem-tui/
+├── tandem-tui/
+│   ├── README.md
+│   └── plan/
+│       ├── spec.md
+│       └── todo.md
+└── extensions/
     ├── README.md
-    └── plan/
-        ├── spec.md
-        └── todo.md
+    ├── plan/
+    │   ├── spec.md
+    │   └── todo.md
+    └── pi-tandem/
+        ├── README.md
+        └── plan/
+            ├── spec.md
+            └── todo.md
 ```
 
 ## Naming model
@@ -34,6 +44,8 @@ tandem/
 - Project config file: `.tandem/tandem.md`
 - CLI binary: `tdm`
 - TUI source area: `tandem-tui/`
+- Integrations area: `extensions/`
+- Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
 - User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes unless explicitly revisited
 
@@ -56,9 +68,10 @@ Current areas:
 
 - `protocol/` — the protocol/spec source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile.
 - `tandem-tui/` — CLI + TUI design and implementation. The user-facing CLI is `tdm`; the current v0 CLI surface is implemented as a single Rust binary crate, and forward implementation focus is the interactive Rust + Ratatui/crossterm TUI.
+- `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tdm` CLI.
 - `plan/` — parent project coordination and cross-cutting decisions.
 
-Do not overdesign the repository. For v0, keep implementation under `tandem-tui/` and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
+Do not overdesign the repository. For v0, keep CLI/TUI implementation under `tandem-tui/`, keep integrations under `extensions/`, and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
 
 ## Locked v0 decisions
 
@@ -90,6 +103,14 @@ CLI/TUI:
 - Markdown planning docs stay canonical for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `td` is reserved for future/internal tool prefixes; `tdm` remains the user-facing CLI.
 
+Extensions:
+
+- `extensions/pi-tandem` is the first v0 integration.
+- `pi-tandem` is a thin Pi adapter over installed `tdm`, not a TypeScript Tandem protocol implementation.
+- Extension tools must use `execFile`/argument arrays, prefer `tdm --json` read paths where supported, preserve human-readable mutation output, and provide diagnostics for missing `tdm`, missing `.tandem`, unsupported CLI surface, and command failures.
+- Project-local extension testing comes before any global Pi config promotion.
+
+
 ## Near-term milestones
 
 1. Reconcile Tandem protocol against live Brainfile protocol plus the local v3 proposal.
@@ -101,3 +122,4 @@ CLI/TUI:
 7. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
 8. Add TUI accord/review/completion flows.
 9. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.
+10. Smoke `pi-tandem` locally as a Pi extension before considering canonical global Pi config promotion.

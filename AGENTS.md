@@ -22,12 +22,13 @@ Core concepts:
 Current direction is intentionally simple:
 
 - Keep this as one parent monorepo named `tandem`.
-- Keep exactly two major child areas for now: `protocol/` and `tandem-tui/`.
+- Keep exactly three major child areas for now: `protocol/`, `tandem-tui/`, and `extensions/`.
 - `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem-tui/` is the current home for user-facing CLI + TUI planning and implementation. The CLI binary name is `tdm`; the directory remains `tandem-tui/` until the user changes it.
 - The v0 `tdm` CLI surface is implemented and considered complete for the current known scope; future CLI work should be explicit new features or bug fixes. Forward implementation focus is the Rust/Ratatui TUI, starting from the current Ratatui/crossterm Board shell. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem-tui/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
+- `extensions/` is the scoped home for agent/editor integrations. The first integration is `extensions/pi-tandem/`, a lightweight Pi adapter over an installed `tdm` CLI; extension code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
 - Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
 
@@ -88,18 +89,25 @@ CLI/TUI:
 │   └── plan/
 │       ├── spec.md        # Tandem protocol draft
 │       └── todo.md        # protocol todo
-└── tandem-tui/
-    ├── README.md          # CLI/TUI area README
-    └── plan/
-        ├── spec.md        # CLI + Rust/Ratatui TUI draft
-        └── todo.md        # CLI/TUI todo
+├── tandem-tui/
+│   ├── README.md          # CLI/TUI area README
+│   └── plan/
+│       ├── spec.md        # CLI + Rust/Ratatui TUI draft
+│       └── todo.md        # CLI/TUI todo
+└── extensions/
+    ├── README.md          # integrations area README
+    ├── plan/
+    │   ├── spec.md        # integrations area draft
+    │   └── todo.md        # integrations todo
+    └── pi-tandem/         # Pi adapter over tdm CLI
 ```
 
-The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI into separate repositories unless explicitly asked.
+The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI/extensions into separate repositories unless explicitly asked.
+
 
 ## Current state
 
-This project is currently in planning/specification plus implementation mode. There is no root Rust workspace; implementation lives in the single `tandem-tui/` Rust binary crate that builds `tdm`.
+This project is currently in planning/specification plus implementation mode. There is no root Rust workspace; CLI/TUI implementation lives in the single `tandem-tui/` Rust binary crate that builds `tdm`, and integration work lives under `extensions/`.
 
 Primary planning documents:
 
@@ -111,6 +119,12 @@ Primary planning documents:
 - `tandem-tui/README.md`
 - `tandem-tui/plan/spec.md`
 - `tandem-tui/plan/todo.md`
+- `extensions/README.md`
+- `extensions/plan/spec.md`
+- `extensions/plan/todo.md`
+- `extensions/pi-tandem/README.md`
+- `extensions/pi-tandem/plan/spec.md`
+- `extensions/pi-tandem/plan/todo.md`
 
 ## Naming rules
 
@@ -122,6 +136,8 @@ Use these names consistently unless the user explicitly changes them:
 - Protocol config file: `.tandem/tandem.md`
 - CLI binary: `tdm`
 - CLI/TUI area: `tandem-tui/`
+- Integrations area: `extensions/`
+- Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
 - User-facing CLI: `tdm`; reserve `td` for future/internal tool prefixes
 
@@ -156,6 +172,14 @@ CLI/TUI:
 - Keep v0 implementation under `tandem-tui/`; treat package/module layout and dependency choices inside that area as open until coding begins.
 - Evaluate live Brainfile CLI/TUI features for parity, then decide what to keep, rename, improve, or intentionally omit.
 
+Extensions:
+
+- Keep integrations under `extensions/` for now.
+- Model `pi-tandem` after `pi-web-tools`: a thin Pi adapter over an installed CLI.
+- Use `execFile`/argument arrays and avoid shell interpolation.
+- Do not duplicate Tandem protocol parsing or mutation behavior in TypeScript; call `tdm` and keep behavior in the CLI/protocol.
+- Test project-local extension behavior first; promote to canonical global Pi config only in an explicit later task.
+
 ## Agent workflow
 
 Before making changes:
@@ -168,7 +192,7 @@ When adding implementation code later:
 
 - Prefer small, reviewable commits/changes.
 - Add tests with protocol changes when implementation exists; do not add schemas or fixtures in v0.
-- Keep protocol parsing/mutation logic separate from TUI rendering logic.
+- Keep protocol parsing/mutation logic separate from TUI rendering logic and extension adapter logic.
 - Do not create opaque state as the only source of truth.
 
 ## File editing rules

@@ -1,9 +1,9 @@
 # Tandem Parent Todo
 
 Status: active implementation
-Last updated: 2026-06-27
+Last updated: 2026-06-28
 
-This todo tracks monorepo-level work that cuts across the protocol and TUI areas.
+This todo tracks monorepo-level work that cuts across the protocol, TUI, and extensions areas.
 
 ## Accomplished
 
@@ -12,7 +12,7 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [x] Established `tdm` as the user-facing CLI and reserved `td` for future/internal tool prefixes.
 - [x] Renamed local repository to `/home/ivan/dev/projects/tandem`.
 - [x] Created private GitHub repo: `Algorant/tandem`.
-- [x] Set monorepo direction with `protocol/` and `tandem-tui/` areas.
+- [x] Set initial monorepo direction with `protocol/` and `tandem-tui/` areas.
 - [x] Created initial protocol and TUI specs.
 - [x] Moved specs into `plan/spec.md` files.
 - [x] Added root project planning spec.
@@ -28,10 +28,11 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [x] Expanded `tdm tui` to Board, Review, Logs, Rules, and Decisions views with initial Board, Rules, Decisions, and Logs interactions.
 - [x] Reworked the Board into count-labeled state subviews with a full-width selected-state list and richer rows while preserving quick-add and `H`/`L` task moves.
 - [x] Added first-class TUI theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, plus workspace `theme = "name"` selection and `default-dark`/`verdigris` preset examples.
+- [x] Added `extensions/` as the third major area for agent/editor integrations.
+- [x] Added the initial `extensions/pi-tandem` Pi adapter MVP over installed `tdm`.
 
 ## Current tasks
 
-- [ ] Keep parent project plan aligned with `protocol/README.md`, `protocol/plan/spec.md`, `tandem-tui/README.md`, and `tandem-tui/plan/spec.md`.
 - [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
 - [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.
@@ -40,13 +41,15 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [ ] Revisit standalone `tdm-tui` only after v0 if packaging/user needs justify it.
 - [ ] Do not create schemas or fixtures in v0; revisit after TUI MVP/protocol stabilization.
 - [ ] Track any remaining open naming/vocabulary decisions after detailed spec updates.
+- [ ] Test `pi-tandem` as a project-local Pi extension before any global Pi config promotion.
 
 ## Next recommended steps
 
 1. Add safe Review action buttons/mutations, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Continue remaining TUI polish without adding schemas or fixtures in v0.
-4. Migrate/dogfood Tandem documents after the TUI can manage them safely.
+4. Smoke `pi-tandem` in a real Pi session with project-local loading, then consider global Pi config promotion only as a separate reviewed step.
+5. Migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Open questions
 
