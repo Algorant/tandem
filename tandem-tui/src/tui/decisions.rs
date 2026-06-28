@@ -9,7 +9,7 @@ use ratatui::{
 
 use super::theme::{StatusTone, TuiTheme};
 use super::{
-    centered_rect, detail_field_line, markdownish_line, push_optional_detail_line, FocusPane,
+    centered_rect, detail_field_line, markdownish_lines, push_optional_detail_line, FocusPane,
     TuiApp,
 };
 use crate::{
@@ -582,9 +582,7 @@ fn decision_detail_lines(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>>
     if doc.body.trim().is_empty() {
         lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
-        for line in doc.body.lines() {
-            lines.push(markdownish_line(line, theme));
-        }
+        lines.extend(markdownish_lines(&doc.body, theme));
     }
     lines
 }
