@@ -212,3 +212,6 @@
 {"ts":"2026-06-28T17:30:14Z","event":"accord.claimed","id":"task-39","summary":"Accord claim for task-39"}
 {"ts":"2026-06-28T17:30:44Z","event":"accord.delivered","id":"task-39","summary":"Accord deliver for task-39"}
 {"ts":"2026-06-28T17:30:44Z","event":"task.completed","id":"task-39","summary":"Wired docs/ Markdown source into the Astro Starlight site via sync step."}
+{"ts":"2026-06-28T17:30:58Z","event":"accord.claimed","id":"task-40","summary":"Accord claim for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"accord.delivered","id":"task-40","summary":"Accord deliver for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"task.completed","id":"task-40","summary":"Documented docs local preview and build workflow."}

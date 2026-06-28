@@ -7,6 +7,10 @@ description: Task-oriented Tandem workflows.
 
 Guides collect practical workflows for using Tandem.
 
+## Available guides
+
+- [Docs site workflow](./docs-site.md) — install, preview, sync, and build the documentation site.
+
 ## Planned guides
 
 - Start a workspace.
