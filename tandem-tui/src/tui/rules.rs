@@ -105,6 +105,30 @@ impl TuiApp {
         self.rules_view.has_prompt()
     }
 
+    pub(super) fn selected_rule_anchor_for_reload(&self) -> Option<(String, Option<usize>)> {
+        Some((
+            self.selected_rule_category().to_string(),
+            self.selected_rule().map(|(_, rule)| rule.id),
+        ))
+    }
+
+    pub(super) fn restore_rule_selection_after_reload(
+        &mut self,
+        anchor: Option<(String, Option<usize>)>,
+    ) {
+        let Some((category, id)) = anchor else {
+            self.rules_view.clamp(&self.rules);
+            return;
+        };
+        let restored = id
+            .map(|id| self.select_rule_by_id(&category, id))
+            .unwrap_or(false);
+        if !restored {
+            self.select_rule_category(&category);
+        }
+        self.rules_view.clamp(&self.rules);
+    }
+
     pub(super) fn rules_prompt_status(&self) -> Option<String> {
         self.rules_view.prompt.as_ref().map(RulePrompt::status_line)
     }
@@ -538,19 +562,13 @@ impl TuiApp {
     fn finish_rule_add(&mut self, category: String, rule: String, source: String) {
         match add_rule_to_workspace(&self.workspace, &category, &rule, &source) {
             Ok(outcome) => {
-                let reload_error = self.reload().err().map(|error| error.message);
+                let reload_note = self.reload().warning_note();
                 self.select_rule_by_id(&outcome.category, outcome.id);
-                self.status = format_rule_outcome("Added", &outcome, reload_error.as_deref());
+                self.status = format_rule_outcome("Added", &outcome, &reload_note);
             }
             Err(error) => {
-                let reload_note = self.reload().err().map(|reload_error| reload_error.message);
-                self.status = format!(
-                    "Rule add error: {}{}",
-                    error.message,
-                    reload_note
-                        .map(|message| format!(" Reload failed: {message}"))
-                        .unwrap_or_default()
-                );
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Rule add error: {}{}", error.message, reload_note);
             }
         }
     }
@@ -558,19 +576,13 @@ impl TuiApp {
     fn finish_rule_edit(&mut self, category: String, id: usize, rule: String, source: String) {
         match edit_rule_in_workspace(&self.workspace, &category, id, &rule, &source) {
             Ok(outcome) => {
-                let reload_error = self.reload().err().map(|error| error.message);
+                let reload_note = self.reload().warning_note();
                 self.select_rule_by_id(&outcome.category, outcome.id);
-                self.status = format_rule_outcome("Edited", &outcome, reload_error.as_deref());
+                self.status = format_rule_outcome("Edited", &outcome, &reload_note);
             }
             Err(error) => {
-                let reload_note = self.reload().err().map(|reload_error| reload_error.message);
-                self.status = format!(
-                    "Rule edit error: {}{}",
-                    error.message,
-                    reload_note
-                        .map(|message| format!(" Reload failed: {message}"))
-                        .unwrap_or_default()
-                );
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Rule edit error: {}{}", error.message, reload_note);
             }
         }
     }
@@ -578,27 +590,17 @@ impl TuiApp {
     fn finish_rule_delete(&mut self, category: String, id: usize) {
         match delete_rule_from_workspace(&self.workspace, &category, id) {
             Ok(outcome) => {
-                let reload_error = self.reload().err().map(|error| error.message);
+                let reload_note = self.reload().warning_note();
                 self.select_rule_category(&outcome.category);
                 self.rules_view.clamp(&self.rules);
                 self.status = format!(
                     "Deleted {} #{}{}",
-                    outcome.category,
-                    outcome.id,
-                    reload_error
-                        .map(|message| format!("; reload failed: {message}"))
-                        .unwrap_or_default()
+                    outcome.category, outcome.id, reload_note
                 );
             }
             Err(error) => {
-                let reload_note = self.reload().err().map(|reload_error| reload_error.message);
-                self.status = format!(
-                    "Rule delete error: {}{}",
-                    error.message,
-                    reload_note
-                        .map(|message| format!(" Reload failed: {message}"))
-                        .unwrap_or_default()
-                );
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Rule delete error: {}{}", error.message, reload_note);
             }
         }
     }
@@ -1017,11 +1019,7 @@ fn missing_rule_source_warning(
     Ok(None)
 }
 
-fn format_rule_outcome(
-    verb: &str,
-    outcome: &RuleMutationOutcome,
-    reload_error: Option<&str>,
-) -> String {
+fn format_rule_outcome(verb: &str, outcome: &RuleMutationOutcome, reload_note: &str) -> String {
     format!(
         "{verb} {} #{}: {}{}{}",
         outcome.category,
@@ -1032,9 +1030,7 @@ fn format_rule_outcome(
             .as_ref()
             .map(|warning| format!("; warning: {warning}"))
             .unwrap_or_default(),
-        reload_error
-            .map(|message| format!("; reload failed: {message}"))
-            .unwrap_or_default()
+        reload_note
     )
 }
 

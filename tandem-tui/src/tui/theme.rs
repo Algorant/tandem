@@ -614,7 +614,7 @@ impl TuiTheme {
     }
 }
 
-fn user_theme_dir_from_env() -> Option<PathBuf> {
+pub(super) fn user_theme_dir_from_env() -> Option<PathBuf> {
     if let Some(xdg_config_home) = env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty())
     {
         return Some(PathBuf::from(xdg_config_home).join("tandem").join("themes"));
