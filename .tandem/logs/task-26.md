@@ -2,12 +2,11 @@
 id: task-26
 type: task
 title: "Sync workflow state and accord status transitions"
-state: "in-progress"
 priority: "high"
 relatedFiles: ["tandem/src/main.rs", "tandem/src/tui.rs", "tandem/plan/spec.md"]
 tags: ["tui", "cli", "accord", "state", "ux"]
 createdAt: "2026-06-28T04:49:08Z"
-updatedAt: "2026-06-28T15:16:45Z"
+updatedAt: "2026-06-28T17:30:32Z"
 subtasks:
   - id: task-26-1
     title: "Define conservative state-to-accord and accord-to-state transition mapping"
@@ -36,6 +35,9 @@ accord:
     commands: ["cd tandem && cargo fmt --check", "cd tandem && cargo test", "cd tandem && cargo build"]
   constraints: ["Keep workflow state, review metadata, and accord status distinct; synchronize only documented common transitions.", "Avoid surprising destructive transitions; warn or prompt when mapping is ambiguous."]
   updatedAt: "2026-06-28T15:16:45Z"
+completedAt: "2026-06-28T17:30:32Z"
+completion:
+  summary: "Rescoped broad workflow/accord synchronization tracker: CLI mapping and conservative baseline are captured; remaining TUI mutation reuse and divergence warning/test work is split into task-44 and task-45."
 ---
 
 ## Description
