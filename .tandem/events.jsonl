@@ -76,3 +76,5 @@
 {"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-10","summary":"Integrated selectable Verdigris TUI theme with example theme selector, docs, validation, and smoke coverage."}
 {"ts":"2026-06-27T23:45:33Z","event":"accord.accepted","id":"task-11","summary":"Accord accept for task-11"}
 {"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-11","summary":"Integrated Brainfile-style Board state subviews with richer full-width rows, docs, validation, and smoke coverage."}
+{"ts":"2026-06-28T00:11:43Z","event":"task.created","id":"task-16","summary":"Test pi-tandem task relationship guidance"}
+{"ts":"2026-06-28T00:11:43Z","event":"accord.ready","id":"task-16","summary":"Accord ready for task-16"}
