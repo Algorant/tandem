@@ -495,11 +495,11 @@ export const tdmTaskParameters = Type.Object({
 	tags: Type.Optional(Type.Array(Type.String())),
 	assignee: Type.Optional(Type.String()),
 	dueDate: Type.Optional(Type.String()),
-	parent: Type.Optional(Type.String()),
-	blockers: Type.Optional(Type.Array(Type.String())),
-	references: Type.Optional(Type.Array(Type.String())),
-	relatedFiles: Type.Optional(Type.Array(Type.String())),
-	subtasks: Type.Optional(Type.Array(Type.String())),
+	parent: Type.Optional(Type.String({ description: "Existing Tandem document ID to write as parentId for child/supertask hierarchy. Create or inspect the parent first." })),
+	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tdm add fail." })),
+	references: Type.Optional(Type.Array(Type.String(), { description: "Related Tandem document IDs such as decisions, sibling tasks, or logs. Prefer existing IDs; missing IDs are warnings, not hard blockers." })),
+	relatedFiles: Type.Optional(Type.Array(Type.String(), { description: "Project-relative file paths relevant to the task for implementation or review context." })),
+	subtasks: Type.Optional(Type.Array(Type.String(), { description: "Lightweight checklist item titles. Use child tasks with parent when work needs its own owner, accord, review, or blockers." })),
 	accord: Type.Optional(Type.String()),
 	review: Type.Optional(Type.String()),
 	filesChanged: Type.Optional(Type.Array(Type.String())),
@@ -510,7 +510,7 @@ export const tdmTaskParameters = Type.Object({
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tdm_status, tdm_task, tdm_accord, tdm_log, tdm_rules, tdm_decision, tdm_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tdm CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use tdm_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tdm_log and tdm_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tdm_status, tdm_task, tdm_accord, tdm_log, tdm_rules, tdm_decision, tdm_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tdm CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- When creating related work, use tdm_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tdm_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tdm_log and tdm_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -541,6 +541,8 @@ export default function piTandem(pi: ExtensionAPI) {
 		promptGuidelines: [
 			"Use tdm_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
 			"Prefer tdm_task read actions with the default JSON output for reliable task inspection.",
+			"When decomposing work, set relationship fields explicitly: parent for hierarchy, blockers for hard dependencies, references for related tasks/decisions/logs, relatedFiles for repo paths, and subtasks for lightweight checklists.",
+			"Create or inspect parent and blocker documents before referencing them; tdm validates parent/blockers strictly, while references are related context and only warn if unresolved.",
 			"Do not use tdm_task complete unless the user or orchestrator explicitly asks to archive completed work.",
 		],
 		parameters: tdmTaskParameters,
