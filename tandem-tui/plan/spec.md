@@ -710,6 +710,7 @@ tdm tui
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns.
   - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, richer Brainfile-style rows, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
+  - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows compact.
   - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
   - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
@@ -811,6 +812,8 @@ Detail view should make PM validation easy:
 ```text
 Actions: [accept] [request changes] [complete] [edit] [copy id]
 ```
+
+The current Board detail implementation keeps the action surface read-only but shows the next likely CLI command and notes that TUI accord mutations are planned. Accord statuses use the theme's semantic accord palette in details as well as badges; `delivered`, `accepted`, `rework`, and `blocked` must remain visually distinct because they imply different next actions.
 
 ### 2. Review queue
 
