@@ -78,3 +78,15 @@
 {"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-11","summary":"Integrated Brainfile-style Board state subviews with richer full-width rows, docs, validation, and smoke coverage."}
 {"ts":"2026-06-28T00:11:43Z","event":"task.created","id":"task-16","summary":"Test pi-tandem task relationship guidance"}
 {"ts":"2026-06-28T00:11:43Z","event":"accord.ready","id":"task-16","summary":"Accord ready for task-16"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-17","summary":"Use Verdigris as this repo's default TUI theme"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-17","summary":"Accord ready for task-17"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-18","summary":"Add first-class user theme discovery and presets"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-18","summary":"Accord ready for task-18"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-19","summary":"Tighten TUI keyboard and focus semantics"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-19","summary":"Accord ready for task-19"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-20","summary":"Surface Board accord details for selected tasks"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-20","summary":"Accord ready for task-20"}
+{"ts":"2026-06-28T00:17:03Z","event":"task.created","id":"task-21","summary":"Open selected Tandem items in $EDITOR from TUI"}
+{"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-21","summary":"Accord ready for task-21"}
+{"ts":"2026-06-28T00:17:03Z","event":"task.created","id":"task-22","summary":"Define Tandem task tag taxonomy for delegation"}
+{"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-22","summary":"Accord ready for task-22"}
