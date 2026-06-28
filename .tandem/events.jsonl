@@ -90,3 +90,7 @@
 {"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-21","summary":"Accord ready for task-21"}
 {"ts":"2026-06-28T00:17:03Z","event":"task.created","id":"task-22","summary":"Define Tandem task tag taxonomy for delegation"}
 {"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-22","summary":"Accord ready for task-22"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.claimed","id":"task-17","summary":"Accord claim for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.delivered","id":"task-17","summary":"Accord deliver for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.accepted","id":"task-17","summary":"Accord accept for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"task.completed","id":"task-17","summary":"Committed repo-local .tandem/theme.toml selecting the built-in Verdigris TUI theme."}
