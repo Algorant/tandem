@@ -29,6 +29,7 @@ use super::*;
 
 mod decisions;
 mod logs;
+#[allow(dead_code)]
 mod review;
 mod rules;
 mod theme;
@@ -127,28 +128,20 @@ enum FocusPane {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TuiView {
     Board,
-    Review,
     Logs,
     Rules,
     Decisions,
 }
 
 impl TuiView {
-    const ALL: [Self; 5] = [
-        Self::Board,
-        Self::Review,
-        Self::Logs,
-        Self::Rules,
-        Self::Decisions,
-    ];
+    const ALL: [Self; 4] = [Self::Board, Self::Logs, Self::Rules, Self::Decisions];
 
     fn from_digit(ch: char) -> Option<Self> {
         match ch {
             '1' => Some(Self::Board),
-            '2' => Some(Self::Review),
-            '3' => Some(Self::Logs),
-            '4' => Some(Self::Rules),
-            '5' => Some(Self::Decisions),
+            '2' => Some(Self::Logs),
+            '3' => Some(Self::Rules),
+            '4' => Some(Self::Decisions),
             _ => None,
         }
     }
@@ -156,7 +149,6 @@ impl TuiView {
     fn label(self) -> &'static str {
         match self {
             Self::Board => "Board",
-            Self::Review => "Review",
             Self::Logs => "Logs",
             Self::Rules => "Rules",
             Self::Decisions => "Decisions",
@@ -166,10 +158,9 @@ impl TuiView {
     fn tab_label(self) -> &'static str {
         match self {
             Self::Board => "1 Board",
-            Self::Review => "2 Review",
-            Self::Logs => "3 Logs",
-            Self::Rules => "4 Rules",
-            Self::Decisions => "5 Decisions",
+            Self::Logs => "2 Logs",
+            Self::Rules => "3 Rules",
+            Self::Decisions => "4 Decisions",
         }
     }
 }
@@ -182,6 +173,7 @@ enum KeyAction {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum HitAction {
     SwitchView(TuiView),
     SelectState(usize),
@@ -258,7 +250,6 @@ impl ReloadFingerprint {
 struct ReloadSelection {
     board_doc_id: Option<String>,
     board_state: Option<String>,
-    review_doc_id: Option<String>,
     log_doc_id: Option<String>,
     rule_anchor: Option<(String, Option<usize>)>,
     decision_doc_id: Option<String>,
@@ -438,9 +429,6 @@ impl TuiApp {
         ReloadSelection {
             board_doc_id: self.selected_doc().map(|doc| doc.id().to_string()),
             board_state: self.states.get(self.selected_state).cloned(),
-            review_doc_id: self
-                .selected_review_item()
-                .map(|item| item.id().to_string()),
             log_doc_id: self.selected_log().map(|doc| doc.id().to_string()),
             rule_anchor: self.selected_rule_anchor_for_reload(),
             decision_doc_id: self.selected_decision_id_for_reload(),
@@ -461,9 +449,6 @@ impl TuiApp {
             }
         }
 
-        if let Some(id) = selection.review_doc_id.as_deref() {
-            self.select_review_item_by_id_preserving_scroll(id);
-        }
         if let Some(id) = selection.log_doc_id.as_deref() {
             self.select_log_by_id_preserving_scroll(id);
         }
@@ -579,6 +564,15 @@ impl TuiApp {
             KeyCode::Char('a') => {
                 self.status = "Add is available in Board, Rules, and Decisions views.".to_string()
             }
+            KeyCode::Char('A') if self.view == TuiView::Board => {
+                self.show_validation_action_hint("approve")
+            }
+            KeyCode::Char('R') if self.view == TuiView::Board => {
+                self.show_validation_action_hint("rework")
+            }
+            KeyCode::Char('C') if self.view == TuiView::Board => {
+                self.show_validation_action_hint("complete")
+            }
             KeyCode::Char('H') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(-1)
             }
@@ -590,9 +584,9 @@ impl TuiApp {
             }
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
             KeyCode::Char('/') => {
-                self.status = "Search is available in Logs view; press 3 for Logs.".to_string()
+                self.status = "Search is available in Logs view; press 2 for Logs.".to_string()
             }
-            KeyCode::Char('e') if matches!(self.view, TuiView::Board | TuiView::Review) => {
+            KeyCode::Char('e') if self.view == TuiView::Board => {
                 return Ok(KeyAction::OpenEditor)
             }
             KeyCode::Char('e') if self.view == TuiView::Logs => {
@@ -603,11 +597,9 @@ impl TuiApp {
             }
             KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
             KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
-            KeyCode::Enter if matches!(self.view, TuiView::Review | TuiView::Logs) => {
-                self.toggle_focus()
-            }
+            KeyCode::Enter if self.view == TuiView::Logs => self.toggle_focus(),
             KeyCode::Esc => match self.view {
-                TuiView::Board | TuiView::Review if self.focus == FocusPane::Detail => {
+                TuiView::Board if self.focus == FocusPane::Detail => {
                     self.focus = FocusPane::Board
                 }
                 TuiView::Logs => self.clear_log_filter_or_focus(),
@@ -621,10 +613,6 @@ impl TuiApp {
                     FocusPane::Board => self.handle_board_key(key),
                     FocusPane::Detail => self.handle_detail_key(key),
                 },
-                TuiView::Review => match self.focus {
-                    FocusPane::Board => self.handle_review_key(key),
-                    FocusPane::Detail => self.handle_review_detail_key(key),
-                },
                 TuiView::Logs => self.handle_logs_key(key),
                 TuiView::Rules => self.handle_rules_key(key),
                 TuiView::Decisions => self.handle_decisions_key(key),
@@ -636,9 +624,6 @@ impl TuiApp {
     fn switch_view(&mut self, view: TuiView) {
         self.view = view;
         self.focus = FocusPane::Board;
-        if view == TuiView::Review {
-            self.clamp_review_selection();
-        }
         if view == TuiView::Logs {
             self.clamp_selection();
         }
@@ -651,17 +636,6 @@ impl TuiApp {
         self.status = match view {
             TuiView::Board => {
                 "Board view active. Use h/l or mouse tabs for state subviews, a to quick-add, and H/L to move tasks.".to_string()
-            }
-            TuiView::Review => {
-                let count = self.review_items().len();
-                let selected = self
-                    .selected_review_item()
-                    .map(|item| format!(" Selected {}.", item.id()))
-                    .unwrap_or_default();
-                format!(
-                    "Review view active: {count} item{} need attention.{selected} Use j/k to navigate and Tab/Enter for queue/detail focus.",
-                    if count == 1 { "" } else { "s" }
-                )
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
@@ -684,27 +658,21 @@ impl TuiApp {
     fn cycle_focus_or_hint(&mut self) {
         match self.view {
             TuiView::Board => self.toggle_board_detail(),
-            TuiView::Review | TuiView::Logs | TuiView::Decisions => self.toggle_focus(),
+            TuiView::Logs | TuiView::Decisions => self.toggle_focus(),
             TuiView::Rules => {
-                self.status = "Rules has a single category/list focus area; Tab stays in Rules. Use h/l for categories and 1..5 for views.".to_string();
+                self.status = "Rules has a single category/list focus area; Tab stays in Rules. Use h/l for categories and 1..4 for views.".to_string();
             }
         }
     }
 
     fn focus_previous_pane(&mut self) {
-        if matches!(
-            self.view,
-            TuiView::Review | TuiView::Logs | TuiView::Decisions
-        ) {
+        if matches!(self.view, TuiView::Logs | TuiView::Decisions) {
             self.focus = FocusPane::Board;
         }
     }
 
     fn focus_next_pane(&mut self) {
-        if matches!(
-            self.view,
-            TuiView::Review | TuiView::Logs | TuiView::Decisions
-        ) {
+        if matches!(self.view, TuiView::Logs | TuiView::Decisions) {
             self.focus = FocusPane::Detail;
         }
     }
@@ -735,6 +703,7 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn handle_review_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => self.previous_review_item(),
@@ -748,6 +717,7 @@ impl TuiApp {
         self.clamp_review_selection();
     }
 
+    #[allow(dead_code)]
     fn handle_review_detail_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => self.scroll_review_detail_up(1),
@@ -967,6 +937,59 @@ impl TuiApp {
         }
     }
 
+    fn show_validation_action_hint(&mut self, action: &str) {
+        let Some(doc) = self.selected_doc() else {
+            self.status = "No selected Board task for Validation action.".to_string();
+            return;
+        };
+        if document_state_label(doc) != "validation" {
+            self.status = format!(
+                "Validation actions apply in the Validation state; selected {} is in {}.",
+                doc.id(),
+                display_state_label(&document_state_label(doc))
+            );
+            return;
+        }
+
+        let status = accord_status(doc).unwrap_or("missing");
+        self.status = match action {
+            "approve" if normalized_accord_status(status) == "delivered" => format!(
+                "Approve {}: {}",
+                doc.id(),
+                accord_cli_hint(doc.id(), status)
+            ),
+            "approve" => format!(
+                "Approve expects delivered accord; {} is {}. {}",
+                doc.id(),
+                status,
+                accord_cli_hint(doc.id(), status)
+            ),
+            "rework" if normalized_accord_status(status) == "delivered" => format!(
+                "Request changes for {}: tandem accord rework {} --note <text>",
+                doc.id(),
+                doc.id()
+            ),
+            "rework" => format!(
+                "Request changes expects delivered accord; {} is {}. {}",
+                doc.id(),
+                status,
+                accord_cli_hint(doc.id(), status)
+            ),
+            "complete" if normalized_accord_status(status) == "accepted" => format!(
+                "Complete/log {}: {}",
+                doc.id(),
+                accord_cli_hint(doc.id(), status)
+            ),
+            "complete" => format!(
+                "Complete expects accepted accord; {} is {}. {}",
+                doc.id(),
+                status,
+                accord_cli_hint(doc.id(), status)
+            ),
+            _ => format!("Unknown Validation action for {}.", doc.id()),
+        };
+    }
+
     fn move_selected_task_by_delta(&mut self, delta: isize) {
         let Some((doc_id, current_state)) = self
             .selected_doc()
@@ -1088,16 +1111,6 @@ impl TuiApp {
                 .selected_doc()
                 .ok_or_else(|| "No active task selected to edit.".to_string())
                 .and_then(editor_target_for_doc),
-            TuiView::Review => {
-                let item = self
-                    .selected_review_item()
-                    .ok_or_else(|| "No review item selected to edit.".to_string())?;
-                self.docs
-                    .iter()
-                    .find(|doc| doc.id() == item.id())
-                    .ok_or_else(|| format!("Review item {} is no longer loaded; press r to reload.", item.id()))
-                    .and_then(editor_target_for_doc)
-            }
             TuiView::Logs => Err("Completed logs are read-only in the TUI; $EDITOR is intentionally disabled for generated history.".to_string()),
             TuiView::Rules => Err("Rules use the in-TUI a/e/d prompts; raw config-file editing is deferred.".to_string()),
             TuiView::Decisions => Err("Decision document editing in $EDITOR is deferred; active task documents are supported first.".to_string()),
@@ -1176,20 +1189,8 @@ impl TuiApp {
                             self.focus = FocusPane::Detail
                         }
                         HitAction::FocusDetail => {}
-                        HitAction::FocusReviewList if self.view == TuiView::Review => {
-                            self.focus = FocusPane::Board
-                        }
                         HitAction::FocusReviewList => {}
-                        HitAction::SelectReviewItem(index) if self.view == TuiView::Review => {
-                            self.selected_review_item = index;
-                            self.review_detail_scroll = 0;
-                            self.focus = FocusPane::Board;
-                            self.clamp_review_selection();
-                        }
                         HitAction::SelectReviewItem(_) => {}
-                        HitAction::FocusReviewDetail if self.view == TuiView::Review => {
-                            self.focus = FocusPane::Detail
-                        }
                         HitAction::FocusReviewDetail => {}
                         HitAction::SelectLog(index) if self.view == TuiView::Logs => {
                             self.selected_log = index;
@@ -1216,14 +1217,6 @@ impl TuiApp {
             MouseEventKind::ScrollUp if self.view == TuiView::Board => match self.focus {
                 FocusPane::Board => self.previous_item(),
                 FocusPane::Detail => self.scroll_detail_up(3),
-            },
-            MouseEventKind::ScrollDown if self.view == TuiView::Review => match self.focus {
-                FocusPane::Board => self.next_review_item(),
-                FocusPane::Detail => self.scroll_review_detail_down(3),
-            },
-            MouseEventKind::ScrollUp if self.view == TuiView::Review => match self.focus {
-                FocusPane::Board => self.previous_review_item(),
-                FocusPane::Detail => self.scroll_review_detail_up(3),
             },
             MouseEventKind::ScrollDown if self.view == TuiView::Logs => match self.focus {
                 FocusPane::Board => self.next_log(),
@@ -1372,6 +1365,7 @@ impl TuiApp {
         self.detail_scroll = self.detail_line_count().saturating_sub(1) as u16;
     }
 
+    #[allow(dead_code)]
     fn previous_review_item(&mut self) {
         if self.selected_review_item > 0 {
             self.selected_review_item -= 1;
@@ -1379,6 +1373,7 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn next_review_item(&mut self) {
         let count = self.review_items().len();
         if self.selected_review_item + 1 < count {
@@ -1387,6 +1382,7 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn last_review_item(&mut self) {
         let count = self.review_items().len();
         if count > 0 {
@@ -1395,10 +1391,12 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn scroll_review_detail_up(&mut self, amount: u16) {
         self.review_detail_scroll = self.review_detail_scroll.saturating_sub(amount);
     }
 
+    #[allow(dead_code)]
     fn scroll_review_detail_down(&mut self, amount: u16) {
         let max_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
         self.review_detail_scroll = self
@@ -1407,6 +1405,7 @@ impl TuiApp {
             .min(max_scroll);
     }
 
+    #[allow(dead_code)]
     fn review_detail_scroll_to_end(&mut self) {
         self.review_detail_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
     }
@@ -1454,6 +1453,7 @@ impl TuiApp {
         self.log_detail_scroll = self.log_detail_scroll.min(max_log_scroll);
     }
 
+    #[allow(dead_code)]
     fn clamp_review_selection(&mut self) {
         let count = review::queue_len(&self.docs);
         if count == 0 {
@@ -1483,6 +1483,10 @@ impl TuiApp {
             self.selected_item.min(count - 1) + 1
         };
         format!("{} {position}/{count}", display_state_label(state))
+    }
+
+    fn selected_state_name(&self) -> Option<&str> {
+        self.states.get(self.selected_state).map(String::as_str)
     }
 
     fn selected_doc(&self) -> Option<&Document> {
@@ -1556,14 +1560,17 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn review_items(&self) -> Vec<review::ReviewQueueItem> {
         review::queue_items(&self.docs)
     }
 
+    #[allow(dead_code)]
     fn selected_review_item(&self) -> Option<review::ReviewQueueItem> {
         review::selected_item(&self.docs, self.selected_review_item)
     }
 
+    #[allow(dead_code)]
     fn select_review_item_by_id_preserving_scroll(&mut self, id: &str) -> bool {
         let items = self.review_items();
         if let Some(index) = items.iter().position(|item| item.id() == id) {
@@ -1576,6 +1583,7 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn review_detail_line_count(&self) -> usize {
         let item = self.selected_review_item();
         review::detail_line_count(item.as_ref(), &self.theme)
@@ -1615,9 +1623,7 @@ impl TuiApp {
             self.draw_board(frame, chunks[1]);
         } else {
             let view_area = chunks[1];
-            if self.view == TuiView::Review {
-                self.draw_review(frame, view_area);
-            } else if self.view == TuiView::Logs {
+            if self.view == TuiView::Logs {
                 self.draw_logs(frame, view_area);
             } else if self.view == TuiView::Rules {
                 self.draw_rules_view(frame, view_area);
@@ -1670,9 +1676,8 @@ impl TuiApp {
 
     fn draw_header(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let counts = format!(
-            "Board {} · Review {} · Logs {} · Rules {} · Decisions {}",
+            "Board {} · Logs {} · Rules {} · Decisions {}",
             self.docs.len(),
-            self.review_items().len(),
             self.logs.len(),
             self.rules_total(),
             self.decision_docs().len()
@@ -1682,10 +1687,6 @@ impl TuiApp {
                 .selected_doc()
                 .map(|doc| format!("selected {}", doc.id()))
                 .unwrap_or_else(|| "no selected item".to_string()),
-            TuiView::Review => self
-                .selected_review_item()
-                .map(|item| format!("selected {} · {}", item.id(), item.reason_summary()))
-                .unwrap_or_else(|| "review queue is empty".to_string()),
             TuiView::Logs => {
                 let filter = if self.log_search_filter.is_empty() {
                     String::new()
@@ -1776,6 +1777,7 @@ impl TuiApp {
         }
     }
 
+    #[allow(dead_code)]
     fn draw_review(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let items = self.review_items();
         review::render_review(
@@ -1942,7 +1944,6 @@ impl TuiApp {
     fn draw_placeholder_view(&self, frame: &mut Frame<'_>, area: Rect) {
         let (title, lines) = match self.view {
             TuiView::Board => (" Board ".to_string(), Vec::new()),
-            TuiView::Review => self.review_placeholder_lines(),
             TuiView::Logs => self.logs_placeholder_lines(),
             TuiView::Rules => (" Rules ".to_string(), Vec::new()),
             TuiView::Decisions => (" Decisions ".to_string(), Vec::new()),
@@ -1956,15 +1957,6 @@ impl TuiApp {
             )
             .wrap(Wrap { trim: false });
         frame.render_widget(paragraph, area);
-    }
-
-    fn review_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
-        (
-            " Review ".to_string(),
-            vec![Line::from(
-                "Review queue renders in the dedicated Review view.",
-            )],
-        )
     }
 
     fn logs_placeholder_lines(&self) -> (String, Vec<Line<'static>>) {
@@ -2232,22 +2224,15 @@ impl TuiApp {
                 FocusPane::Board => "board",
                 FocusPane::Detail => "detail",
             };
-            (
-                format!(
-                    "{focus} · {} · 1..5 views · Enter expand row · Tab toggle detail · a add · e edit · h/l states · H/L move · j/k select/scroll · ? help · {}",
-                    self.selected_state_progress(),
-                    self.status
-                ),
-                self.theme.status_style(status_tone_for_message(&self.status)),
-            )
-        } else if self.view == TuiView::Review {
-            let focus = match self.focus {
-                FocusPane::Board => "queue",
-                FocusPane::Detail => "detail",
+            let validation_hint = if self.selected_state_name() == Some("validation") {
+                " · Validation: e open, A approve hint, R rework hint, C complete hint"
+            } else {
+                ""
             };
             (
                 format!(
-                    "Review {focus} · 1..5 views · q quit · r reload · e edit active task in $EDITOR · j/k item/scroll · h/l or Tab queue/detail · Enter detail · action hints read-only · ? help · {}",
+                    "{focus} · {} · 1..4 views · Enter expand row · Tab toggle detail · a add · e edit · h/l states · H/L move{validation_hint} · j/k select/scroll · ? help · {}",
+                    self.selected_state_progress(),
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -2284,7 +2269,7 @@ impl TuiApp {
         } else {
             (
                 format!(
-                    "{} · 1..5 switch views · local keys stay in view · r reload · q quit · ? help · {}",
+                    "{} · 1..4 switch views · local keys stay in view · r reload · q quit · ? help · {}",
                     self.view.label(),
                     self.status
                 ),
@@ -2306,26 +2291,26 @@ impl TuiApp {
             Line::from(""),
             Line::from("q / Ctrl-C        Quit safely"),
             Line::from("r                 Reload board/config/log/theme data (also auto-detected while idle)"),
-            Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
+            Line::from("1..4              Switch Board, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
             Line::from("tab / shift-tab   Board: show/hide detail pane; other split views: cycle focus"),
-            Line::from("enter             Board: expand/collapse row preview; Review/Logs: toggle list/detail focus"),
+            Line::from("enter             Board: expand/collapse row preview; Logs: toggle list/detail focus"),
             Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
-            Line::from("e                 Board/Review: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
-            Line::from("h/l or ←/→        Board: state subviews; Review/Logs/Decisions: list/detail focus; Rules: category"),
+            Line::from("e                 Board: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
+            Line::from("h/l or ←/→        Board: state subviews; Logs/Decisions: list/detail focus; Rules: category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
-            Line::from("j/k or ↑/↓        Board/Review/Logs/Rules/Decisions: move items, or scroll detail when focused"),
+            Line::from("j/k or ↑/↓        Board/Logs/Rules/Decisions: move items, or scroll detail when focused"),
             Line::from("g/G               First/last item in the active list/detail"),
             Line::from("d                 Rules: delete selected rule with confirmation"),
             Line::from("PgUp/PgDn         Logs/Decisions: scroll selected detail/body"),
             Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
             Line::from("Esc               Logs: clear search filter; prompts: cancel"),
-            Line::from("mouse wheel       Board/Review/Logs/Rules/Decisions: move selection or scroll detail"),
-            Line::from("click tabs/list/detail Board/Review/Logs: switch subviews, select, or focus panes"),
+            Line::from("mouse wheel       Board/Logs/Rules/Decisions: move selection or scroll detail"),
+            Line::from("click tabs/list/detail Board/Logs: switch subviews, select, or focus panes"),
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board state subviews, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
+            Line::from("Board state subviews include Validation for delivered work awaiting accept/rework/complete, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer mutation prompts remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -3567,10 +3552,17 @@ fn push_board_accord_detail_section(
         Span::styled("CLI hint: ", theme.label_style()),
         Span::styled(accord_cli_hint(doc.id(), status), theme.text_style()),
     ]));
-    lines.push(Line::from(Span::styled(
-        "TUI accord mutations are planned; this Board detail pane is read-only.",
-        theme.muted_style(),
-    )));
+    if document_state_label(doc) == "validation" {
+        lines.push(Line::from(Span::styled(
+            "Board Validation: use e to open/edit; A/R/C show approve, rework, and complete commands for the selected task.",
+            theme.muted_style(),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "Board accord mutations beyond movement are CLI-guided from this detail pane.",
+            theme.muted_style(),
+        )));
+    }
 }
 
 fn detail_field_line(label: &str, value: &str, theme: &TuiTheme) -> Line<'static> {
@@ -4221,7 +4213,7 @@ mod tests {
         fs::create_dir_all(&workspace.logs_dir).unwrap();
         fs::write(
             &workspace.config_path,
-            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, review]\n---\n",
+            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, validation]\n---\n",
         )
         .unwrap();
         workspace
@@ -4240,7 +4232,7 @@ mod tests {
     fn keyboard_test_app() -> TuiApp {
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
-            doc_with_state("task-2", Some("review")),
+            doc_with_state("task-2", Some("validation")),
             decision_doc("decision-1"),
         ];
         TuiApp {
@@ -4254,10 +4246,10 @@ mod tests {
             view: TuiView::Board,
             states: vec![
                 "todo".to_string(),
-                "review".to_string(),
+                "validation".to_string(),
                 "unfiled".to_string(),
             ],
-            configured_states: vec!["todo".to_string(), "review".to_string()],
+            configured_states: vec!["todo".to_string(), "validation".to_string()],
             docs,
             logs: Vec::new(),
             log_events: logs::LogEventsById::new(),
@@ -4296,8 +4288,9 @@ mod tests {
             doc_with_state("task-2", Some("blocked")),
             doc_with_state("decision-1", None),
         ];
-        let states = states_with_board_docs(vec!["todo".to_string(), "review".to_string()], &docs);
-        assert_eq!(states, vec!["todo", "review", "blocked", "unfiled"]);
+        let states =
+            states_with_board_docs(vec!["todo".to_string(), "validation".to_string()], &docs);
+        assert_eq!(states, vec!["todo", "validation", "blocked", "unfiled"]);
     }
 
     #[test]
@@ -4309,17 +4302,16 @@ mod tests {
     #[test]
     fn numeric_keys_map_to_top_level_views() {
         assert_eq!(TuiView::from_digit('1'), Some(TuiView::Board));
-        assert_eq!(TuiView::from_digit('2'), Some(TuiView::Review));
-        assert_eq!(TuiView::from_digit('3'), Some(TuiView::Logs));
-        assert_eq!(TuiView::from_digit('4'), Some(TuiView::Rules));
-        assert_eq!(TuiView::from_digit('5'), Some(TuiView::Decisions));
-        assert_eq!(TuiView::from_digit('6'), None);
+        assert_eq!(TuiView::from_digit('2'), Some(TuiView::Logs));
+        assert_eq!(TuiView::from_digit('3'), Some(TuiView::Rules));
+        assert_eq!(TuiView::from_digit('4'), Some(TuiView::Decisions));
+        assert_eq!(TuiView::from_digit('5'), None);
     }
 
     #[test]
     fn numeric_keys_are_explicit_top_level_switchers() {
         let mut app = keyboard_test_app();
-        app.handle_key(key(KeyCode::Char('3'))).unwrap();
+        app.handle_key(key(KeyCode::Char('2'))).unwrap();
         assert_eq!(app.view, TuiView::Logs);
         assert_eq!(app.focus, FocusPane::Board);
 
@@ -4370,14 +4362,6 @@ mod tests {
         assert_eq!(app.view, TuiView::Board);
         assert_eq!(app.selected_state, 0);
 
-        app.switch_view(TuiView::Review);
-        app.handle_key(key(KeyCode::Char('l'))).unwrap();
-        assert_eq!(app.view, TuiView::Review);
-        assert_eq!(app.focus, FocusPane::Detail);
-        app.handle_key(key(KeyCode::Char('h'))).unwrap();
-        assert_eq!(app.view, TuiView::Review);
-        assert_eq!(app.focus, FocusPane::Board);
-
         app.switch_view(TuiView::Logs);
         app.handle_key(key(KeyCode::Char('l'))).unwrap();
         assert_eq!(app.view, TuiView::Logs);
@@ -4425,19 +4409,36 @@ mod tests {
     }
 
     #[test]
-    fn editor_targets_active_tasks_from_board_and_review_only() {
+    fn editor_targets_active_tasks_from_board_only() {
         let mut app = keyboard_test_app();
         assert_eq!(app.selected_editor_target().unwrap().id, "task-1");
 
         app.selected_state = 2;
         let error = app.selected_editor_target().unwrap_err();
         assert!(error.contains("type `decision`"));
+    }
 
+    #[test]
+    fn validation_action_keys_show_selected_task_commands() {
+        let mut app = keyboard_test_app();
+        app.selected_state = 1;
         app.docs[1]
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
-        app.switch_view(TuiView::Review);
-        assert_eq!(app.selected_editor_target().unwrap().id, "task-2");
+
+        app.handle_key(key(KeyCode::Char('A'))).unwrap();
+        assert!(app.status.contains("tandem accord accept task-2"));
+
+        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        assert!(app
+            .status
+            .contains("tandem accord rework task-2 --note <text>"));
+
+        app.docs[1]
+            .fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        app.handle_key(key(KeyCode::Char('C'))).unwrap();
+        assert!(app.status.contains("tandem complete task-2"));
     }
 
     #[test]
@@ -4574,7 +4575,7 @@ mod tests {
 
     #[test]
     fn board_detail_includes_accord_metadata_hints_and_preserves_body() {
-        let mut doc = doc_with_state("task-1", Some("review"));
+        let mut doc = doc_with_state("task-1", Some("validation"));
         doc.fields
             .insert("accord.status".to_string(), "delivered".to_string());
         doc.fields
@@ -4634,8 +4635,9 @@ mod tests {
         assert!(texts
             .iter()
             .any(|text| text.contains("CLI hint: tandem accord accept task-1")));
-        assert!(texts.iter().any(|text| text
-            .contains("TUI accord mutations are planned; this Board detail pane is read-only.")));
+        assert!(texts
+            .iter()
+            .any(|text| text.contains("Board Validation: use e to open/edit")));
         assert!(texts.contains(&"Description".to_string()));
         assert!(texts.contains(&"Keep this body visible.".to_string()));
 
