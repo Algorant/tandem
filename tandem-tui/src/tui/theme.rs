@@ -365,9 +365,54 @@ impl TuiTheme {
         self.muted_style()
     }
 
-    pub(super) fn tag_style(&self) -> Style {
-        self.status_style(StatusTone::Accent)
-            .add_modifier(Modifier::BOLD)
+    pub(super) fn priority_chip_style(&self, priority: &str) -> Style {
+        let color = match normalized(priority).as_str() {
+            "critical" | "urgent" => self.priority.critical,
+            "high" => self.priority.high,
+            "medium" | "med" => self.priority.medium,
+            "low" => self.priority.low,
+            "" | "-" | "none" => self.priority.none,
+            _ => self.priority.none,
+        };
+        self.chip_style(color)
+    }
+
+    pub(super) fn accord_chip_style(&self, status: &str) -> Style {
+        let color = match normalized(status).as_str() {
+            "ready" => self.accord.ready,
+            "claimed" => self.accord.claimed,
+            "delivered" => self.accord.delivered,
+            "accepted" => self.accord.accepted,
+            "rework" => self.accord.rework,
+            "failed" => self.accord.failed,
+            "blocked" => self.accord.blocked,
+            _ => self.accord.unknown,
+        };
+        self.chip_style(color)
+    }
+
+    pub(super) fn review_chip_style(&self, status: &str) -> Style {
+        let color = match normalized(status).as_str() {
+            "not-ready" => self.review.not_ready,
+            "pending" => self.review.pending,
+            "accepted" => self.review.accepted,
+            "changes-requested" => self.review.changes_requested,
+            "rejected" => self.review.rejected,
+            "failed" => self.review.failed,
+            _ => self.review.unknown,
+        };
+        self.chip_style(color)
+    }
+
+    pub(super) fn progress_chip_style(&self, tone: StatusTone) -> Style {
+        let color = match tone {
+            StatusTone::Accent => self.colors.accent,
+            StatusTone::Success => self.colors.success,
+            StatusTone::Warning => self.colors.warning,
+            StatusTone::Error => self.colors.error,
+            StatusTone::Muted => self.colors.muted,
+        };
+        self.chip_style(color)
     }
 
     pub(super) fn tab_style(&self) -> Style {
@@ -468,6 +513,13 @@ impl TuiTheme {
             Some(bg) => style.bg(bg),
             None => style,
         }
+    }
+
+    fn chip_style(&self, bg: Color) -> Style {
+        if self.no_color {
+            return Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
+        }
+        self.style(self.colors.background, Some(bg), Modifier::BOLD)
     }
 
     fn no_color() -> Self {
