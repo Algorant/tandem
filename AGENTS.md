@@ -97,44 +97,6 @@ CLI/TUI:
 
 The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI into separate repositories unless explicitly asked.
 
-## Documentation contract: no drift
-
-Every discrete aspect of the project must have documentation. This includes the parent repository and each major sub-area such as `protocol/` and `tandem-tui/`.
-
-Minimum documentation set for every discrete aspect:
-
-- `README.md` — purpose, scope, layout, links to relevant docs, current status.
-- `plan/spec.md` — design/specification for that aspect.
-- `plan/todo.md` — accomplished/current/next task tracking for that aspect.
-
-The parent docs are the coordination source of truth:
-
-- `README.md`
-- `plan/spec.md`
-- `plan/todo.md`
-- `AGENTS.md`
-
-Sub-area docs must stay synchronized with the parent project docs. No drift is allowed.
-
-When changing naming, layout, lifecycle, scope, architecture, or project direction, update all affected docs in the same change:
-
-1. Parent README/spec/todo as applicable.
-2. Relevant sub-area README/spec/todo.
-3. `AGENTS.md` if the rule or workflow changes.
-
-If docs disagree, treat parent docs as authoritative only long enough to reconcile the mismatch. Do not leave contradictory docs behind.
-
-Before finishing documentation or planning changes, check for stale references and terminology, especially:
-
-- old paths such as `protocol/spec.md` or `tandem-tui/spec.md`
-- old project names or placeholder names
-- `contract` where `accord` should be used
-- `handoff` where `accord` should be used
-- `done` column assumptions
-- outdated CLI references such as `tandem` instead of `tdm`
-- unapproved Rust workspace/crate layout assumptions
-- claims that `clap`, `crates/`, `tandem-core`, or a root `Cargo.toml` are settled decisions
-
 ## Current state
 
 This project is currently in planning/specification plus implementation mode. There is no root Rust workspace; implementation lives in the single `tandem-tui/` Rust binary crate that builds `tdm`.
@@ -149,8 +111,6 @@ Primary planning documents:
 - `tandem-tui/README.md`
 - `tandem-tui/plan/spec.md`
 - `tandem-tui/plan/todo.md`
-
-When changing direction, update the relevant README, `plan/todo.md`, and `plan/spec.md` files together.
 
 ## Naming rules
 
@@ -201,11 +161,8 @@ CLI/TUI:
 Before making changes:
 
 1. Read this file.
-2. Read parent docs: `README.md`, `plan/spec.md`, and `plan/todo.md`.
-3. Read the relevant sub-area `README.md`, `plan/spec.md`, and `plan/todo.md`.
-4. Keep changes scoped to the requested area.
-5. If a decision changes project direction, update parent and area-specific planning docs in the same change.
-6. Check for documentation drift before finalizing.
+2. Inspect the files directly relevant to the requested area.
+3. Keep changes scoped to the requested area.
 
 When adding implementation code later:
 
@@ -213,7 +170,6 @@ When adding implementation code later:
 - Add tests with protocol changes when implementation exists; do not add schemas or fixtures in v0.
 - Keep protocol parsing/mutation logic separate from TUI rendering logic.
 - Do not create opaque state as the only source of truth.
-- Update documentation and todos alongside code changes.
 
 ## File editing rules
 

@@ -144,7 +144,6 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## Current tasks
 
-- [ ] Keep `tandem-tui/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and protocol docs.
 - [x] Define numeric exit-code categories for CLI implementation.
 - [x] Define exact no-match and empty-list behavior for implemented read commands.
 - [x] Replace first-slice YAML-ish frontmatter parsing with a more complete parser while preserving minimal-diff behavior.
@@ -167,8 +166,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Extend Decisions with references/tags prompts only if the TUI needs full CLI option parity beyond the basic title/body flow.
 4. Add any additional built-in palettes beyond Verdigris only as explicit theme requests; next broad polish remains final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
-5. Keep parent and area docs synchronized as TUI implementation continues.
-6. Change existing CLI behavior only for explicit new feature requests or bug fixes.
+5. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
 ## First TUI MVP checklist
 

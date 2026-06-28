@@ -19,7 +19,7 @@ The protocol area owns:
 - local v3 proposal reconciliation from `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`
 - post-v0 schema/fixture definitions only if explicitly useful later
 
-The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem-tui/`, though both areas must stay synchronized.
+The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem-tui/`.
 
 ## Current status
 
@@ -32,23 +32,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 - `../README.md` — parent project overview
 - `../plan/spec.md` — parent project plan
 - `../plan/todo.md` — parent project todo
-- `../AGENTS.md` — agent guidance and documentation sync rules
-
-## Sync requirements
-
-This directory must stay aligned with the parent Tandem docs.
-
-When protocol terminology, layout, lifecycle, CLI naming, or scope changes, update all affected docs in the same change:
-
-- `../README.md`
-- `../plan/spec.md`
-- `../plan/todo.md`
-- `README.md`
-- `plan/spec.md`
-- `plan/todo.md`
-- `../AGENTS.md` if agent rules or workflows change
-
-No drift is allowed. If this README contradicts parent docs, fix the contradiction immediately.
+- `../AGENTS.md` — agent guidance
 
 ## Key current decisions
 

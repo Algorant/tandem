@@ -90,27 +90,14 @@ CLI/TUI:
 - Markdown planning docs stay canonical for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `td` is reserved for future/internal tool prefixes; `tdm` remains the user-facing CLI.
 
-## Documentation contract
-
-Every discrete aspect of Tandem must maintain documentation and remain synchronized with the parent project. No drift is allowed.
-
-Minimum documentation set for each major area:
-
-- `README.md` — purpose, scope, layout, current status, and links.
-- `plan/spec.md` — design/specification for that area.
-- `plan/todo.md` — accomplished/current/next task tracking for that area.
-
-Parent docs are the coordination source of truth. When a naming, scope, architecture, lifecycle, or workflow decision changes, update the parent docs and every affected area doc in the same change.
-
 ## Near-term milestones
 
 1. Reconcile Tandem protocol against live Brainfile protocol plus the local v3 proposal.
 2. Build a feature parity/improvement matrix for live Brainfile CLI/TUI.
 3. Stabilize protocol vocabulary and lifecycle.
-4. Keep protocol, parent, and CLI/TUI documentation synchronized.
-5. Draft the detailed `tdm` command reference from the locked CLI surface.
-6. Keep the existing `tandem-tui/` Rust package layout stable unless implementation pressure proves a change is needed.
-7. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
-8. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
-9. Add TUI accord/review/completion flows.
-10. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.
+4. Draft the detailed `tdm` command reference from the locked CLI surface.
+5. Keep the existing `tandem-tui/` Rust package layout stable unless implementation pressure proves a change is needed.
+6. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
+7. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
+8. Add TUI accord/review/completion flows.
+9. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.

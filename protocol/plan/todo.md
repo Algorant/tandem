@@ -52,9 +52,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 
 ## Current tasks
 
-- [ ] Keep `protocol/README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent docs.
 - [ ] Tighten examples if implementation discovers ambiguous field behavior.
-- [ ] Coordinate any protocol-facing CLI wording changes with `../tandem-tui/` docs through the orchestrator.
 
 ## Next recommended steps
 

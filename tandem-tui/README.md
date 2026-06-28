@@ -105,24 +105,7 @@ In the TUI, use `1`..`5` to switch Board/Review/Logs/Rules/Decisions, arrow keys
 - `../plan/todo.md` — parent project todo
 - `../protocol/README.md` — protocol area overview
 - `../protocol/plan/spec.md` — protocol draft the CLI/TUI must follow
-- `../AGENTS.md` — agent guidance and documentation sync rules
-
-## Sync requirements
-
-This directory must stay aligned with the parent Tandem docs and the protocol docs.
-
-When CLI/TUI architecture, invocation, layout, workflow, or status terminology changes, update all affected docs in the same change:
-
-- `../README.md`
-- `../plan/spec.md`
-- `../plan/todo.md`
-- `README.md`
-- `plan/spec.md`
-- `plan/todo.md`
-- `../protocol/README.md` or `../protocol/plan/spec.md` if protocol-facing behavior changes
-- `../AGENTS.md` if agent rules or workflows change
-
-No drift is allowed. If this README contradicts parent or protocol docs, fix the contradiction immediately.
+- `../AGENTS.md` — agent guidance
 
 ## Key current decisions
 

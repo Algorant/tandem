@@ -34,7 +34,6 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 - [ ] Keep parent project plan aligned with `protocol/README.md`, `protocol/plan/spec.md`, `tandem-tui/README.md`, and `tandem-tui/plan/spec.md`.
 - [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
-- [ ] Enforce no-drift documentation updates whenever naming, scope, architecture, lifecycle, or workflow decisions change.
 - [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.
 - [x] Define minimal Rust implementation layout inside `tandem-tui/` as implementation begins.
 - [x] Decide exact Rust package/module layout for `tdm` inside `tandem-tui/` from the first implementation slice.
@@ -47,8 +46,7 @@ This todo tracks monorepo-level work that cuts across the protocol and TUI areas
 1. Add safe Review action buttons/mutations, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Continue remaining TUI polish without adding schemas or fixtures in v0.
-4. Keep area READMEs, specs, and todos synchronized as TUI implementation continues.
-5. Migrate/dogfood Tandem documents after the TUI can manage them safely.
+4. Migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Open questions
 

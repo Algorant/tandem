@@ -45,18 +45,6 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
 - Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 
-## Documentation contract
-
-Every discrete aspect of Tandem must have its own documentation and keep it synchronized with the parent project docs. No documentation drift is allowed.
-
-Minimum documentation set for each major area:
-
-- `README.md` — purpose, scope, layout, current status, and links.
-- `plan/spec.md` — design/specification.
-- `plan/todo.md` — accomplished/current/next work tracking.
-
-When naming, scope, architecture, lifecycle, or workflow decisions change, update the parent docs and all affected sub-area docs in the same change. Keep the project simple: no root Rust workspace, crates, dependency choices, schemas, or fixtures in v0.
-
 ## Current docs
 
 - `AGENTS.md` — guidance for AI agents working in this repo

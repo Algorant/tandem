@@ -944,7 +944,7 @@ tdm decision list|show|add
 tdm tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem-tui/` and must stay synchronized with protocol decisions.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem-tui/`.
 
 ## Brainfile design mapping/reference only
 
