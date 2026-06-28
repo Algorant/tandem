@@ -17,7 +17,22 @@ export default defineConfig({
       sidebar: [
         {
           label: 'Docs',
-          items: [{ autogenerate: { directory: '.' } }],
+          items: [
+            { label: 'Overview', link: '/' },
+            { label: 'Concepts', link: '/concepts/' },
+            { label: 'Protocol', link: '/protocol/' },
+            { label: 'CLI', link: '/cli/' },
+            { label: 'TUI', link: '/tui/' },
+            { label: 'Extensions', link: '/extensions/' },
+            {
+              label: 'Guides',
+              items: [
+                { label: 'Guides overview', link: '/guides/' },
+                { label: 'Docs site workflow', link: '/guides/docs-site/' },
+              ],
+            },
+            { label: 'Reference', link: '/reference/' },
+          ],
         },
       ],
     }),
