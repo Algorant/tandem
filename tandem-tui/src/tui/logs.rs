@@ -12,7 +12,9 @@ use crate::{
     Document, DocumentLocation,
 };
 
-use super::{detail_field_line, markdownish_line, push_optional_detail_line, StatusTone, TuiTheme};
+use super::{
+    detail_field_line, markdownish_lines, push_optional_detail_line, StatusTone, TuiTheme,
+};
 
 #[derive(Debug, Clone)]
 pub(super) struct LogEvent {
@@ -296,9 +298,7 @@ pub(super) fn detail_lines_for_log(
     if doc.body.trim().is_empty() {
         lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
-        for line in doc.body.lines() {
-            lines.push(markdownish_line(line, theme));
-        }
+        lines.extend(markdownish_lines(&doc.body, theme));
     }
 
     lines

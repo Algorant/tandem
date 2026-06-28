@@ -8,7 +8,8 @@ use ratatui::{
 
 use super::super::{accord_status, display_path, parse_field_values, review_status, Document};
 use super::{
-    document_state_label, rect_contains, FocusPane, HitAction, HitRegion, StatusTone, TuiTheme,
+    document_state_label, markdownish_lines, rect_contains, FocusPane, HitAction, HitRegion,
+    StatusTone, TuiTheme,
 };
 
 const QUEUE_ROW_HEIGHT: u16 = 3;
@@ -529,9 +530,7 @@ fn detail_lines(item: &ReviewQueueItem, theme: &TuiTheme) -> Vec<Line<'static>> 
     if item.body.trim().is_empty() {
         lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
-        for line in item.body.lines() {
-            lines.push(markdownish_line(line, theme));
-        }
+        lines.extend(markdownish_lines(&item.body, theme));
     }
     lines
 }
@@ -764,22 +763,6 @@ fn append_list_field(
         return;
     }
     lines.push(field_line(label, &values.join(", "), theme));
-}
-
-fn markdownish_line(line: &str, theme: &TuiTheme) -> Line<'static> {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with('#') {
-        Line::from(Span::styled(
-            line.to_string(),
-            theme.markdown_heading_style(),
-        ))
-    } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
-        Line::from(Span::styled(line.to_string(), theme.markdown_list_style()))
-    } else if trimmed.starts_with("```") {
-        Line::from(Span::styled(line.to_string(), theme.markdown_code_style()))
-    } else {
-        Line::from(Span::styled(line.to_string(), theme.text_style()))
-    }
 }
 
 fn priority_rank(priority: &str) -> u8 {
