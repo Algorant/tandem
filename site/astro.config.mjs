@@ -14,7 +14,12 @@ export default defineConfig({
           href: 'https://github.com/Algorant/tandem',
         },
       ],
-      sidebar: [{ label: 'Overview', slug: 'overview' }],
+      sidebar: [
+        {
+          label: 'Docs',
+          autogenerate: { directory: '.' },
+        },
+      ],
     }),
   ],
 });

@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "npm run sync:docs",
     "dev": "astro dev",
+    "prestart": "npm run sync:docs",
     "start": "astro dev",
+    "prebuild": "npm run sync:docs",
     "build": "astro build",
     "preview": "astro preview",
     "sync:docs": "node scripts/sync-docs.mjs"
