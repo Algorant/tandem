@@ -2,13 +2,12 @@
 id: task-32
 type: task
 title: "Update pi-tandem guidance for Validation workflow"
-state: "validation"
 priority: "med"
 relatedFiles: ["extensions/pi-tandem/README.md", "extensions/pi-tandem/plan/spec.md", "extensions/pi-tandem/plan/todo.md", "extensions/pi-tandem/index.ts"]
 tags: ["pi-tandem", "validation", "docs"]
 blockers: ["task-28", "task-29", "task-31"]
 createdAt: "2026-06-28T13:57:07Z"
-updatedAt: "2026-06-28T15:31:34Z"
+updatedAt: "2026-06-28T17:33:50Z"
 subtasks:
   - id: task-32-1
     title: "Update prompt guidance so agents deliver work into Validation"
@@ -37,6 +36,10 @@ accord:
   reviewer: "ivan"
   note: "Accepted as completed foundation for the Validation direction; remaining board/TUI cleanup is tracked separately."
   updatedAt: "2026-06-28T15:31:34Z"
+completedAt: "2026-06-28T17:33:50Z"
+completion:
+  summary: "Logged accepted pi-tandem Validation guidance after Validation blockers were resolved."
+  validation: "task-32 already accepted; prior pi-tandem smoke evidence retained"
 ---
 
 ## Description

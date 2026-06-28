@@ -2,13 +2,12 @@
 id: task-30
 type: task
 title: "Implement Board Validation flow in TUI"
-state: todo
 priority: "high"
 relatedFiles: ["tandem/src/tui.rs", "tandem/src/tui/review.rs", "tandem/plan/spec.md"]
 tags: ["tui", "validation", "ux"]
 blockers: ["task-25", "task-28", "task-29"]
 createdAt: "2026-06-28T13:57:07Z"
-updatedAt: "2026-06-28T13:57:19Z"
+updatedAt: "2026-06-28T17:33:50Z"
 subtasks:
   - id: task-30-1
     title: "Render Validation as the Board state/subview for delivered work"
@@ -33,6 +32,10 @@ accord:
     commands: ["cd tandem && cargo fmt --check", "cd tandem && cargo test", "cd tandem && cargo build"]
   constraints: ["Do not reintroduce a top-level Review/Attention pane in this task.", "Validation state is lifecycle placement; blocked/failed/rework remain cross-cutting signals unless actually delivered for acceptance.", "Keep implementation scoped to current Ratatui/crossterm TUI architecture."]
   updatedAt: "2026-06-28T13:57:19Z"
+completedAt: "2026-06-28T17:33:50Z"
+completion:
+  summary: "Implemented Board Validation flow hints in the TUI for delivered work awaiting accept/rework/complete and kept blocked/failed/rework as cross-cutting signals outside Validation placement."
+  validation: "cd tandem && cargo fmt --check && cargo test && cargo build"
 ---
 
 ## Description

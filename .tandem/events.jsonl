@@ -202,3 +202,7 @@
 {"ts":"2026-06-28T17:09:00Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"accord.accepted","id":"task-23","summary":"Accord accept for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"task.completed","id":"task-23","summary":"Accepted Board row visual polish: priority/tag/accord chips, subtle selected row, expanded Tags/Summary/Files/Checklist sections with spacing, and preserved Tab/Enter behavior."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-25","summary":"Removed the top-level Review pane from TUI navigation/rendering/help/status paths while preserving review metadata and Board Validation state."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-30","summary":"Implemented Board Validation flow hints in the TUI for delivered work awaiting accept/rework/complete and kept blocked/failed/rework as cross-cutting signals outside Validation placement."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-31","summary":"Refreshed CLI/TUI documentation for Validation as a Board workflow state and removed stale top-level Review pane language from current docs."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-32","summary":"Logged accepted pi-tandem Validation guidance after Validation blockers were resolved."}
