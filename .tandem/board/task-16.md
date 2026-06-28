@@ -6,9 +6,9 @@ state: todo
 priority: "medium"
 blockers: ["task-14"]
 references: ["task-13", "task-14"]
-tags: ["pi-extension", "pi-tandem", "relationships"]
+tags: ["pi-tandem", "relationships", "smoke"]
 createdAt: "2026-06-28T00:11:43Z"
-updatedAt: "2026-06-28T02:18:41Z"
+updatedAt: "2026-06-28T02:22:39Z"
 accord:
   status: "claimed"
   assignee: "pi"

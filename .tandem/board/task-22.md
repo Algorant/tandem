@@ -6,9 +6,9 @@ state: todo
 priority: "medium"
 references: ["task-12", "task-13"]
 relatedFiles: ["plan/todo.md", "AGENTS.md"]
-tags: ["coordination", "docs", "taxonomy", "delegation"]
+tags: ["docs", "rules", "taxonomy", "delegation"]
 createdAt: "2026-06-28T00:17:03Z"
-updatedAt: "2026-06-28T02:18:41Z"
+updatedAt: "2026-06-28T02:22:39Z"
 accord:
   status: "claimed"
   assignee: "pi"
