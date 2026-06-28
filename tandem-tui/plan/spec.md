@@ -714,7 +714,7 @@ tdm tui
   - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with selected metadata/body/path detail and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - loads the built-in `default-dark` semantic palette, or selectable built-in `verdigris` when `.tandem/theme.toml` sets `base = "verdigris"`, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets `.tandem/theme.toml` select a named built-in or user theme, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies workspace theme selection/overrides from `.tandem/theme.toml` using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active built-in palette remains in use.
   - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
@@ -951,35 +951,50 @@ Theme support is required in MVP, not a later polish task.
 
 ### Built-in themes
 
-Suggested built-ins:
+Implemented built-in presets:
 
-- `default-dark`
-- `verdigris`
-- `default-light`
-- `rose-pine`
-- `catppuccin-mocha`
-- `gruvbox-dark`
-- `nord`
-- `terminal` / no-truecolor fallback
+- `default-dark` — conservative dark/default palette.
+- `verdigris` — warm green/ochre repository default for Tandem development.
+- `terminal/no-color` — automatic fallback when `NO_COLOR=1` or `TANDEM_NO_COLOR=1` is set.
+
+Additional presets such as `default-light`, `rose-pine`, `catppuccin-mocha`, `gruvbox-dark`, or `nord` can be added later as explicit theme work.
 
 ### Theme file
 
-V0 theme files use TOML. The intended full loading order remains built-in defaults, user theme files, then workspace theme override.
+V0 theme files use TOML. The implemented loading order is built-in defaults, user theme files, then workspace selector/override.
 
 Config paths:
 
 ```text
-~/.config/tandem/themes/*.toml   # planned user theme discovery
-.tandem/theme.toml               # implemented workspace override
+$XDG_CONFIG_HOME/tandem/themes/*.toml  # user theme definitions when XDG_CONFIG_HOME is set
+~/.config/tandem/themes/*.toml         # user theme definitions otherwise
+.tandem/theme.toml                     # workspace selector and final overrides
 ```
 
-Current implementation starts from the built-in `default-dark` palette. If `.tandem/theme.toml` includes root `base = "verdigris"` (or alias `builtin`/`extends`), it selects the built-in Verdigris palette before applying any local overrides. The parser intentionally accepts only simple TOML-style root keys, `key = "color"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys, unknown built-in bases, and invalid colors are reported as non-fatal TUI status warnings.
+The TUI starts from `default-dark`, discovers every user `*.toml` theme in the user theme directory, then reads `.tandem/theme.toml` if present. The workspace file can select a named built-in or user theme without copying the full theme:
+
+```toml
+theme = "verdigris"
+```
+
+`base`, `builtin`, and `extends` are accepted selector aliases for existing workspace files. User theme files are registered by root `name`, or by their filename stem when `name` is omitted. User themes may inherit from a built-in or previously loaded user theme:
+
+```toml
+name = "my-custom-dark"
+base = "default-dark"
+
+[colors]
+accent = "#8ec07c"
+```
+
+After selection, `.tandem/theme.toml` may override any supported color key. The parser intentionally accepts only simple TOML-style root keys, `key = "color"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme files, and invalid colors are non-fatal TUI status warnings.
 
 Implemented keys:
 
 ```toml
-base = "verdigris"
-name = "verdigris"
+theme = "verdigris"
+name = "optional-display-name"
+base = "default-dark"
 
 [colors]
 background = "#1d2021"
@@ -1021,9 +1036,9 @@ failed = "#e36f63"
 unknown = "#928374"
 ```
 
-A checked-in selector for visual evaluation lives at `tandem-tui/examples/themes/verdigris.toml`; copy it to `.tandem/theme.toml`, run `cd tandem-tui && cargo run -- tui`, switch views with `1`..`5`, and press `q` to exit. A manual PTY smoke should confirm the status line reports `theme built-in verdigris + .../.tandem/theme.toml` and that priority/accord/review badges use fern/patina/aqua/ochre/moss/diff-red while keeping vellum text readable on dark panels.
+Checked-in examples live in `tandem-tui/examples/themes/default-dark.toml` and `tandem-tui/examples/themes/verdigris.toml`. Install them as user themes with `mkdir -p ~/.config/tandem/themes` and `cp tandem-tui/examples/themes/*.toml ~/.config/tandem/themes/`. A manual PTY smoke should confirm the status line reports either `theme built-in verdigris + .../.tandem/theme.toml` or `theme user theme <name> (.../themes/<name>.toml) + .../.tandem/theme.toml`; invalid themes should show non-fatal theme warning counts.
 
-`NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris is selected. User theme discovery from `~/.config/tandem/themes/*.toml` remains planned.
+`NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris or a user theme is selected.
 
 ### Theme requirements
 
@@ -1202,7 +1217,7 @@ The app should watch:
 - `events.jsonl`
 - theme files
 
-Theme config loading order is built-in defaults first, then user TOML theme files from `~/.config/tandem/themes/*.toml`, then workspace override `.tandem/theme.toml`. Workspace config wins when settings conflict.
+Theme config loading order is built-in defaults first, then user TOML theme files from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override `.tandem/theme.toml`. Workspace config wins when settings conflict.
 
 Hot reload behavior:
 
@@ -1301,7 +1316,7 @@ Need to choose later:
 - Whether to keep manual CLI parsing or approve a CLI parser crate after v0 command behavior stabilizes.
 
 - Serialization/frontmatter/event parsing strategy.
-- Whether to keep the current no-dependency workspace theme parser or later approve a fuller TOML parser for user theme discovery at `~/.config/tandem/themes/*.toml`.
+- Whether to keep the current no-dependency simple theme parser long term or later approve a fuller TOML parser for richer theme syntax.
 - File watching strategy for the first TUI MVP.
 - ID/timestamp helper strategy, if helpers are needed.
 - Whether to keep the direct crossterm event loop or introduce a thin internal event abstraction as the TUI grows.
@@ -1506,7 +1521,7 @@ Manual smoke:
 
 - Launch through `tdm tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs.
-- Board renders active board documents as count-labeled state subviews with a full-width selected-state list, richer rows, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark` theme styling, selectable built-in `verdigris` styling, and workspace `.tandem/theme.toml` color overrides.
+- Board renders active board documents as count-labeled state subviews with a full-width selected-state list, richer rows, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark`/`verdigris` theme styling, user theme discovery from config dirs, and workspace `.tandem/theme.toml` selection/color overrides.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.
 - Render safe Review action buttons/mutations and remaining Board/accord/completion workflows on top of the existing view shell.

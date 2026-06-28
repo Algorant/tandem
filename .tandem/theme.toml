@@ -1,9 +1,7 @@
 # Tandem Verdigris TUI theme selector.
 #
-# To evaluate from the repository root:
-#   cp tandem-tui/examples/themes/verdigris.toml .tandem/theme.toml
-#   cd tandem-tui && cargo run -- tui
+# This workspace intentionally selects the built-in Verdigris preset without
+# copying a full theme file into the repository.
 #
 # NO_COLOR=1 or TANDEM_NO_COLOR=1 keeps Tandem in the terminal/no-color fallback.
-base = "verdigris"
-name = "verdigris"
+theme = "verdigris"
