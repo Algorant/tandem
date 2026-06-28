@@ -161,3 +161,25 @@
 {"ts":"2026-06-28T13:09:00Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
 {"ts":"2026-06-28T13:28:31Z","event":"accord.accepted","id":"task-27","summary":"Accord accept for task-27"}
 {"ts":"2026-06-28T13:28:31Z","event":"task.completed","id":"task-27","summary":"Prepared and merged the first Tandem CLI/TUI release target for tdm v0.1.0, including release notes, lockfile, and install instructions."}
+{"ts":"2026-06-28T14:58:57Z","event":"accord.claimed","id":"task-33","summary":"Accord claim for task-33"}
+{"ts":"2026-06-28T15:05:06Z","event":"accord.claimed","id":"task-28","summary":"Accord claim for task-28"}
+{"ts":"2026-06-28T15:05:13Z","event":"task.moved","id":"task-28","summary":"Moved task-28 from todo to in-progress"}
+{"ts":"2026-06-28T15:05:19Z","event":"task.moved","id":"task-33","summary":"Moved task-33 from todo to in-progress"}
+{"ts":"2026-06-28T15:05:19Z","event":"accord.delivered","id":"task-33","summary":"Accord deliver for task-33"}
+{"ts":"2026-06-28T15:08:24Z","event":"task.moved","id":"task-28","summary":"Moved task-28 from in-progress to validation"}
+{"ts":"2026-06-28T15:08:28Z","event":"accord.claimed","id":"task-29","summary":"Accord claim for task-29"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-31","summary":"Accord claim for task-31"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-32","summary":"Accord claim for task-32"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-26","summary":"Accord claim for task-26"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-28","summary":"Accord deliver for task-28"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-29","summary":"Accord deliver for task-29"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-32","summary":"Accord deliver for task-32"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to validation"}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-33","summary":"Accord accept for task-33"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-33","summary":"Accepted Board layout/header/inline expansion work; Enter expands rows and Tab toggles the detail pane as intended."}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-34","summary":"Renamed CLI/TUI app and release surface to tandem; global install and command verified."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-28","summary":"Accord accept for task-28"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-28","summary":"Defined Validation as the canonical workflow state in protocol/root docs while preserving review metadata and legacy review-state tolerance."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-29","summary":"Accord accept for task-29"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-29","summary":"Updated CLI defaults and state handling to prefer validation while tolerating legacy review aliases and syncing common accord transitions."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-32","summary":"Accord accept for task-32"}

@@ -4,7 +4,7 @@ type: task
 title: "Research Tandem documentation platform and static site approach"
 state: "in-progress"
 priority: "medium"
-relatedFiles: ["README.md", "plan/spec.md", "protocol/plan/spec.md", "tandem-tui/plan/spec.md", "extensions/plan/spec.md", "plan/docs-platform-research.md"]
+relatedFiles: ["README.md", "plan/spec.md", "protocol/plan/spec.md", "tandem/plan/spec.md", "extensions/plan/spec.md", "plan/docs-platform-research.md"]
 tags: ["docs", "research", "static-site", "github-pages"]
 createdAt: "2026-06-28T03:45:11Z"
 updatedAt: "2026-06-28T04:42:04Z"

@@ -4,7 +4,7 @@ type: task
 title: "Harden TUI runtime interactions and rendering"
 state: "in-progress"
 priority: "medium"
-relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
+relatedFiles: ["tandem/src/tui.rs", "tandem/plan/spec.md"]
 tags: ["tui", "keyboard", "mouse", "markdown"]
 createdAt: "2026-06-27T03:59:00Z"
 updatedAt: "2026-06-28T04:46:25Z"
@@ -25,9 +25,9 @@ accord:
   status: "claimed"
   assignee: "pi"
   claimedAt: "2026-06-28T02:27:57Z"
-  deliverables: ["code:tandem-tui/src/tui.rs:runtime interaction polish", "docs:tandem-tui/plan/spec.md:keybinding/mouse/markdown details if behavior changes"]
+  deliverables: ["code:tandem/src/tui.rs:runtime interaction polish", "docs:tandem/plan/spec.md:keybinding/mouse/markdown details if behavior changes"]
   validation:
-    commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
+    commands: ["cd tandem && cargo fmt --check", "cd tandem && cargo test", "cd tandem && cargo build"]
   constraints: ["Keep keyboard-first behavior; drag/drop stays out of v0."]
   updatedAt: "2026-06-28T03:32:31Z"
 ---
@@ -38,7 +38,7 @@ Finish MVP interaction polish as a parent task tracked through focused subtasks.
 
 Context from orchestration:
 - This task is intentionally broad and should not be delegated as one monolithic implementation slice.
-- Use the subtasks below to keep work reviewable and reduce conflicts in `tandem-tui/src/tui.rs`.
+- Use the subtasks below to keep work reviewable and reduce conflicts in `tandem/src/tui.rs`.
 - Delegate hot reload/error handling and Markdown rendering first; mouse/action-button work should follow once runtime stability is clearer; final keybinding/help cleanup should come last.
 
 Subtask direction:

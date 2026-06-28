@@ -2,11 +2,16 @@
 id: task-34
 type: task
 title: "Rename CLI/TUI app and command to tandem"
-state: "in-progress"
 priority: "high"
 tags: ["config", "cli", "monorepo"]
 createdAt: "2026-06-28T14:51:57Z"
-updatedAt: "2026-06-28T14:56:25Z"
+updatedAt: "2026-06-28T15:31:34Z"
+completedAt: "2026-06-28T15:31:34Z"
+completion:
+  summary: "Renamed CLI/TUI app and release surface to tandem; global install and command verified."
+  filesChanged: ["tandem/Cargo.toml", "tandem/src/main.rs", "README.md", "AGENTS.md", "extensions/pi-tandem/index.ts"]
+  validation: "Committed and pushed 3f1677e; cargo/bun/install validation passed; user verified rename and release work"
+  reviewer: "ivan"
 ---
 
 ## Description
