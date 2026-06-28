@@ -8,14 +8,16 @@ blockers: ["task-14"]
 references: ["task-13", "task-14"]
 tags: ["pi-extension", "pi-tandem", "relationships"]
 createdAt: "2026-06-28T00:11:43Z"
-updatedAt: "2026-06-28T00:11:43Z"
+updatedAt: "2026-06-28T02:18:41Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-06-28T02:18:41Z"
   deliverables: ["test:extensions/pi-tandem/tests/relationship-smoke.md:relationship guidance smoke notes", "docs:extensions/pi-tandem/README.md:relationship examples or guidance updates"]
   validation:
-    commands: ["rg -n 'parentId|blockers|references|subtasks|relationship' extensions/pi-tandem .tandem/board"]
+    commands: ["bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts", "bun extensions/pi-tandem/tests/smoke.ts", "bun extensions/pi-tandem/tests/pi-runtime-smoke.ts"]
   constraints: ["Run after task-14 project-local pi-tandem smoke is available.", "Do not invent new protocol relationship fields unless protocol docs are explicitly updated."]
-  updatedAt: "2026-06-28T00:11:43Z"
+  updatedAt: "2026-06-28T02:18:41Z"
 ---
 
 ## Description

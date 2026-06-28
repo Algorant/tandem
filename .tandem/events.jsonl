@@ -126,3 +126,5 @@
 {"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-21","summary":"Accord deliver for task-21"}
 {"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-21","summary":"Accord accept for task-21"}
 {"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-21","summary":"Integrated TUI editor-open support for active task documents from Board and Review."}
+{"ts":"2026-06-28T02:18:41Z","event":"accord.claimed","id":"task-16","summary":"Accord claim for task-16"}
+{"ts":"2026-06-28T02:18:41Z","event":"accord.claimed","id":"task-22","summary":"Accord claim for task-22"}

@@ -8,14 +8,16 @@ references: ["task-12", "task-13"]
 relatedFiles: ["plan/todo.md", "AGENTS.md"]
 tags: ["coordination", "docs", "taxonomy", "delegation"]
 createdAt: "2026-06-28T00:17:03Z"
-updatedAt: "2026-06-28T00:17:03Z"
+updatedAt: "2026-06-28T02:18:41Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-06-28T02:18:41Z"
   deliverables: ["docs:plan/todo.md:tag taxonomy or convention notes", "docs:AGENTS.md:agent task tagging guidance if needed"]
   validation:
-    commands: ["./tandem-tui/target/debug/tdm search ui --json"]
+    commands: ["./tandem-tui/target/debug/tdm list --tag pi-tandem", "git diff --check"]
   constraints: ["Prefer convention and docs before protocol/schema changes."]
-  updatedAt: "2026-06-28T00:17:03Z"
+  updatedAt: "2026-06-28T02:18:41Z"
 ---
 
 ## Description
