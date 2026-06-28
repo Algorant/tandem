@@ -202,3 +202,8 @@
 {"ts":"2026-06-28T17:09:00Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"accord.accepted","id":"task-23","summary":"Accord accept for task-23"}
 {"ts":"2026-06-28T17:12:04Z","event":"task.completed","id":"task-23","summary":"Accepted Board row visual polish: priority/tag/accord chips, subtle selected row, expanded Tags/Summary/Files/Checklist sections with spacing, and preserved Tab/Enter behavior."}
+{"ts":"2026-06-28T17:26:15Z","event":"accord.claimed","id":"task-36","summary":"Accord claim for task-36"}
+{"ts":"2026-06-28T17:26:18Z","event":"accord.claimed","id":"task-37","summary":"Accord claim for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"accord.delivered","id":"task-37","summary":"Accord deliver for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"task.completed","id":"task-37","summary":"Created the initial docs/ Markdown skeleton as canonical documentation source."}
+{"ts":"2026-06-28T17:27:14Z","event":"accord.claimed","id":"task-38","summary":"Accord claim for task-38"}

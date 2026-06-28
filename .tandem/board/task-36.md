@@ -2,13 +2,13 @@
 id: task-36
 type: task
 title: "Implement Tandem docs site foundation"
-state: todo
+state: "in-progress"
 priority: "high"
 references: ["task-24"]
 relatedFiles: ["docs", "site", ".github/workflows"]
 tags: ["docs", "site", "astro", "github-pages"]
 createdAt: "2026-06-28T16:58:46Z"
-updatedAt: "2026-06-28T16:58:46Z"
+updatedAt: "2026-06-28T17:26:15Z"
 subtasks:
   - id: task-36-1
     title: "Create the docs/ content skeleton"
@@ -25,6 +25,11 @@ subtasks:
   - id: task-36-5
     title: "Add GitHub Pages deployment workflow"
     completed: false
+accord:
+  status: "claimed"
+  assignee: "docs-site-36-41"
+  claimedAt: "2026-06-28T17:26:15Z"
+  updatedAt: "2026-06-28T17:26:15Z"
 ---
 
 ## Description
