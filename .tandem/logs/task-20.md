@@ -2,22 +2,30 @@
 id: task-20
 type: task
 title: "Surface Board accord details for selected tasks"
-state: todo
 priority: "high"
 references: ["task-5", "task-11"]
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "board", "accord"]
 createdAt: "2026-06-28T00:17:02Z"
-updatedAt: "2026-06-28T01:43:16Z"
+updatedAt: "2026-06-28T02:04:09Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-06-28T01:43:16Z"
+  deliveredAt: "2026-06-28T02:04:09Z"
   deliverables: ["code:tandem-tui/src/tui.rs:Board accord detail rendering", "docs:tandem-tui/plan/spec.md:Board accord detail behavior"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build"]
   constraints: ["Do not change protocol accord semantics."]
-  updatedAt: "2026-06-28T01:43:16Z"
+  summary: "Added Board selected-task accord details and read-only next-action hints."
+  evidence: ["Merged 93e1fd8 via 7ff3e75; integrated validation passed."]
+  filesChanged: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
+  reviewer: "pi"
+  updatedAt: "2026-06-28T02:04:09Z"
+completedAt: "2026-06-28T02:04:09Z"
+completion:
+  summary: "Integrated Board accord detail rendering with status styling, metadata, and CLI hints."
+  validation: "cargo fmt --check; cargo test; cargo build"
 ---
 
 ## Description

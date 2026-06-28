@@ -2,21 +2,29 @@
 id: task-21
 type: task
 title: "Open selected Tandem items in $EDITOR from TUI"
-state: todo
 priority: "high"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "editor", "workflow"]
 createdAt: "2026-06-28T00:17:03Z"
-updatedAt: "2026-06-28T01:43:16Z"
+updatedAt: "2026-06-28T02:04:09Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-06-28T01:43:16Z"
+  deliveredAt: "2026-06-28T02:04:09Z"
   deliverables: ["code:tandem-tui/src/tui.rs:external editor action", "docs:tandem-tui/README.md:editor key and behavior"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build"]
   constraints: ["Do not corrupt terminal raw mode or alternate screen on editor launch/return."]
-  updatedAt: "2026-06-28T01:43:16Z"
+  summary: "Added TUI editor-open action for active tasks."
+  evidence: ["Merged b13727f via fe08697; integrated validation passed."]
+  filesChanged: ["tandem-tui/src/tui.rs", "tandem-tui/src/tui/decisions.rs", "tandem-tui/README.md"]
+  reviewer: "pi"
+  updatedAt: "2026-06-28T02:04:09Z"
+completedAt: "2026-06-28T02:04:09Z"
+completion:
+  summary: "Integrated TUI editor-open support for active task documents from Board and Review."
+  validation: "cargo fmt --check; cargo test; cargo build"
 ---
 
 ## Description

@@ -117,3 +117,12 @@
 {"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-14","summary":"Accord claim for task-14"}
 {"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-20","summary":"Accord claim for task-20"}
 {"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-21","summary":"Accord claim for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-14","summary":"Accord deliver for task-14"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-14","summary":"Accord accept for task-14"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-14","summary":"Integrated project-local pi-tandem runtime smoke coverage and documentation."}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-20","summary":"Accord deliver for task-20"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-20","summary":"Accord accept for task-20"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-20","summary":"Integrated Board accord detail rendering with status styling, metadata, and CLI hints."}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-21","summary":"Accord deliver for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-21","summary":"Accord accept for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-21","summary":"Integrated TUI editor-open support for active task documents from Board and Review."}
