@@ -1,0 +1,12 @@
+# Tandem Default Dark TUI theme preset.
+#
+# Use as a user theme:
+#   mkdir -p ~/.config/tandem/themes
+#   cp tandem-tui/examples/themes/default-dark.toml ~/.config/tandem/themes/default-dark.toml
+#
+# Select from a workspace without copying the full theme:
+#   printf 'theme = "default-dark"\n' > .tandem/theme.toml
+#
+# NO_COLOR=1 or TANDEM_NO_COLOR=1 keeps Tandem in the terminal/no-color fallback.
+base = "default-dark"
+name = "default-dark"

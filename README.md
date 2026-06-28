@@ -42,7 +42,7 @@ tandem-tui/    CLI + Rust/Ratatui TUI planning and implementation
 - First TUI MVP: board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, simple filtered Review queue, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI aliases: none; canonical commands and long flags only.
 - V0 repo shape: implementation stays under `tandem-tui/`; no root Rust workspace, schemas, or fixtures.
-- Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, then workspace TOML override at `.tandem/theme.toml`.
+- Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
 - Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Documentation contract

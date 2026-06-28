@@ -42,7 +42,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Locked first TUI MVP inclusion of board mutations.
 - [x] Locked theme support into the first TUI MVP.
 - [x] Locked theme config loading order: built-in defaults, then user config, then workspace config.
-- [x] Locked v0 theme file policy: TOML user themes in `~/.config/tandem/themes/*.toml` and workspace override at `.tandem/theme.toml`.
+- [x] Locked v0 theme file policy: TOML user themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml` and workspace selector/override at `.tandem/theme.toml`.
 - [x] Locked mouse support into the first TUI MVP, enabled by default for click/scroll/tab/action-button interactions.
 - [x] Excluded drag/drop from v0.
 - [x] Locked fixed default keybindings for v0; keymap config is deferred.
@@ -130,6 +130,11 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - the active state gets the full Board list area
   - rows include richer priority, title, accord/review, checklist, tag, assignee, updated, file-count, path, and right-ish ID metadata
   - quick-add, `H`/`L` task moves, detail focus, theme styling, and mouse wheel/click behavior remain active
+- [x] Added first-class user theme discovery and preset examples:
+  - discovers `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`
+  - lets `.tandem/theme.toml` select built-in or user themes with `theme = "name"` before applying workspace overrides
+  - keeps invalid theme files non-fatal with status warnings
+  - documents `default-dark` and `verdigris` examples under `tandem-tui/examples/themes/`
 
 ## Current tasks
 
@@ -146,7 +151,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Define minimal implementation layout inside `tandem-tui/` and dependency choices only when implementation begins.
 - [x] Decide initial Ratatui event loop approach.
 - [x] Define exact TOML theme keys for workspace override in the current theme foundation.
-- [ ] Add full user theme discovery from `~/.config/tandem/themes/*.toml`.
+- [x] Add full user theme discovery from `~/.config/tandem/themes/*.toml` and `$XDG_CONFIG_HOME/tandem/themes/*.toml`.
 - [ ] Define final fixed keyboard default table for v0.
 - [ ] Define styled-basic Markdown rendering details.
 
@@ -155,7 +160,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 1. Add safe Review action buttons/mutations on top of the current read-only queue, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Extend Decisions with references/tags prompts only if the TUI needs full CLI option parity beyond the basic title/body flow.
-4. Finish full user theme discovery and any additional built-in palettes beyond Verdigris if needed, then draft final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
+4. Add any additional built-in palettes beyond Verdigris only as explicit theme requests; next broad polish remains final mouse hit-map, keyboard, and styled-basic Markdown requirements at MVP level.
 5. Keep parent and area docs synchronized as TUI implementation continues.
 6. Change existing CLI behavior only for explicit new feature requests or bug fixes.
 
@@ -172,7 +177,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Add/edit/delete rules.
 - [x] Browse active decisions and add basic title/body decisions.
 - [x] Show and search logs.
-- [x] Load and apply built-in plus workspace override themes.
+- [x] Load and apply built-in, user-discovered, plus workspace selector/override themes.
 - [x] Support mouse selection, scrolling, and tab/subview switching by default.
 - [ ] Add action-button click interactions.
 - [ ] Confirm drag/drop is absent from v0 interactions.
@@ -185,7 +190,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Makes the simple filtered Review queue obvious.
 - [x] Makes accord state obvious at a basic status-badge level.
 - [x] Supports board mutations immediately.
-- [x] Supports built-in plus workspace override themes.
+- [x] Supports built-in, user-discovered, plus workspace selector/override themes.
 - [x] Supports mouse selection and scroll.
 - [ ] Handles external file edits without crashing.
 - [x] Keeps logs useful, searchable, and inspectable.

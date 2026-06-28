@@ -1975,7 +1975,7 @@ impl TuiApp {
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board state subviews, quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in defaults and .tandem/theme.toml workspace overrides are active; user theme discovery and richer action buttons remain planned."),
+            Line::from("Board state subviews, quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(

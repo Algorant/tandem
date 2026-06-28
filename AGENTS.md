@@ -67,7 +67,7 @@ CLI/TUI:
 - TUI top-level views: Board, Review, Logs, Rules, Decisions.
 - Theme and mouse support are part of the first TUI MVP.
 - Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded from v0.
-- Theme config loading order: built-in defaults, user TOML themes in `~/.config/tandem/themes/*.toml`, workspace TOML override at `.tandem/theme.toml`.
+- Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, workspace selector/override at `.tandem/theme.toml`.
 - V0 keybindings are fixed defaults; custom keymap config is deferred.
 - V0 Markdown rendering is styled basics.
 - V0 Review queue is a simple filtered list, not hard-coded workflow sections.

@@ -1,6 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
+use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use super::super::{display_path, Workspace};
 
@@ -9,6 +11,24 @@ pub(super) struct ThemeLoad {
     pub(super) theme: TuiTheme,
     pub(super) source: String,
     pub(super) warnings: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct UserThemeRegistry {
+    themes: BTreeMap<String, UserTheme>,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct UserTheme {
+    theme: TuiTheme,
+    path: PathBuf,
+}
+
+#[derive(Debug, Clone)]
+struct ResolvedTheme {
+    theme: TuiTheme,
+    source: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -178,9 +198,21 @@ impl TuiTheme {
         }
     }
 
+    fn built_in_names() -> &'static [&'static str] {
+        &["default-dark", "verdigris"]
+    }
+
     pub(super) fn load_for_workspace(workspace: &Workspace) -> ThemeLoad {
         let no_color =
             env::var_os("NO_COLOR").is_some() || env::var_os("TANDEM_NO_COLOR").is_some();
+        Self::load_for_workspace_with_options(workspace, user_theme_dir_from_env(), no_color)
+    }
+
+    fn load_for_workspace_with_options(
+        workspace: &Workspace,
+        user_theme_dir: Option<PathBuf>,
+        no_color: bool,
+    ) -> ThemeLoad {
         let mut theme = if no_color {
             Self::no_color()
         } else {
@@ -192,35 +224,53 @@ impl TuiTheme {
             format!("built-in {}", theme.name)
         };
         let mut warnings = Vec::new();
-        let workspace_theme = workspace.config_path.with_file_name("theme.toml");
+        let user_themes = if no_color {
+            UserThemeRegistry::default()
+        } else {
+            match user_theme_dir.as_deref() {
+                Some(dir) => load_user_themes(dir),
+                None => UserThemeRegistry::default(),
+            }
+        };
+        warnings.extend(user_themes.warnings.clone());
 
+        let workspace_theme = workspace.config_path.with_file_name("theme.toml");
         if workspace_theme.exists() {
             match fs::read_to_string(&workspace_theme) {
                 Ok(content) => {
                     if no_color {
                         if let Some(name) =
-                            parse_theme_base(&content).or_else(|| parse_theme_name(&content))
+                            parse_theme_selection(&content).or_else(|| parse_theme_name(&content))
                         {
                             theme.name = format!("{name} (no-color)");
                         }
-                    } else {
-                        if let Some(base) = parse_theme_base(&content) {
-                            match Self::built_in(&base) {
-                                Some(base_theme) => theme = base_theme,
-                                None => warnings.push(format!(
-                                    "Theme warning: unknown built-in theme `{base}`; using default-dark"
-                                )),
-                            }
-                        }
-                        let built_in_source = format!("built-in {}", theme.name);
-                        warnings.extend(theme.apply_theme_content(&content));
-                        source = format!("{built_in_source} + {}", display_path(&workspace_theme));
-                    }
-                    if no_color {
                         source = format!(
                             "built-in terminal/no-color + {}",
                             display_path(&workspace_theme)
                         );
+                    } else {
+                        if let Some(selection) = parse_theme_selection(&content) {
+                            match resolve_theme_reference(&selection, &user_themes) {
+                                Some(resolved) => {
+                                    theme = resolved.theme;
+                                    source = resolved.source;
+                                }
+                                None => warnings.push(format!(
+                                    "Theme warning: unknown theme `{selection}`; searched built-ins [{}] and user themes{}; using default-dark",
+                                    Self::built_in_names().join(", "),
+                                    user_theme_dir
+                                        .as_deref()
+                                        .map(|dir| format!(" in {}", display_path(dir)))
+                                        .unwrap_or_else(|| "".to_string())
+                                )),
+                            }
+                        }
+                        let selected_source = source.clone();
+                        warnings.extend(prefix_theme_warnings(
+                            &workspace_theme,
+                            theme.apply_theme_content(&content),
+                        ));
+                        source = format!("{selected_source} + {}", display_path(&workspace_theme));
                     }
                 }
                 Err(error) => warnings.push(format!(
@@ -492,7 +542,7 @@ impl TuiTheme {
                             self.name = value;
                         }
                     }
-                    "base" | "builtin" | "extends" => {}
+                    "theme" | "base" | "builtin" | "extends" => {}
                     _ => warnings.push(format!(
                         "Theme warning line {line_number}: unknown root key `{key}`"
                     )),
@@ -564,6 +614,157 @@ impl TuiTheme {
     }
 }
 
+fn user_theme_dir_from_env() -> Option<PathBuf> {
+    if let Some(xdg_config_home) = env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty())
+    {
+        return Some(PathBuf::from(xdg_config_home).join("tandem").join("themes"));
+    }
+
+    env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .map(|home| {
+            PathBuf::from(home)
+                .join(".config")
+                .join("tandem")
+                .join("themes")
+        })
+}
+
+fn load_user_themes(dir: &Path) -> UserThemeRegistry {
+    let mut registry = UserThemeRegistry::default();
+    if !dir.exists() {
+        return registry;
+    }
+
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) => {
+            registry.warnings.push(format!(
+                "Theme warning: could not read user theme directory {}: {error}",
+                display_path(dir)
+            ));
+            return registry;
+        }
+    };
+
+    let mut paths = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => {
+                let path = entry.path();
+                if path.extension().and_then(|value| value.to_str()) == Some("toml") {
+                    paths.push(path);
+                }
+            }
+            Err(error) => registry.warnings.push(format!(
+                "Theme warning: could not inspect user theme in {}: {error}",
+                display_path(dir)
+            )),
+        }
+    }
+    paths.sort();
+
+    for path in paths {
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+            registry.warnings.push(format!(
+                "Theme warning: could not determine user theme name for {}",
+                display_path(&path)
+            ));
+            continue;
+        };
+        let fallback_name = stem.trim().to_string();
+        let content = match fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(error) => {
+                registry.warnings.push(format!(
+                    "Theme warning: could not read user theme {}: {error}",
+                    display_path(&path)
+                ));
+                continue;
+            }
+        };
+
+        let explicit_name = parse_theme_name(&content);
+        let theme_name = explicit_name
+            .clone()
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or(fallback_name);
+        let key = normalized(&theme_name);
+        if key.is_empty() {
+            registry.warnings.push(format!(
+                "Theme warning: user theme {} has an empty name",
+                display_path(&path)
+            ));
+            continue;
+        }
+        if registry.themes.contains_key(&key) {
+            registry.warnings.push(format!(
+                "Theme warning: duplicate user theme `{theme_name}` in {}; keeping the first definition",
+                display_path(&path)
+            ));
+            continue;
+        }
+
+        let mut theme = match parse_theme_base(&content) {
+            Some(base) => match resolve_theme_reference(&base, &registry) {
+                Some(resolved) => resolved.theme,
+                None => {
+                    registry.warnings.push(format!(
+                        "Theme warning: unknown base `{base}` in user theme {}; using default-dark",
+                        display_path(&path)
+                    ));
+                    TuiTheme::default_dark()
+                }
+            },
+            None => TuiTheme::default_dark(),
+        };
+        registry.warnings.extend(prefix_theme_warnings(
+            &path,
+            theme.apply_theme_content(&content),
+        ));
+        if explicit_name.is_none() {
+            theme.name = theme_name.clone();
+        }
+
+        registry.themes.insert(key, UserTheme { theme, path });
+    }
+
+    registry
+}
+
+fn resolve_theme_reference(name: &str, user_themes: &UserThemeRegistry) -> Option<ResolvedTheme> {
+    let key = normalized(name);
+    if let Some(user_theme) = user_themes.themes.get(&key) {
+        return Some(ResolvedTheme {
+            theme: user_theme.theme.clone(),
+            source: format!(
+                "user theme {} ({})",
+                user_theme.theme.name(),
+                display_path(&user_theme.path)
+            ),
+        });
+    }
+
+    TuiTheme::built_in(name).map(|theme| ResolvedTheme {
+        source: format!("built-in {}", theme.name()),
+        theme,
+    })
+}
+
+fn prefix_theme_warnings(path: &Path, warnings: Vec<String>) -> Vec<String> {
+    warnings
+        .into_iter()
+        .map(|warning| match warning.strip_prefix("Theme warning ") {
+            Some(rest) => format!("Theme warning {}: {rest}", display_path(path)),
+            None => format!("Theme warning {}: {warning}", display_path(path)),
+        })
+        .collect()
+}
+
+fn parse_theme_selection(content: &str) -> Option<String> {
+    parse_root_value(content, &["theme"]).or_else(|| parse_theme_base(content))
+}
+
 fn parse_theme_base(content: &str) -> Option<String> {
     parse_root_value(content, &["base", "builtin", "extends"])
 }
@@ -575,11 +776,10 @@ fn parse_theme_name(content: &str) -> Option<String> {
 fn parse_root_value(content: &str, keys: &[&str]) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty()
-            || line.starts_with('#')
-            || line.starts_with(';')
-            || line.starts_with('[')
-        {
+        if line.starts_with('[') {
+            break;
+        }
+        if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
             continue;
         }
         let Some((key, value)) = line.split_once('=') else {
@@ -746,6 +946,90 @@ changes-requested = "#eb6f92"
     }
 
     #[test]
+    fn discovers_user_theme_and_applies_workspace_selector() {
+        let root = temp_theme_dir("selector");
+        let workspace = workspace_at(&root);
+        let user_theme_dir = root.join("xdg").join("tandem").join("themes");
+        std::fs::create_dir_all(&user_theme_dir).unwrap();
+        std::fs::write(
+            user_theme_dir.join("calm-dark.toml"),
+            r##"
+name = "calm-dark"
+base = "default-dark"
+
+[colors]
+accent = "#010203"
+"##,
+        )
+        .unwrap();
+        std::fs::write(
+            workspace.config_path.with_file_name("theme.toml"),
+            r##"
+theme = "calm-dark"
+
+[colors]
+border = "#040506"
+"##,
+        )
+        .unwrap();
+
+        let load = TuiTheme::load_for_workspace_with_options(
+            &workspace,
+            Some(user_theme_dir.clone()),
+            false,
+        );
+
+        assert!(
+            load.warnings.is_empty(),
+            "unexpected warnings: {:?}",
+            load.warnings
+        );
+        assert_eq!(load.theme.name(), "calm-dark");
+        assert_eq!(load.theme.colors.accent, Color::Rgb(1, 2, 3));
+        assert_eq!(load.theme.colors.border, Color::Rgb(4, 5, 6));
+        assert!(load.source.contains("user theme calm-dark"));
+        assert!(load.source.contains("theme.toml"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn invalid_user_theme_warns_without_blocking_fallback_theme() {
+        let root = temp_theme_dir("invalid");
+        let workspace = workspace_at(&root);
+        let user_theme_dir = root.join("xdg").join("tandem").join("themes");
+        std::fs::create_dir_all(&user_theme_dir).unwrap();
+        std::fs::write(
+            user_theme_dir.join("broken.toml"),
+            r##"
+name = "broken"
+
+[colors]
+accent = "wat"
+"##,
+        )
+        .unwrap();
+
+        let load =
+            TuiTheme::load_for_workspace_with_options(&workspace, Some(user_theme_dir), false);
+
+        assert_eq!(load.theme.name(), "default-dark");
+        assert!(load.source.contains("built-in default-dark"));
+        assert_eq!(load.warnings.len(), 1);
+        assert!(load.warnings[0].contains("broken.toml"));
+        assert!(load.warnings[0].contains("invalid color"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn root_selector_parsing_stops_at_sections() {
+        assert_eq!(
+            parse_theme_selection("theme = \"verdigris\""),
+            Some("verdigris".to_string())
+        );
+        assert_eq!(parse_theme_selection("[colors]\ntheme = \"ignored\""), None);
+    }
+
+    #[test]
     fn reports_unknown_keys_and_bad_colors() {
         let mut theme = TuiTheme::default_dark();
         let warnings = theme.apply_theme_content(
@@ -758,5 +1042,36 @@ accent = "wat"
         assert_eq!(warnings.len(), 2);
         assert!(warnings[0].contains("unknown theme key"));
         assert!(warnings[1].contains("invalid color"));
+    }
+
+    fn temp_theme_dir(name: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        path.push(format!(
+            "tandem-theme-{name}-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn workspace_at(root: &Path) -> Workspace {
+        let tandem_dir = root.join(".tandem");
+        std::fs::create_dir_all(&tandem_dir).unwrap();
+        let config_path = tandem_dir.join("tandem.md");
+        std::fs::write(
+            &config_path,
+            "---\ntitle: Test\nstates: [todo, in-progress, review]\n---\n",
+        )
+        .unwrap();
+        Workspace {
+            board_dir: tandem_dir.join("board"),
+            logs_dir: tandem_dir.join("logs"),
+            events_path: tandem_dir.join("events.jsonl"),
+            config_path,
+        }
     }
 }

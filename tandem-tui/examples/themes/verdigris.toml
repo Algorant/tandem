@@ -1,6 +1,13 @@
-# Tandem Verdigris TUI theme selector.
+# Tandem Verdigris TUI theme preset.
 #
-# To evaluate from the repository root:
+# Use as a user theme:
+#   mkdir -p ~/.config/tandem/themes
+#   cp tandem-tui/examples/themes/verdigris.toml ~/.config/tandem/themes/verdigris.toml
+#
+# Select from a workspace without copying the full theme:
+#   printf 'theme = "verdigris"\n' > .tandem/theme.toml
+#
+# To evaluate the repository default from the repository root:
 #   cp tandem-tui/examples/themes/verdigris.toml .tandem/theme.toml
 #   cd tandem-tui && cargo run -- tui
 #
