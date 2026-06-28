@@ -13,7 +13,8 @@ This is the first installable Tandem CLI/TUI release target. It is intended to u
 - Markdown/YAML-frontmatter Tandem workspace support under `.tandem/`, with active work in `.tandem/board/`, completed logs in `.tandem/logs/`, and audit events in `.tandem/events.jsonl`.
 - Raw-source minimal-diff mutations for task movement, completion metadata, accord lifecycle, rules, and decisions.
 - Ratatui/crossterm TUI with Board, Review, Logs, Rules, and Decisions tabs.
-- Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), and `$EDITOR` open for selected active tasks (`e`).
+- Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), manual reload (`r`), and `$EDITOR` open for selected active tasks (`e`).
+- Idle file-change hot reload with selection preservation where possible and safe warning/error surfacing for reload parse/load issues.
 - Review queue, completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
 - Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, and workspace selection/overrides from `.tandem/theme.toml`.
 - Mouse tab/click/scroll support and fixed keyboard defaults.
@@ -24,7 +25,7 @@ This is the first installable Tandem CLI/TUI release target. It is intended to u
 - No root Rust workspace or split crates; install commands must target `--path tandem-tui`.
 - No `tdm --version` command yet; version confirmation is currently from `tandem-tui/Cargo.toml`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
-- TUI gaps remain for richer Board mutations, Review action mutations/buttons, decision reference/tag prompt parity, hot reload, richer action buttons, and `$EDITOR` support for decisions/custom documents.
+- TUI gaps remain for richer Board mutations, Review action mutations/buttons, decision reference/tag prompt parity, richer action buttons, and `$EDITOR` support for decisions/custom documents.
 - Keybindings are fixed defaults; custom keymap config is deferred.
 - Markdown rendering is styled basics only.
 - Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope for v0.
