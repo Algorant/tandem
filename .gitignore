@@ -4,7 +4,8 @@
 # Rust
 /target/
 **/target/
-Cargo.lock
+# Keep binary crate lockfiles committed; ignore only an accidental root lockfile.
+/Cargo.lock
 
 # Editors / OS
 .DS_Store

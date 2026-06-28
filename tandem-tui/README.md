@@ -43,6 +43,24 @@ cargo run -- tui
 
 Use `cargo run -- <command>` during early development. The package binary name is `tdm`.
 
+## Release and install target
+
+Current release recommendation: `tandem-tui` package version `0.1.0`, `tdm` binary, annotated git tag `tandem-tui-v0.1.0`.
+
+After that tag is approved and pushed, downstream integrations such as `pi-tandem` should install the CLI with:
+
+```text
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-tui-v0.1.0 --path tandem-tui --locked
+```
+
+For local checkout installs before a tag is published:
+
+```text
+cargo install --path tandem-tui --locked
+```
+
+`pi-tandem` should locate the installed binary through `TANDEM_TDM_BIN`, `TDM_BIN`, or `tdm` on `$PATH` in that order. Release notes, known limitations, and the blocked publish commands are in `RELEASE.md`.
+
 ## Implemented TUI themes and keys
 
 `tdm tui` starts from the built-in `default-dark` palette. It then discovers user theme files and finally applies the workspace selector/override:
