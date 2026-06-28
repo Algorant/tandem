@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
-use std::io;
+use std::env;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::Duration;
 
 use crossterm::{
@@ -35,7 +38,7 @@ pub(crate) fn run_tui() -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let mut app = TuiApp::load(workspace)?;
     let mut session = TerminalSession::enter()?;
-    app.run(session.terminal_mut())
+    app.run(&mut session)
 }
 
 struct TerminalSession {
@@ -71,6 +74,32 @@ impl TerminalSession {
 
     fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<io::Stdout>> {
         &mut self.terminal
+    }
+
+    fn suspend_for_editor(&mut self) -> Result<(), CliError> {
+        self.terminal.show_cursor()?;
+        self.terminal.backend_mut().flush()?;
+        disable_raw_mode()?;
+        execute!(
+            self.terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        Ok(())
+    }
+
+    fn resume_after_editor(&mut self) -> Result<(), CliError> {
+        enable_raw_mode()?;
+        if let Err(error) = execute!(
+            self.terminal.backend_mut(),
+            EnterAlternateScreen,
+            EnableMouseCapture
+        ) {
+            let _ = disable_raw_mode();
+            return Err(error.into());
+        }
+        self.terminal.clear()?;
+        Ok(())
     }
 }
 
@@ -150,6 +179,13 @@ impl TuiView {
             Self::Decisions => "5 Decisions",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeyAction {
+    Continue,
+    Quit,
+    OpenEditor,
 }
 
 #[derive(Debug, Clone)]
@@ -316,19 +352,16 @@ impl TuiApp {
         Ok(())
     }
 
-    fn run(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    ) -> Result<(), CliError> {
+    fn run(&mut self, session: &mut TerminalSession) -> Result<(), CliError> {
         loop {
-            terminal.draw(|frame| self.draw(frame))?;
+            session.terminal_mut().draw(|frame| self.draw(frame))?;
             if event::poll(Duration::from_millis(200))? {
                 match event::read()? {
-                    Event::Key(key) => {
-                        if self.handle_key(key)? {
-                            break;
-                        }
-                    }
+                    Event::Key(key) => match self.handle_key(key)? {
+                        KeyAction::Continue => {}
+                        KeyAction::Quit => break,
+                        KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
+                    },
                     Event::Mouse(mouse) => self.handle_mouse(mouse),
                     Event::Resize(_, _) => {}
                     _ => {}
@@ -338,29 +371,29 @@ impl TuiApp {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Result<bool, CliError> {
+    fn handle_key(&mut self, key: KeyEvent) -> Result<KeyAction, CliError> {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-            return Ok(true);
+            return Ok(KeyAction::Quit);
         }
 
         if self.quick_add.is_some() {
             self.handle_quick_add_key(key);
-            return Ok(false);
+            return Ok(KeyAction::Continue);
         }
 
         if self.log_search_input.is_some() {
             self.handle_log_search_key(key);
-            return Ok(false);
+            return Ok(KeyAction::Continue);
         }
 
         if self.rules_prompt_active() {
             self.handle_rules_prompt_key(key);
-            return Ok(false);
+            return Ok(KeyAction::Continue);
         }
 
         if self.decision_prompt_active() {
             self.handle_decision_prompt_key(key);
-            return Ok(false);
+            return Ok(KeyAction::Continue);
         }
 
         if self.show_help {
@@ -368,18 +401,18 @@ impl TuiApp {
                 KeyCode::Esc | KeyCode::Char('?') | KeyCode::Char('q') => self.show_help = false,
                 _ => {}
             }
-            return Ok(false);
+            return Ok(KeyAction::Continue);
         }
 
         if let KeyCode::Char(ch) = key.code {
             if let Some(view) = TuiView::from_digit(ch) {
                 self.switch_view(view);
-                return Ok(false);
+                return Ok(KeyAction::Continue);
             }
         }
 
         match key.code {
-            KeyCode::Char('q') => return Ok(true),
+            KeyCode::Char('q') => return Ok(KeyAction::Quit),
             KeyCode::Char('?') => self.show_help = true,
             KeyCode::Char('r') => match self.reload() {
                 Ok(()) => {}
@@ -405,6 +438,15 @@ impl TuiApp {
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
             KeyCode::Char('/') => {
                 self.status = "Search is available in Logs view; press 3 for Logs.".to_string()
+            }
+            KeyCode::Char('e') if matches!(self.view, TuiView::Board | TuiView::Review) => {
+                return Ok(KeyAction::OpenEditor)
+            }
+            KeyCode::Char('e') if self.view == TuiView::Logs => {
+                self.status = "Completed logs are read-only in the TUI; $EDITOR is intentionally disabled for generated history.".to_string()
+            }
+            KeyCode::Char('e') if self.view == TuiView::Decisions => {
+                self.status = "Decision document editing in $EDITOR is deferred; use Decisions add or edit the file manually for now.".to_string()
             }
             KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
             KeyCode::Enter
@@ -436,7 +478,7 @@ impl TuiApp {
                 TuiView::Decisions => self.handle_decisions_key(key),
             },
         }
-        Ok(false)
+        Ok(KeyAction::Continue)
     }
 
     fn switch_view(&mut self, view: TuiView) {
@@ -845,6 +887,94 @@ impl TuiApp {
                 };
                 self.status = format!("Move error: {}{}", error.message, reload_note);
             }
+        }
+    }
+
+    fn open_selected_item_in_editor(
+        &mut self,
+        session: &mut TerminalSession,
+    ) -> Result<(), CliError> {
+        let target = match self.selected_editor_target() {
+            Ok(target) => target,
+            Err(message) => {
+                self.status = message;
+                return Ok(());
+            }
+        };
+        let editor = match editor_command_from_env() {
+            Ok(editor) => editor,
+            Err(error) => {
+                self.status = format!("Editor error: {}", error.message);
+                return Ok(());
+            }
+        };
+
+        self.status = format!(
+            "Opening {} in {} from {}...",
+            target.id,
+            editor.display_label(),
+            editor.source
+        );
+        session.terminal_mut().draw(|frame| self.draw(frame))?;
+
+        session.suspend_for_editor()?;
+        let editor_result = run_editor_command(&editor, &target.path);
+        let resume_result = session.resume_after_editor();
+        if let Err(error) = resume_result {
+            return Err(CliError::user(format!(
+                "failed to restore terminal after editor exit: {}",
+                error.message
+            )));
+        }
+
+        let reload_note = match self.reload() {
+            Ok(()) => {
+                self.select_document_by_id(&target.id);
+                String::new()
+            }
+            Err(error) => format!("; reload failed: {}", error.message),
+        };
+
+        self.status = match editor_result {
+            Ok(status) if status.success() => format!(
+                "Edited {} via {}{}",
+                target.id,
+                editor.display_label(),
+                reload_note
+            ),
+            Ok(status) => format!(
+                "Editor exited with {status} for {}{}",
+                target.id, reload_note
+            ),
+            Err(error) => format!(
+                "Editor launch failed for {} using {}: {error}{}",
+                target.id,
+                editor.display_label(),
+                reload_note
+            ),
+        };
+        Ok(())
+    }
+
+    fn selected_editor_target(&self) -> Result<EditorTarget, String> {
+        match self.view {
+            TuiView::Board => self
+                .selected_doc()
+                .ok_or_else(|| "No active task selected to edit.".to_string())
+                .and_then(editor_target_for_doc),
+            TuiView::Review => {
+                let item = self
+                    .selected_review_item()
+                    .ok_or_else(|| "No review item selected to edit.".to_string())?;
+                self.docs
+                    .iter()
+                    .find(|doc| doc.id() == item.id())
+                    .ok_or_else(|| format!("Review item {} is no longer loaded; press r to reload.", item.id()))
+                    .and_then(editor_target_for_doc)
+            }
+            TuiView::Logs => Err("Completed logs are read-only in the TUI; $EDITOR is intentionally disabled for generated history.".to_string()),
+            TuiView::Rules => Err("Rules use the in-TUI a/e/d prompts; raw config-file editing is deferred.".to_string()),
+            TuiView::Decisions => Err("Decision document editing in $EDITOR is deferred; active task documents are supported first.".to_string()),
         }
     }
 
@@ -1899,7 +2029,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · h/l state subview · H/L move task · j/k item/scroll · Tab/Enter detail · ? help · {}",
+                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · e edit task in $EDITOR · h/l state subview · H/L move task · j/k item/scroll · Tab/Enter detail · ? help · {}",
                     self.selected_state_progress(),
                     self.status
                 ),
@@ -1912,7 +2042,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "Review {focus} · 1..5 views · q quit · r reload · j/k item/scroll · h/l or Tab queue/detail · Enter detail · read-only hints · ? help · {}",
+                    "Review {focus} · 1..5 views · q quit · r reload · e edit active task in $EDITOR · j/k item/scroll · h/l or Tab queue/detail · Enter detail · action hints read-only · ? help · {}",
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1929,7 +2059,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · h/l or Tab list/detail · Enter focus detail/list · r reload · q quit · {}",
+                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · h/l or Tab list/detail · Enter focus detail/list · e read-only/no editor · r reload · q quit · {}",
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1976,11 +2106,12 @@ impl TuiApp {
             Line::from("tab / shift-tab   Cycle list/detail focus where available; never switches views"),
             Line::from("enter             Toggle list/detail focus in Board, Review, and Logs"),
             Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
+            Line::from("e                 Board/Review: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
             Line::from("h/l or ←/→        Board: state subviews; Review/Logs/Decisions: list/detail focus; Rules: category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
             Line::from("j/k or ↑/↓        Board/Review/Logs/Rules/Decisions: move items, or scroll detail when focused"),
             Line::from("g/G               First/last item in the active list/detail"),
-            Line::from("e / d             Rules: edit selected rule / delete with confirmation"),
+            Line::from("d                 Rules: delete selected rule with confirmation"),
             Line::from("PgUp/PgDn         Logs/Decisions: scroll selected detail/body"),
             Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
             Line::from("Esc               Logs: clear search filter; prompts: cancel"),
@@ -1989,7 +2120,7 @@ impl TuiApp {
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board state subviews, quick-add/H/L moves, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
+            Line::from("Board state subviews, quick-add/H/L moves, $EDITOR for active task documents, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -2002,6 +2133,153 @@ impl TuiApp {
         .wrap(Wrap { trim: true });
         frame.render_widget(help, popup);
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EditorTarget {
+    id: String,
+    path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EditorCommand {
+    program: String,
+    args: Vec<String>,
+    source: &'static str,
+}
+
+impl EditorCommand {
+    fn from_value(value: &str, source: &'static str) -> Result<Self, CliError> {
+        let words = split_editor_command(value).map_err(|message| {
+            CliError::user(format!(
+                "could not parse {source} value `{value}`: {message}"
+            ))
+        })?;
+        let Some((program, args)) = words.split_first() else {
+            return Err(CliError::user(format!("{source} is empty")));
+        };
+        Ok(Self {
+            program: program.clone(),
+            args: args.to_vec(),
+            source,
+        })
+    }
+
+    fn display_label(&self) -> String {
+        if self.args.is_empty() {
+            self.program.clone()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+}
+
+fn editor_target_for_doc(doc: &Document) -> Result<EditorTarget, String> {
+    if doc.location != DocumentLocation::Board {
+        return Err("Only active board documents are editable in $EDITOR for now.".to_string());
+    }
+    if doc.doc_type() != "task" {
+        return Err(format!(
+            "Only active task documents open in $EDITOR for now; {} is type `{}` and is deferred.",
+            doc.id(),
+            doc.doc_type()
+        ));
+    }
+    Ok(EditorTarget {
+        id: doc.id().to_string(),
+        path: doc.path.clone(),
+    })
+}
+
+fn editor_command_from_env() -> Result<EditorCommand, CliError> {
+    for (name, source) in [("EDITOR", "$EDITOR"), ("VISUAL", "$VISUAL")] {
+        if let Ok(value) = env::var(name) {
+            if !value.trim().is_empty() {
+                return EditorCommand::from_value(&value, source);
+            }
+        }
+    }
+
+    EditorCommand::from_value(default_editor_program(), "default editor")
+}
+
+fn default_editor_program() -> &'static str {
+    if cfg!(windows) {
+        "notepad"
+    } else {
+        "vi"
+    }
+}
+
+fn run_editor_command(command: &EditorCommand, path: &Path) -> io::Result<ExitStatus> {
+    Command::new(&command.program)
+        .args(&command.args)
+        .arg(path)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+}
+
+fn split_editor_command(value: &str) -> Result<Vec<String>, String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    let mut word_started = false;
+
+    for ch in value.chars() {
+        if escaped {
+            current.push(ch);
+            word_started = true;
+            escaped = false;
+            continue;
+        }
+
+        if ch == '\\' && quote != Some('\'') {
+            escaped = true;
+            word_started = true;
+            continue;
+        }
+
+        if let Some(active_quote) = quote {
+            if ch == active_quote {
+                quote = None;
+            } else {
+                current.push(ch);
+            }
+            word_started = true;
+            continue;
+        }
+
+        if ch == '\'' || ch == '"' {
+            quote = Some(ch);
+            word_started = true;
+        } else if ch.is_whitespace() {
+            if word_started {
+                words.push(current.clone());
+                current.clear();
+                word_started = false;
+            }
+        } else {
+            current.push(ch);
+            word_started = true;
+        }
+    }
+
+    if escaped {
+        current.push('\\');
+    }
+    if let Some(active_quote) = quote {
+        return Err(format!("unterminated {active_quote} quote"));
+    }
+    if word_started {
+        words.push(current);
+    }
+    if words.first().map(|word| word.is_empty()).unwrap_or(false) {
+        return Err("editor command program is empty".to_string());
+    }
+    Ok(words)
 }
 
 fn read_workspace_title(workspace: &Workspace) -> Result<String, CliError> {
@@ -2792,6 +3070,9 @@ fn rect_contains(rect: Rect, x: u16, y: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::env;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 
@@ -2830,6 +3111,14 @@ mod tests {
 
     fn key(code: KeyCode) -> KeyEvent {
         KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn unique_test_dir(prefix: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("{prefix}-{}-{nonce}", std::process::id()))
     }
 
     fn keyboard_test_app() -> TuiApp {
@@ -2990,6 +3279,92 @@ mod tests {
         app.handle_key(key(KeyCode::Char('h'))).unwrap();
         assert_eq!(app.view, TuiView::Decisions);
         assert_eq!(app.focus, FocusPane::Board);
+    }
+
+    #[test]
+    fn editor_key_requests_open_for_board_and_marks_read_only_views() {
+        let mut app = keyboard_test_app();
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('e'))).unwrap(),
+            KeyAction::OpenEditor
+        );
+
+        app.switch_view(TuiView::Logs);
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('e'))).unwrap(),
+            KeyAction::Continue
+        );
+        assert!(app.status.contains("read-only"));
+
+        app.switch_view(TuiView::Decisions);
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('e'))).unwrap(),
+            KeyAction::Continue
+        );
+        assert!(app.status.contains("deferred"));
+    }
+
+    #[test]
+    fn editor_targets_active_tasks_from_board_and_review_only() {
+        let mut app = keyboard_test_app();
+        assert_eq!(app.selected_editor_target().unwrap().id, "task-1");
+
+        app.selected_state = 2;
+        let error = app.selected_editor_target().unwrap_err();
+        assert!(error.contains("type `decision`"));
+
+        app.docs[1]
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        app.switch_view(TuiView::Review);
+        assert_eq!(app.selected_editor_target().unwrap().id, "task-2");
+    }
+
+    #[test]
+    fn split_editor_command_supports_arguments_and_quotes() {
+        assert_eq!(
+            split_editor_command("code --wait 'two words.md'").unwrap(),
+            vec!["code", "--wait", "two words.md"]
+        );
+        assert_eq!(
+            split_editor_command("\"/tmp/my editor\" --flag").unwrap(),
+            vec!["/tmp/my editor", "--flag"]
+        );
+        assert!(split_editor_command("vim '")
+            .unwrap_err()
+            .contains("unterminated"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn run_editor_command_smoke_appends_to_document() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = unique_test_dir("tandem-tui-editor-smoke");
+        fs::create_dir_all(&root).unwrap();
+        let script = root.join("editor-smoke.sh");
+        let doc = root.join("task-1.md");
+        fs::write(
+            &script,
+            "#!/bin/sh\nprintf '\\nsmoke editor touched %s\\n' \"$1\" >> \"$1\"\n",
+        )
+        .unwrap();
+        let mut permissions = fs::metadata(&script).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&script, permissions).unwrap();
+        fs::write(
+            &doc,
+            "---\nid: task-1\ntype: task\ntitle: Test\nstate: todo\n---\n",
+        )
+        .unwrap();
+
+        let command = EditorCommand::from_value(&script.to_string_lossy(), "test editor").unwrap();
+        let status = run_editor_command(&command, &doc).unwrap();
+        assert!(status.success());
+        assert!(fs::read_to_string(&doc)
+            .unwrap()
+            .contains("smoke editor touched"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
