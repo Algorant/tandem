@@ -721,7 +721,7 @@ tandem tui
   - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets `.tandem/theme.toml` select a named built-in or user theme, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets `.tandem/theme.toml` select a named built-in or user theme, and applies the active palette to Board, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies workspace theme selection/overrides from `.tandem/theme.toml` using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active built-in palette remains in use.
   - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
@@ -745,11 +745,11 @@ tandem tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Review/Logs/Rules/Decisions view state, support Board state subview navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Review now has a real read-only filtered queue with inspection detail and action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Logs/Rules/Decisions view state, support Board state subview navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Board Validation now carries delivered-work inspection and approve/rework/complete action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
 
 The full first TUI MVP should include:
 
-- Top-level views: Board, Review, Logs, Rules, Decisions.
+- Top-level views: Board, Logs, Rules, Decisions. Validation is a Board state/subview, not a top-level pane.
 - Board mutations: add item, move state, edit item, complete to logs, update priority/tags/assignee where supported, and toggle subtasks.
 - Accord actions: ready, claim, deliver, accept, rework, block, fail.
 - Rules actions: list, add, edit, delete.
@@ -820,7 +820,7 @@ Actions: [accept] [request changes] [complete] [edit] [copy id]
 
 The current Board detail implementation keeps the action surface read-only but shows the next likely CLI command and notes that TUI accord mutations are planned. Accord statuses use the theme's semantic accord palette in details as well as badges; `delivered`, `accepted`, `rework`, and `blocked` must remain visually distinct because they imply different next actions.
 
-### 2. Review queue
+### 2. Board Validation flow
 
 A dedicated filtered list showing items needing attention:
 
@@ -949,7 +949,7 @@ My Project  in-progress 4 · review 3 · blocked 1 · completed this week 7
 Optional progress bars:
 
 - epic progress: completed children / total children
-- review queue: accepted / delivered
+- Board Validation flow: delivered / accepted work awaiting accept, rework, or completion
 - validation: passed / total delivered
 - decision/review progress if useful
 
@@ -1108,7 +1108,7 @@ Global:
 | `:` | command palette / command line |
 | `/` | search current view |
 | `r` | reload |
-| `1..5` | switch major view: Board, Review, Logs, Rules, Decisions |
+| `1..4` | switch major view: Board, Logs, Rules, Decisions |
 | `tab` / `shift-tab` | cycle focus only within views that have meaningful focusable panes; no top-level fallback |
 | `esc` | close modal/clear filter/return detail focus to list where supported |
 
@@ -1117,7 +1117,7 @@ Navigation:
 | Key | Action |
 | --- | --- |
 | `j/k` or arrows | move selection or scroll the focused detail/body pane |
-| `h/l` or left/right | local movement only: Board state subview, Review/Logs/Decisions list-detail focus, or Rules category |
+| `h/l` or left/right | local movement only: Board state subview, Logs/Decisions list-detail focus, or Rules category |
 | `g/G` | top/bottom in the active local list/detail |
 | `ctrl-d/u` | half-page down/up |
 | `enter` | expand/open |
@@ -1528,7 +1528,7 @@ Manual smoke:
 ### Phase 2: First TUI MVP
 
 - Launch through `tandem tui`.
-- Started with a Ratatui/crossterm shell that renders top-level Board, Review, Logs, Rules, and Decisions tabs.
+- Started with a Ratatui/crossterm shell that renders top-level Board, Logs, Rules, and Decisions tabs.
 - Board renders active board documents as count-labeled state subviews with a full-width selected-state list, sparse one-line rows with real chip/badge styling, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark`/`verdigris` theme styling, user theme discovery from config dirs, and workspace `.tandem/theme.toml` selection/color overrides.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.

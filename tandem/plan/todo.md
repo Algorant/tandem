@@ -47,7 +47,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Excluded drag/drop from v0.
 - [x] Locked fixed default keybindings for v0; keymap config is deferred.
 - [x] Locked styled-basic Markdown rendering for v0.
-- [x] Chose a simple filtered-list Review queue for v0 instead of opinionated hard-coded sections.
+- [x] Superseded the simple filtered-list Review queue direction by folding delivered-work handling into Board Validation.
 - [x] Captured current Brainfile TUI issues to avoid:
   - progress tied to a persistent completion state
   - hardcoded theming
@@ -68,7 +68,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Defined `tandem decision list|show|add` v0 command model.
 - [x] Defined v0 `tandem log` output fields for list, show, and search.
 - [x] Defined v0 rules CLI add/edit/delete flow.
-- [x] Defined simple Review view sort direction: priority first, then recently updated or delivered.
+- [x] Preserved review metadata sort/detail lessons for Board Validation and logs rather than a top-level Review view.
 - [x] Planned minimal-diff write behavior for CLI/TUI mutations, including raw source preservation, atomic writes, concurrent edit detection, timestamp discipline, and separate event appends.
 - [x] Started the Rust implementation inside `tandem/` with a single `tandem` binary package.
 - [x] Implemented the first CLI slice:
@@ -104,8 +104,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
-- [x] Implemented top-level TUI view switching: Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows.
-- [x] Implemented a real read-only Review queue view:
+- [x] Implemented top-level TUI view switching: Board, Logs, Rules, and Decisions tabs; `1`..`4` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows. Validation now lives as a Board state/subview.
+- [x] Folded the prior read-only Review queue direction into Board Validation:
   - filters active items needing attention: delivered accords, pending/in-review items, changes-requested/rejected/failed reviews, blocked/failed/rework accords, accepted active accords, validation failures, and blockers
   - sorts priority first, then most recently delivered/updated
   - renders selectable queue rows plus inspection detail with reason badges/lines, accord/review/state/priority metadata, blockers, delivered evidence/files, and CLI action hints
@@ -137,7 +137,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - documents `default-dark` and `verdigris` examples under `tandem/examples/themes/`
 - [x] Tightened default TUI keyboard/focus semantics:
   - `1`..`5` are the keyboard top-level view switchers; local keys no longer switch top-level views.
-  - `h/j/k/l` stay inside the active view: Board state/items, Review/Logs/Decisions list-detail focus or scroll, and Rules category/list movement.
+  - `h/j/k/l` stay inside the active view: Board state/items, Logs/Decisions list-detail focus or scroll, and Rules category/list movement.
   - Tab/BackTab cycle focus only in views with meaningful focusable panes and show a Rules hint instead of falling back to top-level view cycling.
   - Added unit coverage for numeric switching, local `h/j/k/l`, and Tab no-fallback behavior.
   - Manual PTY smoke (2026-06-28): `target/debug/tandem tui` accepted scripted `1`..`5`, local `h/j/k/l`, and Tab/BackTab sequences and exited cleanly (`rc=0`).
@@ -170,8 +170,8 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 
 ## First TUI MVP checklist
 
-- [x] Render Board, Review, Logs, Rules, and Decisions views at shell/placeholder level.
-- [x] Render the Review queue as a filtered list with inspection detail.
+- [x] Render Board, Logs, Rules, and Decisions views at shell/placeholder level.
+- [x] Render Validation as the Board state/subview for delivered work with inspection detail and action hints.
 - [x] Navigate state subviews/items and view details.
 - [x] Add items from the Board view.
 - [x] Move items between states.
@@ -191,7 +191,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 ## Acceptance criteria for first usable TUI
 
 - [x] Does not assume a persistent completion state.
-- [x] Makes the simple filtered Review queue obvious.
+- [x] Makes the Board Validation flow obvious.
 - [x] Makes accord state obvious at a basic status-badge level.
 - [x] Supports board mutations immediately.
 - [x] Supports built-in, user-discovered, plus workspace selector/override themes.
