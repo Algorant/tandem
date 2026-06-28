@@ -51,7 +51,7 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 - **CLI first, TUI now:** the `tandem` command workflows are implemented for the current known v0 scope; focus new work on the interactive TUI unless fixing CLI bugs or adding requested CLI features.
 - **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
 - **Logs are real:** completed work is browsable, searchable, inspectable, and useful; restore/reopen behavior can come after the v0 log read scope.
-- **Review is central:** delivered work should naturally flow to review, validation, acceptance, rework, and completion.
+- **Validation is central:** delivered work should naturally flow to the Board Validation state for acceptance, rejection, redirection, reviewer metadata updates, rework, and completion.
 - **Agent state is visible, not omnipresent:** accord/review/validation/blocker information must be available in the right place, but the Board list should surface only the signals that change scan priority or next action.
 - **Minimal first:** start each TUI surface from the smallest useful shape, then add only proven-needed details. Avoid kitchen-sink rows, decorative color, and metadata duplication between list rows and detail panes.
 - **Fast scanning:** compact rows, calm hierarchy, and clear badge/chip shapes. Important labels should read as small terminal stickers using foreground + background styling, not merely differently colored text.
@@ -176,7 +176,7 @@ tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <ta
 ```text
 ID      STATE        PRI   TITLE                         ASSIGNEE  ACCORD      REVIEW
 task-7  in-progress  high  Implement theme loader        pi        claimed     not-ready
-task-8  review       med   Add decision view             pi        delivered   pending
+task-8  validation   med   Add decision view             pi        delivered   pending
 ```
 
 - `--json` data shape:
@@ -284,7 +284,11 @@ tandem move <id> --state <state>
 - Required inputs:
   - `<id>`: task ID.
   - `--state <state>`: target active state.
-- Human output shape: one-line status transition plus path.
+- Human output shape: one-line status transition plus any synchronized accord transition and path.
+- State/accord synchronization:
+  - moving a task from `todo` to `in-progress` claims an existing `accord.status: ready` and prints `Accord: ready -> claimed`.
+  - moving to `validation` is preferred for delivered work; existing `state: review` files are tolerated as a legacy alias.
+  - ambiguous or destructive accord changes are left to explicit `tandem accord ...` commands.
 - Exit/error notes:
   - fails if the task is not active, the ID resolves to a non-task document, the state is unknown, structural validation fails, or the write fails.
 
@@ -521,7 +525,8 @@ tandem accord fail <id> --reason <text>
   - `ready` may include repeated `--deliverable`, repeated `--validation`, repeated `--constraint`, and `--assignee`.
   - `deliver` may include repeated `--evidence` and repeated `--file-changed`.
   - `accept` may include `--reviewer` and `--note`.
-- Human output shape: labeled status transition and any state/review warnings. The current implementation writes `accord.claimedAt` on claim, `accord.deliveredAt` on deliver, and repeated `--validation` values under `accord.validation.commands`; it still reads earlier `accord.validations` values.
+- Human output shape: labeled status transition plus any synchronized workflow-state transition or state/review warnings. The current implementation writes `accord.claimedAt` on claim, `accord.deliveredAt` on deliver, and repeated `--validation` values under `accord.validation.commands`; it still reads earlier `accord.validations` values.
+- State synchronization is conservative: `claim` moves `todo` to `in-progress`; `deliver` and `accept` move compatible `todo`, `in-progress`, or legacy `review` tasks to `validation`; `rework` moves compatible `validation`/legacy `review` tasks back to `in-progress`; `block` and `fail` remain cross-cutting signals and do not automatically move workflow state.
 
 Examples:
 
@@ -707,7 +712,7 @@ tandem tui
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tandem tui` command.
-  - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` are the keyboard view switchers, and mouse tab clicks remain explicit pointer navigation.
+  - renders top-level Board, Logs, Rules, and Decisions tabs in the target Validation workflow; legacy Review-queue code may exist only as transitional implementation detail while task-25/task-30 remove it.
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns.
   - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, sparse one-line rows, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
@@ -763,7 +768,7 @@ Primary view for active Tandem items.
 Default states:
 
 ```text
-todo | in-progress | review
+todo | in-progress | validation
 ```
 
 Projects may configure state names. The TUI should not assume a persistent completion state exists.
@@ -773,7 +778,7 @@ Board view should support:
 - state subview tabs with counts for configured states plus any active unfiled/unknown-state buckets
 - one selected-state list at a time, using the full Board content width instead of simultaneous narrow columns
 - sparse one-line rows: optional non-default type, title, a small set of action-changing chips, and muted ID
-- chips for priority, delivered/rework/blocked/failed accord states, attention-needing review states, and checklist progress; chips should use foreground + background styles so they read like labels/stickers
+- chips for priority, delivered/rework/blocked/failed accord states, attention-needing validation states, and checklist progress; chips should use foreground + background styles so they read like labels/stickers
 - no second metadata row by default; tags, assignee, due dates, blockers, related-file counts, timestamps, paths, and full accord/review data belong in the detail pane until proven needed in the Board list
 - compact first; expanded/detail modes may be added later only when they solve a concrete workflow gap
 - selection and multi-select later
@@ -820,7 +825,7 @@ The current Board detail implementation keeps the action surface read-only but s
 A dedicated filtered list showing items needing attention:
 
 - accord delivered
-- review pending or in review state
+- review pending or in validation state
 - review changes-requested, rejected, or failed
 - validation failed
 - blocked items and blocked/failed/rework accords
@@ -927,9 +932,9 @@ Do not compute progress from a `done` column.
 Useful metrics:
 
 - in-progress count
-- review count
+- validation count
 - blocked count
-- delivered needing review
+- delivered needing validation
 - completed today/week from logs/events
 - accord statuses
 - validation failures
@@ -1144,7 +1149,7 @@ Examples:
 
 ```text
 :new task
-:move review
+:move validation
 :complete
 :accord deliver
 :review accept
@@ -1162,7 +1167,7 @@ Examples:
 
 ```text
 theme
-state:review
+state:validation
 accord:delivered
 review:pending
 priority:high tag:tui
@@ -1175,7 +1180,7 @@ Saved views should be possible via workspace config later:
 ```yaml
 views:
   needs-review:
-    query: "state:review OR accord:delivered"
+    query: "state:validation OR accord:delivered"
   mine:
     query: "assignee:ivan OR assignee:pi"
 ```
@@ -1252,7 +1257,7 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 - `tandem add`: writes one new task file and updates only required workspace/event state.
 - `tandem move`: updates only an active task document's `state` and mutation timestamp fields that actually change.
 - `tandem complete`: moves the document to logs, adds nested `completion` metadata, removes active-only fields only when required, and appends a separate event.
-- `tandem accord ...`: updates only the `accord` subtree plus the task `updatedAt`; claim/deliver timestamps are written inside `accord`.
+- `tandem accord ...`: updates the `accord` subtree plus the task `updatedAt`; conservative paired state synchronization may also update `state` for common compatible transitions (`claimed` → `in-progress`, `delivered`/`accepted` → `validation`, `rework` → `in-progress`).
 - `tandem rules add|edit|delete`: patches only the relevant rule category in workspace frontmatter.
 - `tandem decision add`: writes one new decision file and appends a creation event.
 - TUI quick edits and action buttons must call the same mutation behavior as CLI commands.
@@ -1393,7 +1398,7 @@ This keeps keyboard, mouse, and command palette behavior consistent.
 Happy path:
 
 1. Agent/human delivers item.
-2. Item appears in Review queue with `[A:delivered]`.
+2. Item appears in the Board Validation state with `[A:delivered]`.
 3. User opens detail.
 4. TUI shows deliverables, files changed, validation commands/results, summary.
 5. User selects:

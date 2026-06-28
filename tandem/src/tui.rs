@@ -142,16 +142,6 @@ impl TuiView {
         Self::Decisions,
     ];
 
-    fn index(self) -> usize {
-        match self {
-            Self::Board => 0,
-            Self::Review => 1,
-            Self::Logs => 2,
-            Self::Rules => 3,
-            Self::Decisions => 4,
-        }
-    }
-
     fn from_digit(ch: char) -> Option<Self> {
         match ch {
             '1' => Some(Self::Board),
@@ -293,6 +283,8 @@ struct TuiApp {
     selected_review_item: usize,
     selected_log: usize,
     focus: FocusPane,
+    show_board_detail: bool,
+    expanded_board_doc_id: Option<String>,
     detail_scroll: u16,
     review_detail_scroll: u16,
     log_detail_scroll: u16,
@@ -329,6 +321,8 @@ impl TuiApp {
             selected_review_item: 0,
             selected_log: 0,
             focus: FocusPane::Board,
+            show_board_detail: false,
+            expanded_board_doc_id: None,
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
@@ -608,9 +602,8 @@ impl TuiApp {
                 self.status = "Decision document editing in $EDITOR is deferred; use Decisions add or edit the file manually for now.".to_string()
             }
             KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
-            KeyCode::Enter
-                if matches!(self.view, TuiView::Board | TuiView::Review | TuiView::Logs) =>
-            {
+            KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
+            KeyCode::Enter if matches!(self.view, TuiView::Review | TuiView::Logs) => {
                 self.toggle_focus()
             }
             KeyCode::Esc => match self.view {
@@ -690,9 +683,8 @@ impl TuiApp {
 
     fn cycle_focus_or_hint(&mut self) {
         match self.view {
-            TuiView::Board | TuiView::Review | TuiView::Logs | TuiView::Decisions => {
-                self.toggle_focus()
-            }
+            TuiView::Board => self.toggle_board_detail(),
+            TuiView::Review | TuiView::Logs | TuiView::Decisions => self.toggle_focus(),
             TuiView::Rules => {
                 self.status = "Rules has a single category/list focus area; Tab stays in Rules. Use h/l for categories and 1..5 for views.".to_string();
             }
@@ -1262,6 +1254,34 @@ impl TuiApp {
         };
     }
 
+    fn toggle_board_detail(&mut self) {
+        self.show_board_detail = !self.show_board_detail;
+        self.focus = if self.show_board_detail {
+            FocusPane::Detail
+        } else {
+            FocusPane::Board
+        };
+        self.status = if self.show_board_detail {
+            "Board detail pane shown; Tab or Esc returns to the list.".to_string()
+        } else {
+            "Board detail pane hidden; Enter expands the selected row inline.".to_string()
+        };
+    }
+
+    fn toggle_board_expansion(&mut self) {
+        let Some(doc_id) = self.selected_doc().map(|doc| doc.id().to_string()) else {
+            self.status = "No selected Board item to expand.".to_string();
+            return;
+        };
+        if self.expanded_board_doc_id.as_deref() == Some(doc_id.as_str()) {
+            self.expanded_board_doc_id = None;
+            self.status = format!("Collapsed {doc_id}.");
+        } else {
+            self.expanded_board_doc_id = Some(doc_id.clone());
+            self.status = format!("Expanded {doc_id} inline; press Enter to collapse.");
+        }
+    }
+
     fn previous_state(&mut self) {
         if self.selected_state > 0 {
             self.selected_state -= 1;
@@ -1581,30 +1601,20 @@ impl TuiApp {
             return;
         }
 
-        let detail_height = (area.height / 3).clamp(5, 12);
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Length(3),
-                Constraint::Length(3),
+                Constraint::Length(5),
                 Constraint::Min(4),
-                Constraint::Length(detail_height),
                 Constraint::Length(1),
             ])
             .split(area);
 
         self.draw_header(frame, chunks[0]);
-        self.draw_view_tabs(frame, chunks[1]);
         if self.view == TuiView::Board {
-            self.draw_board(frame, chunks[2]);
-            self.draw_detail(frame, chunks[3]);
+            self.draw_board(frame, chunks[1]);
         } else {
-            let view_area = Rect {
-                x: chunks[2].x,
-                y: chunks[2].y,
-                width: chunks[2].width,
-                height: chunks[2].height.saturating_add(chunks[3].height),
-            };
+            let view_area = chunks[1];
             if self.view == TuiView::Review {
                 self.draw_review(frame, view_area);
             } else if self.view == TuiView::Logs {
@@ -1617,7 +1627,7 @@ impl TuiApp {
                 self.draw_placeholder_view(frame, view_area);
             }
         }
-        self.draw_footer(frame, chunks[4]);
+        self.draw_footer(frame, chunks[2]);
 
         if self.rules_prompt_active() {
             self.draw_rules_prompt(frame, area);
@@ -1635,7 +1645,7 @@ impl TuiApp {
     fn draw_tiny(&self, frame: &mut Frame<'_>, area: Rect) {
         let message = Paragraph::new(vec![
             Line::from(Span::styled(
-                "Tandem CLI/TUI needs a larger terminal",
+                "Tandem TUI needs a larger terminal",
                 self.theme
                     .status_style(StatusTone::Warning)
                     .add_modifier(Modifier::BOLD),
@@ -1658,7 +1668,7 @@ impl TuiApp {
         frame.render_widget(message, area);
     }
 
-    fn draw_header(&self, frame: &mut Frame<'_>, area: Rect) {
+    fn draw_header(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let counts = format!(
             "Board {} · Review {} · Logs {} · Rules {} · Decisions {}",
             self.docs.len(),
@@ -1707,6 +1717,7 @@ impl TuiApp {
                 Span::raw("  "),
                 Span::styled(counts, self.theme.muted_style()),
             ]),
+            self.view_tab_line(),
             Line::from(Span::styled(context, self.theme.muted_style())),
         ])
         .style(self.theme.panel_style())
@@ -1718,34 +1729,32 @@ impl TuiApp {
                 .style(self.theme.panel_style()),
         );
         frame.render_widget(header, area);
+        self.register_view_tab_hits(header_inner_row(area, 1));
     }
 
-    fn draw_view_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let titles = TuiView::ALL
-            .into_iter()
-            .map(|view| Line::from(view.tab_label()))
-            .collect::<Vec<_>>();
-        let tabs = Tabs::new(titles)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(self.theme.border_style(false))
-                    .style(self.theme.panel_style()),
-            )
-            .select(self.view.index())
-            .style(self.theme.tab_style())
-            .highlight_style(self.theme.tab_selected_style());
-        frame.render_widget(tabs, area);
-        self.register_view_tab_hits(area);
+    fn view_tab_line(&self) -> Line<'static> {
+        let mut spans = Vec::new();
+        for (index, view) in TuiView::ALL.into_iter().enumerate() {
+            if index > 0 {
+                spans.push(Span::raw("  "));
+            }
+            let style = if view == self.view {
+                self.theme.tab_selected_style()
+            } else {
+                self.theme.tab_style()
+            };
+            spans.push(Span::styled(view.tab_label().to_string(), style));
+        }
+        Line::from(spans)
     }
 
     fn register_view_tab_hits(&mut self, area: Rect) {
-        if area.width <= 2 || area.height <= 2 {
+        if area.width == 0 || area.height == 0 {
             return;
         }
-        let mut x = area.x.saturating_add(1);
-        let right = area.x.saturating_add(area.width).saturating_sub(1);
-        let y = area.y.saturating_add(1);
+        let mut x = area.x;
+        let right = area.x.saturating_add(area.width);
+        let y = area.y;
         for view in TuiView::ALL {
             let width = (view.tab_label().chars().count() as u16).saturating_add(2);
             if x >= right {
@@ -2008,7 +2017,19 @@ impl TuiApp {
     }
 
     fn draw_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        self.draw_state_tabs(frame, area);
+        if self.show_board_detail {
+            let detail_height = (area.height / 3)
+                .clamp(5, 12)
+                .min(area.height.saturating_sub(4));
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(4), Constraint::Length(detail_height)])
+                .split(area);
+            self.draw_state_tabs(frame, chunks[0]);
+            self.draw_detail(frame, chunks[1]);
+        } else {
+            self.draw_state_tabs(frame, area);
+        }
     }
 
     fn draw_state_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -2078,7 +2099,15 @@ impl TuiApp {
         } else {
             let show_doc_type = docs.iter().any(|doc| doc.doc_type() != "task");
             docs.iter()
-                .map(|doc| list_item_for_doc(doc, &self.theme, content_width, show_doc_type))
+                .map(|doc| {
+                    list_item_for_doc(
+                        doc,
+                        &self.theme,
+                        content_width,
+                        show_doc_type,
+                        self.expanded_board_doc_id.as_deref() == Some(doc.id()),
+                    )
+                })
                 .collect::<Vec<_>>()
         };
 
@@ -2106,22 +2135,31 @@ impl TuiApp {
             let mut state = ListState::default();
             state.select(Some(self.selected_item.min(count - 1)));
             frame.render_stateful_widget(list, area, &mut state);
-            self.register_board_row_hits(area, state_index, count);
+            let row_heights = docs
+                .iter()
+                .map(|doc| {
+                    if self.expanded_board_doc_id.as_deref() == Some(doc.id()) {
+                        inline_preview_height(doc)
+                    } else {
+                        1
+                    }
+                })
+                .collect::<Vec<_>>();
+            self.register_board_row_hits(area, state_index, &row_heights);
         } else {
             frame.render_widget(list, area);
         }
     }
 
-    fn register_board_row_hits(&mut self, area: Rect, state_index: usize, count: usize) {
+    fn register_board_row_hits(&mut self, area: Rect, state_index: usize, row_heights: &[u16]) {
         if area.width <= 2 || area.height <= 2 {
             return;
         }
         let left = area.x.saturating_add(1);
-        let top = area.y.saturating_add(1);
+        let mut y = area.y.saturating_add(1);
         let width = area.width.saturating_sub(2);
         let bottom = area.y.saturating_add(area.height).saturating_sub(1);
-        for index in 0..count {
-            let y = top.saturating_add(index as u16);
+        for (index, height) in row_heights.iter().copied().enumerate() {
             if y >= bottom {
                 break;
             }
@@ -2130,10 +2168,11 @@ impl TuiApp {
                     x: left,
                     y,
                     width,
-                    height: 1,
+                    height: height.min(bottom.saturating_sub(y)),
                 },
                 action: HitAction::SelectBoardItem(state_index, index),
             });
+            y = y.saturating_add(height);
         }
     }
 
@@ -2193,7 +2232,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · e edit task in $EDITOR · h/l state subview · H/L move task · j/k item/scroll · Tab/Enter detail · ? help · {}",
+                    "{focus} · {} · 1..5 views · Enter expand row · Tab toggle detail · a add · e edit · h/l states · H/L move · j/k select/scroll · ? help · {}",
                     self.selected_state_progress(),
                     self.status
                 ),
@@ -2259,7 +2298,7 @@ impl TuiApp {
         frame.render_widget(Clear, popup);
         let help = Paragraph::new(vec![
             Line::from(Span::styled(
-                "Tandem CLI/TUI view shell",
+                "Tandem TUI view shell",
                 self.theme.title_style(),
             )),
             Line::from(""),
@@ -2267,8 +2306,8 @@ impl TuiApp {
             Line::from("r                 Reload board/config/log/theme data (also auto-detected while idle)"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / shift-tab   Cycle list/detail focus where available; never switches views"),
-            Line::from("enter             Toggle list/detail focus in Board, Review, and Logs"),
+            Line::from("tab / shift-tab   Board: show/hide detail pane; other split views: cycle focus"),
+            Line::from("enter             Board: expand/collapse row preview; Review/Logs: toggle list/detail focus"),
             Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
             Line::from("e                 Board/Review: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
             Line::from("h/l or ←/→        Board: state subviews; Review/Logs/Decisions: list/detail focus; Rules: category"),
@@ -2284,7 +2323,7 @@ impl TuiApp {
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board state subviews, quick-add/H/L moves, $EDITOR for active task documents, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
+            Line::from("Board state subviews, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Review queue, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer action buttons remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -2983,12 +3022,14 @@ fn list_item_for_doc(
     theme: &TuiTheme,
     content_width: usize,
     show_doc_type: bool,
+    expanded: bool,
 ) -> ListItem<'static> {
     ListItem::new(board_item_lines_for_doc(
         doc,
         theme,
         content_width,
         show_doc_type,
+        expanded,
     ))
 }
 
@@ -2997,6 +3038,7 @@ fn board_item_lines_for_doc(
     theme: &TuiTheme,
     content_width: usize,
     show_doc_type: bool,
+    expanded: bool,
 ) -> Vec<Line<'static>> {
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in the detail pane. Add chips here only when they change the next
@@ -3017,7 +3059,9 @@ fn board_item_lines_for_doc(
     {
         chips.push((status_chip(review), theme.review_chip_style(review)));
     }
-    if let Some((completed, total)) = subtask_progress(doc) {
+    if let Some((completed, total)) =
+        subtask_progress(doc).filter(|(completed, total)| *completed > 0 || completed == total)
+    {
         let tone = if completed == total {
             StatusTone::Success
         } else {
@@ -3042,7 +3086,7 @@ fn board_item_lines_for_doc(
     let fixed_width = doc_type_width + chip_width + 1 + text_width(doc.id());
     let title_width = content_width.saturating_sub(fixed_width).max(12);
     let title = truncate(doc.title(), title_width);
-    let used_before_id = doc_type_width + text_width(&title) + chip_width;
+    let used_before_id = doc_type_width + chip_width + text_width(&title);
     let spacer_width = content_width
         .saturating_sub(used_before_id + text_width(doc.id()))
         .max(1);
@@ -3052,18 +3096,27 @@ fn board_item_lines_for_doc(
         title_spans.push(Span::styled(doc_type, theme.board_doc_type_style()));
         title_spans.push(Span::raw(" "));
     }
+    for (index, (chip, style)) in chips.into_iter().enumerate() {
+        if index > 0 || doc_type_width > 0 {
+            title_spans.push(Span::raw(" "));
+        }
+        title_spans.push(Span::styled(chip, style));
+    }
+    if chip_width > 0 || doc_type_width > 0 {
+        title_spans.push(Span::raw(" "));
+    }
     title_spans.push(Span::styled(
         title,
         theme.text_style().add_modifier(Modifier::BOLD),
     ));
-    for (chip, style) in chips {
-        title_spans.push(Span::raw(" "));
-        title_spans.push(Span::styled(chip, style));
-    }
     title_spans.push(Span::raw(" ".repeat(spacer_width)));
     title_spans.push(Span::styled(doc.id().to_string(), theme.muted_style()));
 
-    vec![Line::from(title_spans)]
+    let mut lines = vec![Line::from(title_spans)];
+    if expanded {
+        lines.extend(inline_preview_lines_for_doc(doc, theme, content_width));
+    }
+    lines
 }
 
 fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
@@ -3097,6 +3150,70 @@ fn status_chip(status: &str) -> String {
 
 fn chip_text(label: &str) -> String {
     format!(" {label} ")
+}
+
+fn inline_preview_height(doc: &Document) -> u16 {
+    let mut height = 2;
+    if doc.field("tags").is_some() {
+        height += 1;
+    }
+    if doc.field("relatedFiles").is_some() {
+        height += 1;
+    }
+    height
+}
+
+fn inline_preview_lines_for_doc(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    if let Some(tags) = doc.field("tags") {
+        lines.push(inline_preview_field("tags", tags, theme, content_width));
+    }
+    let excerpt = body_excerpt(&doc.body, content_width.saturating_sub(10).max(24));
+    lines.push(inline_preview_field(
+        "summary",
+        &excerpt,
+        theme,
+        content_width,
+    ));
+    if let Some(files) = doc.field("relatedFiles") {
+        lines.push(inline_preview_field("files", files, theme, content_width));
+    }
+    lines.push(Line::from(Span::styled(
+        "   Enter collapse · Tab detail pane · e edit",
+        theme.muted_style(),
+    )));
+    lines
+}
+
+fn inline_preview_field(
+    label: &str,
+    value: &str,
+    theme: &TuiTheme,
+    content_width: usize,
+) -> Line<'static> {
+    let prefix = format!("   {label}: ");
+    let value_width = content_width.saturating_sub(text_width(&prefix)).max(8);
+    Line::from(vec![
+        Span::styled(prefix, theme.label_style()),
+        Span::styled(truncate(value, value_width), theme.muted_style()),
+    ])
+}
+
+fn body_excerpt(body: &str, width: usize) -> String {
+    let mut text = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if text.is_empty() {
+        text = "(no body text)".to_string();
+    }
+    truncate(&text, width)
 }
 
 fn board_should_surface_accord_status(status: &str) -> bool {
@@ -3658,6 +3775,15 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
+fn header_inner_row(area: Rect, row: u16) -> Rect {
+    Rect {
+        x: area.x.saturating_add(1),
+        y: area.y.saturating_add(1).saturating_add(row),
+        width: area.width.saturating_sub(2),
+        height: 1,
+    }
+}
+
 fn rect_contains(rect: Rect, x: u16, y: u16) -> bool {
     x >= rect.x
         && x < rect.x.saturating_add(rect.width)
@@ -3710,11 +3836,11 @@ mod tests {
         doc.fields
             .insert("accord.status".to_string(), "ready".to_string());
 
-        let lines = board_item_lines_for_doc(&doc, &theme, 120, false);
+        let lines = board_item_lines_for_doc(&doc, &theme, 120, false, false);
         let title = line_text(&lines[0]);
 
         assert_eq!(lines.len(), 1);
-        assert!(title.contains("Polish Board rows  HIGH"));
+        assert!(title.contains(" HIGH  Polish Board rows"));
         assert!(!title.contains("accord ready"));
         assert!(!title.contains("tui"));
         assert!(!title.contains("[task]"));
@@ -3722,6 +3848,38 @@ mod tests {
         assert!(lines[0].spans.iter().any(|span| {
             span.content.as_ref() == " HIGH " && span.style == theme.priority_chip_style("high")
         }));
+    }
+
+    #[test]
+    fn board_row_expansion_adds_at_a_glance_preview_without_metadata_dump() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = doc_with_state("task-33", Some("todo"));
+        doc.fields
+            .insert("title".to_string(), "Refine Board layout".to_string());
+        doc.fields
+            .insert("tags".to_string(), "[\"tui\", \"board\"]".to_string());
+        doc.fields.insert(
+            "relatedFiles".to_string(),
+            "[\"tandem/src/tui.rs\"]".to_string(),
+        );
+        doc.body =
+            "## Description\n\nUse one large Board pane by default and keep metadata inline."
+                .to_string();
+
+        let collapsed = board_item_lines_for_doc(&doc, &theme, 96, false, false);
+        let expanded = board_item_lines_for_doc(&doc, &theme, 96, false, true);
+        let expanded_text = expanded
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert_eq!(collapsed.len(), 1);
+        assert!(expanded.len() > collapsed.len());
+        assert!(expanded_text.contains("tags:"));
+        assert!(expanded_text.contains("summary:"));
+        assert!(expanded_text.contains("files:"));
+        assert!(!expanded_text.contains("updatedAt"));
     }
 
     #[test]
@@ -3733,11 +3891,14 @@ mod tests {
         task.fields
             .insert("priority".to_string(), "low".to_string());
 
-        let default_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, false)[0]);
-        let mixed_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, true)[0]);
-        assert!(default_context.contains("Default work  LOW"));
+        let default_context =
+            line_text(&board_item_lines_for_doc(&task, &theme, 96, false, false)[0]);
+        let mixed_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, true, false)[0]);
+        assert!(default_context.contains(" LOW  Default work"));
         assert!(!default_context.contains("task Default work"));
-        assert!(mixed_context.contains("task Default work  LOW"));
+        assert!(mixed_context.contains("task"));
+        assert!(mixed_context.contains(" LOW "));
+        assert!(mixed_context.contains("Default work"));
 
         let mut decision = task.clone();
         decision
@@ -3749,8 +3910,11 @@ mod tests {
         decision
             .fields
             .insert("title".to_string(), "Choose layout".to_string());
-        let non_default = line_text(&board_item_lines_for_doc(&decision, &theme, 96, false)[0]);
-        assert!(non_default.contains("decision Choose layout  LOW"));
+        let non_default =
+            line_text(&board_item_lines_for_doc(&decision, &theme, 96, false, false)[0]);
+        assert!(non_default.contains("decision"));
+        assert!(non_default.contains(" LOW "));
+        assert!(non_default.contains("Choose layout"));
     }
 
     #[test]
@@ -3888,6 +4052,8 @@ mod tests {
             selected_review_item: 0,
             selected_log: 0,
             focus: FocusPane::Board,
+            show_board_detail: false,
+            expanded_board_doc_id: None,
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
