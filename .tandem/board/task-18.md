@@ -2,20 +2,22 @@
 id: task-18
 type: task
 title: "Add first-class user theme discovery and presets"
-state: todo
+state: "in-progress"
 priority: "high"
 references: ["task-10"]
 relatedFiles: ["tandem-tui/src/tui/theme.rs", "tandem-tui/README.md", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "theme", "config"]
 createdAt: "2026-06-28T00:17:02Z"
-updatedAt: "2026-06-28T00:17:02Z"
+updatedAt: "2026-06-28T00:35:13Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:tui-theme-discovery"
+  claimedAt: "2026-06-28T00:35:13Z"
   deliverables: ["code:tandem-tui/src/tui/theme.rs:user theme discovery and selection", "docs:tandem-tui/README.md:theme install/select examples", "examples:tandem-tui/examples/themes:theme preset examples"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build", "PTY/manual smoke with ~/.config/tandem/themes custom theme and workspace selector"]
   constraints: ["Do not require users to commit personal themes into project workspaces."]
-  updatedAt: "2026-06-28T00:17:02Z"
+  updatedAt: "2026-06-28T00:35:13Z"
 ---
 
 ## Description

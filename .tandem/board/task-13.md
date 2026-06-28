@@ -2,18 +2,20 @@
 id: task-13
 type: task
 title: "Implement CLI-backed pi-tandem extension MVP"
-state: todo
+state: "in-progress"
 priority: "high"
 tags: ["pi-extension", "pi-tandem"]
 createdAt: "2026-06-27T23:30:04Z"
-updatedAt: "2026-06-27T23:30:04Z"
+updatedAt: "2026-06-28T00:35:13Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:pi-tandem-extension"
+  claimedAt: "2026-06-28T00:35:13Z"
   deliverables: ["code:extensions/pi-tandem/index.ts:Pi extension wrapper over tdm CLI", "docs:extensions/pi-tandem/README.md:usage and tool mapping", "test:extensions/pi-tandem/tests/smoke.ts:CLI-backed smoke test"]
   validation:
     commands: ["bun --check extensions/pi-tandem/index.ts", "bun extensions/pi-tandem/tests/smoke.ts"]
   constraints: ["Do not duplicate Tandem protocol mutation logic; call tdm for behavior.", "Do not edit global Pi config in this task."]
-  updatedAt: "2026-06-27T23:30:04Z"
+  updatedAt: "2026-06-28T00:35:13Z"
 ---
 
 ## Description

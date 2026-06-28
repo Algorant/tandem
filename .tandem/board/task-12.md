@@ -2,18 +2,20 @@
 id: task-12
 type: task
 title: "Scaffold pi-tandem extension area and adapter spec"
-state: todo
+state: "in-progress"
 priority: "high"
 tags: ["pi-extension", "pi-tandem"]
 createdAt: "2026-06-27T23:27:58Z"
-updatedAt: "2026-06-27T23:30:04Z"
+updatedAt: "2026-06-28T00:35:13Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:pi-tandem-extension"
+  claimedAt: "2026-06-28T00:35:13Z"
   deliverables: ["docs:extensions/README.md:extension area overview", "docs:extensions/pi-tandem/plan/spec.md:pi-tandem adapter MVP scope"]
   validation:
     commands: ["rg -n 'rules_decisions|contract|handoff|done column|tandem binary' README.md plan AGENTS.md extensions || true"]
   constraints: ["Do not implement extension behavior in this task; define structure and scope only.", "Preserve no-drift docs by updating parent docs and AGENTS.md."]
-  updatedAt: "2026-06-27T23:30:04Z"
+  updatedAt: "2026-06-28T00:35:13Z"
 ---
 
 ## Description

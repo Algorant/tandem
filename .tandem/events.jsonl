@@ -94,3 +94,11 @@
 {"ts":"2026-06-28T00:24:37Z","event":"accord.delivered","id":"task-17","summary":"Accord deliver for task-17"}
 {"ts":"2026-06-28T00:24:37Z","event":"accord.accepted","id":"task-17","summary":"Accord accept for task-17"}
 {"ts":"2026-06-28T00:24:37Z","event":"task.completed","id":"task-17","summary":"Committed repo-local .tandem/theme.toml selecting the built-in Verdigris TUI theme."}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-12","summary":"Moved task-12 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-12","summary":"Accord claim for task-12"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-13","summary":"Moved task-13 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-13","summary":"Accord claim for task-13"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-19","summary":"Moved task-19 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-19","summary":"Accord claim for task-19"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-18","summary":"Moved task-18 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-18","summary":"Accord claim for task-18"}

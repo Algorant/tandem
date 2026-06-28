@@ -2,20 +2,22 @@
 id: task-19
 type: task
 title: "Tighten TUI keyboard and focus semantics"
-state: todo
+state: "in-progress"
 priority: "high"
 references: ["task-11"]
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/README.md", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "keyboard", "focus"]
 createdAt: "2026-06-28T00:17:02Z"
-updatedAt: "2026-06-28T00:17:02Z"
+updatedAt: "2026-06-28T00:35:13Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "herd:tui-keyboard-focus"
+  claimedAt: "2026-06-28T00:35:13Z"
   deliverables: ["code:tandem-tui/src/tui.rs:local-only navigation semantics", "docs:tandem-tui/README.md:updated controls"]
   validation:
     commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build", "PTY smoke for 1..5 top-level switching, hjkl local movement, and Tab no-op/hint where no pane focus exists"]
   constraints: ["Do not make h/l switch top-level views by default."]
-  updatedAt: "2026-06-28T00:17:02Z"
+  updatedAt: "2026-06-28T00:35:13Z"
 ---
 
 ## Description
