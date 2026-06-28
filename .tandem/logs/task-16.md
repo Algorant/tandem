@@ -2,22 +2,30 @@
 id: task-16
 type: task
 title: "Test pi-tandem task relationship guidance"
-state: todo
 priority: "medium"
 blockers: ["task-14"]
 references: ["task-13", "task-14"]
 tags: ["pi-tandem", "relationships", "smoke"]
 createdAt: "2026-06-28T00:11:43Z"
-updatedAt: "2026-06-28T02:22:39Z"
+updatedAt: "2026-06-28T02:39:55Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-06-28T02:18:41Z"
+  deliveredAt: "2026-06-28T02:39:54Z"
   deliverables: ["test:extensions/pi-tandem/tests/relationship-smoke.md:relationship guidance smoke notes", "docs:extensions/pi-tandem/README.md:relationship examples or guidance updates"]
   validation:
-    commands: ["bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts", "bun extensions/pi-tandem/tests/smoke.ts", "bun extensions/pi-tandem/tests/pi-runtime-smoke.ts"]
+    commands: ["bun extensions/pi-tandem/tests/relationship-smoke.ts"]
   constraints: ["Run after task-14 project-local pi-tandem smoke is available.", "Do not invent new protocol relationship fields unless protocol docs are explicitly updated."]
-  updatedAt: "2026-06-28T02:18:41Z"
+  summary: "Added pi-tandem relationship guidance and deterministic relationship smoke coverage."
+  evidence: ["Merged 243123a via 7d114a6; integrated validation passed."]
+  filesChanged: ["extensions/pi-tandem/index.ts", "extensions/pi-tandem/pi-tandem.md", "extensions/pi-tandem/tests/relationship-smoke.ts"]
+  reviewer: "pi"
+  updatedAt: "2026-06-28T02:39:54Z"
+completedAt: "2026-06-28T02:39:55Z"
+completion:
+  summary: "Integrated pi-tandem relationship guidance and smoke coverage; identified CLI/TUI relationship-display gap."
+  validation: "bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts; bun extensions/pi-tandem/tests/smoke.ts; bun extensions/pi-tandem/tests/pi-runtime-smoke.ts; bun extensions/pi-tandem/tests/relationship-smoke.ts"
 ---
 
 ## Description

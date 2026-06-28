@@ -2,22 +2,30 @@
 id: task-22
 type: task
 title: "Define Tandem task tag taxonomy for delegation"
-state: todo
 priority: "medium"
 references: ["task-12", "task-13"]
 relatedFiles: ["plan/todo.md", "AGENTS.md"]
 tags: ["docs", "rules", "taxonomy", "delegation"]
 createdAt: "2026-06-28T00:17:03Z"
-updatedAt: "2026-06-28T02:22:39Z"
+updatedAt: "2026-06-28T02:39:55Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-06-28T02:18:41Z"
+  deliveredAt: "2026-06-28T02:39:55Z"
   deliverables: ["docs:plan/todo.md:tag taxonomy or convention notes", "docs:AGENTS.md:agent task tagging guidance if needed"]
   validation:
-    commands: ["./tandem-tui/target/debug/tdm list --tag pi-tandem", "git diff --check"]
+    commands: ["tdm list --tag pi-tandem; tdm list --tag tui; tdm rules list"]
   constraints: ["Prefer convention and docs before protocol/schema changes."]
-  updatedAt: "2026-06-28T02:18:41Z"
+  summary: "Defined lightweight Tandem tag taxonomy and applied it to active tasks while preserving task-9 subtask split."
+  evidence: ["Merged 4463afd via 49f68a8 with task-9 metadata reconciliation; integrated validation passed."]
+  filesChanged: [".tandem/tandem.md", "plan/todo.md", ".tandem/board/task-9.md"]
+  reviewer: "pi"
+  updatedAt: "2026-06-28T02:39:55Z"
+completedAt: "2026-06-28T02:39:55Z"
+completion:
+  summary: "Integrated tag taxonomy rules/conventions and reconciled task-9 tags with the new subtask breakdown."
+  validation: "tdm list --tag pi-tandem; tdm list --tag tui; tdm rules list; git diff --check"
 ---
 
 ## Description
