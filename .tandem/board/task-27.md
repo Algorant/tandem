@@ -2,37 +2,41 @@
 id: task-27
 type: task
 title: "Create first Tandem CLI/TUI release"
-state: "in-progress"
+state: "review"
 priority: "high"
-relatedFiles: ["tandem-tui/Cargo.toml", "tandem-tui/Cargo.lock", "tandem-tui/README.md", "tandem-tui/plan/spec.md"]
+relatedFiles: [".gitignore", "tandem-tui/Cargo.toml", "tandem-tui/Cargo.lock", "tandem-tui/README.md", "tandem-tui/RELEASE.md"]
 tags: ["release", "cli", "tui", "tdm"]
 createdAt: "2026-06-28T12:51:19Z"
-updatedAt: "2026-06-28T12:57:29Z"
+updatedAt: "2026-06-28T13:00:37Z"
 subtasks:
   - id: task-27-1
     title: "Confirm release version, tag name, and package scope"
-    completed: false
+    completed: true
   - id: task-27-2
     title: "Run clean release validation for tandem-tui"
-    completed: false
+    completed: true
   - id: task-27-3
     title: "Prepare release notes and known limitations"
-    completed: false
+    completed: true
   - id: task-27-4
     title: "Create/publish the release tag or document publishing blocker"
-    completed: false
+    completed: true
   - id: task-27-5
     title: "Document install path expected by pi-tandem/global Pi config"
-    completed: false
+    completed: true
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "herd:task27-cli-tui-release"
   claimedAt: "2026-06-28T12:57:29Z"
-  deliverables: ["release:tag:tagged Tandem CLI/TUI release for tdm", "docs:release-notes:release notes and known limitations", "docs:install-path:tdm install/lookup instructions for pi-tandem task-15"]
+  deliveredAt: "2026-06-28T13:00:37Z"
+  deliverables: ["release:decision:recommended Tandem CLI/TUI release target tandem-tui v0.1.0 / tandem-tui-v0.1.0", "docs:release-notes:tandem-tui/RELEASE.md release notes and known limitations", "docs:install-path:tdm install/lookup instructions for pi-tandem task-15"]
   validation:
-    commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build --release"]
+    commands: ["git diff --check", "cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build --release"]
   constraints: ["Do not promote global Pi config in this task; only unblock it with a clear tdm release/install target.", "Do not publish artifacts or push tags without an explicit release decision if credentials/settings are unclear."]
-  updatedAt: "2026-06-28T12:57:29Z"
+  summary: "Prepared the first tdm release target as tandem-tui package v0.1.0 with recommended annotated tag tandem-tui-v0.1.0, release notes, install instructions, and documented tag/publish blocker pending parent approval."
+  evidence: ["Validation passed: git diff --check; cd tandem-tui && cargo fmt --check; cd tandem-tui && cargo test; cd tandem-tui && cargo build --release; cd tandem-tui && cargo build --release --locked.", "No tag, push, GitHub release, or artifact was created because release policy/credentials/settings are not yet documented and parent approval is required."]
+  filesChanged: [".gitignore", ".tandem/board/task-27.md", "tandem-tui/Cargo.lock", "tandem-tui/README.md", "tandem-tui/RELEASE.md"]
+  updatedAt: "2026-06-28T13:00:37Z"
 ---
 
 ## Description
