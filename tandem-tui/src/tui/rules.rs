@@ -248,7 +248,7 @@ impl TuiApp {
 
     pub(super) fn rules_footer_text(&self) -> String {
         format!(
-            "Rules · j/k select · h/l category · a add · e edit · d delete · r reload · q quit · ? help · {}",
+            "Rules · j/k select · h/l category · Tab no focus fallback · a add · e edit · d delete · 1..5 views · r reload · q quit · ? help · {}",
             self.status
         )
     }

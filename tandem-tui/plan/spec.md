@@ -706,14 +706,14 @@ tdm tui
 - Human output shape: enters the TUI; startup errors are plain terminal errors.
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tdm tui` command.
-  - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` and mouse tab clicks switch views.
+  - renders top-level Board, Review, Logs, Rules, and Decisions tabs; `1`..`5` are the keyboard view switchers, and mouse tab clicks remain explicit pointer navigation.
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns.
-  - keeps Board keyboard and mouse navigation across state subviews/items, richer Brainfile-style rows, selected-item detail scrolling, reload, help, and safe quit.
+  - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, richer Brainfile-style rows, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
-  - renders Review as a real read-only filtered queue of active items needing attention, with selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
-  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
-  - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
-  - renders Decisions as a selectable active decision list with selected metadata/body/path detail and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
+  - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
+  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
+  - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
+  - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
   - loads the built-in `default-dark` semantic palette, or selectable built-in `verdigris` when `.tandem/theme.toml` sets `base = "verdigris"`, and applies the active palette to Board, Review, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies workspace theme selection/overrides from `.tandem/theme.toml` using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active built-in palette remains in use.
   - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
@@ -1086,16 +1086,16 @@ Global:
 | `/` | search current view |
 | `r` | reload |
 | `1..5` | switch major view: Board, Review, Logs, Rules, Decisions |
-| `tab` / `shift-tab` | next/previous section |
-| `esc` | close modal/clear filter |
+| `tab` / `shift-tab` | cycle focus only within views that have meaningful focusable panes; no top-level fallback |
+| `esc` | close modal/clear filter/return detail focus to list where supported |
 
 Navigation:
 
 | Key | Action |
 | --- | --- |
-| `j/k` or arrows | move selection |
-| `h/l` or left/right | move Board state subview or current view tab |
-| `g/G` | top/bottom |
+| `j/k` or arrows | move selection or scroll the focused detail/body pane |
+| `h/l` or left/right | local movement only: Board state subview, Review/Logs/Decisions list-detail focus, or Rules category |
+| `g/G` | top/bottom in the active local list/detail |
 | `ctrl-d/u` | half-page down/up |
 | `enter` | expand/open |
 

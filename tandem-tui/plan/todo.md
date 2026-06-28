@@ -130,6 +130,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - the active state gets the full Board list area
   - rows include richer priority, title, accord/review, checklist, tag, assignee, updated, file-count, path, and right-ish ID metadata
   - quick-add, `H`/`L` task moves, detail focus, theme styling, and mouse wheel/click behavior remain active
+- [x] Tightened default TUI keyboard/focus semantics:
+  - `1`..`5` are the keyboard top-level view switchers; local keys no longer switch top-level views.
+  - `h/j/k/l` stay inside the active view: Board state/items, Review/Logs/Decisions list-detail focus or scroll, and Rules category/list movement.
+  - Tab/BackTab cycle focus only in views with meaningful focusable panes and show a Rules hint instead of falling back to top-level view cycling.
+  - Added unit coverage for numeric switching, local `h/j/k/l`, and Tab no-fallback behavior.
+  - Manual PTY smoke (2026-06-28): `target/debug/tdm tui` accepted scripted `1`..`5`, local `h/j/k/l`, and Tab/BackTab sequences and exited cleanly (`rc=0`).
 
 ## Current tasks
 

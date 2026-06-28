@@ -9,7 +9,8 @@ use ratatui::{
 
 use super::theme::{StatusTone, TuiTheme};
 use super::{
-    centered_rect, detail_field_line, markdownish_line, push_optional_detail_line, TuiApp,
+    centered_rect, detail_field_line, markdownish_line, push_optional_detail_line, FocusPane,
+    TuiApp,
 };
 use crate::{
     append_event, current_timestamp, display_path, first_body_line, next_sequential_id,
@@ -106,10 +107,24 @@ impl TuiApp {
 
     pub(super) fn handle_decisions_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Up | KeyCode::Char('k') => self.previous_decision_selection(),
-            KeyCode::Down | KeyCode::Char('j') => self.next_decision_selection(),
-            KeyCode::Home | KeyCode::Char('g') => self.first_decision_selection(),
-            KeyCode::End | KeyCode::Char('G') => self.last_decision_selection(),
+            KeyCode::Up | KeyCode::Char('k') => match self.focus {
+                FocusPane::Board => self.previous_decision_selection(),
+                FocusPane::Detail => self.scroll_decision_detail_up(1),
+            },
+            KeyCode::Down | KeyCode::Char('j') => match self.focus {
+                FocusPane::Board => self.next_decision_selection(),
+                FocusPane::Detail => self.scroll_decision_detail_down(1),
+            },
+            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
+            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
+            KeyCode::Home | KeyCode::Char('g') => match self.focus {
+                FocusPane::Board => self.first_decision_selection(),
+                FocusPane::Detail => self.decisions_view.detail_scroll = 0,
+            },
+            KeyCode::End | KeyCode::Char('G') => match self.focus {
+                FocusPane::Board => self.last_decision_selection(),
+                FocusPane::Detail => self.scroll_decision_detail_down(u16::MAX),
+            },
             KeyCode::PageUp => self.scroll_decision_detail_up(6),
             KeyCode::PageDown => self.scroll_decision_detail_down(6),
             KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -124,7 +139,7 @@ impl TuiApp {
                     .selected_decision_doc()
                     .map(|doc| {
                         format!(
-                            "Selected decision {}; body and metadata are shown in the detail pane.",
+                            "Selected decision {}; body and metadata are shown in the detail pane. Use Tab or l to focus the body.",
                             doc.id()
                         )
                     })
@@ -201,8 +216,12 @@ impl TuiApp {
     }
 
     pub(super) fn decisions_footer_text(&self) -> String {
+        let focus = match self.focus {
+            FocusPane::Board => "list",
+            FocusPane::Detail => "body",
+        };
         format!(
-            "Decisions · j/k select · PgUp/PgDn body · a add · r reload · q quit · ? help · {}",
+            "Decisions {focus} · j/k select/scroll · h/l or Tab list/body · PgUp/PgDn body · a add · 1..5 views · r reload · q quit · ? help · {}",
             self.status
         )
     }
@@ -234,7 +253,7 @@ impl TuiApp {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(format!(" Decisions ({}) ", decisions.len()))
-                    .border_style(self.theme.border_style(true))
+                    .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )
             .highlight_style(self.theme.selected_style())
@@ -269,7 +288,7 @@ impl TuiApp {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(self.theme.border_style(false))
+                    .border_style(self.theme.border_style(self.focus == FocusPane::Detail))
                     .style(self.theme.panel_style()),
             )
             .scroll((self.decisions_view.detail_scroll, 0))
