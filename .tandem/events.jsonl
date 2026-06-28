@@ -159,3 +159,5 @@
 {"ts":"2026-06-28T13:08:58Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
 {"ts":"2026-06-28T13:08:59Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to in-progress"}
 {"ts":"2026-06-28T13:09:00Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T13:28:31Z","event":"accord.accepted","id":"task-27","summary":"Accord accept for task-27"}
+{"ts":"2026-06-28T13:28:31Z","event":"task.completed","id":"task-27","summary":"Prepared and merged the first Tandem CLI/TUI release target for tdm v0.1.0, including release notes, lockfile, and install instructions."}

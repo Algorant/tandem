@@ -2,12 +2,11 @@
 id: task-27
 type: task
 title: "Create first Tandem CLI/TUI release"
-state: "review"
 priority: "high"
 relatedFiles: [".gitignore", "tandem-tui/Cargo.toml", "tandem-tui/Cargo.lock", "tandem-tui/README.md", "tandem-tui/RELEASE.md"]
 tags: ["release", "cli", "tui", "tdm"]
 createdAt: "2026-06-28T12:51:19Z"
-updatedAt: "2026-06-28T13:00:37Z"
+updatedAt: "2026-06-28T13:28:31Z"
 subtasks:
   - id: task-27-1
     title: "Confirm release version, tag name, and package scope"
@@ -25,7 +24,7 @@ subtasks:
     title: "Document install path expected by pi-tandem/global Pi config"
     completed: true
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "herd:task27-cli-tui-release"
   claimedAt: "2026-06-28T12:57:29Z"
   deliveredAt: "2026-06-28T13:00:37Z"
@@ -36,7 +35,15 @@ accord:
   summary: "Prepared the first tdm release target as tandem-tui package v0.1.0 with recommended annotated tag tandem-tui-v0.1.0, release notes, install instructions, and documented tag/publish blocker pending parent approval."
   evidence: ["Validation passed: git diff --check; cd tandem-tui && cargo fmt --check; cd tandem-tui && cargo test; cd tandem-tui && cargo build --release; cd tandem-tui && cargo build --release --locked.", "No tag, push, GitHub release, or artifact was created because release policy/credentials/settings are not yet documented and parent approval is required."]
   filesChanged: [".gitignore", ".tandem/board/task-27.md", "tandem-tui/Cargo.lock", "tandem-tui/README.md", "tandem-tui/RELEASE.md"]
-  updatedAt: "2026-06-28T13:00:37Z"
+  reviewer: "pi"
+  note: "Release prep branch verified and merged; release tag/publish approved by user."
+  updatedAt: "2026-06-28T13:28:31Z"
+completedAt: "2026-06-28T13:28:31Z"
+completion:
+  summary: "Prepared and merged the first Tandem CLI/TUI release target for tdm v0.1.0, including release notes, lockfile, and install instructions."
+  filesChanged: ["tandem-tui/RELEASE.md", "tandem-tui/README.md", "tandem-tui/Cargo.lock", ".gitignore"]
+  validation: "git diff --check; cd tandem-tui && cargo fmt --check; cargo test; cargo build --release --locked"
+  reviewer: "pi"
 ---
 
 ## Description
