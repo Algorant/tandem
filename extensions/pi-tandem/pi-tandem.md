@@ -13,6 +13,26 @@ Use `pi-tandem` when a project has `.tandem/tandem.md` or when the user asks for
 
 Avoid editing `.tandem/board/*.md`, `.tandem/logs/*.md`, or `.tandem/tandem.md` directly unless the user asks for raw source repair or the CLI cannot perform the needed action.
 
+## Relationship guidance
+
+When decomposing or linking work, set Tandem relationship fields explicitly instead of burying relationships in prose:
+
+- `parent` writes `parentId` and is for supertask/child hierarchy. Create or inspect the parent document first.
+- `blockers` writes strict dependency IDs. Blockers must already exist; unresolved blockers are validation errors.
+- `references` writes related Tandem document IDs such as decisions, sibling tasks, or completed logs. Prefer existing IDs even though unresolved references are only warnings.
+- `relatedFiles` records project paths that help implementers/reviewers find relevant code or docs.
+- `subtasks` creates lightweight checklist items inside one task. Use child tasks with `parent` when work needs its own owner, accord, review, or blockers.
+
+Example tool pattern:
+
+```text
+tdm_task action=add title="Ship relationship UI" relatedFiles=["tandem-tui/src/tui.rs"] subtasks=["Define display", "Review copy"]
+tdm_decision action=add title="Relationship display policy" references=["task-1"]
+tdm_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem-tui/src/tui.rs", "protocol/plan/spec.md"] subtasks=["Show parent", "Show blockers", "Show references"]
+```
+
+After creating linked work, inspect with `tdm_task show` and `tdm_search`. If relationship fields are present in the document but hard to see in CLI/TUI output, report that as a display UX gap; do not invent replacement fields.
+
 ## Lifecycle cautions
 
 - Claim or deliver only when assigned/asked.

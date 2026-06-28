@@ -29,12 +29,14 @@ Maps to:
 ```text
 tdm list [filters] --json
 tdm show <id> --json
-tdm add --title <title> ...
+tdm add --title <title> [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--subtask <title>] ...
 tdm move <id> --state <state>
 tdm complete <id> --summary <text> ...
 ```
 
 Read actions default to JSON. Mutation actions keep the CLI's human-readable output.
+
+Relationship parameters map directly to Tandem protocol fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, `relatedFiles` → project paths, and `subtasks` → lightweight checklist items. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings.
 
 ### `tdm_accord`
 
@@ -110,12 +112,13 @@ From the repository root:
 
 ```text
 cargo build --manifest-path tandem-tui/Cargo.toml
-bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts
+bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 bun extensions/pi-tandem/tests/smoke.ts
 bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
+bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repo's `.tandem` board, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts`, starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes the loader.
+`smoke.ts` performs read-only checks against this repo's `.tandem` board, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts`, starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes the loader. `relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tdm`, then verifies persisted relationship fields and search visibility.
 
 Manual project-local Pi smoke:
 

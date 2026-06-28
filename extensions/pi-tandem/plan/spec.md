@@ -73,14 +73,17 @@ Guidance emphasizes using `tdm_*` tools rather than direct `.tandem` edits, and 
 Static/smoke commands:
 
 ```text
-bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts
+bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 bun extensions/pi-tandem/tests/smoke.ts
 bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
+bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
 `smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_TDM_BIN`/`TDM_BIN` is set and the local debug binary is missing, it builds `tandem-tui` first.
 
 `pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing `.pi` state: it creates `.pi/extensions/pi-tandem/index.ts`, starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status` against the repo workspace, and cleans up.
+
+`relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tdm`, then verifies persisted `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks` plus search visibility.
 
 Manual Pi smoke after review:
 
