@@ -7,14 +7,14 @@ priority: "medium"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["tui", "keyboard", "mouse", "markdown"]
 createdAt: "2026-06-27T03:59:00Z"
-updatedAt: "2026-06-28T02:27:57Z"
+updatedAt: "2026-06-28T03:32:31Z"
 subtasks:
   - id: task-9-1
     title: "Implement hot reload and safe external edit/error handling"
-    completed: false
+    completed: true
   - id: task-9-2
     title: "Render styled-basic Markdown in detail panes"
-    completed: false
+    completed: true
   - id: task-9-3
     title: "Improve mouse hit-map and action-button interactions"
     completed: false
@@ -29,7 +29,7 @@ accord:
   validation:
     commands: ["cd tandem-tui && cargo fmt --check", "cd tandem-tui && cargo test", "cd tandem-tui && cargo build"]
   constraints: ["Keep keyboard-first behavior; drag/drop stays out of v0."]
-  updatedAt: "2026-06-28T02:27:57Z"
+  updatedAt: "2026-06-28T03:32:31Z"
 ---
 
 ## Description
