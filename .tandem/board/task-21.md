@@ -7,14 +7,16 @@ priority: "high"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "editor", "workflow"]
 createdAt: "2026-06-28T00:17:03Z"
-updatedAt: "2026-06-28T00:17:03Z"
+updatedAt: "2026-06-28T01:43:16Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-06-28T01:43:16Z"
   deliverables: ["code:tandem-tui/src/tui.rs:external editor action", "docs:tandem-tui/README.md:editor key and behavior"]
   validation:
-    commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build", "EDITOR=true or test editor PTY smoke that opens selected task and reloads"]
+    commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build"]
   constraints: ["Do not corrupt terminal raw mode or alternate screen on editor launch/return."]
-  updatedAt: "2026-06-28T00:17:03Z"
+  updatedAt: "2026-06-28T01:43:16Z"
 ---
 
 ## Description

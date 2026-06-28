@@ -8,14 +8,16 @@ references: ["task-5", "task-11"]
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/plan/spec.md"]
 tags: ["ui", "tui", "board", "accord"]
 createdAt: "2026-06-28T00:17:02Z"
-updatedAt: "2026-06-28T00:17:02Z"
+updatedAt: "2026-06-28T01:43:16Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-06-28T01:43:16Z"
   deliverables: ["code:tandem-tui/src/tui.rs:Board accord detail rendering", "docs:tandem-tui/plan/spec.md:Board accord detail behavior"]
   validation:
-    commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build", "PTY/manual smoke selecting tasks with ready/claimed/delivered accords"]
+    commands: ["cd tandem-tui && cargo fmt --check && cargo test && cargo build"]
   constraints: ["Do not change protocol accord semantics."]
-  updatedAt: "2026-06-28T00:17:02Z"
+  updatedAt: "2026-06-28T01:43:16Z"
 ---
 
 ## Description

@@ -6,14 +6,16 @@ state: todo
 priority: "medium"
 tags: ["pi-extension", "pi-tandem"]
 createdAt: "2026-06-27T23:30:04Z"
-updatedAt: "2026-06-27T23:30:05Z"
+updatedAt: "2026-06-28T01:43:16Z"
 accord:
-  status: "ready"
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-06-28T01:43:16Z"
   deliverables: ["docs:extensions/pi-tandem/README.md:project-local install and smoke instructions", "test:extensions/pi-tandem/tests/project-smoke.md:manual smoke evidence"]
   validation:
-    commands: ["test -f extensions/pi-tandem/index.ts", "rg -n 'project-local|pi -e|/reload|tdm_status|tdm_task' extensions/pi-tandem"]
+    commands: ["bun --check extensions/pi-tandem/index.ts", "bun extensions/pi-tandem/tests/smoke.ts"]
   constraints: ["Do not commit private Pi sessions/cache/logs.", "Do not promote to global config until this project-local smoke passes."]
-  updatedAt: "2026-06-27T23:30:05Z"
+  updatedAt: "2026-06-28T01:43:16Z"
 ---
 
 ## Description

@@ -114,3 +114,6 @@
 {"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-18","summary":"Integrated user theme discovery, presets, and documentation; validation passed after merge."}
 {"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-19","summary":"Accord accept for task-19"}
 {"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-19","summary":"Integrated tightened TUI keyboard and focus semantics; validation passed after merge."}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-14","summary":"Accord claim for task-14"}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-20","summary":"Accord claim for task-20"}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-21","summary":"Accord claim for task-21"}
