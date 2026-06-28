@@ -74,6 +74,19 @@ impl TuiApp {
         self.decisions_view.has_prompt()
     }
 
+    pub(super) fn selected_decision_id_for_reload(&self) -> Option<String> {
+        self.selected_decision_doc().map(|doc| doc.id().to_string())
+    }
+
+    pub(super) fn restore_decision_selection_after_reload(&mut self, id: Option<String>) {
+        if let Some(id) = id.as_deref() {
+            if self.select_decision_by_id_preserving_scroll(id) {
+                return;
+            }
+        }
+        self.clamp_decisions_state();
+    }
+
     pub(super) fn decision_prompt_status(&self) -> Option<String> {
         self.decisions_view
             .prompt
@@ -361,35 +374,35 @@ impl TuiApp {
     fn finish_decision_add(&mut self, title: String, body: String) {
         match create_basic_decision(&self.workspace, &title, &body) {
             Ok(outcome) => {
-                let reload_error = self.reload().err().map(|error| error.message);
+                let reload_note = self.reload().warning_note();
                 self.select_decision_by_id(&outcome.id);
                 self.status = format!(
                     "Created decision {}: {}{}",
-                    outcome.id,
-                    outcome.title,
-                    reload_error
-                        .map(|message| format!("; reload failed: {message}"))
-                        .unwrap_or_default()
+                    outcome.id, outcome.title, reload_note
                 );
             }
             Err(error) => {
-                let reload_note = self.reload().err().map(|reload_error| reload_error.message);
-                self.status = format!(
-                    "Decision add error: {}{}",
-                    error.message,
-                    reload_note
-                        .map(|message| format!(" Reload failed: {message}"))
-                        .unwrap_or_default()
-                );
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Decision add error: {}{}", error.message, reload_note);
             }
         }
     }
 
     fn select_decision_by_id(&mut self, id: &str) -> bool {
+        self.select_decision_by_id_with_scroll(id, true)
+    }
+
+    fn select_decision_by_id_preserving_scroll(&mut self, id: &str) -> bool {
+        self.select_decision_by_id_with_scroll(id, false)
+    }
+
+    fn select_decision_by_id_with_scroll(&mut self, id: &str, reset_scroll: bool) -> bool {
         let decisions = self.sorted_decision_docs();
         if let Some(index) = decisions.iter().position(|doc| doc.id() == id) {
             self.decisions_view.selected = index;
-            self.decisions_view.detail_scroll = 0;
+            if reset_scroll {
+                self.decisions_view.detail_scroll = 0;
+            }
             true
         } else {
             self.clamp_decisions_state();

@@ -1,9 +1,12 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
+use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+use yaml_rust2::Yaml;
 
 use crossterm::{
     event::{
@@ -215,6 +218,62 @@ struct QuickAddInput {
     fallback_note: Option<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+struct ReloadOutcome {
+    warning_count: usize,
+    first_warning: Option<String>,
+}
+
+impl ReloadOutcome {
+    fn from_warnings(warnings: &[String]) -> Self {
+        Self {
+            warning_count: warnings.len(),
+            first_warning: warnings.first().cloned(),
+        }
+    }
+
+    fn warning_note(&self) -> String {
+        match self.warning_count {
+            0 => String::new(),
+            1 => format!(
+                "; reload warning: {}",
+                truncate(
+                    self.first_warning.as_deref().unwrap_or("inspect status"),
+                    120
+                )
+            ),
+            count => format!(
+                "; {count} reload warnings; first: {}",
+                truncate(
+                    self.first_warning.as_deref().unwrap_or("inspect status"),
+                    120
+                )
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ReloadFingerprint {
+    files: BTreeMap<PathBuf, Option<FileSignature>>,
+}
+
+impl ReloadFingerprint {
+    fn is_empty(&self) -> bool {
+        self.files.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct ReloadSelection {
+    board_doc_id: Option<String>,
+    board_state: Option<String>,
+    review_doc_id: Option<String>,
+    log_doc_id: Option<String>,
+    rule_anchor: Option<(String, Option<usize>)>,
+    decision_doc_id: Option<String>,
+}
+
 struct TuiApp {
     workspace: Workspace,
     title: String,
@@ -245,6 +304,8 @@ struct TuiApp {
     rules_view: RulesState,
     decisions_view: DecisionsState,
     hits: Vec<HitRegion>,
+    reload_fingerprint: ReloadFingerprint,
+    last_reload_check: Instant,
 }
 
 impl TuiApp {
@@ -279,32 +340,62 @@ impl TuiApp {
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             hits: Vec::new(),
+            reload_fingerprint: ReloadFingerprint::default(),
+            last_reload_check: Instant::now(),
         };
-        app.reload()?;
+        app.reload();
         Ok(app)
     }
 
-    fn reload(&mut self) -> Result<(), CliError> {
-        let mut docs = read_documents(&self.workspace.board_dir, DocumentLocation::Board)?;
-        sort_documents(&mut docs);
-        let configured_states = read_workspace_states(&self.workspace)?;
-        let theme_load = TuiTheme::load_for_workspace(&self.workspace);
-        self.title = read_workspace_title(&self.workspace)?;
-
+    fn reload(&mut self) -> ReloadOutcome {
+        let selection = self.capture_reload_selection();
         let mut load_errors = Vec::new();
+        let mut docs = read_documents_tolerant(
+            &self.workspace.board_dir,
+            DocumentLocation::Board,
+            "Board",
+            &mut load_errors,
+        );
+        sort_documents(&mut docs);
+
+        let (title, configured_states, rules) =
+            match read_frontmatter_yaml_file(&self.workspace.config_path) {
+                Ok(root) => (
+                    workspace_title_from_root(root.as_ref())
+                        .unwrap_or_else(|| "Tandem".to_string()),
+                    workspace_states_from_root(root.as_ref()),
+                    parse_rules_from_yaml(root.as_ref()),
+                ),
+                Err(error) => {
+                    load_errors.push(format!("Config load failed: {}", error.message));
+                    (
+                        if self.title.is_empty() {
+                            "Tandem".to_string()
+                        } else {
+                            self.title.clone()
+                        },
+                        if self.configured_states.is_empty() {
+                            default_workspace_states()
+                        } else {
+                            self.configured_states.clone()
+                        },
+                        self.rules.clone(),
+                    )
+                }
+            };
+
+        let theme_load = TuiTheme::load_for_workspace(&self.workspace);
         let log_load = logs::load_logs(&self.workspace.logs_dir);
         load_errors.extend(log_load.warnings);
         let (log_events, event_warnings) = logs::load_log_events(&self.workspace.events_path);
         load_errors.extend(event_warnings);
+        load_errors.extend(validation_load_errors(
+            &docs,
+            &log_load.docs,
+            &configured_states,
+        ));
 
-        let rules = match read_rules(&self.workspace.config_path) {
-            Ok(rules) => rules,
-            Err(error) => {
-                load_errors.push(format!("Rules load failed: {}", error.message));
-                empty_rules()
-            }
-        };
-
+        self.title = title;
         self.states = states_with_board_docs(configured_states.clone(), &docs);
         self.configured_states = configured_states;
         self.docs = docs;
@@ -315,9 +406,12 @@ impl TuiApp {
         self.theme = theme_load.theme;
         self.theme_source = theme_load.source;
         self.theme_warnings = theme_load.warnings;
+        self.restore_reload_selection(selection);
         self.clamp_selection();
         self.clamp_rules_state();
         self.clamp_decisions_state();
+        let warnings = self.runtime_warnings();
+        let outcome = ReloadOutcome::from_warnings(&warnings);
         let theme_note = if self.theme_warnings.is_empty() {
             format!("theme {}", self.theme.source_label(&self.theme_source))
         } else {
@@ -332,28 +426,94 @@ impl TuiApp {
                 }
             )
         };
-        let load_note = if self.load_errors.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "; {} load warning{}",
-                self.load_errors.len(),
-                if self.load_errors.len() == 1 { "" } else { "s" }
-            )
-        };
+        let load_note = runtime_warning_status_note(&outcome);
         self.status = format!(
-            "Loaded {} active document{} from {} · {}{}",
+            "Reloaded {} active document{} from {} · {}{}",
             self.docs.len(),
             if self.docs.len() == 1 { "" } else { "s" },
             display_path(&self.workspace.board_dir),
             theme_note,
             load_note
         );
-        Ok(())
+        self.reload_fingerprint = collect_reload_fingerprint(&self.workspace);
+        self.last_reload_check = Instant::now();
+        outcome
+    }
+
+    fn capture_reload_selection(&self) -> ReloadSelection {
+        ReloadSelection {
+            board_doc_id: self.selected_doc().map(|doc| doc.id().to_string()),
+            board_state: self.states.get(self.selected_state).cloned(),
+            review_doc_id: self
+                .selected_review_item()
+                .map(|item| item.id().to_string()),
+            log_doc_id: self.selected_log().map(|doc| doc.id().to_string()),
+            rule_anchor: self.selected_rule_anchor_for_reload(),
+            decision_doc_id: self.selected_decision_id_for_reload(),
+        }
+    }
+
+    fn restore_reload_selection(&mut self, selection: ReloadSelection) {
+        let restored_board_doc = selection
+            .board_doc_id
+            .as_deref()
+            .map(|id| self.select_document_by_id_preserving_scroll(id))
+            .unwrap_or(false);
+        if !restored_board_doc {
+            if let Some(state) = selection.board_state.as_deref() {
+                if let Some(index) = self.states.iter().position(|candidate| candidate == state) {
+                    self.selected_state = index;
+                }
+            }
+        }
+
+        if let Some(id) = selection.review_doc_id.as_deref() {
+            self.select_review_item_by_id_preserving_scroll(id);
+        }
+        if let Some(id) = selection.log_doc_id.as_deref() {
+            self.select_log_by_id_preserving_scroll(id);
+        }
+        self.restore_rule_selection_after_reload(selection.rule_anchor);
+        self.restore_decision_selection_after_reload(selection.decision_doc_id);
+    }
+
+    fn runtime_warnings(&self) -> Vec<String> {
+        self.load_errors
+            .iter()
+            .chain(self.theme_warnings.iter())
+            .cloned()
+            .collect()
+    }
+
+    fn input_overlay_active(&self) -> bool {
+        self.quick_add.is_some()
+            || self.log_search_input.is_some()
+            || self.rules_prompt_active()
+            || self.decision_prompt_active()
+            || self.show_help
+    }
+
+    fn reload_if_changed(&mut self) {
+        if self.input_overlay_active()
+            || self.last_reload_check.elapsed() < Duration::from_millis(250)
+        {
+            return;
+        }
+        self.last_reload_check = Instant::now();
+        let current = collect_reload_fingerprint(&self.workspace);
+        if self.reload_fingerprint.is_empty() {
+            self.reload_fingerprint = current;
+            return;
+        }
+        if current != self.reload_fingerprint {
+            self.reload();
+            self.status = format!("External changes detected; {}", self.status);
+        }
     }
 
     fn run(&mut self, session: &mut TerminalSession) -> Result<(), CliError> {
         loop {
+            self.reload_if_changed();
             session.terminal_mut().draw(|frame| self.draw(frame))?;
             if event::poll(Duration::from_millis(200))? {
                 match event::read()? {
@@ -414,10 +574,9 @@ impl TuiApp {
         match key.code {
             KeyCode::Char('q') => return Ok(KeyAction::Quit),
             KeyCode::Char('?') => self.show_help = true,
-            KeyCode::Char('r') => match self.reload() {
-                Ok(()) => {}
-                Err(error) => self.status = format!("Reload failed: {}", error.message),
-            },
+            KeyCode::Char('r') => {
+                self.reload();
+            }
             KeyCode::Char('a') if self.view == TuiView::Board => self.start_quick_add(),
             KeyCode::Char('a') if self.view == TuiView::Rules => self.start_rule_add_prompt(),
             KeyCode::Char('a') if self.view == TuiView::Decisions => {
@@ -762,28 +921,15 @@ impl TuiApp {
 
         match create_basic_task(&self.workspace, &title, &state) {
             Ok(outcome) => {
-                let reload_error = match self.reload() {
-                    Ok(()) => {
-                        self.select_document_by_id(&outcome.id);
-                        None
-                    }
-                    Err(error) => Some(error.message),
-                };
+                let reload_note = self.reload().warning_note();
+                self.select_document_by_id(&outcome.id);
                 self.status = format!(
                     "Created {} in {}: {}{}",
-                    outcome.id,
-                    outcome.state,
-                    outcome.title,
-                    reload_error
-                        .map(|message| format!("; reload failed: {message}"))
-                        .unwrap_or_default()
+                    outcome.id, outcome.state, outcome.title, reload_note
                 );
             }
             Err(error) => {
-                let reload_note = match self.reload() {
-                    Ok(()) => String::new(),
-                    Err(reload_error) => format!(" Reload failed: {}", reload_error.message),
-                };
+                let reload_note = self.reload().warning_note();
                 self.status = format!("Add error: {}{}", error.message, reload_note);
             }
         }
@@ -856,35 +1002,23 @@ impl TuiApp {
     fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
         match move_task_to_state(&self.workspace, doc_id, target_state) {
             Ok(outcome) => {
-                let reload_error = match self.reload() {
-                    Ok(()) => {
-                        self.select_document_by_id(&outcome.id);
-                        None
-                    }
-                    Err(error) => Some(error.message),
-                };
+                let reload_note = self.reload().warning_note();
+                self.select_document_by_id(&outcome.id);
                 self.status = if outcome.changed {
                     format!(
                         "Moved {}: {} -> {}{}",
-                        outcome.id,
-                        outcome.from,
-                        outcome.to,
-                        reload_error
-                            .map(|message| format!("; reload failed: {message}"))
-                            .unwrap_or_default()
+                        outcome.id, outcome.from, outcome.to, reload_note
                     )
                 } else {
-                    format!("{} is already in state {}", outcome.id, outcome.to)
+                    format!(
+                        "{} is already in state {}{}",
+                        outcome.id, outcome.to, reload_note
+                    )
                 };
             }
             Err(error) => {
-                let reload_note = match self.reload() {
-                    Ok(()) => {
-                        self.select_document_by_id(doc_id);
-                        String::new()
-                    }
-                    Err(reload_error) => format!(" Reload failed: {}", reload_error.message),
-                };
+                let reload_note = self.reload().warning_note();
+                self.select_document_by_id(doc_id);
                 self.status = format!("Move error: {}{}", error.message, reload_note);
             }
         }
@@ -927,13 +1061,13 @@ impl TuiApp {
             )));
         }
 
-        let reload_note = match self.reload() {
-            Ok(()) => {
-                self.select_document_by_id(&target.id);
-                String::new()
-            }
-            Err(error) => format!("; reload failed: {}", error.message),
+        let reload_note = self.reload().warning_note();
+        let selection_note = if self.select_document_by_id(&target.id) {
+            String::new()
+        } else {
+            "; edited item is not currently loadable or no longer active".to_string()
         };
+        let reload_note = format!("{reload_note}{selection_note}");
 
         self.status = match editor_result {
             Ok(status) if status.success() => format!(
@@ -979,6 +1113,14 @@ impl TuiApp {
     }
 
     fn select_document_by_id(&mut self, id: &str) -> bool {
+        self.select_document_by_id_with_scroll(id, true)
+    }
+
+    fn select_document_by_id_preserving_scroll(&mut self, id: &str) -> bool {
+        self.select_document_by_id_with_scroll(id, false)
+    }
+
+    fn select_document_by_id_with_scroll(&mut self, id: &str, reset_scroll: bool) -> bool {
         for state_index in 0..self.states.len() {
             let Some(state_name) = self.states.get(state_index) else {
                 continue;
@@ -989,7 +1131,9 @@ impl TuiApp {
                     if doc.id() == id {
                         self.selected_state = state_index;
                         self.selected_item = item_index;
-                        self.detail_scroll = 0;
+                        if reset_scroll {
+                            self.detail_scroll = 0;
+                        }
                         self.clamp_selection();
                         return true;
                     }
@@ -1002,12 +1146,7 @@ impl TuiApp {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
-        if self.quick_add.is_some()
-            || self.log_search_input.is_some()
-            || self.rules_prompt_active()
-            || self.decision_prompt_active()
-            || self.show_help
-        {
+        if self.input_overlay_active() {
             return;
         }
 
@@ -1355,6 +1494,18 @@ impl TuiApp {
         self.filtered_logs().into_iter().nth(self.selected_log)
     }
 
+    fn select_log_by_id_preserving_scroll(&mut self, id: &str) -> bool {
+        let logs = self.filtered_logs();
+        if let Some(index) = logs.iter().position(|doc| doc.id() == id) {
+            self.selected_log = index;
+            self.clamp_selection();
+            true
+        } else {
+            self.clamp_selection();
+            false
+        }
+    }
+
     fn log_events_for(&self, id: &str) -> &[logs::LogEvent] {
         self.log_events.get(id).map(Vec::as_slice).unwrap_or(&[])
     }
@@ -1391,6 +1542,18 @@ impl TuiApp {
 
     fn selected_review_item(&self) -> Option<review::ReviewQueueItem> {
         review::selected_item(&self.docs, self.selected_review_item)
+    }
+
+    fn select_review_item_by_id_preserving_scroll(&mut self, id: &str) -> bool {
+        let items = self.review_items();
+        if let Some(index) = items.iter().position(|item| item.id() == id) {
+            self.selected_review_item = index;
+            self.clamp_review_selection();
+            true
+        } else {
+            self.clamp_review_selection();
+            false
+        }
     }
 
     fn review_detail_line_count(&self) -> usize {
@@ -2100,7 +2263,7 @@ impl TuiApp {
             )),
             Line::from(""),
             Line::from("q / Ctrl-C        Quit safely"),
-            Line::from("r                 Reload board/log/rule data"),
+            Line::from("r                 Reload board/config/log/theme data (also auto-detected while idle)"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
             Line::from("tab / shift-tab   Cycle list/detail focus where available; never switches views"),
@@ -2282,14 +2445,47 @@ fn split_editor_command(value: &str) -> Result<Vec<String>, String> {
     Ok(words)
 }
 
-fn read_workspace_title(workspace: &Workspace) -> Result<String, CliError> {
-    let root = read_frontmatter_yaml_file(&workspace.config_path)?;
-    Ok(root
-        .as_ref()
-        .and_then(|root| yaml_mapping_value(root, "title"))
+fn workspace_title_from_root(root: Option<&Yaml>) -> Option<String> {
+    root.and_then(|root| yaml_mapping_value(root, "title"))
         .and_then(yaml_scalar_to_string)
         .filter(|title| !title.trim().is_empty())
-        .unwrap_or_else(|| "Tandem".to_string()))
+}
+
+fn workspace_states_from_root(root: Option<&Yaml>) -> Vec<String> {
+    let mut states = Vec::new();
+    if let Some(states_yaml) = root.and_then(|root| yaml_mapping_value(root, "states")) {
+        match states_yaml {
+            Yaml::Array(items) => {
+                for item in items {
+                    if let Some(state) = yaml_scalar_to_string(item)
+                        .or_else(|| yaml_mapping_value(item, "id").and_then(yaml_scalar_to_string))
+                    {
+                        if !state.trim().is_empty() {
+                            states.push(state);
+                        }
+                    }
+                }
+            }
+            _ => {
+                if let Some(state) = yaml_scalar_to_string(states_yaml) {
+                    if !state.trim().is_empty() {
+                        states.push(state);
+                    }
+                }
+            }
+        }
+    }
+    if states.is_empty() {
+        states = default_workspace_states();
+    }
+    states
+}
+
+fn default_workspace_states() -> Vec<String> {
+    DEFAULT_STATES
+        .iter()
+        .map(|state| (*state).to_string())
+        .collect()
 }
 
 fn states_with_board_docs(mut states: Vec<String>, docs: &[Document]) -> Vec<String> {
@@ -2310,6 +2506,220 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
+}
+
+fn read_documents_tolerant(
+    dir: &Path,
+    location: DocumentLocation,
+    label: &str,
+    load_errors: &mut Vec<String>,
+) -> Vec<Document> {
+    if !dir.exists() {
+        return Vec::new();
+    }
+
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) => {
+            load_errors.push(format!(
+                "{label} load failed: could not read {}: {error}",
+                display_path(dir)
+            ));
+            return Vec::new();
+        }
+    };
+
+    let mut paths = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(entry) => {
+                let path = entry.path();
+                if path.extension().and_then(|value| value.to_str()) == Some("md") {
+                    paths.push(path);
+                }
+            }
+            Err(error) => load_errors.push(format!(
+                "{label} load warning: could not inspect entry in {}: {error}",
+                display_path(dir)
+            )),
+        }
+    }
+    paths.sort();
+
+    let mut docs = Vec::new();
+    for path in paths {
+        match read_document(&path, location) {
+            Ok(doc) => docs.push(doc),
+            Err(error) => load_errors.push(format!("{label} load warning: {}", error.message)),
+        }
+    }
+    docs
+}
+
+fn validation_load_errors(
+    docs: &[Document],
+    logs: &[Document],
+    configured_states: &[String],
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+    let mut ids = BTreeSet::new();
+    let mut id_paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for doc in docs.iter().chain(logs.iter()) {
+        let id = doc.id().trim();
+        if !id.is_empty() {
+            ids.insert(id.to_string());
+            id_paths
+                .entry(id.to_string())
+                .or_default()
+                .push(display_path(&doc.path));
+        }
+    }
+
+    for (id, paths) in id_paths.iter().filter(|(_, paths)| paths.len() > 1) {
+        warnings.push(format!(
+            "Validation error: duplicate id `{id}` in {}",
+            paths.join(", ")
+        ));
+    }
+
+    for doc in docs.iter().chain(logs.iter()) {
+        let mut errors = Vec::new();
+        if doc.id().trim().is_empty() {
+            errors.push("missing required field `id`".to_string());
+        }
+        if doc.title().trim().is_empty() {
+            errors.push("missing required field `title`".to_string());
+        }
+
+        match doc.field("type") {
+            Some(doc_type) if !doc_type.trim().is_empty() => {}
+            _ => errors.push("missing required field `type`".to_string()),
+        }
+
+        if doc.location == DocumentLocation::Board && doc.doc_type() == "task" {
+            match doc.field("state") {
+                Some(state) if configured_states.iter().any(|known| known == state) => {}
+                Some(state) if !state.trim().is_empty() => errors.push(format!(
+                    "unknown state `{state}`; known states: {}",
+                    configured_states.join(", ")
+                )),
+                _ => errors.push("missing required field `state`".to_string()),
+            }
+        }
+
+        if doc.location == DocumentLocation::Logs && doc.doc_type() == "task" {
+            if doc.field("completedAt").is_none() {
+                errors.push("missing required log field `completedAt`".to_string());
+            }
+            if completion_summary(doc).is_none() {
+                errors.push("missing required log field `completion.summary`".to_string());
+            }
+        }
+
+        if let Some(parent) = doc
+            .field("parentId")
+            .filter(|value| !value.trim().is_empty())
+        {
+            if !ids.contains(parent) {
+                errors.push(format!("unresolved parentId `{parent}`"));
+            }
+        }
+        for blocker in doc
+            .field("blockers")
+            .map(parse_field_values)
+            .unwrap_or_default()
+        {
+            if !ids.contains(&blocker) {
+                errors.push(format!("unresolved blocker `{blocker}`"));
+            }
+        }
+        if has_metadata(doc, "accord") || doc.field("accordStatus").is_some() {
+            match accord_status(doc) {
+                Some(status) if ACCORD_STATUSES.contains(&status) => {}
+                Some(status) => errors.push(format!("invalid accord.status `{status}`")),
+                None => errors
+                    .push("accord.status is required when accord metadata is present".to_string()),
+            }
+        }
+        if has_metadata(doc, "review") || doc.field("reviewStatus").is_some() {
+            match review_status(doc) {
+                Some(status) if REVIEW_STATUSES.contains(&status) => {}
+                Some(status) => errors.push(format!("invalid review.status `{status}`")),
+                None => errors
+                    .push("review.status is required when review metadata is present".to_string()),
+            }
+        }
+
+        if !errors.is_empty() {
+            warnings.push(format!(
+                "Validation error: {}: {}",
+                display_path(&doc.path),
+                errors.join("; ")
+            ));
+        }
+    }
+
+    warnings
+}
+
+fn runtime_warning_status_note(outcome: &ReloadOutcome) -> String {
+    match outcome.warning_count {
+        0 => String::new(),
+        1 => format!(
+            "; 1 runtime warning: {}",
+            truncate(
+                outcome.first_warning.as_deref().unwrap_or("inspect status"),
+                120
+            )
+        ),
+        count => format!(
+            "; {count} runtime warnings; first: {}",
+            truncate(
+                outcome.first_warning.as_deref().unwrap_or("inspect status"),
+                120
+            )
+        ),
+    }
+}
+
+fn collect_reload_fingerprint(workspace: &Workspace) -> ReloadFingerprint {
+    let mut files = BTreeMap::new();
+    insert_optional_fingerprint(&mut files, workspace.config_path.clone());
+    insert_optional_fingerprint(&mut files, workspace.events_path.clone());
+    insert_optional_fingerprint(
+        &mut files,
+        workspace.config_path.with_file_name("theme.toml"),
+    );
+    insert_directory_fingerprints(&mut files, &workspace.board_dir, "md");
+    insert_directory_fingerprints(&mut files, &workspace.logs_dir, "md");
+    if let Some(user_theme_dir) = theme::user_theme_dir_from_env() {
+        insert_directory_fingerprints(&mut files, &user_theme_dir, "toml");
+    }
+    ReloadFingerprint { files }
+}
+
+fn insert_optional_fingerprint(
+    files: &mut BTreeMap<PathBuf, Option<FileSignature>>,
+    path: PathBuf,
+) {
+    let signature = file_signature(&path).ok();
+    files.insert(path, signature);
+}
+
+fn insert_directory_fingerprints(
+    files: &mut BTreeMap<PathBuf, Option<FileSignature>>,
+    dir: &Path,
+    extension: &str,
+) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) == Some(extension) {
+            insert_optional_fingerprint(files, path);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -3121,6 +3531,34 @@ mod tests {
         env::temp_dir().join(format!("{prefix}-{}-{nonce}", std::process::id()))
     }
 
+    fn temp_workspace(root: &Path) -> Workspace {
+        let tandem_dir = root.join(".tandem");
+        let workspace = Workspace {
+            board_dir: tandem_dir.join("board"),
+            logs_dir: tandem_dir.join("logs"),
+            config_path: tandem_dir.join("tandem.md"),
+            events_path: tandem_dir.join("events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, review]\n---\n",
+        )
+        .unwrap();
+        workspace
+    }
+
+    fn write_task_doc(workspace: &Workspace, id: &str, title: &str, state: &str) {
+        fs::write(
+            workspace.board_dir.join(format!("{id}.md")),
+            format!(
+                "---\nid: {id}\ntype: task\ntitle: {title}\nstate: {state}\n---\n\nBody for {id}.\n"
+            ),
+        )
+        .unwrap();
+    }
+
     fn keyboard_test_app() -> TuiApp {
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
@@ -3166,6 +3604,8 @@ mod tests {
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             hits: Vec::new(),
+            reload_fingerprint: ReloadFingerprint::default(),
+            last_reload_check: Instant::now(),
         }
     }
 
@@ -3333,6 +3773,70 @@ mod tests {
         assert!(split_editor_command("vim '")
             .unwrap_err()
             .contains("unterminated"));
+    }
+
+    #[test]
+    fn reload_preserves_selected_document_by_id_after_external_state_change() {
+        let root = unique_test_dir("tandem-tui-reload-preserve");
+        let workspace = temp_workspace(&root);
+        write_task_doc(&workspace, "task-1", "Task one", "todo");
+        write_task_doc(&workspace, "task-2", "Task two", "review");
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        assert!(app.select_document_by_id("task-2"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
+
+        write_task_doc(&workspace, "task-2", "Task two", "todo");
+        let outcome = app.reload();
+
+        assert_eq!(outcome.warning_count, 0);
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
+        assert_eq!(
+            app.states.get(app.selected_state).map(String::as_str),
+            Some("todo")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reload_surfaces_parse_errors_without_panicking() {
+        let root = unique_test_dir("tandem-tui-reload-error");
+        let workspace = temp_workspace(&root);
+        write_task_doc(&workspace, "task-1", "Task one", "todo");
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        fs::write(
+            workspace.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Broken\nstate: todo\n\nmissing closing delimiter\n",
+        )
+        .unwrap();
+
+        let outcome = app.reload();
+
+        assert!(outcome.warning_count >= 1);
+        assert!(app
+            .load_errors
+            .iter()
+            .any(|error| error.contains("Board load warning")));
+        assert!(app.status.contains("runtime warning"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn idle_hot_reload_detects_external_board_file_changes() {
+        let root = unique_test_dir("tandem-tui-auto-reload");
+        let workspace = temp_workspace(&root);
+        write_task_doc(&workspace, "task-1", "Task one", "todo");
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        write_task_doc(&workspace, "task-2", "Task two", "review");
+
+        app.reload_if_changed();
+
+        assert!(app.docs.iter().any(|doc| doc.id() == "task-2"));
+        assert!(app.status.contains("External changes detected"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[cfg(unix)]
