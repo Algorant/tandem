@@ -406,19 +406,20 @@ impl TuiApp {
             KeyCode::Char('/') => {
                 self.status = "Search is available in Logs view; press 3 for Logs.".to_string()
             }
-            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter
-                if matches!(self.view, TuiView::Board | TuiView::Review) =>
+            KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
+            KeyCode::Enter
+                if matches!(self.view, TuiView::Board | TuiView::Review | TuiView::Logs) =>
             {
                 self.toggle_focus()
             }
-            KeyCode::Enter if self.view == TuiView::Logs => self.toggle_focus(),
-            KeyCode::Tab => self.next_view(),
-            KeyCode::BackTab => self.previous_view(),
             KeyCode::Esc => match self.view {
                 TuiView::Board | TuiView::Review if self.focus == FocusPane::Detail => {
                     self.focus = FocusPane::Board
                 }
                 TuiView::Logs => self.clear_log_filter_or_focus(),
+                TuiView::Decisions if self.focus == FocusPane::Detail => {
+                    self.focus = FocusPane::Board
+                }
                 _ => {}
             },
             _ => match self.view {
@@ -440,9 +441,7 @@ impl TuiApp {
 
     fn switch_view(&mut self, view: TuiView) {
         self.view = view;
-        if view != TuiView::Board {
-            self.focus = FocusPane::Board;
-        }
+        self.focus = FocusPane::Board;
         if view == TuiView::Review {
             self.clamp_review_selection();
         }
@@ -466,18 +465,18 @@ impl TuiApp {
                     .map(|item| format!(" Selected {}.", item.id()))
                     .unwrap_or_default();
                 format!(
-                    "Review view active: {count} item{} need attention.{selected} Use j/k to navigate and tab/enter for detail.",
+                    "Review view active: {count} item{} need attention.{selected} Use j/k to navigate and Tab/Enter for queue/detail focus.",
                     if count == 1 { "" } else { "s" }
                 )
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
-                "Rules view active: {} project rule{} loaded. Use j/k select, h/l category, a/e/d add/edit/delete.",
+                "Rules view active: {} project rule{} loaded. Use j/k select, h/l category, a/e/d add/edit/delete; Tab has no top-level fallback.",
                 self.rules_total(),
                 if self.rules_total() == 1 { "" } else { "s" }
             ),
             TuiView::Decisions => format!(
-                "Decisions view active: {} decision{} loaded. Use j/k select, a add, PgUp/PgDn scroll body.",
+                "Decisions view active: {} decision{} loaded. Use j/k select, h/l or Tab for list/body focus, a add.",
                 self.decision_docs().len(),
                 if self.decision_docs().len() == 1 {
                     ""
@@ -488,18 +487,33 @@ impl TuiApp {
         };
     }
 
-    fn next_view(&mut self) {
-        let next = (self.view.index() + 1) % TuiView::ALL.len();
-        self.switch_view(TuiView::ALL[next]);
+    fn cycle_focus_or_hint(&mut self) {
+        match self.view {
+            TuiView::Board | TuiView::Review | TuiView::Logs | TuiView::Decisions => {
+                self.toggle_focus()
+            }
+            TuiView::Rules => {
+                self.status = "Rules has a single category/list focus area; Tab stays in Rules. Use h/l for categories and 1..5 for views.".to_string();
+            }
+        }
     }
 
-    fn previous_view(&mut self) {
-        let previous = if self.view.index() == 0 {
-            TuiView::ALL.len() - 1
-        } else {
-            self.view.index() - 1
-        };
-        self.switch_view(TuiView::ALL[previous]);
+    fn focus_previous_pane(&mut self) {
+        if matches!(
+            self.view,
+            TuiView::Review | TuiView::Logs | TuiView::Decisions
+        ) {
+            self.focus = FocusPane::Board;
+        }
+    }
+
+    fn focus_next_pane(&mut self) {
+        if matches!(
+            self.view,
+            TuiView::Review | TuiView::Logs | TuiView::Decisions
+        ) {
+            self.focus = FocusPane::Detail;
+        }
     }
 
     fn handle_board_key(&mut self, key: KeyEvent) {
@@ -534,8 +548,8 @@ impl TuiApp {
             KeyCode::Down | KeyCode::Char('j') => self.next_review_item(),
             KeyCode::Home | KeyCode::Char('g') => self.selected_review_item = 0,
             KeyCode::End | KeyCode::Char('G') => self.last_review_item(),
-            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
+            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
             _ => {}
         }
         self.clamp_review_selection();
@@ -549,8 +563,8 @@ impl TuiApp {
             KeyCode::PageDown | KeyCode::Char('d') => self.scroll_review_detail_down(6),
             KeyCode::Home | KeyCode::Char('g') => self.review_detail_scroll = 0,
             KeyCode::End | KeyCode::Char('G') => self.review_detail_scroll_to_end(),
-            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
+            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
             _ => {}
         }
     }
@@ -584,8 +598,8 @@ impl TuiApp {
                 FocusPane::Board => self.last_log(),
                 FocusPane::Detail => self.log_detail_scroll_to_end(),
             },
-            KeyCode::Left | KeyCode::Char('h') => self.previous_view(),
-            KeyCode::Right | KeyCode::Char('l') => self.next_view(),
+            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
+            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
             _ => {}
         }
     }
@@ -1226,7 +1240,7 @@ impl TuiApp {
         let visible = self.filtered_logs().len();
         if self.log_search_filter.is_empty() {
             format!(
-                "Logs view active: {} completed item{} loaded. Press / to search, j/k to select, Enter for detail focus.",
+                "Logs view active: {} completed item{} loaded. Press / to search, j/k to select, and h/l or Tab for list/detail focus.",
                 self.logs.len(),
                 if self.logs.len() == 1 { "" } else { "s" }
             )
@@ -1885,7 +1899,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · h/l state subview · H/L move task · j/k item/scroll · tab/enter detail · ? help · {}",
+                    "{focus} · {} · 1..5 views · q quit · r reload · a add task · h/l state subview · H/L move task · j/k item/scroll · Tab/Enter detail · ? help · {}",
                     self.selected_state_progress(),
                     self.status
                 ),
@@ -1898,7 +1912,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "Review {focus} · 1..5 views · q quit · r reload · j/k item/scroll · tab/enter detail · h/l view · read-only hints · ? help · {}",
+                    "Review {focus} · 1..5 views · q quit · r reload · j/k item/scroll · h/l or Tab queue/detail · Enter detail · read-only hints · ? help · {}",
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1915,7 +1929,7 @@ impl TuiApp {
             };
             (
                 format!(
-                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · Enter focus detail/list · h/l view · r reload · q quit · {}",
+                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · h/l or Tab list/detail · Enter focus detail/list · r reload · q quit · {}",
                     self.status
                 ),
                 self.theme.status_style(status_tone_for_message(&self.status)),
@@ -1935,7 +1949,7 @@ impl TuiApp {
         } else {
             (
                 format!(
-                    "{} · 1..5 switch views · tab/shift-tab next/prev view · h/l view · r reload · q quit · ? help · {}",
+                    "{} · 1..5 switch views · local keys stay in view · r reload · q quit · ? help · {}",
                     self.view.label(),
                     self.status
                 ),
@@ -1959,10 +1973,10 @@ impl TuiApp {
             Line::from("r                 Reload board/log/rule data"),
             Line::from("1..5              Switch Board, Review, Logs, Rules, Decisions"),
             Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / enter       Toggle list/detail focus in Board, Review, and Logs"),
-            Line::from("tab / shift-tab   Next/previous view outside Board/Review/Logs"),
+            Line::from("tab / shift-tab   Cycle list/detail focus where available; never switches views"),
+            Line::from("enter             Toggle list/detail focus in Board, Review, and Logs"),
             Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
-            Line::from("h/l or ←/→        Board: switch state subviews; Review/Logs: switch views; Rules: switch category"),
+            Line::from("h/l or ←/→        Board: state subviews; Review/Logs/Decisions: list/detail focus; Rules: category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
             Line::from("j/k or ↑/↓        Board/Review/Logs/Rules/Decisions: move items, or scroll detail when focused"),
             Line::from("g/G               First/last item in the active list/detail"),
@@ -2610,6 +2624,68 @@ mod tests {
         }
     }
 
+    fn decision_doc(id: &str) -> Document {
+        let mut doc = doc_with_state(id, None);
+        doc.fields
+            .insert("type".to_string(), "decision".to_string());
+        doc.fields
+            .insert("title".to_string(), format!("Decision {id}"));
+        doc.body = "## Decision\nKeep local navigation local.".to_string();
+        doc
+    }
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn keyboard_test_app() -> TuiApp {
+        let docs = vec![
+            doc_with_state("task-1", Some("todo")),
+            doc_with_state("task-2", Some("review")),
+            decision_doc("decision-1"),
+        ];
+        TuiApp {
+            workspace: Workspace {
+                board_dir: PathBuf::from(".tandem/board"),
+                logs_dir: PathBuf::from(".tandem/logs"),
+                config_path: PathBuf::from(".tandem/tandem.md"),
+                events_path: PathBuf::from(".tandem/events.jsonl"),
+            },
+            title: "Test".to_string(),
+            view: TuiView::Board,
+            states: vec![
+                "todo".to_string(),
+                "review".to_string(),
+                "unfiled".to_string(),
+            ],
+            configured_states: vec!["todo".to_string(), "review".to_string()],
+            docs,
+            logs: Vec::new(),
+            log_events: logs::LogEventsById::new(),
+            rules: empty_rules(),
+            load_errors: Vec::new(),
+            theme: TuiTheme::default_dark(),
+            theme_source: "test".to_string(),
+            theme_warnings: Vec::new(),
+            selected_state: 0,
+            selected_item: 0,
+            selected_review_item: 0,
+            selected_log: 0,
+            focus: FocusPane::Board,
+            detail_scroll: 0,
+            review_detail_scroll: 0,
+            log_detail_scroll: 0,
+            log_search_filter: String::new(),
+            log_search_input: None,
+            status: String::new(),
+            show_help: false,
+            quick_add: None,
+            rules_view: RulesState::default(),
+            decisions_view: DecisionsState::default(),
+            hits: Vec::new(),
+        }
+    }
+
     #[test]
     fn states_include_unfiled_and_unknown_board_docs() {
         let docs = vec![
@@ -2635,6 +2711,91 @@ mod tests {
         assert_eq!(TuiView::from_digit('4'), Some(TuiView::Rules));
         assert_eq!(TuiView::from_digit('5'), Some(TuiView::Decisions));
         assert_eq!(TuiView::from_digit('6'), None);
+    }
+
+    #[test]
+    fn numeric_keys_are_explicit_top_level_switchers() {
+        let mut app = keyboard_test_app();
+        app.handle_key(key(KeyCode::Char('3'))).unwrap();
+        assert_eq!(app.view, TuiView::Logs);
+        assert_eq!(app.focus, FocusPane::Board);
+
+        app.handle_key(key(KeyCode::Char('1'))).unwrap();
+        assert_eq!(app.view, TuiView::Board);
+        assert_eq!(app.focus, FocusPane::Board);
+    }
+
+    #[test]
+    fn tab_cycles_focus_without_switching_top_level_views() {
+        let mut app = keyboard_test_app();
+        app.switch_view(TuiView::Logs);
+
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        assert_eq!(app.view, TuiView::Logs);
+        assert_eq!(app.focus, FocusPane::Detail);
+
+        app.handle_key(key(KeyCode::BackTab)).unwrap();
+        assert_eq!(app.view, TuiView::Logs);
+        assert_eq!(app.focus, FocusPane::Board);
+    }
+
+    #[test]
+    fn tab_has_no_top_level_fallback_without_focusable_panes() {
+        let mut app = keyboard_test_app();
+        app.switch_view(TuiView::Rules);
+
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        assert_eq!(app.view, TuiView::Rules);
+        assert_eq!(app.focus, FocusPane::Board);
+        assert!(app.status.contains("Tab stays in Rules"));
+
+        app.handle_key(key(KeyCode::BackTab)).unwrap();
+        assert_eq!(app.view, TuiView::Rules);
+        assert_eq!(app.focus, FocusPane::Board);
+        assert!(app.status.contains("Tab stays in Rules"));
+    }
+
+    #[test]
+    fn hjkl_local_navigation_does_not_switch_top_level_views() {
+        let mut app = keyboard_test_app();
+
+        app.switch_view(TuiView::Board);
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.view, TuiView::Board);
+        assert_eq!(app.selected_state, 1);
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.view, TuiView::Board);
+        assert_eq!(app.selected_state, 0);
+
+        app.switch_view(TuiView::Review);
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.view, TuiView::Review);
+        assert_eq!(app.focus, FocusPane::Detail);
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.view, TuiView::Review);
+        assert_eq!(app.focus, FocusPane::Board);
+
+        app.switch_view(TuiView::Logs);
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.view, TuiView::Logs);
+        assert_eq!(app.focus, FocusPane::Detail);
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.view, TuiView::Logs);
+        assert_eq!(app.focus, FocusPane::Board);
+
+        app.switch_view(TuiView::Rules);
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.view, TuiView::Rules);
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.view, TuiView::Rules);
+
+        app.switch_view(TuiView::Decisions);
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.view, TuiView::Decisions);
+        assert_eq!(app.focus, FocusPane::Detail);
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.view, TuiView::Decisions);
+        assert_eq!(app.focus, FocusPane::Board);
     }
 
     #[test]

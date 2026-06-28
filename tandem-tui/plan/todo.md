@@ -135,6 +135,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - lets `.tandem/theme.toml` select built-in or user themes with `theme = "name"` before applying workspace overrides
   - keeps invalid theme files non-fatal with status warnings
   - documents `default-dark` and `verdigris` examples under `tandem-tui/examples/themes/`
+- [x] Tightened default TUI keyboard/focus semantics:
+  - `1`..`5` are the keyboard top-level view switchers; local keys no longer switch top-level views.
+  - `h/j/k/l` stay inside the active view: Board state/items, Review/Logs/Decisions list-detail focus or scroll, and Rules category/list movement.
+  - Tab/BackTab cycle focus only in views with meaningful focusable panes and show a Rules hint instead of falling back to top-level view cycling.
+  - Added unit coverage for numeric switching, local `h/j/k/l`, and Tab no-fallback behavior.
+  - Manual PTY smoke (2026-06-28): `target/debug/tdm tui` accepted scripted `1`..`5`, local `h/j/k/l`, and Tab/BackTab sequences and exited cleanly (`rc=0`).
 
 ## Current tasks
 
