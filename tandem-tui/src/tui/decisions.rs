@@ -221,7 +221,7 @@ impl TuiApp {
             FocusPane::Detail => "body",
         };
         format!(
-            "Decisions {focus} · j/k select/scroll · h/l or Tab list/body · PgUp/PgDn body · a add · 1..5 views · r reload · q quit · ? help · {}",
+            "Decisions {focus} · j/k select/scroll · h/l or Tab list/body · PgUp/PgDn body · a add · e editor deferred · 1..5 views · r reload · q quit · ? help · {}",
             self.status
         )
     }
