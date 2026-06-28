@@ -218,3 +218,5 @@
 {"ts":"2026-06-28T17:32:11Z","event":"accord.claimed","id":"task-41","summary":"Accord claim for task-41"}
 {"ts":"2026-06-28T17:32:31Z","event":"accord.delivered","id":"task-41","summary":"Accord deliver for task-41"}
 {"ts":"2026-06-28T17:32:31Z","event":"task.completed","id":"task-41","summary":"Added GitHub Pages deployment workflow for docs site."}
+{"ts":"2026-06-28T17:34:29Z","event":"accord.delivered","id":"task-36","summary":"Accord deliver for task-36"}
+{"ts":"2026-06-28T17:34:29Z","event":"task.completed","id":"task-36","summary":"Implemented Tandem docs site foundation across docs/, site/, and GitHub Pages workflow."}

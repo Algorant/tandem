@@ -2,13 +2,12 @@
 id: task-36
 type: task
 title: "Implement Tandem docs site foundation"
-state: "in-progress"
 priority: "high"
 references: ["task-24"]
 relatedFiles: ["docs", "site", ".github/workflows"]
 tags: ["docs", "site", "astro", "github-pages"]
 createdAt: "2026-06-28T16:58:46Z"
-updatedAt: "2026-06-28T17:26:15Z"
+updatedAt: "2026-06-28T17:34:29Z"
 subtasks:
   - id: task-36-1
     title: "Create the docs/ content skeleton"
@@ -26,10 +25,17 @@ subtasks:
     title: "Add GitHub Pages deployment workflow"
     completed: false
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "docs-site-36-41"
   claimedAt: "2026-06-28T17:26:15Z"
-  updatedAt: "2026-06-28T17:26:15Z"
+  deliveredAt: "2026-06-28T17:34:29Z"
+  validation:
+    commands: ["cd site && npm ci && npm run build && npm audit --audit-level=high; git diff --check"]
+  summary: "Implemented docs site foundation: canonical docs/ Markdown skeleton, site/ Astro Starlight project, docs sync wiring, local workflow docs, GitHub Pages workflow, and dependency audit cleanup."
+  updatedAt: "2026-06-28T17:34:29Z"
+completedAt: "2026-06-28T17:34:29Z"
+completion:
+  summary: "Implemented Tandem docs site foundation across docs/, site/, and GitHub Pages workflow."
 ---
 
 ## Description
