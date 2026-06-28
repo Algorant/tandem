@@ -2076,8 +2076,9 @@ impl TuiApp {
                 self.theme.muted_style(),
             )))]
         } else {
+            let show_doc_type = docs.iter().any(|doc| doc.doc_type() != "task");
             docs.iter()
-                .map(|doc| list_item_for_doc(doc, &self.theme, content_width))
+                .map(|doc| list_item_for_doc(doc, &self.theme, content_width, show_doc_type))
                 .collect::<Vec<_>>()
         };
 
@@ -2098,7 +2099,7 @@ impl TuiApp {
                     .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )
-            .highlight_style(self.theme.selected_style())
+            .highlight_style(self.theme.board_selected_style())
             .highlight_symbol("▸ ");
 
         if count > 0 {
@@ -2977,16 +2978,41 @@ fn display_state_label(state: &str) -> String {
         .to_uppercase()
 }
 
-fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> ListItem<'static> {
+fn list_item_for_doc(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+    show_doc_type: bool,
+) -> ListItem<'static> {
+    ListItem::new(board_item_lines_for_doc(
+        doc,
+        theme,
+        content_width,
+        show_doc_type,
+    ))
+}
+
+fn board_item_lines_for_doc(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+    show_doc_type: bool,
+) -> Vec<Line<'static>> {
     let priority = doc.field("priority").unwrap_or("-");
     let priority_badge = priority_badge(priority);
-    let type_badge = format!("[{}]", doc.doc_type());
+    let type_badge = doc_type_badge(doc, show_doc_type);
     let mut badges = Vec::new();
     if let Some(accord) = accord_status(doc).filter(|status| !status.trim().is_empty()) {
-        badges.push((format!("[A:{accord}]"), theme.accord_style(accord)));
+        badges.push((
+            board_status_badge("accord", accord),
+            theme.accord_style(accord).add_modifier(Modifier::BOLD),
+        ));
     }
     if let Some(review) = review_status(doc).filter(|status| !status.trim().is_empty()) {
-        badges.push((format!("[R:{review}]"), theme.review_style(review)));
+        badges.push((
+            board_status_badge("review", review),
+            theme.review_style(review).add_modifier(Modifier::BOLD),
+        ));
     }
     if let Some((completed, total)) = subtask_progress(doc) {
         let tone = if completed == total {
@@ -2994,7 +3020,7 @@ fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> 
         } else {
             StatusTone::Warning
         };
-        badges.push((format!("[{completed}/{total}]"), theme.status_style(tone)));
+        badges.push((format!("{completed}/{total}"), theme.status_style(tone)));
     }
 
     let badge_width = badges
@@ -3003,23 +3029,15 @@ fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> 
         .sum::<usize>()
         + badges.len().saturating_sub(1);
     let badge_prefix_width = if badges.is_empty() { 0 } else { 1 };
-    let fixed_width = text_width(&priority_badge)
-        + 1
-        + text_width(&type_badge)
-        + 1
-        + badge_prefix_width
-        + badge_width
-        + 1
-        + text_width(doc.id());
+    let type_width = type_badge
+        .as_ref()
+        .map(|badge| text_width(badge) + 1)
+        .unwrap_or(0);
+    let prefix_width = text_width(&priority_badge) + 1 + type_width;
+    let fixed_width = prefix_width + badge_prefix_width + badge_width + 1 + text_width(doc.id());
     let title_width = content_width.saturating_sub(fixed_width).max(12);
     let title = truncate(doc.title(), title_width);
-    let used_before_id = text_width(&priority_badge)
-        + 1
-        + text_width(&type_badge)
-        + 1
-        + text_width(&title)
-        + badge_prefix_width
-        + badge_width;
+    let used_before_id = prefix_width + text_width(&title) + badge_prefix_width + badge_width;
     let spacer_width = content_width
         .saturating_sub(used_before_id + text_width(doc.id()))
         .max(1);
@@ -3027,10 +3045,15 @@ fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> 
     let mut title_spans = vec![
         Span::styled(priority_badge, theme.priority_style(priority)),
         Span::raw(" "),
-        Span::styled(type_badge, theme.muted_style()),
-        Span::raw(" "),
-        Span::styled(title, theme.text_style().add_modifier(Modifier::BOLD)),
     ];
+    if let Some(type_badge) = type_badge {
+        title_spans.push(Span::styled(type_badge, theme.board_doc_type_style()));
+        title_spans.push(Span::raw(" "));
+    }
+    title_spans.push(Span::styled(
+        title,
+        theme.text_style().add_modifier(Modifier::BOLD),
+    ));
     if !badges.is_empty() {
         title_spans.push(Span::raw(" "));
         for (index, (badge, style)) in badges.into_iter().enumerate() {
@@ -3046,10 +3069,10 @@ fn list_item_for_doc(doc: &Document, theme: &TuiTheme, content_width: usize) -> 
         theme.status_style(StatusTone::Accent),
     ));
 
-    ListItem::new(vec![
+    vec![
         Line::from(title_spans),
         Line::from(board_metadata_spans(doc, theme)),
-    ])
+    ]
 }
 
 fn priority_badge(priority: &str) -> String {
@@ -3061,20 +3084,39 @@ fn priority_badge(priority: &str) -> String {
         "" | "-" | "none" => "NONE".to_string(),
         other => other.chars().take(4).collect::<String>().to_uppercase(),
     };
-    format!("[{label:<4}]")
+    format!("{label:<4}")
+}
+
+fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
+    let doc_type = doc.doc_type().trim();
+    if doc_type.is_empty() || (!show_doc_type && doc_type.eq_ignore_ascii_case("task")) {
+        None
+    } else {
+        Some(doc_type.to_ascii_lowercase())
+    }
+}
+
+fn board_status_badge(label: &str, status: &str) -> String {
+    format!("{label} {}", status.trim().replace('_', "-"))
 }
 
 fn board_metadata_spans(doc: &Document, theme: &TuiTheme) -> Vec<Span<'static>> {
-    let mut segments: Vec<(String, Style)> = Vec::new();
+    let mut segments: Vec<Vec<Span<'static>>> = Vec::new();
 
     if let Some(tags) = doc.field("tags").map(parse_field_values) {
-        let tags = tags
+        let tag_spans = tags
             .into_iter()
-            .map(|tag| format!("#{tag}"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        if !tags.is_empty() {
-            segments.push((tags, theme.status_style(StatusTone::Accent)));
+            .filter_map(|tag| tag_chip(&tag))
+            .enumerate()
+            .fold(Vec::new(), |mut spans, (index, tag)| {
+                if index > 0 {
+                    spans.push(Span::raw(" "));
+                }
+                spans.push(Span::styled(tag, theme.tag_style()));
+                spans
+            });
+        if !tag_spans.is_empty() {
+            segments.push(tag_spans);
         }
     }
 
@@ -3083,24 +3125,29 @@ fn board_metadata_spans(doc: &Document, theme: &TuiTheme) -> Vec<Span<'static>> 
         .or_else(|| doc.field("accord.assignee"))
         .filter(|assignee| !assignee.trim().is_empty() && *assignee != "-")
     {
-        segments.push((format!("@{assignee}"), theme.muted_style()));
+        push_metadata_segment(&mut segments, format!("@{assignee}"), theme.muted_style());
     }
 
     if let Some(due) = doc
         .field("dueDate")
         .filter(|due| !due.trim().is_empty() && *due != "-")
     {
-        segments.push((format!("due {}", truncate(due, 16)), theme.muted_style()));
+        push_metadata_segment(
+            &mut segments,
+            format!("due {}", truncate(due, 16)),
+            theme.muted_style(),
+        );
     }
 
     if let Some(updated) = doc
         .field("updatedAt")
         .filter(|updated| !updated.trim().is_empty())
     {
-        segments.push((
+        push_metadata_segment(
+            &mut segments,
             format!("updated {}", compact_timestamp(updated)),
             theme.muted_style(),
-        ));
+        );
     }
 
     let related_files = doc
@@ -3108,10 +3155,11 @@ fn board_metadata_spans(doc: &Document, theme: &TuiTheme) -> Vec<Span<'static>> 
         .map(parse_field_values)
         .unwrap_or_default();
     if !related_files.is_empty() {
-        segments.push((
+        push_metadata_segment(
+            &mut segments,
             format!("files {}", related_files.len()),
             theme.muted_style(),
-        ));
+        );
     }
 
     let blockers = doc
@@ -3119,28 +3167,47 @@ fn board_metadata_spans(doc: &Document, theme: &TuiTheme) -> Vec<Span<'static>> 
         .map(parse_field_values)
         .unwrap_or_default();
     if !blockers.is_empty() {
-        segments.push((
+        push_metadata_segment(
+            &mut segments,
             format!("blocked by {}", blockers.len()),
             theme.status_style(StatusTone::Warning),
-        ));
+        );
     }
 
-    segments.push((truncate(&display_path(&doc.path), 48), theme.muted_style()));
+    push_metadata_segment(
+        &mut segments,
+        truncate(&display_path(&doc.path), 48),
+        theme.muted_style(),
+    );
 
     join_metadata_segments(segments, theme)
 }
 
-fn join_metadata_segments(segments: Vec<(String, Style)>, theme: &TuiTheme) -> Vec<Span<'static>> {
+fn tag_chip(tag: &str) -> Option<String> {
+    let tag = tag.trim().trim_start_matches('#').trim();
+    (!tag.is_empty()).then(|| tag.to_string())
+}
+
+fn push_metadata_segment(segments: &mut Vec<Vec<Span<'static>>>, text: String, style: Style) {
+    if !text.trim().is_empty() {
+        segments.push(vec![Span::styled(text, style)]);
+    }
+}
+
+fn join_metadata_segments(
+    segments: Vec<Vec<Span<'static>>>,
+    theme: &TuiTheme,
+) -> Vec<Span<'static>> {
     if segments.is_empty() {
         return vec![Span::styled("no metadata".to_string(), theme.muted_style())];
     }
 
     let mut spans = Vec::new();
-    for (index, (text, style)) in segments.into_iter().enumerate() {
+    for (index, segment) in segments.into_iter().enumerate() {
         if index > 0 {
             spans.push(Span::styled(" · ", theme.muted_style()));
         }
-        spans.push(Span::styled(text, style));
+        spans.extend(segment);
     }
     spans
 }
@@ -3732,6 +3799,65 @@ mod tests {
             .iter()
             .map(|span| span.content.as_ref())
             .collect()
+    }
+
+    #[test]
+    fn board_row_suppresses_default_type_and_uses_clean_badges() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = doc_with_state("task-23", Some("todo"));
+        doc.fields
+            .insert("title".to_string(), "Polish Board rows".to_string());
+        doc.fields
+            .insert("priority".to_string(), "high".to_string());
+        doc.fields
+            .insert("tags".to_string(), "[\"tui\", \"board\"]".to_string());
+        doc.fields
+            .insert("accord.status".to_string(), "ready".to_string());
+
+        let lines = board_item_lines_for_doc(&doc, &theme, 120, false);
+        let title = line_text(&lines[0]);
+        let metadata = line_text(&lines[1]);
+
+        assert!(title.contains("HIGH Polish Board rows"));
+        assert!(title.contains("accord ready"));
+        assert!(!title.contains("[task]"));
+        assert!(!title.contains("A:"));
+        assert!(metadata.contains("tui board"));
+        assert!(!metadata.contains("#tui"));
+        assert!(!metadata.contains('['));
+        assert!(lines[1]
+            .spans
+            .iter()
+            .any(|span| { span.content.as_ref() == "tui" && span.style == theme.tag_style() }));
+    }
+
+    #[test]
+    fn board_row_shows_type_only_when_mixed_or_non_default() {
+        let theme = TuiTheme::default_dark();
+        let mut task = doc_with_state("task-1", Some("todo"));
+        task.fields
+            .insert("title".to_string(), "Default work".to_string());
+        task.fields
+            .insert("priority".to_string(), "low".to_string());
+
+        let default_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, false)[0]);
+        let mixed_context = line_text(&board_item_lines_for_doc(&task, &theme, 96, true)[0]);
+        assert!(default_context.contains("LOW  Default work"));
+        assert!(!default_context.contains("LOW  task Default work"));
+        assert!(mixed_context.contains("LOW  task Default work"));
+
+        let mut decision = task.clone();
+        decision
+            .fields
+            .insert("id".to_string(), "decision-1".to_string());
+        decision
+            .fields
+            .insert("type".to_string(), "decision".to_string());
+        decision
+            .fields
+            .insert("title".to_string(), "Choose layout".to_string());
+        let non_default = line_text(&board_item_lines_for_doc(&decision, &theme, 96, false)[0]);
+        assert!(non_default.contains("LOW  decision Choose layout"));
     }
 
     #[test]

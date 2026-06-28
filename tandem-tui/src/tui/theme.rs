@@ -111,14 +111,14 @@ impl TuiTheme {
                 warning: Color::Rgb(250, 204, 21),
                 error: Color::Rgb(248, 113, 113),
                 border: Color::Rgb(55, 65, 81),
-                selected_bg: Color::Rgb(30, 64, 175),
+                selected_bg: Color::Rgb(31, 41, 55),
                 selected_fg: Color::Rgb(255, 255, 255),
             },
             priority: PriorityPalette {
-                critical: Color::Rgb(248, 113, 113),
-                high: Color::Rgb(251, 146, 60),
-                medium: Color::Rgb(250, 204, 21),
-                low: Color::Rgb(148, 163, 184),
+                critical: Color::Rgb(239, 68, 68),
+                high: Color::Rgb(248, 113, 113),
+                medium: Color::Rgb(96, 165, 250),
+                low: Color::Rgb(74, 222, 128),
                 none: Color::Rgb(107, 114, 128),
             },
             accord: AccordPalette {
@@ -162,9 +162,9 @@ impl TuiTheme {
             },
             priority: PriorityPalette {
                 critical: Color::Rgb(227, 111, 99),
-                high: Color::Rgb(230, 191, 134),
+                high: Color::Rgb(227, 111, 99),
                 medium: Color::Rgb(131, 165, 152),
-                low: Color::Rgb(112, 118, 74),
+                low: Color::Rgb(142, 192, 124),
                 none: Color::Rgb(146, 131, 116),
             },
             accord: AccordPalette {
@@ -354,6 +354,22 @@ impl TuiTheme {
         )
     }
 
+    pub(super) fn board_selected_style(&self) -> Style {
+        if self.no_color {
+            return Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
+        }
+        Style::default().bg(self.colors.selected_bg)
+    }
+
+    pub(super) fn board_doc_type_style(&self) -> Style {
+        self.muted_style()
+    }
+
+    pub(super) fn tag_style(&self) -> Style {
+        self.status_style(StatusTone::Accent)
+            .add_modifier(Modifier::BOLD)
+    }
+
     pub(super) fn tab_style(&self) -> Style {
         self.muted_style()
     }
@@ -398,7 +414,7 @@ impl TuiTheme {
             _ => self.priority.none,
         };
         let modifier = match normalized(priority).as_str() {
-            "critical" | "urgent" => Modifier::BOLD,
+            "critical" | "urgent" | "high" => Modifier::BOLD,
             _ => Modifier::empty(),
         };
         self.style(color, Some(self.colors.panel), modifier)
@@ -894,6 +910,19 @@ mod tests {
     }
 
     #[test]
+    fn default_board_semantic_styles_keep_row_metadata_legible() {
+        let theme = TuiTheme::default_dark();
+        assert_eq!(theme.priority.low, Color::Rgb(74, 222, 128));
+        assert_eq!(theme.priority.medium, Color::Rgb(96, 165, 250));
+        assert_eq!(theme.priority.high, Color::Rgb(248, 113, 113));
+        assert_eq!(theme.board_selected_style().fg, None);
+        assert_eq!(
+            theme.board_selected_style().bg,
+            Some(theme.colors.selected_bg)
+        );
+    }
+
+    #[test]
     fn applies_workspace_theme_content() {
         let mut theme = TuiTheme::default_dark();
         let warnings = theme.apply_theme_content(
@@ -936,9 +965,9 @@ changes-requested = "#eb6f92"
         assert_eq!(theme.colors.text, Color::Rgb(235, 219, 178));
         assert_eq!(theme.colors.accent, Color::Rgb(142, 192, 124));
         assert_eq!(theme.priority.critical, Color::Rgb(227, 111, 99));
-        assert_eq!(theme.priority.high, Color::Rgb(230, 191, 134));
+        assert_eq!(theme.priority.high, Color::Rgb(227, 111, 99));
         assert_eq!(theme.priority.medium, Color::Rgb(131, 165, 152));
-        assert_eq!(theme.priority.low, Color::Rgb(112, 118, 74));
+        assert_eq!(theme.priority.low, Color::Rgb(142, 192, 124));
         assert_eq!(theme.accord.claimed, Color::Rgb(131, 165, 152));
         assert_eq!(theme.accord.delivered, Color::Rgb(142, 192, 124));
         assert_eq!(theme.accord.accepted, Color::Rgb(104, 157, 106));
