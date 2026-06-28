@@ -7,7 +7,7 @@ priority: "high"
 relatedFiles: ["tandem-tui/src/tui.rs", "tandem-tui/src/tui/theme.rs", "tandem-tui/examples/themes/default-dark.toml", "tandem-tui/examples/themes/verdigris.toml"]
 tags: ["tui", "board", "ux", "theme"]
 createdAt: "2026-06-28T03:31:41Z"
-updatedAt: "2026-06-28T05:05:18Z"
+updatedAt: "2026-06-28T13:09:00Z"
 subtasks:
   - id: task-23-1
     title: "Tune priority palette semantics: low green, medium neutral/blue, high red"

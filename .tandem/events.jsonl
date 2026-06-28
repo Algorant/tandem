@@ -155,3 +155,7 @@
 {"ts":"2026-06-28T12:51:19Z","event":"task.updated","id":"task-15","summary":"Marked task-15 blocked by task-27 CLI/TUI release."}
 {"ts":"2026-06-28T12:57:29Z","event":"accord.claimed","id":"task-27","summary":"Accord claim for task-27"}
 {"ts":"2026-06-28T12:57:29Z","event":"task.moved","id":"task-27","summary":"Moved task-27 from todo to in-progress"}
+{"ts":"2026-06-28T13:08:56Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to in-progress"}
+{"ts":"2026-06-28T13:08:58Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T13:08:59Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to in-progress"}
+{"ts":"2026-06-28T13:09:00Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
