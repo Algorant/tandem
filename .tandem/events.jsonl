@@ -102,3 +102,15 @@
 {"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-19","summary":"Accord claim for task-19"}
 {"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-18","summary":"Moved task-18 from todo to in-progress"}
 {"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-18","summary":"Accord claim for task-18"}
+{"ts":"2026-06-28T00:51:24Z","event":"accord.delivered","id":"task-18","summary":"Accord deliver for task-18"}
+{"ts":"2026-06-28T00:51:58Z","event":"accord.delivered","id":"task-12","summary":"Accord deliver for task-12"}
+{"ts":"2026-06-28T00:52:05Z","event":"accord.delivered","id":"task-13","summary":"Accord deliver for task-13"}
+{"ts":"2026-06-28T00:59:38Z","event":"accord.delivered","id":"task-19","summary":"Accord deliver for task-19"}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-12","summary":"Accord accept for task-12"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-12","summary":"Scaffolded the extensions/pi-tandem area and adapter guidance; integrated in ce6303d."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-13","summary":"Accord accept for task-13"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-13","summary":"Implemented the CLI-backed pi-tandem MVP, including the tdm_task summary schema fix; integrated in ce6303d."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-18","summary":"Accord accept for task-18"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-18","summary":"Integrated user theme discovery, presets, and documentation; validation passed after merge."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-19","summary":"Accord accept for task-19"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-19","summary":"Integrated tightened TUI keyboard and focus semantics; validation passed after merge."}
