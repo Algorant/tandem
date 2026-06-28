@@ -53,3 +53,14 @@ Use this when you want to inspect the generated Starlight content before preview
 - Commit source changes under `docs/` and site tooling changes under `site/`.
 - Do not commit `site/dist/`, `site/.astro/`, or `site/node_modules/`.
 - Keep generated `site/src/content/docs/**/*.md` out of version control; it exists only to bridge canonical docs into Starlight.
+## GitHub Pages deployment
+
+The workflow `.github/workflows/docs.yml` builds the Starlight site and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
+
+Repository setup required in GitHub:
+
+1. Open **Settings → Pages**.
+2. Set **Build and deployment → Source** to **GitHub Actions**.
+3. Ensure Actions are enabled for the private repository and the `github-pages` environment can deploy.
+
+The site config currently uses `site: 'https://algorant.github.io'` and `base: '/tandem'`, matching the expected GitHub Pages project URL.
