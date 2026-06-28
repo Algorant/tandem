@@ -38,7 +38,7 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.
 - [x] Define minimal Rust implementation layout inside `tandem/` as implementation begins.
 - [x] Decide exact Rust package/module layout for `tandem` inside `tandem/` from the first implementation slice.
-- [ ] Revisit standalone `tandem` only after v0 if packaging/user needs justify it.
+- [ ] Revisit standalone split CLI/TUI crate only after v0 if packaging/user needs justify it.
 - [ ] Do not create schemas or fixtures in v0; revisit after TUI MVP/protocol stabilization.
 - [ ] Track any remaining open naming/vocabulary decisions after detailed spec updates.
 - [ ] Test `pi-tandem` as a project-local Pi extension before any global Pi config promotion.

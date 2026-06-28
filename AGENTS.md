@@ -14,8 +14,7 @@ Core concepts:
 - **accord**: the explicit agreement for a unit of work, replacing Brainfile's `contract` term.
 - **review**: human/PM validation state, separate from accord state.
 - **logs**: first-class completed-work history, not just a trash/archive folder.
-- **tandem**: intended CLI binary name.
-- **tandem**: user-facing CLI binary. **td** is reserved for future/internal tool prefixes unless explicitly revisited.
+- **tandem**: user-facing CLI/TUI binary and Rust app crate. **td** is reserved for future/internal tool prefixes unless explicitly revisited.
 
 ## Canonical project brief
 
@@ -25,7 +24,7 @@ Current direction is intentionally simple:
 - Keep exactly three major child areas for now: `protocol/`, `tandem/`, and `extensions/`.
 - `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
-- `tandem/` is the current home for user-facing CLI + TUI planning and implementation. The CLI binary name is `tandem`; the directory remains `tandem/` until the user changes it.
+- `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
 - The v0 `tandem` CLI surface is implemented and considered complete for the current known scope; future CLI work should be explicit new features or bug fixes. Forward implementation focus is the Rust/Ratatui TUI, starting from the current Ratatui/crossterm Board shell. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
 - `extensions/` is the scoped home for agent/editor integrations. The first integration is `extensions/pi-tandem/`, a lightweight Pi adapter over an installed `tandem` CLI; extension code must not duplicate Tandem protocol parsing or mutation behavior.

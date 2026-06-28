@@ -35,8 +35,7 @@ This is the first installable Tandem CLI/TUI release target. It is intended to u
 `pi-tandem` resolves `tandem` in this order:
 
 1. `TANDEM_BIN`
-2. `TANDEM_BIN`
-3. `tandem` on `$PATH`
+2. `tandem` on `$PATH`
 
 After the release tag exists, install from git with:
 
