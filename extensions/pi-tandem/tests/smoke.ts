@@ -56,6 +56,37 @@ function parseId(output: string): string {
 	return match[1];
 }
 
+async function runRepoReadSmoke(tdm: string): Promise<void> {
+	const list = parseJson(await runTdm(tdm, buildTaskArgs({ action: "list" }), repoRoot));
+	assert(list.ok === true, "repo task list JSON should be ok");
+	const items = list.data?.items ?? [];
+	assert(Array.isArray(items) && items.length > 0, "repo board should have active Tandem items");
+	const taskId = items.find((item: any) => item.id === "task-14")?.id ?? items[0]?.id;
+	assert(typeof taskId === "string", "repo task list should expose an item id");
+
+	const shown = parseJson(await runTdm(tdm, buildTaskArgs({ action: "show", id: taskId }), repoRoot));
+	assert(shown.data?.document?.id === taskId, "repo task show should return the selected task");
+
+	const logs = parseJson(await runTdm(tdm, buildLogArgs({ action: "list" }), repoRoot));
+	assert(logs.ok === true, "repo log list JSON should be ok");
+	const logSearch = parseJson(await runTdm(tdm, buildLogArgs({ action: "search", query: "pi-tandem" }), repoRoot));
+	assert(logSearch.ok === true, "repo log search JSON should be ok");
+
+	const rules = parseJson(await runTdm(tdm, buildRulesArgs({ action: "list" }), repoRoot));
+	assert(rules.ok === true, "repo rules list JSON should be ok");
+	assert(typeof rules.data?.counts?.total === "number", "repo rules list should expose counts");
+
+	const decisions = parseJson(await runTdm(tdm, buildDecisionArgs({ action: "list" }), repoRoot));
+	assert(decisions.ok === true, "repo decision list JSON should be ok");
+	assert(typeof decisions.data?.count === "number", "repo decision list should expose a count");
+
+	const search = parseJson(await runTdm(tdm, buildSearchArgs({ query: "pi-tandem" }), repoRoot));
+	assert(search.ok === true, "repo search JSON should be ok");
+	assert((search.data?.results ?? []).length > 0, "repo search should find pi-tandem work");
+
+	console.log(`pi-tandem repo read smoke passed against ${repoRoot}`);
+}
+
 const taskSchemaProperties = (tdmTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tdm_task schema should expose summary for complete actions");
 
@@ -64,6 +95,8 @@ assert(completeArgs.includes("--summary"), "tdm_task complete builder should pas
 assert(completeArgs.includes("Schema smoke"), "tdm_task complete builder should include summary value");
 
 const tdm = await ensureTdm();
+await runRepoReadSmoke(tdm);
+
 const workspace = await mkdtemp(join(tmpdir(), "pi-tandem-smoke-"));
 
 try {
@@ -85,6 +118,10 @@ try {
 
 	const shown = parseJson(await runTdm(tdm, buildTaskArgs({ action: "show", id: taskId }), workspace));
 	assert(shown.data.document.title === "Smoke task", "show should return created task");
+
+	await runTdm(tdm, buildTaskArgs({ action: "move", id: taskId, state: "in-progress" }), workspace);
+	const moved = parseJson(await runTdm(tdm, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	assert(moved.data.document.state === "in-progress", "move should update task state");
 
 	await runTdm(tdm, buildAccordArgs({
 		action: "ready",

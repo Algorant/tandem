@@ -110,17 +110,30 @@ From the repository root:
 
 ```text
 cargo build --manifest-path tandem-tui/Cargo.toml
-bun --check extensions/pi-tandem/index.ts
+bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/smoke.ts
+bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 ```
 
-Optional local Pi runtime smoke:
+`smoke.ts` performs read-only checks against this repo's `.tandem` board, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts`, starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes the loader.
+
+Manual project-local Pi smoke:
 
 ```text
-pi -e extensions/pi-tandem/index.ts
+mkdir -p .pi/extensions/pi-tandem
+cat > .pi/extensions/pi-tandem/index.ts <<'EOF'
+export { default } from "../../../extensions/pi-tandem/index";
+EOF
+TANDEM_TDM_BIN="$PWD/tandem-tui/target/debug/tdm" pi --approve
 ```
 
-Then use `/tandem status` or ask Pi to list Tandem tasks. Do not promote this extension into `~/.pi/agent/extensions` until a separate review/promotion task.
+Then use `/tandem status` or `/reload` after edits. `.pi/` is ignored local runtime state; do not commit it unless a future task explicitly chooses a lightweight loader. For quick one-off testing without `.pi/`, use:
+
+```text
+TANDEM_TDM_BIN="$PWD/tandem-tui/target/debug/tdm" pi -e ./extensions/pi-tandem/index.ts
+```
+
+Do not promote this extension into `~/.pi/agent/extensions` until a separate review/promotion task.
 
 ## Prompt guidance
 

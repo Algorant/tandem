@@ -11,16 +11,17 @@ Last updated: 2026-06-28
 - [x] Added diagnostics for missing `tdm`, missing `.tandem`, unsupported CLI surface, timeout/abort, and command failures.
 - [x] Added prompt snippets/guidelines and workspace-aware prompt guidance.
 - [x] Added smoke test coverage for CLI-backed wrapper mappings.
+- [x] Added repo read smoke coverage for this workspace's `.tandem` board.
+- [x] Added a project-local Pi runtime smoke that creates an ignored `.pi/extensions/pi-tandem/index.ts` loader, verifies fresh RPC startup discovers `/tandem`, runs `/tandem status`, and cleans up.
 
 ## Current tasks
 
-- [ ] Keep `README.md`, `plan/spec.md`, and `plan/todo.md` synchronized with parent and extension-area docs.
-- [ ] Run a real Pi runtime smoke with `pi -e extensions/pi-tandem/index.ts` after code review.
 - [ ] Collect review feedback on tool schemas before global promotion.
+- [ ] Optionally run an interactive TUI `/reload` smoke if a human wants visual confirmation beyond the automated fresh-start RPC smoke.
 
 ## Next recommended steps
 
-1. Project-local install/smoke in Pi without editing global config.
+1. Review the project-local smoke results and decide whether they satisfy task-14.
 2. Decide whether a dedicated `tdm_init`/workspace tool is needed or whether workspace bootstrap should remain a manual CLI action.
 3. Promote accepted extension code into canonical Pi config in a separate task.
 
