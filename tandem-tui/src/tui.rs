@@ -2504,13 +2504,9 @@ fn detail_lines_for_doc(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> 
     push_optional_detail_line(&mut lines, "Review", review_status(doc), theme);
     push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
     lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
+    push_board_accord_detail_section(&mut lines, doc, theme);
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Body",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
+    lines.push(detail_section_heading("Body", theme));
     if doc.body.trim().is_empty() {
         lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
@@ -2521,11 +2517,118 @@ fn detail_lines_for_doc(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> 
     lines
 }
 
+fn push_board_accord_detail_section(
+    lines: &mut Vec<Line<'static>>,
+    doc: &Document,
+    theme: &TuiTheme,
+) {
+    if doc.doc_type() != "task" {
+        return;
+    }
+
+    let status = accord_status(doc).unwrap_or("missing").trim();
+    let status = if status.is_empty() { "missing" } else { status };
+
+    lines.push(Line::from(""));
+    lines.push(detail_section_heading("Accord", theme));
+    lines.push(detail_status_line(
+        "Status",
+        status,
+        accord_detail_status_style(status, theme),
+        theme,
+    ));
+    lines.push(detail_field_line(
+        "Signal",
+        accord_state_signal(status),
+        theme,
+    ));
+    push_optional_detail_line(
+        lines,
+        "Accord assignee",
+        doc.field("accord.assignee"),
+        theme,
+    );
+    push_optional_detail_line(lines, "Claimed", doc.field("accord.claimedAt"), theme);
+    push_optional_detail_line(lines, "Delivered", doc.field("accord.deliveredAt"), theme);
+    push_optional_detail_list_line(
+        lines,
+        "Deliverables",
+        first_accord_list(doc, &["accord.deliverables"]),
+        theme,
+    );
+    push_optional_detail_list_line(
+        lines,
+        "Validation",
+        first_accord_list(
+            doc,
+            &[
+                "accord.validation.commands",
+                "accord.validation",
+                "accord.validations",
+            ],
+        ),
+        theme,
+    );
+    push_optional_detail_list_line(
+        lines,
+        "Constraints",
+        first_accord_list(doc, &["accord.constraints"]),
+        theme,
+    );
+    push_optional_detail_line(lines, "Summary", doc.field("accord.summary"), theme);
+    push_optional_detail_list_line(
+        lines,
+        "Evidence",
+        first_accord_list(doc, &["accord.evidence"]),
+        theme,
+    );
+    push_optional_detail_list_line(
+        lines,
+        "Files changed",
+        first_accord_list(doc, &["accord.filesChanged"]),
+        theme,
+    );
+    push_optional_detail_line(lines, "Reviewer", doc.field("accord.reviewer"), theme);
+    push_optional_detail_line(lines, "Note", doc.field("accord.note"), theme);
+    push_optional_detail_line(lines, "Reason", doc.field("accord.reason"), theme);
+    push_optional_detail_line(
+        lines,
+        "Accord updated",
+        doc.field("accord.updatedAt"),
+        theme,
+    );
+    lines.push(detail_field_line("Next", accord_next_action(status), theme));
+    lines.push(Line::from(vec![
+        Span::styled("CLI hint: ", theme.label_style()),
+        Span::styled(accord_cli_hint(doc.id(), status), theme.text_style()),
+    ]));
+    lines.push(Line::from(Span::styled(
+        "TUI accord mutations are planned; this Board detail pane is read-only.",
+        theme.muted_style(),
+    )));
+}
+
 fn detail_field_line(label: &str, value: &str, theme: &TuiTheme) -> Line<'static> {
     Line::from(vec![
         Span::styled(format!("{label}: "), theme.label_style()),
         Span::styled(value.to_string(), theme.text_style()),
     ])
+}
+
+fn detail_status_line(label: &str, value: &str, style: Style, theme: &TuiTheme) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("{label}: "), theme.label_style()),
+        Span::styled(value.to_string(), style),
+    ])
+}
+
+fn detail_section_heading(label: &str, theme: &TuiTheme) -> Line<'static> {
+    Line::from(Span::styled(
+        label.to_string(),
+        theme
+            .markdown_heading_style()
+            .add_modifier(Modifier::UNDERLINED),
+    ))
 }
 
 fn push_optional_detail_line(
@@ -2537,6 +2640,90 @@ fn push_optional_detail_line(
     if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         lines.push(detail_field_line(label, value, theme));
     }
+}
+
+fn push_optional_detail_list_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    values: Vec<String>,
+    theme: &TuiTheme,
+) {
+    if !values.is_empty() {
+        lines.push(detail_field_line(label, &values.join(", "), theme));
+    }
+}
+
+fn first_accord_list(doc: &Document, keys: &[&str]) -> Vec<String> {
+    keys.iter()
+        .filter_map(|key| doc.field(key).map(parse_field_values))
+        .find(|values| !values.is_empty())
+        .unwrap_or_default()
+}
+
+fn accord_detail_status_style(status: &str, theme: &TuiTheme) -> Style {
+    if normalized_accord_status(status) == "missing" {
+        theme.muted_style()
+    } else {
+        theme.accord_style(status).add_modifier(Modifier::BOLD)
+    }
+}
+
+fn accord_state_signal(status: &str) -> &'static str {
+    match normalized_accord_status(status).as_str() {
+        "ready" => "Ready: scope is recorded and the work can be claimed.",
+        "claimed" => "Claimed: an owner is actively working the accord.",
+        "delivered" => "Delivered: inspect summary/evidence, then accept or request rework.",
+        "accepted" => "Accepted: accord review passed; completion/logging is still separate.",
+        "rework" => "Rework: changes were requested before the accord can be accepted.",
+        "blocked" => "Blocked: work cannot proceed until the recorded reason is resolved.",
+        "failed" => "Failed: the accord attempt ended unsuccessfully and needs review.",
+        "missing" | "" => "Missing: no accord metadata is recorded for this task yet.",
+        _ => "Unknown: inspect the raw task before changing accord state.",
+    }
+}
+
+fn accord_next_action(status: &str) -> &'static str {
+    match normalized_accord_status(status).as_str() {
+        "ready" => "Claim the accord when an owner is known.",
+        "claimed" => "Deliver when complete, or block/fail with a reason if work cannot proceed.",
+        "delivered" => "Inspect the delivery, then accept it or request rework.",
+        "accepted" => "Complete/archive the task when it is ready to leave the Board.",
+        "rework" => "Apply requested changes, then deliver again with a fresh summary.",
+        "blocked" => "Resolve the blocker, then ready/claim/deliver; fail only if unrecoverable.",
+        "failed" => "Review the failure and reset to ready if retrying the work.",
+        "missing" | "" => {
+            "Create a ready accord once scope, deliverables, and validation are known."
+        }
+        _ => "Inspect current metadata before choosing the next accord action.",
+    }
+}
+
+fn accord_cli_hint(id: &str, status: &str) -> String {
+    match normalized_accord_status(status).as_str() {
+        "ready" => format!("tdm accord claim {id} --assignee <name>"),
+        "claimed" => format!(
+            "tdm accord deliver {id} --summary <text> [--evidence <text>] [--file-changed <path>]"
+        ),
+        "delivered" => format!(
+            "tdm accord accept {id} [--reviewer <name>] [--note <text>] OR tdm accord rework {id} --note <text>"
+        ),
+        "accepted" => format!(
+            "tdm complete {id} --summary <text> [--validation <text>] [--reviewer <name>]"
+        ),
+        "rework" => format!("tdm accord deliver {id} --summary <text> [--evidence <text>]"),
+        "blocked" => format!(
+            "tdm accord ready {id} [--assignee <name>] OR tdm accord fail {id} --reason <text>"
+        ),
+        "failed" => format!("tdm accord ready {id} [--assignee <name>]"),
+        "missing" | "" => format!(
+            "tdm accord ready {id} [--assignee <name>] [--deliverable <spec>] [--validation <command>]"
+        ),
+        _ => format!("tdm show {id}  # inspect accord metadata before mutating"),
+    }
+}
+
+fn normalized_accord_status(status: &str) -> String {
+    status.trim().to_ascii_lowercase().replace('_', "-")
 }
 
 fn markdownish_line(line: &str, theme: &TuiTheme) -> Line<'static> {
@@ -2622,6 +2809,13 @@ mod tests {
             fields,
             body: String::new(),
         }
+    }
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
     }
 
     fn decision_doc(id: &str) -> Document {
@@ -2817,6 +3011,103 @@ mod tests {
             review_attention_reason(&pending).as_deref(),
             Some("review pending")
         );
+    }
+
+    #[test]
+    fn board_detail_includes_accord_metadata_hints_and_preserves_body() {
+        let mut doc = doc_with_state("task-1", Some("review"));
+        doc.fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        doc.fields
+            .insert("accord.assignee".to_string(), "pi".to_string());
+        doc.fields.insert(
+            "accord.deliveredAt".to_string(),
+            "2026-06-28T01:00:00Z".to_string(),
+        );
+        doc.fields.insert(
+            "accord.deliverables".to_string(),
+            "[\"code:src/lib.rs\", \"docs:README.md\"]".to_string(),
+        );
+        doc.fields.insert(
+            "accord.validation.commands".to_string(),
+            "[\"cargo test\", \"cargo build\"]".to_string(),
+        );
+        doc.fields.insert(
+            "accord.constraints".to_string(),
+            "[\"do not mutate task state\"]".to_string(),
+        );
+        doc.fields.insert(
+            "accord.summary".to_string(),
+            "Rendered accord metadata".to_string(),
+        );
+        doc.fields.insert(
+            "accord.evidence".to_string(),
+            "[\"tests passed\"]".to_string(),
+        );
+        doc.fields.insert(
+            "accord.filesChanged".to_string(),
+            "[\"src/lib.rs\"]".to_string(),
+        );
+        doc.body = "## Description\nKeep this body visible.".to_string();
+
+        let theme = TuiTheme::default_dark();
+        let lines = detail_lines_for_doc(&doc, &theme);
+        let texts = lines.iter().map(line_text).collect::<Vec<_>>();
+
+        let accord_index = texts.iter().position(|text| text == "Accord").unwrap();
+        let body_index = texts.iter().position(|text| text == "Body").unwrap();
+        assert!(accord_index < body_index);
+        assert!(texts.contains(&"Status: delivered".to_string()));
+        assert!(texts.iter().any(|text| text.contains(
+            "Signal: Delivered: inspect summary/evidence, then accept or request rework."
+        )));
+        assert!(texts.contains(&"Accord assignee: pi".to_string()));
+        assert!(texts.contains(&"Deliverables: code:src/lib.rs, docs:README.md".to_string()));
+        assert!(texts.contains(&"Validation: cargo test, cargo build".to_string()));
+        assert!(texts.contains(&"Constraints: do not mutate task state".to_string()));
+        assert!(texts.contains(&"Summary: Rendered accord metadata".to_string()));
+        assert!(texts.contains(&"Evidence: tests passed".to_string()));
+        assert!(texts.contains(&"Files changed: src/lib.rs".to_string()));
+        assert!(texts
+            .iter()
+            .any(|text| text
+                .contains("Next: Inspect the delivery, then accept it or request rework.")));
+        assert!(texts
+            .iter()
+            .any(|text| text.contains("CLI hint: tdm accord accept task-1")));
+        assert!(texts.iter().any(|text| text
+            .contains("TUI accord mutations are planned; this Board detail pane is read-only.")));
+        assert!(texts.contains(&"## Description".to_string()));
+        assert!(texts.contains(&"Keep this body visible.".to_string()));
+
+        let status_line = lines
+            .iter()
+            .find(|line| line_text(line) == "Status: delivered")
+            .unwrap();
+        assert_eq!(
+            status_line.spans[1].style,
+            theme.accord_style("delivered").add_modifier(Modifier::BOLD)
+        );
+    }
+
+    #[test]
+    fn accord_detail_styles_key_review_states_distinctly() {
+        let theme = TuiTheme::default_dark();
+        let delivered = accord_detail_status_style("delivered", &theme);
+        let accepted = accord_detail_status_style("accepted", &theme);
+        let rework = accord_detail_status_style("rework", &theme);
+        let blocked = accord_detail_status_style("blocked", &theme);
+
+        assert_ne!(delivered, accepted);
+        assert_ne!(delivered, rework);
+        assert_ne!(delivered, blocked);
+        assert_ne!(accepted, rework);
+        assert_ne!(accepted, blocked);
+        assert_ne!(rework, blocked);
+        assert!(accord_state_signal("delivered").starts_with("Delivered:"));
+        assert!(accord_state_signal("accepted").contains("completion/logging is still separate"));
+        assert!(accord_state_signal("rework").starts_with("Rework:"));
+        assert!(accord_state_signal("blocked").starts_with("Blocked:"));
     }
 
     #[test]
