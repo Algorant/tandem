@@ -2273,7 +2273,17 @@ impl TuiApp {
         } else {
             filtered
                 .iter()
-                .map(|doc| logs::list_item_for_log(doc, &self.theme, area.width.saturating_sub(4)))
+                .enumerate()
+                .map(|(index, doc)| {
+                    logs::list_item_for_log(
+                        doc,
+                        index
+                            .checked_sub(1)
+                            .and_then(|previous| filtered.get(previous).copied()),
+                        &self.theme,
+                        area.width.saturating_sub(4),
+                    )
+                })
                 .collect::<Vec<_>>()
         };
 

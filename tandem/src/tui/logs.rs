@@ -199,32 +199,46 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
 
 pub(super) fn list_item_for_log(
     doc: &Document,
+    previous_doc: Option<&Document>,
     theme: &TuiTheme,
     available_width: u16,
 ) -> ListItem<'static> {
-    ListItem::new(line_for_log(doc, theme, available_width))
+    ListItem::new(line_for_log(doc, previous_doc, theme, available_width))
 }
 
-fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
-    let completed = completed_at_compact(doc.field("completedAt").unwrap_or("-"));
+fn line_for_log(
+    doc: &Document,
+    previous_doc: Option<&Document>,
+    theme: &TuiTheme,
+    available_width: u16,
+) -> Line<'static> {
+    let completed_at = doc.field("completedAt").unwrap_or("-");
+    let date = completed_at_date_label(completed_at);
+    let previous_date = previous_doc
+        .and_then(|doc| doc.field("completedAt"))
+        .map(completed_at_date_label);
+    let show_date = previous_date.as_deref() != Some(date.as_str());
+    let date_cell = if show_date { date } else { "     ".to_string() };
+    let time = completed_at_time_label(completed_at);
     let cue = short_log_cue(doc);
-    let fixed_width = doc.id().chars().count() + 2 + completed.chars().count();
+
+    let fixed_width =
+        date_cell.chars().count() + 2 + doc.id().chars().count() + 1 + time.chars().count();
     let remaining = (available_width as usize).saturating_sub(fixed_width);
-    let cue_width = remaining.saturating_sub(3).min(14);
+    let cue_width = remaining.saturating_sub(3).min(10);
 
     let mut spans = vec![
-        Span::styled(
-            format!("{}  ", doc.id()),
-            theme.status_style(StatusTone::Accent),
-        ),
-        Span::styled(completed, theme.muted_style()),
+        Span::styled(format!("{date_cell}  "), theme.muted_style()),
+        Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
+        Span::styled(" ", theme.muted_style()),
+        Span::styled(time, theme.muted_style()),
     ];
 
-    if cue_width >= 6 {
+    if cue_width >= 5 && !cue.is_empty() {
         spans.push(Span::styled("  ", theme.muted_style()));
         spans.push(Span::styled(
             truncate_for_log(&cue, cue_width),
-            theme.text_style().add_modifier(Modifier::BOLD),
+            theme.text_style(),
         ));
     }
 
@@ -232,25 +246,59 @@ fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<
 }
 
 fn short_log_cue(doc: &Document) -> String {
-    let title = doc.title().trim();
-    if !title.is_empty() {
-        return title.to_string();
+    let files = completion_files_changed(doc);
+    if files.len() > 1 {
+        return format!("{} files", files.len());
     }
-    let summary = completion_summary(doc).unwrap_or("").trim();
-    if !summary.is_empty() {
-        return summary.to_string();
+    if let Some(file) = files.first() {
+        return Path::new(file)
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(file)
+            .to_string();
     }
-    doc.doc_type().to_string()
+    if let Some(value) = doc.field("tags").filter(|value| !value.trim().is_empty()) {
+        if let Some(tag) = parse_field_values(value).into_iter().next() {
+            return format!("#{tag}");
+        }
+    }
+    String::new()
 }
 
 pub(super) fn completed_at_compact(value: &str) -> String {
     if value == "-" || value == "unknown" || value.trim().is_empty() {
         return value.to_string();
     }
-    if let Some((date, time)) = value.split_once('T') {
-        let hhmm = time.get(0..5).unwrap_or(time).trim_end_matches('Z');
-        let short_date = date.get(5..).unwrap_or(date);
-        return format!("{short_date} {hhmm}");
+    if value.contains('T') {
+        return format!(
+            "{} {}",
+            completed_at_date_label(value),
+            completed_at_time_label(value)
+        );
+    }
+    value.to_string()
+}
+
+fn completed_at_date_label(value: &str) -> String {
+    if value == "-" || value == "unknown" || value.trim().is_empty() {
+        return "-----".to_string();
+    }
+    if let Some((date, _)) = value.split_once('T') {
+        return date.get(5..).unwrap_or(date).to_string();
+    }
+    value.chars().take(5).collect()
+}
+
+fn completed_at_time_label(value: &str) -> String {
+    if value == "-" || value == "unknown" || value.trim().is_empty() {
+        return "--:--".to_string();
+    }
+    if let Some((_, time)) = value.split_once('T') {
+        return time
+            .get(0..5)
+            .unwrap_or(time)
+            .trim_end_matches('Z')
+            .to_string();
     }
     value.to_string()
 }
@@ -265,20 +313,6 @@ pub(super) fn detail_lines_for_log(
         doc.title().to_string(),
         theme.title_style(),
     )));
-    lines.push(Line::from(vec![
-        Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
-        Span::styled(" · ", theme.muted_style()),
-        Span::styled(doc.doc_type().to_string(), theme.muted_style()),
-        Span::styled(" · completed ", theme.muted_style()),
-        Span::styled(
-            completed_at_compact(doc.field("completedAt").unwrap_or("unknown")),
-            theme.text_style(),
-        ),
-    ]));
-    lines.push(Line::from(Span::styled(
-        format!("path {}", display_path(&doc.path)),
-        theme.muted_style(),
-    )));
 
     let summary = completion_summary(doc);
     let validation = completion_validation(doc);
@@ -289,16 +323,6 @@ pub(super) fn detail_lines_for_log(
         push_compact_optional(&mut lines, "summary", summary, theme);
         push_compact_optional(&mut lines, "validation", validation, theme);
         push_compact_optional(&mut lines, "reviewer", reviewer, theme);
-    }
-
-    let chips = compact_metadata(doc);
-    if !chips.is_empty() {
-        lines.push(Line::from(""));
-        lines.push(section_heading("Metadata", theme));
-        lines.push(Line::from(Span::styled(
-            chips.join(" · "),
-            theme.text_style(),
-        )));
     }
 
     let files = completion_files_changed(doc);
@@ -316,6 +340,33 @@ pub(super) fn detail_lines_for_log(
                 Span::styled(file, theme.text_style()),
             ]));
         }
+    }
+
+    lines.push(Line::from(""));
+    lines.push(section_heading("Log reference", theme));
+    lines.push(Line::from(vec![
+        Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
+        Span::styled(" · ", theme.muted_style()),
+        Span::styled(doc.doc_type().to_string(), theme.muted_style()),
+        Span::styled(" · completed ", theme.muted_style()),
+        Span::styled(
+            completed_at_compact(doc.field("completedAt").unwrap_or("unknown")),
+            theme.text_style(),
+        ),
+    ]));
+    lines.push(Line::from(Span::styled(
+        format!("path {}", display_path(&doc.path)),
+        theme.muted_style(),
+    )));
+
+    let chips = compact_metadata(doc);
+    if !chips.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(section_heading("Process metadata", theme));
+        lines.push(Line::from(Span::styled(
+            chips.join(" · "),
+            theme.muted_style(),
+        )));
     }
 
     append_accord_lines(&mut lines, doc, theme);
@@ -582,10 +633,10 @@ mod tests {
             "[\"docs/index.md\", \"tandem/src/tui.rs\"]".to_string(),
         );
 
-        let row = line_text(&line_for_log(&doc, &theme, 80));
-        assert!(row.starts_with("task-36  06-28 17:34"));
-        assert!(row.contains("Implement"));
-        assert!(!row.contains("Implement Tandem docs site foundation"));
+        let row = line_text(&line_for_log(&doc, None, &theme, 80));
+        assert!(row.starts_with("06-28  task-36 17:34"));
+        assert!(row.contains("2 files"));
+        assert!(!row.contains("Implement"));
         assert!(!row.contains("2026-06-28T17:34:12Z"));
         assert!(!row.contains("accepted"));
         assert!(!row.contains("docs/index.md"));
@@ -604,8 +655,63 @@ mod tests {
             "Body",
         );
 
-        let row = line_text(&line_for_log(&doc, &theme, 22));
-        assert_eq!(row, "task-36  06-28 17:34");
+        let row = line_text(&line_for_log(&doc, None, &theme, 22));
+        assert_eq!(row, "06-28  task-36 17:34");
+    }
+
+    #[test]
+    fn log_list_item_groups_repeated_dates_with_blank_date_cell() {
+        let theme = TuiTheme::default_dark();
+        let previous = log_doc("task-35", "Previous", "", "2026-06-28T18:34:12Z", "");
+        let doc = log_doc("task-36", "Next", "", "2026-06-28T17:34:12Z", "");
+
+        let row = line_text(&line_for_log(&doc, Some(&previous), &theme, 80));
+        assert!(row.starts_with("       task-36 17:34"));
+        assert!(!row.contains("06-28"));
+    }
+
+    #[test]
+    fn log_detail_prioritizes_completion_and_files_before_process_metadata() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = log_doc(
+            "task-36",
+            "Implement Tandem docs site foundation",
+            "Finished the useful docs foundation.",
+            "2026-06-28T17:34:12Z",
+            "Body",
+        );
+        doc.fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        doc.fields.insert(
+            "completion.filesChanged".to_string(),
+            "[\"docs/index.md\"]".to_string(),
+        );
+
+        let lines = detail_lines_for_log(&doc, &[], &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        let completion_index = lines.iter().position(|line| line == "Completion").unwrap();
+        let files_index = lines
+            .iter()
+            .position(|line| line == "Files changed")
+            .unwrap();
+        let reference_index = lines
+            .iter()
+            .position(|line| line == "Log reference")
+            .unwrap();
+        let process_index = lines
+            .iter()
+            .position(|line| line == "Process metadata")
+            .unwrap();
+
+        assert!(completion_index < files_index);
+        assert!(files_index < reference_index);
+        assert!(reference_index < process_index);
+        assert!(lines
+            .iter()
+            .any(|line| line.contains("Finished the useful")));
+        assert!(lines.iter().any(|line| line.contains("docs/index.md")));
     }
 
     #[test]
