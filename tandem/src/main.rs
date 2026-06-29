@@ -9,6 +9,7 @@ use yaml_rust2::{Yaml, YamlLoader};
 
 mod tui;
 
+const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const PROTOCOL_VERSION: &str = "0.1.0";
 const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
 const LEGACY_REVIEW_STATE: &str = "review";
@@ -266,10 +267,11 @@ fn run() -> Result<(), CliError> {
         "rules" => cmd_rules(&args)?,
         "decision" => cmd_decision(&args)?,
         "tui" => cmd_tui(&args)?,
+        "version" | "--version" => print_version(),
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, list, show, add, move, complete, search, log, accord, rules, decision, tui"
+                "unknown command `{other}`. Supported commands: init, list, show, add, move, complete, search, log, accord, rules, decision, tui, version"
             )))
         }
     }
@@ -293,6 +295,16 @@ fn print_help() {
     println!("  tandem rules list|add|edit|delete ...");
     println!("  tandem decision list|show|add ...");
     println!("  tandem tui");
+    println!("  tandem version");
+    println!("  tandem --version");
+}
+
+fn print_version() {
+    println!("{}", version_text());
+}
+
+fn version_text() -> String {
+    format!("tandem {PACKAGE_VERSION}")
 }
 
 fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
@@ -3715,6 +3727,14 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cli_version_uses_cargo_package_version() {
+        assert_eq!(
+            version_text(),
+            format!("tandem {}", env!("CARGO_PKG_VERSION"))
+        );
+    }
 
     #[test]
     fn derives_workspace_title_from_directory_basename() {
