@@ -2,6 +2,10 @@
 name = "tandem"
 version = "0.2.1"
 edition = "2021"
+license = "MIT"
+description = "Local-first CLI/TUI for human and agent project coordination"
+repository = "https://github.com/Algorant/tandem"
+readme = "README.md"
 
 [[bin]]
 name = "tandem"
