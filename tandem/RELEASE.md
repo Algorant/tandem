@@ -8,7 +8,7 @@ This release is intended to support global `pi-tandem` testing against a tagged 
 
 ### Current capabilities
 
-- CLI commands: `init`, `list`, `show`, `add`, `move`, `complete`, `search`, `log list|show|search`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, and `tui`.
+- CLI commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `complete`, `search`, `log list|show|search`, `accord ready|claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, and `tui`.
 - JSON read paths for supported read commands using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
 - Markdown/YAML-frontmatter Tandem workspace support under `.tandem/`, with active work in `.tandem/board/`, completed logs in `.tandem/logs/`, and audit events in `.tandem/events.jsonl`.
 - Default workflow states are `todo`, `in-progress`, and `validation`; legacy `state: review` reads are tolerated.
@@ -26,7 +26,6 @@ This release is intended to support global `pi-tandem` testing against a tagged 
 
 - No binary artifacts are published; install from the git tag with Cargo.
 - No root Rust workspace or split crates; install commands must target `--path tandem`.
-- No `tandem --version` command yet; version confirmation is currently from `tandem/Cargo.toml`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
 - TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
 - Keybindings are fixed defaults; custom keymap config is deferred.
@@ -45,12 +44,14 @@ After the release tag exists, install from git with:
 
 ```text
 cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.0 --path tandem --locked
+tandem --version
 ```
 
 If installing from a local checkout before the tag is pushed, use:
 
 ```text
 cargo install --path tandem --locked
+tandem --version
 ```
 
 For Pi smoke tests without installing globally, set an explicit binary path:
@@ -66,6 +67,8 @@ cd tandem
 cargo fmt --check
 cargo test
 cargo build --release
+cargo run -- --version
+cargo run -- version
 cd ../site
 npm ci
 npm run build
