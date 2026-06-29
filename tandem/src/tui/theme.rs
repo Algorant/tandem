@@ -47,6 +47,7 @@ pub(super) struct TuiTheme {
     priority: PriorityPalette,
     accord: AccordPalette,
     review: ReviewPalette,
+    transparent_background: bool,
     no_color: bool,
 }
 
@@ -140,6 +141,7 @@ impl TuiTheme {
                 failed: Color::Rgb(248, 113, 113),
                 unknown: Color::Rgb(107, 114, 128),
             },
+            transparent_background: false,
             no_color: false,
         }
     }
@@ -186,6 +188,7 @@ impl TuiTheme {
                 failed: Color::Rgb(227, 111, 99),
                 unknown: Color::Rgb(146, 131, 116),
             },
+            transparent_background: false,
             no_color: false,
         }
     }
@@ -302,33 +305,37 @@ impl TuiTheme {
     pub(super) fn app_style(&self) -> Style {
         self.style(
             self.colors.text,
-            Some(self.colors.background),
+            self.background_option(self.colors.background),
             Modifier::empty(),
         )
     }
 
     pub(super) fn panel_style(&self) -> Style {
-        self.style(self.colors.text, Some(self.colors.panel), Modifier::empty())
+        self.style(
+            self.colors.text,
+            self.background_option(self.colors.panel),
+            Modifier::empty(),
+        )
     }
 
     pub(super) fn title_style(&self) -> Style {
-        self.style(self.colors.accent, Some(self.colors.panel), Modifier::BOLD)
+        self.style(self.colors.accent, self.panel_background(), Modifier::BOLD)
     }
 
     pub(super) fn text_style(&self) -> Style {
-        self.style(self.colors.text, Some(self.colors.panel), Modifier::empty())
+        self.style(self.colors.text, self.panel_background(), Modifier::empty())
     }
 
     pub(super) fn muted_style(&self) -> Style {
         self.style(
             self.colors.muted,
-            Some(self.colors.panel),
+            self.panel_background(),
             Modifier::empty(),
         )
     }
 
     pub(super) fn label_style(&self) -> Style {
-        self.style(self.colors.muted, Some(self.colors.panel), Modifier::BOLD)
+        self.style(self.colors.muted, self.panel_background(), Modifier::BOLD)
     }
 
     pub(super) fn border_style(&self, active: bool) -> Style {
@@ -338,7 +345,7 @@ impl TuiTheme {
             } else {
                 self.colors.border
             },
-            Some(self.colors.panel),
+            self.panel_background(),
             Modifier::empty(),
         )
     }
@@ -362,7 +369,7 @@ impl TuiTheme {
     }
 
     pub(super) fn board_selected_title_style(&self) -> Style {
-        self.style(self.colors.accent, Some(self.colors.panel), Modifier::BOLD)
+        self.style(self.colors.accent, self.panel_background(), Modifier::BOLD)
     }
 
     pub(super) fn board_doc_type_style(&self) -> Style {
@@ -437,7 +444,7 @@ impl TuiTheme {
     pub(super) fn state_tab_selected_style(&self) -> Style {
         self.style(
             self.colors.accent,
-            Some(self.colors.panel),
+            self.panel_background(),
             Modifier::BOLD | Modifier::UNDERLINED,
         )
     }
@@ -463,7 +470,7 @@ impl TuiTheme {
             };
             self.style(self.colors.background, Some(bg), Modifier::BOLD)
         } else {
-            self.style(color, Some(self.colors.panel), Modifier::empty())
+            self.style(color, self.panel_background(), Modifier::empty())
         }
     }
 
@@ -475,7 +482,7 @@ impl TuiTheme {
             StatusTone::Error => self.colors.error,
             StatusTone::Muted => self.colors.muted,
         };
-        self.style(color, Some(self.colors.panel), Modifier::empty())
+        self.style(color, self.panel_background(), Modifier::empty())
     }
 
     pub(super) fn priority_style(&self, priority: &str) -> Style {
@@ -491,7 +498,7 @@ impl TuiTheme {
             "critical" | "urgent" | "high" => Modifier::BOLD,
             _ => Modifier::empty(),
         };
-        self.style(color, Some(self.colors.panel), modifier)
+        self.style(color, self.panel_background(), modifier)
     }
 
     pub(super) fn accord_style(&self, status: &str) -> Style {
@@ -505,7 +512,7 @@ impl TuiTheme {
             "blocked" => self.accord.blocked,
             _ => self.accord.unknown,
         };
-        self.style(color, Some(self.colors.panel), Modifier::empty())
+        self.style(color, self.panel_background(), Modifier::empty())
     }
 
     pub(super) fn review_style(&self, status: &str) -> Style {
@@ -518,7 +525,7 @@ impl TuiTheme {
             "failed" => self.review.failed,
             _ => self.review.unknown,
         };
-        self.style(color, Some(self.colors.panel), Modifier::empty())
+        self.style(color, self.panel_background(), Modifier::empty())
     }
 
     pub(super) fn markdown_heading_style(&self) -> Style {
@@ -542,6 +549,18 @@ impl TuiTheme {
             Some(bg) => style.bg(bg),
             None => style,
         }
+    }
+
+    fn background_option(&self, color: Color) -> Option<Color> {
+        if self.transparent_background {
+            None
+        } else {
+            Some(color)
+        }
+    }
+
+    fn panel_background(&self) -> Option<Color> {
+        self.background_option(self.colors.panel)
     }
 
     fn chip_style(&self, bg: Color) -> Style {
@@ -597,6 +616,10 @@ impl TuiTheme {
         theme
     }
 
+    fn set_transparent_background(&mut self, enabled: bool) {
+        self.transparent_background = enabled;
+    }
+
     fn apply_theme_content(&mut self, content: &str) -> Vec<String> {
         let mut section = String::new();
         let mut warnings = Vec::new();
@@ -640,6 +663,14 @@ impl TuiTheme {
                         }
                     }
                     "theme" | "base" | "builtin" | "extends" => {}
+                    "transparent_background" | "transparent-background" | "transparent" => {
+                        match parse_bool(&value) {
+                            Some(enabled) => self.set_transparent_background(enabled),
+                            None => warnings.push(format!(
+                                "Theme warning line {line_number}: invalid boolean for `{key}`: use true or false"
+                            )),
+                        }
+                    }
                     _ => warnings.push(format!(
                         "Theme warning line {line_number}: unknown root key `{key}`"
                     )),
@@ -921,6 +952,14 @@ fn parse_value(raw: &str) -> String {
     }
 }
 
+fn parse_bool(value: &str) -> Option<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "true" | "yes" | "on" | "1" => Some(true),
+        "false" | "no" | "off" | "0" => Some(false),
+        _ => None,
+    }
+}
+
 fn parse_color(value: &str) -> Result<Color, String> {
     let value = value.trim();
     if value.is_empty() {
@@ -1033,6 +1072,33 @@ changes-requested = "#eb6f92"
         assert_eq!(theme.priority.high, Color::Rgb(246, 193, 119));
         assert_eq!(theme.accord.delivered, Color::Rgb(196, 167, 231));
         assert_eq!(theme.review.changes_requested, Color::Rgb(235, 111, 146));
+    }
+
+    #[test]
+    fn transparent_background_is_opt_in_and_removes_panel_fills() {
+        let mut theme = TuiTheme::default_dark();
+        assert_eq!(theme.panel_style().bg, Some(theme.colors.panel));
+        assert_eq!(theme.app_style().bg, Some(theme.colors.background));
+
+        let warnings = theme.apply_theme_content("transparent_background = true\n");
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert!(theme.transparent_background);
+        assert_eq!(theme.colors.background, Color::Rgb(12, 14, 18));
+        assert_eq!(theme.colors.panel, Color::Rgb(22, 25, 31));
+        assert_eq!(theme.panel_style().bg, None);
+        assert_eq!(theme.app_style().bg, None);
+        assert_eq!(theme.text_style().bg, None);
+        assert_eq!(theme.selected_style().bg, Some(theme.colors.selected_bg));
+    }
+
+    #[test]
+    fn invalid_transparent_background_value_warns_and_preserves_opaque_default() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content("transparent_background = maybe\n");
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("invalid boolean"));
+        assert!(!theme.transparent_background);
+        assert_eq!(theme.panel_style().bg, Some(theme.colors.panel));
     }
 
     #[test]
