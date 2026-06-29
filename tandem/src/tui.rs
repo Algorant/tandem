@@ -172,12 +172,22 @@ enum KeyAction {
     OpenEditor,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 enum HitAction {
     SwitchView(TuiView),
     SelectState(usize),
     SelectBoardItem(usize, usize),
+    ToggleBoardExpansion,
+    ToggleBoardDetail,
+    StartQuickAdd,
+    CycleBoardTagFilter,
+    CycleBoardPriorityFilter,
+    ClearBoardFilters,
+    MoveSelectedTask(isize),
+    ShowValidationAction(&'static str),
+    OpenEditor,
+    ShowHelp,
     FocusDetail,
     FocusReviewList,
     SelectReviewItem(usize),
@@ -185,6 +195,8 @@ enum HitAction {
     SelectLog(usize),
     FocusLogList,
     FocusLogDetail,
+    StartLogSearch,
+    ToggleFocus,
 }
 
 #[derive(Debug, Clone)]
@@ -560,7 +572,11 @@ impl TuiApp {
                         KeyAction::Quit => break,
                         KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
                     },
-                    Event::Mouse(mouse) => self.handle_mouse(mouse),
+                    Event::Mouse(mouse) => match self.handle_mouse(mouse) {
+                        KeyAction::Continue => {}
+                        KeyAction::Quit => break,
+                        KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
+                    },
                     Event::Resize(_, _) => {}
                     _ => {}
                 }
@@ -1396,9 +1412,9 @@ impl TuiApp {
         false
     }
 
-    fn handle_mouse(&mut self, mouse: MouseEvent) {
+    fn handle_mouse(&mut self, mouse: MouseEvent) -> KeyAction {
         if self.input_overlay_active() {
-            return;
+            return KeyAction::Continue;
         }
 
         match mouse.kind {
@@ -1423,14 +1439,57 @@ impl TuiApp {
                         HitAction::SelectBoardItem(state_index, item_index)
                             if self.view == TuiView::Board =>
                         {
-                            self.selected_state =
-                                state_index.min(self.states.len().saturating_sub(1));
+                            let state_index = state_index.min(self.states.len().saturating_sub(1));
+                            let was_selected = self.selected_state == state_index
+                                && self.selected_item == item_index
+                                && self.focus == FocusPane::Board;
+                            self.selected_state = state_index;
                             self.selected_item = item_index;
                             self.detail_scroll = 0;
                             self.focus = FocusPane::Board;
                             self.clamp_selection();
+                            if was_selected {
+                                self.toggle_board_expansion();
+                            }
                         }
                         HitAction::SelectBoardItem(_, _) => {}
+                        HitAction::ToggleBoardExpansion if self.view == TuiView::Board => {
+                            self.toggle_board_expansion()
+                        }
+                        HitAction::ToggleBoardExpansion => {}
+                        HitAction::ToggleBoardDetail if self.view == TuiView::Board => {
+                            self.toggle_board_detail()
+                        }
+                        HitAction::ToggleBoardDetail => {}
+                        HitAction::StartQuickAdd if self.view == TuiView::Board => {
+                            self.start_quick_add()
+                        }
+                        HitAction::StartQuickAdd => {}
+                        HitAction::CycleBoardTagFilter if self.view == TuiView::Board => {
+                            self.cycle_board_tag_filter()
+                        }
+                        HitAction::CycleBoardTagFilter => {}
+                        HitAction::CycleBoardPriorityFilter if self.view == TuiView::Board => {
+                            self.cycle_board_priority_filter()
+                        }
+                        HitAction::CycleBoardPriorityFilter => {}
+                        HitAction::ClearBoardFilters if self.view == TuiView::Board => {
+                            self.clear_board_filters()
+                        }
+                        HitAction::ClearBoardFilters => {}
+                        HitAction::MoveSelectedTask(delta) if self.view == TuiView::Board => {
+                            self.move_selected_task_by_delta(delta)
+                        }
+                        HitAction::MoveSelectedTask(_) => {}
+                        HitAction::ShowValidationAction(action) if self.view == TuiView::Board => {
+                            self.show_validation_action_hint(action)
+                        }
+                        HitAction::ShowValidationAction(_) => {}
+                        HitAction::OpenEditor if self.view == TuiView::Board => {
+                            return KeyAction::OpenEditor
+                        }
+                        HitAction::OpenEditor => {}
+                        HitAction::ShowHelp => self.show_help = true,
                         HitAction::FocusDetail if self.view == TuiView::Board => {
                             self.focus = FocusPane::Detail
                         }
@@ -1453,25 +1512,26 @@ impl TuiApp {
                             self.focus = FocusPane::Detail
                         }
                         HitAction::FocusLogDetail => {}
+                        HitAction::StartLogSearch if self.view == TuiView::Logs => {
+                            self.start_log_search()
+                        }
+                        HitAction::StartLogSearch => {}
+                        HitAction::ToggleFocus => self.toggle_focus(),
                     }
                 }
             }
-            MouseEventKind::ScrollDown if self.view == TuiView::Board => match self.focus {
-                FocusPane::Board => self.next_item(),
-                FocusPane::Detail => self.scroll_detail_down(3),
-            },
-            MouseEventKind::ScrollUp if self.view == TuiView::Board => match self.focus {
-                FocusPane::Board => self.previous_item(),
-                FocusPane::Detail => self.scroll_detail_up(3),
-            },
-            MouseEventKind::ScrollDown if self.view == TuiView::Logs => match self.focus {
-                FocusPane::Board => self.next_log(),
-                FocusPane::Detail => self.scroll_log_detail_down(3),
-            },
-            MouseEventKind::ScrollUp if self.view == TuiView::Logs => match self.focus {
-                FocusPane::Board => self.previous_log(),
-                FocusPane::Detail => self.scroll_log_detail_up(3),
-            },
+            MouseEventKind::ScrollDown if self.view == TuiView::Board => {
+                self.scroll_board_at(mouse, 3)
+            }
+            MouseEventKind::ScrollUp if self.view == TuiView::Board => {
+                self.scroll_board_at(mouse, -3)
+            }
+            MouseEventKind::ScrollDown if self.view == TuiView::Logs => {
+                self.scroll_logs_at(mouse, 3)
+            }
+            MouseEventKind::ScrollUp if self.view == TuiView::Logs => {
+                self.scroll_logs_at(mouse, -3)
+            }
             MouseEventKind::ScrollDown if self.view == TuiView::Rules => self.next_rule_selection(),
             MouseEventKind::ScrollUp if self.view == TuiView::Rules => {
                 self.previous_rule_selection()
@@ -1481,6 +1541,62 @@ impl TuiApp {
             }
             MouseEventKind::ScrollUp if self.view == TuiView::Decisions => {
                 self.previous_decision_selection()
+            }
+            _ => {}
+        }
+        KeyAction::Continue
+    }
+
+    fn mouse_hit_action(&self, column: u16, row: u16) -> Option<HitAction> {
+        self.hits
+            .iter()
+            .rev()
+            .find(|hit| rect_contains(hit.rect, column, row))
+            .map(|hit| hit.action.clone())
+    }
+
+    fn scroll_board_at(&mut self, mouse: MouseEvent, amount: i16) {
+        match self.mouse_hit_action(mouse.column, mouse.row) {
+            Some(HitAction::FocusDetail) => {
+                self.focus = FocusPane::Detail;
+                if amount > 0 {
+                    self.scroll_detail_down(amount as u16);
+                } else {
+                    self.scroll_detail_up(amount.unsigned_abs());
+                }
+            }
+            Some(HitAction::SelectState(_))
+            | Some(HitAction::SelectBoardItem(_, _))
+            | Some(HitAction::ToggleBoardExpansion)
+            | None => {
+                self.focus = FocusPane::Board;
+                if amount > 0 {
+                    self.next_item();
+                } else {
+                    self.previous_item();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn scroll_logs_at(&mut self, mouse: MouseEvent, amount: i16) {
+        match self.mouse_hit_action(mouse.column, mouse.row) {
+            Some(HitAction::FocusLogDetail) => {
+                self.focus = FocusPane::Detail;
+                if amount > 0 {
+                    self.scroll_log_detail_down(amount as u16);
+                } else {
+                    self.scroll_log_detail_up(amount.unsigned_abs());
+                }
+            }
+            Some(HitAction::FocusLogList) | Some(HitAction::SelectLog(_)) | None => {
+                self.focus = FocusPane::Board;
+                if amount > 0 {
+                    self.next_log();
+                } else {
+                    self.previous_log();
+                }
             }
             _ => {}
         }
@@ -2561,9 +2677,9 @@ impl TuiApp {
         } else if self.selected_state_name() == Some("validation") {
             "Enter detail · A accept · R rework · e edit · ? help".to_string()
         } else if self.board_filters.is_active() {
-            "Enter detail · F clear filter · H/L move · ? help".to_string()
+            "Enter detail · F clear filter · H prev · L next · ? help".to_string()
         } else {
-            "Enter detail · a add · t/p filter · ? help".to_string()
+            "Enter detail · a add · t tag · p priority · ? help".to_string()
         };
         self.with_status(format!(
             "{context} · {} · {commands}",
@@ -2585,7 +2701,7 @@ impl TuiApp {
         self.with_status(format!("Logs {context} · {commands}"))
     }
 
-    fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
+    fn draw_footer(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let footer_line = if let Some(input) = self.quick_add.as_ref() {
             Line::from(Span::styled(
                 quick_add_status(input),
@@ -2619,7 +2735,13 @@ impl TuiApp {
                 TuiView::Decisions => self.decisions_footer_text(),
             })
         };
+        let footer_text = footer_line
+            .spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect::<String>();
         frame.render_widget(Paragraph::new(footer_line), area);
+        self.register_footer_hits(area, &footer_text);
     }
 
     fn footer_line_for_text(&self, hints: String) -> Line<'static> {
@@ -2640,6 +2762,90 @@ impl TuiApp {
                 self.theme.status_style(status_tone_for_message(status)),
             ),
         ])
+    }
+
+    fn register_footer_hits(&mut self, area: Rect, text: &str) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        match self.view {
+            TuiView::Board => {
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "Enter detail",
+                    HitAction::ToggleBoardExpansion,
+                );
+                self.register_footer_hit(area, text, "Tab board", HitAction::ToggleBoardDetail);
+                self.register_footer_hit(area, text, "a add", HitAction::StartQuickAdd);
+                self.register_footer_hit(area, text, "t tag", HitAction::CycleBoardTagFilter);
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "p priority",
+                    HitAction::CycleBoardPriorityFilter,
+                );
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "F clear filter",
+                    HitAction::ClearBoardFilters,
+                );
+                self.register_footer_hit(area, text, "H prev", HitAction::MoveSelectedTask(-1));
+                self.register_footer_hit(area, text, "L next", HitAction::MoveSelectedTask(1));
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "A accept",
+                    HitAction::ShowValidationAction("accept"),
+                );
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "R rework",
+                    HitAction::ShowValidationAction("rework"),
+                );
+                self.register_footer_hit(area, text, "e edit", HitAction::OpenEditor);
+            }
+            TuiView::Logs => {
+                self.register_footer_hit(area, text, "Enter detail", HitAction::ToggleFocus);
+                self.register_footer_hit(area, text, "Enter list", HitAction::ToggleFocus);
+                self.register_footer_hit(area, text, "/ search", HitAction::StartLogSearch);
+            }
+            TuiView::Rules | TuiView::Decisions => {}
+        }
+        self.register_footer_hit(area, text, "? help", HitAction::ShowHelp);
+    }
+
+    fn register_footer_hit(&mut self, area: Rect, text: &str, label: &str, action: HitAction) {
+        if let Some(start) = text.find(label) {
+            let x = area.x.saturating_add(start as u16);
+            if x >= area.x.saturating_add(area.width) {
+                return;
+            }
+            let width = (label.chars().count() as u16)
+                .min(area.x.saturating_add(area.width).saturating_sub(x));
+            if width > 0 {
+                self.hits.push(HitRegion {
+                    rect: Rect {
+                        x,
+                        y: area.y,
+                        width,
+                        height: 1,
+                    },
+                    action,
+                });
+            }
+        }
+    }
+
+    fn show_validation_action_hint(&mut self, action: &str) {
+        match action {
+            "accept" | "approve" => self.start_validation_accept(),
+            "rework" => self.start_validation_rework(),
+            "complete" => self.show_validation_complete_hint(),
+            _ => self.status = format!("Unknown Validation action `{action}`."),
+        }
     }
 
     fn help_lines(&self) -> Vec<Line<'static>> {
@@ -2699,12 +2905,16 @@ impl TuiApp {
         );
 
         self.push_help_section(&mut lines, "Validation");
-        self.push_help_command(&mut lines, "A", "show accept command for delivered work");
-        self.push_help_command(&mut lines, "R", "show rework command with note placeholder");
+        self.push_help_command(
+            &mut lines,
+            "A",
+            "open accept confirmation for delivered work",
+        );
+        self.push_help_command(&mut lines, "R", "open feedback dialog and request rework");
         self.push_help_command(
             &mut lines,
             "C",
-            "show complete command when accord is accepted",
+            "de-emphasized; accept first, then archive/log outside review",
         );
 
         self.push_help_section(&mut lines, "Logs");
@@ -5283,7 +5493,7 @@ mod tests {
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 item · Enter detail · a add · t/p filter · ? help"
+            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -5307,6 +5517,87 @@ mod tests {
             app.rules_footer_text(),
             "Rules · h/l category · j/k select · n new · e edit · d delete · ? help"
         );
+    }
+
+    fn left_click(column: u16, row: u16) -> MouseEvent {
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        }
+    }
+
+    fn scroll_down(column: u16, row: u16) -> MouseEvent {
+        MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        }
+    }
+
+    #[test]
+    fn mouse_hit_map_selects_rows_expands_selected_row_and_noops_elsewhere() {
+        let mut app = keyboard_test_app();
+        app.hits = vec![HitRegion {
+            rect: Rect {
+                x: 2,
+                y: 4,
+                width: 20,
+                height: 1,
+            },
+            action: HitAction::SelectBoardItem(0, 0),
+        }];
+
+        assert_eq!(app.handle_mouse(left_click(90, 20)), KeyAction::Continue);
+        assert_eq!(app.selected_item, 0);
+        assert!(app.expanded_board_doc_id.is_none());
+
+        assert_eq!(app.handle_mouse(left_click(3, 4)), KeyAction::Continue);
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1"));
+
+        assert_eq!(app.handle_mouse(left_click(3, 4)), KeyAction::Continue);
+        assert!(app.expanded_board_doc_id.is_none());
+    }
+
+    #[test]
+    fn mouse_footer_action_hits_reuse_keyboard_paths() {
+        let mut app = keyboard_test_app();
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let add_hit = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::StartQuickAdd)
+            .cloned()
+            .expect("footer should register quick-add action");
+        assert_eq!(
+            app.handle_mouse(left_click(add_hit.rect.x, add_hit.rect.y)),
+            KeyAction::Continue
+        );
+        assert!(app.quick_add.is_some());
+    }
+
+    #[test]
+    fn mouse_wheel_scrolls_pane_under_pointer() {
+        let mut app = keyboard_test_app();
+        app.show_board_detail = true;
+        app.hits = vec![HitRegion {
+            rect: Rect {
+                x: 0,
+                y: 10,
+                width: 80,
+                height: 5,
+            },
+            action: HitAction::FocusDetail,
+        }];
+
+        assert_eq!(app.focus, FocusPane::Board);
+        assert_eq!(app.handle_mouse(scroll_down(1, 11)), KeyAction::Continue);
+        assert_eq!(app.focus, FocusPane::Detail);
+        assert!(app.detail_scroll > 0);
     }
 
     #[test]
@@ -5345,7 +5636,7 @@ mod tests {
             assert!(text.contains(heading), "missing help heading {heading}");
         }
         assert!(text.contains("1 2 3 4"));
-        assert!(text.contains("A           show accept command"));
+        assert!(text.contains("A           open accept confirmation"));
         assert!(text.contains("/           search id, title"));
         assert!(text.contains("e / d       edit or delete"));
         assert!(text.contains("deferred; edit decision files manually"));

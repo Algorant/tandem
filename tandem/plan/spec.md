@@ -1048,6 +1048,8 @@ Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tand
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris or a user theme is selected.
 
+Themes may opt into terminal-default/transparent fills with root `transparent_background = true`. The default is false, so omitted themes continue to force the active palette's opaque `background` and `panel` colors. When enabled, app and panel fills use no explicit background where practical while selection and badge styles may still use explicit backgrounds for legibility.
+
 ### Theme requirements
 
 - Support truecolor terminals.
@@ -1064,10 +1066,10 @@ Mouse support should be built into the event model.
 Required interactions:
 
 - click tabs/views
-- click cards to select
-- double-click or enter/click to expand detail
-- scroll lists with mouse wheel
-- click action buttons in detail/review/log views
+- click cards/rows to select
+- enter/click the selected Board row to expand or collapse inline detail
+- scroll lists/details with the mouse wheel, using the pane under the pointer
+- click visible footer/action labels for safe keyboard-equivalent actions
 - click Board state tabs and state picker controls in move mode
 - click confirmation buttons
 
