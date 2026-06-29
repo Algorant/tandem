@@ -2586,61 +2586,190 @@ impl TuiApp {
     }
 
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
-        let (hints, style) = if let Some(input) = self.quick_add.as_ref() {
-            (
+        let footer_line = if let Some(input) = self.quick_add.as_ref() {
+            Line::from(Span::styled(
                 quick_add_status(input),
                 self.theme.status_style(StatusTone::Warning),
-            )
+            ))
         } else if self.log_search_input.is_some() {
-            (
+            Line::from(Span::styled(
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
-            )
+            ))
         } else if self.validation_prompt.is_some() {
-            (
+            Line::from(Span::styled(
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
-            )
+            ))
         } else if let Some(status) = self.rules_prompt_status() {
-            (status, self.theme.status_style(StatusTone::Warning))
+            Line::from(Span::styled(
+                status,
+                self.theme.status_style(StatusTone::Warning),
+            ))
         } else if let Some(status) = self.decision_prompt_status() {
-            (status, self.theme.status_style(StatusTone::Warning))
-        } else if self.view == TuiView::Board {
-            (
-                self.board_footer_text(),
-                self.theme
-                    .status_style(status_tone_for_message(&self.status)),
-            )
-        } else if self.view == TuiView::Logs {
-            (
-                self.logs_footer_text(),
-                self.theme
-                    .status_style(status_tone_for_message(&self.status)),
-            )
-        } else if self.view == TuiView::Rules {
-            (
-                self.rules_footer_text(),
-                self.theme
-                    .status_style(status_tone_for_message(&self.status)),
-            )
-        } else if self.view == TuiView::Decisions {
-            (
-                self.decisions_footer_text(),
-                self.theme
-                    .status_style(status_tone_for_message(&self.status)),
-            )
+            Line::from(Span::styled(
+                status,
+                self.theme.status_style(StatusTone::Warning),
+            ))
         } else {
-            (
-                self.with_status(format!(
-                    "{} · r reload · q quit · ? help",
-                    self.view.label()
-                )),
-                self.theme
-                    .status_style(status_tone_for_message(&self.status)),
-            )
+            self.footer_line_for_text(match self.view {
+                TuiView::Board => self.board_footer_text(),
+                TuiView::Logs => self.logs_footer_text(),
+                TuiView::Rules => self.rules_footer_text(),
+                TuiView::Decisions => self.decisions_footer_text(),
+            })
         };
-        let footer = Paragraph::new(Line::from(Span::styled(hints, style)));
-        frame.render_widget(footer, area);
+        frame.render_widget(Paragraph::new(footer_line), area);
+    }
+
+    fn footer_line_for_text(&self, hints: String) -> Line<'static> {
+        let hint_style = self.theme.text_style();
+        let separator_style = self.theme.muted_style();
+        let Some(status) = (!self.status.is_empty()).then_some(self.status.as_str()) else {
+            return Line::from(Span::styled(hints, hint_style));
+        };
+        let suffix = format!(" · {status}");
+        let Some(base) = hints.strip_suffix(&suffix) else {
+            return Line::from(Span::styled(hints, hint_style));
+        };
+        Line::from(vec![
+            Span::styled(base.to_string(), hint_style),
+            Span::styled(" · ", separator_style),
+            Span::styled(
+                status.to_string(),
+                self.theme.status_style(status_tone_for_message(status)),
+            ),
+        ])
+    }
+
+    fn help_lines(&self) -> Vec<Line<'static>> {
+        let mut lines = vec![
+            Line::from(Span::styled("Tandem TUI help", self.theme.title_style())),
+            Line::from(Span::styled(
+                "Keyboard-first commands grouped by view. Press ? / Esc / q to close.",
+                self.theme.muted_style(),
+            )),
+            Line::from(""),
+        ];
+        self.push_help_section(&mut lines, "Global");
+        self.push_help_command(&mut lines, "q, Ctrl-C", "quit safely");
+        self.push_help_command(&mut lines, "r", "reload board/config/log/theme data");
+        self.push_help_command(
+            &mut lines,
+            "1 2 3 4",
+            "switch Board, Logs, Rules, Decisions",
+        );
+        self.push_help_command(
+            &mut lines,
+            "mouse",
+            "click tabs/lists/panes; wheel selects or scrolls",
+        );
+
+        self.push_help_section(&mut lines, "Navigation");
+        self.push_help_command(
+            &mut lines,
+            "j/k, ↑/↓",
+            "move selection; scroll detail when focused",
+        );
+        self.push_help_command(&mut lines, "h/l, ←/→", "move within the active view");
+        self.push_help_command(
+            &mut lines,
+            "g/G",
+            "first/last item in the active list or detail",
+        );
+        self.push_help_command(
+            &mut lines,
+            "Tab",
+            "Board detail toggle; Logs/Decisions focus toggle",
+        );
+
+        self.push_help_section(&mut lines, "Board");
+        self.push_help_command(&mut lines, "Enter", "expand/collapse row preview");
+        self.push_help_command(&mut lines, "a", "quick-add a task in the selected state");
+        self.push_help_command(&mut lines, "e", "open the selected active task in $EDITOR");
+        self.push_help_command(
+            &mut lines,
+            "t / p / F",
+            "cycle tag filter, priority filter, clear filters",
+        );
+        self.push_help_command(
+            &mut lines,
+            "H / L",
+            "move selected task to previous/next state",
+        );
+
+        self.push_help_section(&mut lines, "Validation");
+        self.push_help_command(&mut lines, "A", "show accept command for delivered work");
+        self.push_help_command(&mut lines, "R", "show rework command with note placeholder");
+        self.push_help_command(
+            &mut lines,
+            "C",
+            "show complete command when accord is accepted",
+        );
+
+        self.push_help_section(&mut lines, "Logs");
+        self.push_help_command(&mut lines, "Enter", "toggle list/detail focus");
+        self.push_help_command(
+            &mut lines,
+            "/",
+            "search id, title, summary, body, validation, files",
+        );
+        self.push_help_command(&mut lines, "Esc", "clear search filter or return to list");
+        self.push_help_command(
+            &mut lines,
+            "e",
+            "read-only; generated history is not edited here",
+        );
+
+        self.push_help_section(&mut lines, "Rules");
+        self.push_help_command(
+            &mut lines,
+            "h/l",
+            "switch always/never/prefer/context categories",
+        );
+        self.push_help_command(&mut lines, "a or n", "add a rule");
+        self.push_help_command(&mut lines, "e / d", "edit or delete the selected rule");
+
+        self.push_help_section(&mut lines, "Decisions");
+        self.push_help_command(&mut lines, "Enter", "toggle list/body focus");
+        self.push_help_command(&mut lines, "a", "add a decision document");
+        self.push_help_command(&mut lines, "PgUp/PgDn", "scroll selected decision body");
+        self.push_help_command(
+            &mut lines,
+            "e",
+            "deferred; edit decision files manually for now",
+        );
+
+        self.push_help_section(&mut lines, "Prompts");
+        self.push_help_command(&mut lines, "Enter", "advance/save prompt input");
+        self.push_help_command(&mut lines, "Esc", "cancel prompt or close help");
+        self.push_help_command(&mut lines, "Ctrl-U", "clear current prompt field");
+        lines
+    }
+
+    fn push_help_section(&self, lines: &mut Vec<Line<'static>>, title: &'static str) {
+        if lines.last().is_some_and(|line| !line.spans.is_empty()) {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(
+            title,
+            self.theme.label_style().add_modifier(Modifier::BOLD),
+        )));
+    }
+
+    fn push_help_command(
+        &self,
+        lines: &mut Vec<Line<'static>>,
+        keys: &'static str,
+        detail: &'static str,
+    ) {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("  {keys:<12}"),
+                self.theme.status_style(StatusTone::Accent),
+            ),
+            Span::styled(detail.to_string(), self.theme.text_style()),
+        ]));
     }
 
     fn draw_validation_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -2667,47 +2796,18 @@ impl TuiApp {
     }
 
     fn draw_help(&self, frame: &mut Frame<'_>, area: Rect) {
-        let popup = centered_rect(72, 60, area);
+        let popup = centered_rect(78, 72, area);
         frame.render_widget(Clear, popup);
-        let help = Paragraph::new(vec![
-            Line::from(Span::styled(
-                "Tandem TUI view shell",
-                self.theme.title_style(),
-            )),
-            Line::from(""),
-            Line::from("q / Ctrl-C        Quit safely"),
-            Line::from("r                 Reload board/config/log/theme data (also auto-detected while idle)"),
-            Line::from("1..4              Switch Board, Logs, Rules, Decisions"),
-            Line::from("click top tabs    Switch views with the mouse"),
-            Line::from("tab / shift-tab   Board: show/hide detail pane; other split views: cycle focus"),
-            Line::from("enter             Board: expand/collapse row preview; Logs: toggle list/detail focus"),
-            Line::from("a                 Board quick-add; Rules add rule; Decisions add decision"),
-            Line::from("e                 Board: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
-            Line::from("h/l or ←/→        Board: state subviews; Logs/Decisions: list/detail focus; Rules: category"),
-            Line::from("H/L               Board: move selected task to previous/next configured state"),
-            Line::from("t / p / F         Board: cycle tag filter, cycle priority filter, clear filters"),
-            Line::from("j/k or ↑/↓        Board/Logs/Rules/Decisions: move items, or scroll detail when focused"),
-            Line::from("g/G               First/last item in the active list/detail"),
-            Line::from("d                 Rules: delete selected rule with confirmation"),
-            Line::from("PgUp/PgDn         Logs/Decisions: scroll selected detail/body"),
-            Line::from("/                 Logs: search by id, title, summary, body, validation, files"),
-            Line::from("Esc               Logs: clear search filter; prompts: cancel"),
-            Line::from("mouse wheel       Board/Logs/Rules/Decisions: move selection or scroll detail"),
-            Line::from("click tabs/list/detail Board/Logs: switch subviews, select, or focus panes"),
-            Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
-            Line::from("Log search        Type a query, Enter applies, Esc cancels"),
-            Line::from(""),
-            Line::from("Board state subviews include Validation for delivered work awaiting human sign-off, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer mutation prompts remain planned."),
-        ])
-        .style(self.theme.panel_style())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" Help ")
-                .border_style(self.theme.border_style(true))
-                .style(self.theme.panel_style()),
-        )
-        .wrap(Wrap { trim: true });
+        let help = Paragraph::new(self.help_lines())
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Help ")
+                    .border_style(self.theme.border_style(true))
+                    .style(self.theme.panel_style()),
+            )
+            .wrap(Wrap { trim: true });
         frame.render_widget(help, popup);
     }
 }
@@ -5207,6 +5307,49 @@ mod tests {
             app.rules_footer_text(),
             "Rules · h/l category · j/k select · n new · e edit · d delete · ? help"
         );
+    }
+
+    #[test]
+    fn footer_status_style_does_not_leak_into_hotkey_hints() {
+        let mut app = keyboard_test_app();
+        app.status = "Logs view active: 0 completed logs loaded.".to_string();
+        let line = app.footer_line_for_text(app.logs_footer_text());
+
+        assert_eq!(line_text(&line), app.logs_footer_text());
+        assert_eq!(line.spans.len(), 3);
+        assert!(line.spans[0].content.contains("Logs list"));
+        assert_eq!(line.spans[0].style, app.theme.text_style());
+        assert_eq!(line.spans[1].style, app.theme.muted_style());
+        assert_eq!(
+            line.spans[2].style,
+            app.theme.status_style(status_tone_for_message(&app.status))
+        );
+    }
+
+    #[test]
+    fn help_popup_groups_current_commands_by_view() {
+        let app = keyboard_test_app();
+        let lines = app.help_lines();
+        let text = lines.iter().map(line_text).collect::<Vec<_>>().join("\n");
+
+        for heading in [
+            "Global",
+            "Navigation",
+            "Board",
+            "Validation",
+            "Logs",
+            "Rules",
+            "Decisions",
+            "Prompts",
+        ] {
+            assert!(text.contains(heading), "missing help heading {heading}");
+        }
+        assert!(text.contains("1 2 3 4"));
+        assert!(text.contains("A           show accept command"));
+        assert!(text.contains("/           search id, title"));
+        assert!(text.contains("e / d       edit or delete"));
+        assert!(text.contains("deferred; edit decision files manually"));
+        assert!(!text.contains("Review actions"));
     }
 
     #[test]
