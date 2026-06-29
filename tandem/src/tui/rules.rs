@@ -25,6 +25,12 @@ fn title_case(value: &str) -> String {
     }
 }
 
+fn rule_category_tab_width(index: usize, category: &str, count: usize) -> u16 {
+    format!("[{}]  {} ({count}) ", index + 1, title_case(category))
+        .chars()
+        .count() as u16
+}
+
 #[derive(Debug, Default)]
 pub(super) struct RulesState {
     selected_category: usize,
@@ -285,20 +291,41 @@ impl TuiApp {
     }
 
     fn draw_rule_category_tabs(&self, frame: &mut Frame<'_>, area: Rect) {
+        let tab_widths = RULE_CATEGORIES
+            .iter()
+            .enumerate()
+            .map(|(index, category)| {
+                let count = self.rules.get(*category).map(Vec::len).unwrap_or(0);
+                rule_category_tab_width(index, category, count)
+            })
+            .collect::<Vec<_>>();
+        let content_width: u16 = tab_widths.iter().sum();
+        let gaps = RULE_CATEGORIES.len().saturating_sub(1) as u16;
+        let gap_width = if gaps == 0 {
+            0
+        } else {
+            ((area.width.saturating_sub(content_width)) / gaps).clamp(4, 10)
+        };
+        let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
+        let leading = area.width.saturating_sub(total_width) / 2;
+
         let mut spans = Vec::new();
+        if leading > 0 {
+            spans.push(Span::raw(" ".repeat(leading as usize)));
+        }
         for (index, category) in RULE_CATEGORIES.iter().enumerate() {
             if index > 0 {
-                spans.push(Span::raw("  "));
+                spans.push(Span::raw(" ".repeat(gap_width as usize)));
             }
             let count = self.rules.get(*category).map(Vec::len).unwrap_or(0);
-            let style = if index == self.rules_view.selected_category {
-                self.theme.tab_selected_style()
-            } else {
-                self.theme.tab_style()
-            };
+            let selected = index == self.rules_view.selected_category;
             spans.push(Span::styled(
-                format!("{} {count}", title_case(category)),
-                style,
+                format!("[{}] ", index + 1),
+                self.theme.muted_style(),
+            ));
+            spans.push(Span::styled(
+                format!(" {} ({count}) ", title_case(category)),
+                self.theme.rule_category_style(category, selected),
             ));
         }
         frame.render_widget(

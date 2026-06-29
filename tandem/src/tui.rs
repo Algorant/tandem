@@ -155,12 +155,12 @@ impl TuiView {
         }
     }
 
-    fn tab_label(self) -> &'static str {
+    fn shortcut(self) -> &'static str {
         match self {
-            Self::Board => "1 Board",
-            Self::Logs => "2 Logs",
-            Self::Rules => "3 Rules",
-            Self::Decisions => "4 Decisions",
+            Self::Board => "1",
+            Self::Logs => "2",
+            Self::Rules => "3",
+            Self::Decisions => "4",
         }
     }
 }
@@ -1788,8 +1788,9 @@ impl TuiApp {
             TuiView::Rules => self.rules_context(),
             TuiView::Decisions => self.decisions_context(),
         };
+        let tab_area = header_inner_row(area, 0);
         let header = Paragraph::new(vec![
-            self.view_tab_line(),
+            self.view_tab_line(tab_area.width),
             Line::from(Span::styled(context, self.theme.muted_style())),
         ])
         .style(self.theme.panel_style())
@@ -1813,47 +1814,94 @@ impl TuiApp {
         self.register_view_tab_hits(header_inner_row(area, 0));
     }
 
-    fn view_tab_line(&self) -> Line<'static> {
-        let counts = [
+    fn view_tab_line(&self, width: u16) -> Line<'static> {
+        let counts = self.view_counts();
+        let tab_widths = TuiView::ALL
+            .into_iter()
+            .enumerate()
+            .map(|(index, view)| view_tab_text_width(view, counts[index]))
+            .collect::<Vec<_>>();
+        let content_width: u16 = tab_widths.iter().sum();
+        let gaps = TuiView::ALL.len().saturating_sub(1) as u16;
+        let gap_width = if gaps == 0 {
+            0
+        } else {
+            ((width.saturating_sub(content_width)) / gaps).clamp(3, 8)
+        };
+        let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
+        let leading = width.saturating_sub(total_width) / 2;
+
+        let mut spans = Vec::new();
+        if leading > 0 {
+            spans.push(Span::raw(" ".repeat(leading as usize)));
+        }
+        for (index, view) in TuiView::ALL.into_iter().enumerate() {
+            if index > 0 {
+                spans.push(Span::raw(" ".repeat(gap_width as usize)));
+            }
+            spans.extend(self.view_tab_spans(view, counts[index]));
+        }
+        Line::from(spans)
+    }
+
+    fn view_counts(&self) -> [usize; 4] {
+        [
             self.docs.len(),
             self.logs.len(),
             self.rules_total(),
             self.decision_docs().len(),
-        ];
-        let mut spans = Vec::new();
-        for (index, view) in TuiView::ALL.into_iter().enumerate() {
-            if index > 0 {
-                spans.push(Span::raw("  "));
-            }
-            let style = if view == self.view {
-                self.theme.tab_selected_style()
-            } else {
-                self.theme.tab_style()
-            };
-            spans.push(Span::styled(
-                format!("{} {}", view.tab_label(), counts[index]),
-                style,
-            ));
-        }
-        Line::from(spans)
+        ]
+    }
+
+    fn view_tab_spans(&self, view: TuiView, count: usize) -> Vec<Span<'static>> {
+        let selected = view == self.view;
+        let label_style = if selected {
+            self.theme.tab_selected_style()
+        } else {
+            self.theme.text_style()
+        };
+        let shortcut_style = if selected {
+            self.theme.tab_selected_style()
+        } else {
+            self.theme.muted_style()
+        };
+        let count_style = self.theme.muted_style();
+
+        vec![
+            Span::styled(format!("[{}] ", view.shortcut()), shortcut_style),
+            Span::styled(view.label().to_string(), label_style),
+            Span::styled(format!(" ({count})"), count_style),
+        ]
     }
 
     fn register_view_tab_hits(&mut self, area: Rect) {
         if area.width == 0 || area.height == 0 {
             return;
         }
-        let mut x = area.x;
+        let counts = self.view_counts();
+        let tab_widths = TuiView::ALL
+            .into_iter()
+            .enumerate()
+            .map(|(index, view)| view_tab_text_width(view, counts[index]))
+            .collect::<Vec<_>>();
+        let content_width: u16 = tab_widths.iter().sum();
+        let gaps = TuiView::ALL.len().saturating_sub(1) as u16;
+        let gap_width = if gaps == 0 {
+            0
+        } else {
+            ((area.width.saturating_sub(content_width)) / gaps).clamp(3, 8)
+        };
+        let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
+        let mut x = area
+            .x
+            .saturating_add(area.width.saturating_sub(total_width) / 2);
         let right = area.x.saturating_add(area.width);
         let y = area.y;
-        for view in TuiView::ALL {
-            let count = match view {
-                TuiView::Board => self.docs.len(),
-                TuiView::Logs => self.logs.len(),
-                TuiView::Rules => self.rules_total(),
-                TuiView::Decisions => self.decision_docs().len(),
-            };
-            let width =
-                (format!("{} {count}", view.tab_label()).chars().count() as u16).saturating_add(2);
+        for (index, view) in TuiView::ALL.into_iter().enumerate() {
+            if index > 0 {
+                x = x.saturating_add(gap_width);
+            }
+            let width = tab_widths[index];
             if x >= right {
                 break;
             }
@@ -1944,7 +1992,7 @@ impl TuiApp {
         } else {
             filtered
                 .iter()
-                .map(|doc| logs::list_item_for_log(doc, &self.theme))
+                .map(|doc| logs::list_item_for_log(doc, &self.theme, area.width.saturating_sub(4)))
                 .collect::<Vec<_>>()
         };
 
@@ -4140,6 +4188,12 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
+fn view_tab_text_width(view: TuiView, count: usize) -> u16 {
+    format!("[{}] {} ({count})", view.shortcut(), view.label())
+        .chars()
+        .count() as u16
+}
+
 fn header_inner_row(area: Rect, row: u16) -> Rect {
     Rect {
         x: area.x.saturating_add(1),
@@ -4564,6 +4618,17 @@ mod tests {
         assert_eq!(TuiView::from_digit('3'), Some(TuiView::Rules));
         assert_eq!(TuiView::from_digit('4'), Some(TuiView::Decisions));
         assert_eq!(TuiView::from_digit('5'), None);
+    }
+
+    #[test]
+    fn top_header_tabs_separate_shortcuts_labels_and_counts() {
+        let app = keyboard_test_app();
+        let line = line_text(&app.view_tab_line(96));
+        assert!(line.contains("[1] Board (3)"));
+        assert!(line.contains("[2] Logs (0)"));
+        assert!(line.contains("[3] Rules (0)"));
+        assert!(line.contains("[4] Decisions (1)"));
+        assert!(!line.contains("1 Board 2"));
     }
 
     #[test]
