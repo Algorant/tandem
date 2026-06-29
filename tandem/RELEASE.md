@@ -1,6 +1,6 @@
 # Tandem CLI/TUI release notes
 
-## v0.2.0 (recommended tag: `tandem-v0.2.0`)
+## v0.2.1 (recommended tag: `tandem-v0.2.1`)
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
@@ -43,7 +43,7 @@ This release is intended to support global `pi-tandem` testing against a tagged 
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.0 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.1 --path tandem --locked
 tandem --version
 ```
 
@@ -84,7 +84,7 @@ git diff --check
 ### Release commands
 
 ```text
-git tag -a tandem-v0.2.0 -m "Release tandem v0.2.0"
+git tag -a tandem-v0.2.1 -m "Release tandem v0.2.0"
 git push origin main
-git push origin tandem-v0.2.0
+git push origin tandem-v0.2.1
 ```
