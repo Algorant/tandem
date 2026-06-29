@@ -207,28 +207,40 @@ pub(super) fn list_item_for_log(
 
 fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
     let completed = completed_at_compact(doc.field("completedAt").unwrap_or("-"));
-    let title = if doc.title().trim().is_empty() {
-        completion_summary(doc).unwrap_or("-")
-    } else {
-        doc.title()
-    };
-    let suffix = format!("  {completed}");
-    let fixed_width = doc.id().chars().count() + 2 + suffix.chars().count();
-    let title_width = (available_width as usize)
-        .saturating_sub(fixed_width)
-        .max(12);
+    let cue = short_log_cue(doc);
+    let fixed_width = doc.id().chars().count() + 2 + completed.chars().count();
+    let remaining = (available_width as usize).saturating_sub(fixed_width);
+    let cue_width = remaining.saturating_sub(3).min(14);
 
-    Line::from(vec![
+    let mut spans = vec![
         Span::styled(
             format!("{}  ", doc.id()),
             theme.status_style(StatusTone::Accent),
         ),
-        Span::styled(
-            truncate_for_log(title, title_width),
+        Span::styled(completed, theme.muted_style()),
+    ];
+
+    if cue_width >= 6 {
+        spans.push(Span::styled("  ", theme.muted_style()));
+        spans.push(Span::styled(
+            truncate_for_log(&cue, cue_width),
             theme.text_style().add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(suffix, theme.muted_style()),
-    ])
+        ));
+    }
+
+    Line::from(spans)
+}
+
+fn short_log_cue(doc: &Document) -> String {
+    let title = doc.title().trim();
+    if !title.is_empty() {
+        return title.to_string();
+    }
+    let summary = completion_summary(doc).unwrap_or("").trim();
+    if !summary.is_empty() {
+        return summary.to_string();
+    }
+    doc.doc_type().to_string()
 }
 
 pub(super) fn completed_at_compact(value: &str) -> String {
@@ -571,12 +583,29 @@ mod tests {
         );
 
         let row = line_text(&line_for_log(&doc, &theme, 80));
-        assert!(row.starts_with("task-36  Implement Tandem docs site foundation"));
-        assert!(row.contains("06-28 17:34"));
+        assert!(row.starts_with("task-36  06-28 17:34"));
+        assert!(row.contains("Implement"));
+        assert!(!row.contains("Implement Tandem docs site foundation"));
         assert!(!row.contains("2026-06-28T17:34:12Z"));
         assert!(!row.contains("accepted"));
         assert!(!row.contains("docs/index.md"));
         assert!(!row.contains("Long completion summary"));
+        assert!(row.chars().count() <= 80);
+    }
+
+    #[test]
+    fn log_list_item_preserves_timestamp_at_narrow_width() {
+        let theme = TuiTheme::default_dark();
+        let doc = log_doc(
+            "task-36",
+            "Implement Tandem docs site foundation",
+            "Long completion summary belongs in detail",
+            "2026-06-28T17:34:12Z",
+            "Body",
+        );
+
+        let row = line_text(&line_for_log(&doc, &theme, 22));
+        assert_eq!(row, "task-36  06-28 17:34");
     }
 
     #[test]

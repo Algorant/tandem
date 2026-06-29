@@ -457,11 +457,15 @@ impl TuiTheme {
             _ => self.colors.muted,
         };
         if selected {
-            let bg = match normalized(category).as_str() {
-                "always" => self.colors.selected_bg,
-                _ => color,
-            };
-            self.style(self.colors.background, Some(bg), Modifier::BOLD)
+            if normalized(category).as_str() == "always" {
+                self.style(
+                    self.colors.selected_fg,
+                    Some(self.colors.selected_bg),
+                    Modifier::BOLD,
+                )
+            } else {
+                self.style(self.colors.background, Some(color), Modifier::BOLD)
+            }
         } else {
             self.style(color, Some(self.colors.panel), Modifier::empty())
         }
@@ -1002,6 +1006,15 @@ mod tests {
             theme.board_selected_title_style().fg,
             Some(theme.colors.accent)
         );
+    }
+
+    #[test]
+    fn selected_always_rule_category_reads_active_not_disabled() {
+        let theme = TuiTheme::default_dark();
+        let selected = theme.rule_category_style("always", true);
+        assert_eq!(selected.fg, Some(theme.colors.selected_fg));
+        assert_eq!(selected.bg, Some(theme.colors.selected_bg));
+        assert!(selected.add_modifier.contains(Modifier::BOLD));
     }
 
     #[test]
