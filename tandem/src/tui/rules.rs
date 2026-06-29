@@ -279,7 +279,9 @@ impl TuiApp {
     }
 
     pub(super) fn rules_footer_text(&self) -> String {
-        self.with_status("Rules · h/l category · j/k select · n new · e edit · d delete · ? help".to_string())
+        self.with_status(
+            "Rules · h/l category · j/k select · n new · e edit · d delete · ? help".to_string(),
+        )
     }
 
     fn draw_rule_category_tabs(&self, frame: &mut Frame<'_>, area: Rect) {

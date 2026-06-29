@@ -200,6 +200,33 @@ struct QuickAddInput {
     fallback_note: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct BoardFilters {
+    tag: Option<String>,
+    priority: Option<String>,
+}
+
+impl BoardFilters {
+    fn is_active(&self) -> bool {
+        self.tag.is_some() || self.priority.is_some()
+    }
+
+    fn summary(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(tag) = self.tag.as_deref() {
+            parts.push(format!("#{}", tag));
+        }
+        if let Some(priority) = self.priority.as_deref() {
+            parts.push(format!("priority {}", priority));
+        }
+        if parts.is_empty() {
+            "no Board filters".to_string()
+        } else {
+            format!("filter {}", parts.join(" · "))
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 struct ReloadOutcome {
     warning_count: usize,
@@ -272,6 +299,7 @@ struct TuiApp {
     selected_state: usize,
     selected_item: usize,
     selected_review_item: usize,
+    board_filters: BoardFilters,
     selected_log: usize,
     focus: FocusPane,
     show_board_detail: bool,
@@ -310,6 +338,7 @@ impl TuiApp {
             selected_state: 0,
             selected_item: 0,
             selected_review_item: 0,
+            board_filters: BoardFilters::default(),
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -579,6 +608,9 @@ impl TuiApp {
             KeyCode::Char('L') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(1)
             }
+            KeyCode::Char('t') if self.view == TuiView::Board => self.cycle_board_tag_filter(),
+            KeyCode::Char('p') if self.view == TuiView::Board => self.cycle_board_priority_filter(),
+            KeyCode::Char('F') if self.view == TuiView::Board => self.clear_board_filters(),
             KeyCode::Char('H') | KeyCode::Char('L') => {
                 self.status = "Task move is available in Board view; press 1 for Board.".to_string()
             }
@@ -635,7 +667,7 @@ impl TuiApp {
         }
         self.status = match view {
             TuiView::Board => {
-                "Board view active. Use h/l or mouse tabs for state subviews, a to quick-add, and H/L to move tasks.".to_string()
+                "Board view active. Use h/l for states, j/k for rows, t/p for tag/priority filters, F to clear filters.".to_string()
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
@@ -686,6 +718,51 @@ impl TuiApp {
             KeyCode::Home | KeyCode::Char('g') => self.selected_item = 0,
             KeyCode::End | KeyCode::Char('G') => self.last_item(),
             _ => {}
+        }
+    }
+
+    fn cycle_board_tag_filter(&mut self) {
+        let tags = board_filter_tags(&self.docs);
+        if tags.is_empty() {
+            self.status = "No Board tags are available to filter.".to_string();
+            return;
+        }
+        self.board_filters.tag = next_filter_value(self.board_filters.tag.as_deref(), &tags);
+        self.selected_item = 0;
+        self.detail_scroll = 0;
+        self.clamp_selection();
+        self.status = format!(
+            "Board {}. Press t to cycle tags, F to clear.",
+            self.board_filters.summary()
+        );
+    }
+
+    fn cycle_board_priority_filter(&mut self) {
+        let priorities = board_filter_priorities(&self.docs);
+        if priorities.is_empty() {
+            self.status = "No Board priorities are available to filter.".to_string();
+            return;
+        }
+        self.board_filters.priority =
+            next_filter_value(self.board_filters.priority.as_deref(), &priorities);
+        self.selected_item = 0;
+        self.detail_scroll = 0;
+        self.clamp_selection();
+        self.status = format!(
+            "Board {}. Press p to cycle priorities, F to clear.",
+            self.board_filters.summary()
+        );
+    }
+
+    fn clear_board_filters(&mut self) {
+        if self.board_filters.is_active() {
+            self.board_filters = BoardFilters::default();
+            self.selected_item = 0;
+            self.detail_scroll = 0;
+            self.clamp_selection();
+            self.status = "Board filters cleared.".to_string();
+        } else {
+            self.status = "No Board filters are active.".to_string();
         }
     }
 
@@ -1508,6 +1585,7 @@ impl TuiApp {
         self.docs
             .iter()
             .filter(|doc| document_state_label(doc) == state)
+            .filter(|doc| board_filters_match(doc, &self.board_filters))
             .collect()
     }
 
@@ -2047,7 +2125,7 @@ impl TuiApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(1)])
             .split(area);
-        let subviews = board_subview_tabs(&self.states, &self.docs);
+        let subviews = board_subview_tabs(&self.states, &self.docs, &self.board_filters);
         let titles = subviews
             .iter()
             .map(|tab| Line::from(state_tab_title(&tab.state, tab.count)))
@@ -2102,8 +2180,13 @@ impl TuiApp {
         let count = docs.len();
         let content_width = area.width.saturating_sub(4) as usize;
         let items = if docs.is_empty() {
+            let empty_text = if self.board_filters.is_active() {
+                "No items match the active Board filters. Press F to clear filters."
+            } else {
+                "No active items in this state. Press a to quick-add here."
+            };
             vec![ListItem::new(Line::from(Span::styled(
-                "No active items in this state. Press a to quick-add here.",
+                empty_text,
                 self.theme.muted_style(),
             )))]
         } else {
@@ -2123,11 +2206,17 @@ impl TuiApp {
                 .collect::<Vec<_>>()
         };
 
+        let filter_suffix = if self.board_filters.is_active() {
+            format!(" · {} ", self.board_filters.summary())
+        } else {
+            String::new()
+        };
         let title = format!(
-            " {} · {} item{} ",
+            " {} · {} item{}{} ",
             display_state_label(state_name),
             count,
-            if count == 1 { "" } else { "s" }
+            if count == 1 { "" } else { "s" },
+            filter_suffix
         );
         let list = List::new(items)
             .style(self.theme.panel_style())
@@ -2234,14 +2323,21 @@ impl TuiApp {
             FocusPane::Detail => "detail",
         };
         let commands = if self.focus == FocusPane::Detail {
-            "Tab board · j/k scroll · e edit · ? help"
+            "Tab board · j/k scroll · e edit · ? help".to_string()
         } else if self.selected_state_name() == Some("validation") {
-            "Enter detail · A/R/C validate · e edit · ? help"
+            "Enter detail · A/R/C validate · e edit · ? help".to_string()
+        } else if self.board_filters.is_active() {
+            "Enter detail · F clear filter · H/L move · ? help".to_string()
         } else {
-            "Enter detail · a add · H/L move · ? help"
+            "Enter detail · a add · t/p filter · ? help".to_string()
+        };
+        let filter_context = if self.board_filters.is_active() {
+            format!(" · {}", self.board_filters.summary())
+        } else {
+            String::new()
         };
         self.with_status(format!(
-            "{context} · {} · {commands}",
+            "{context} · {}{filter_context} · {commands}",
             self.selected_state_summary()
         ))
     }
@@ -2332,6 +2428,7 @@ impl TuiApp {
             Line::from("e                 Board: open active task in $EDITOR; Rules: edit rule; Logs read-only; Decisions deferred"),
             Line::from("h/l or ←/→        Board: state subviews; Logs/Decisions: list/detail focus; Rules: category"),
             Line::from("H/L               Board: move selected task to previous/next configured state"),
+            Line::from("t / p / F         Board: cycle tag filter, cycle priority filter, clear filters"),
             Line::from("j/k or ↑/↓        Board/Logs/Rules/Decisions: move items, or scroll detail when focused"),
             Line::from("g/G               First/last item in the active list/detail"),
             Line::from("d                 Rules: delete selected rule with confirmation"),
@@ -2952,7 +3049,11 @@ struct BoardSubviewTab {
     count: usize,
 }
 
-fn board_subview_tabs(states: &[String], docs: &[Document]) -> Vec<BoardSubviewTab> {
+fn board_subview_tabs(
+    states: &[String],
+    docs: &[Document],
+    filters: &BoardFilters,
+) -> Vec<BoardSubviewTab> {
     states
         .iter()
         .map(|state| BoardSubviewTab {
@@ -2960,6 +3061,7 @@ fn board_subview_tabs(states: &[String], docs: &[Document]) -> Vec<BoardSubviewT
             count: docs
                 .iter()
                 .filter(|doc| document_state_label(doc) == state.as_str())
+                .filter(|doc| board_filters_match(doc, filters))
                 .count(),
         })
         .collect()
@@ -3011,6 +3113,9 @@ fn board_item_lines_for_doc(
     let mut chips: Vec<(String, Style)> = Vec::new();
     if let Some(priority_chip) = priority_chip(priority) {
         chips.push((priority_chip, theme.priority_chip_style(priority)));
+    }
+    if let Some(kind_chip) = research_or_spike_chip(doc) {
+        chips.push((kind_chip, theme.progress_chip_style(StatusTone::Accent)));
     }
     if let Some(accord) =
         accord_status(doc).filter(|status| board_should_surface_accord_status(status))
@@ -3107,6 +3212,95 @@ fn priority_chip(priority: &str) -> Option<String> {
         }
     };
     Some(chip_text(label))
+}
+
+fn research_or_spike_chip(doc: &Document) -> Option<String> {
+    let tags = document_tags(doc);
+    if tags.iter().any(|tag| tag.eq_ignore_ascii_case("spike")) {
+        Some(chip_text("SPIKE"))
+    } else if tags.iter().any(|tag| tag.eq_ignore_ascii_case("research")) {
+        Some(chip_text("RESEARCH"))
+    } else {
+        None
+    }
+}
+
+fn board_filters_match(doc: &Document, filters: &BoardFilters) -> bool {
+    if let Some(tag) = filters.tag.as_deref() {
+        if !document_tags(doc)
+            .iter()
+            .any(|candidate| candidate.eq_ignore_ascii_case(tag))
+        {
+            return false;
+        }
+    }
+    if let Some(priority) = filters.priority.as_deref() {
+        if normalize_filter_value(doc.field("priority").unwrap_or("")) != priority {
+            return false;
+        }
+    }
+    true
+}
+
+fn board_filter_tags(docs: &[Document]) -> Vec<String> {
+    let mut tags = BTreeSet::new();
+    for doc in docs {
+        for tag in document_tags(doc) {
+            tags.insert(tag);
+        }
+    }
+    tags.into_iter().collect()
+}
+
+fn board_filter_priorities(docs: &[Document]) -> Vec<String> {
+    let mut priorities = docs
+        .iter()
+        .filter_map(|doc| {
+            let priority = normalize_filter_value(doc.field("priority").unwrap_or(""));
+            if priority.is_empty() || priority == "-" || priority == "none" {
+                None
+            } else {
+                Some(priority)
+            }
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    priorities.sort_by_key(|priority| priority_filter_sort_key(priority));
+    priorities
+}
+
+fn next_filter_value(current: Option<&str>, values: &[String]) -> Option<String> {
+    let next_index = current
+        .and_then(|current| values.iter().position(|value| value == current))
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    values.get(next_index).cloned()
+}
+
+fn priority_filter_sort_key(priority: &str) -> (usize, String) {
+    let rank = match priority {
+        "critical" | "urgent" => 0,
+        "high" => 1,
+        "medium" | "med" => 2,
+        "low" => 3,
+        _ => 4,
+    };
+    (rank, priority.to_string())
+}
+
+fn document_tags(doc: &Document) -> Vec<String> {
+    doc.field("tags")
+        .map(|tags| format_inline_list(tags, ""))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|tag| normalize_filter_value(&tag))
+        .filter(|tag| !tag.is_empty())
+        .collect()
+}
+
+fn normalize_filter_value(value: &str) -> String {
+    value.trim().trim_start_matches('#').to_ascii_lowercase()
 }
 
 fn status_chip(status: &str) -> String {
@@ -4022,6 +4216,89 @@ mod tests {
     }
 
     #[test]
+    fn board_row_badges_research_and_spike_from_existing_tags() {
+        let theme = TuiTheme::default_dark();
+        let mut research = doc_with_state("task-24", Some("todo"));
+        research
+            .fields
+            .insert("title".to_string(), "Research docs platform".to_string());
+        research
+            .fields
+            .insert("tags".to_string(), "[\"docs\", \"research\"]".to_string());
+        let research_title =
+            line_text(&board_item_lines_for_doc(&research, &theme, 120, false, false, false)[0]);
+        assert!(research_title.contains(" RESEARCH  Research docs platform"));
+
+        let mut spike = doc_with_state("task-25", Some("todo"));
+        spike
+            .fields
+            .insert("title".to_string(), "Spike rendering approach".to_string());
+        spike
+            .fields
+            .insert("tags".to_string(), "[\"tui\", \"spike\"]".to_string());
+        let spike_title =
+            line_text(&board_item_lines_for_doc(&spike, &theme, 120, false, false, false)[0]);
+        assert!(spike_title.contains(" SPIKE  Spike rendering approach"));
+    }
+
+    #[test]
+    fn board_filters_match_existing_tags_and_priorities() {
+        let mut research = doc_with_state("task-24", Some("todo"));
+        research
+            .fields
+            .insert("tags".to_string(), "[\"docs\", \"research\"]".to_string());
+        research
+            .fields
+            .insert("priority".to_string(), "medium".to_string());
+        let mut implementation = doc_with_state("task-52", Some("todo"));
+        implementation
+            .fields
+            .insert("tags".to_string(), "[\"tui\", \"board\"]".to_string());
+        implementation
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+
+        let docs = vec![research, implementation];
+        let filters = BoardFilters {
+            tag: Some("tui".to_string()),
+            priority: Some("high".to_string()),
+        };
+        let tabs = board_subview_tabs(&["todo".to_string()], &docs, &filters);
+        assert_eq!(tabs[0].count, 1);
+        assert!(board_filters_match(&docs[1], &filters));
+        assert!(!board_filters_match(&docs[0], &filters));
+    }
+
+    #[test]
+    fn board_filter_key_cycles_and_clears_filters() {
+        let mut app = keyboard_test_app();
+        app.docs[0]
+            .fields
+            .insert("tags".to_string(), "[\"research\"]".to_string());
+        app.docs[0]
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+        app.docs[1]
+            .fields
+            .insert("tags".to_string(), "[\"spike\"]".to_string());
+        app.docs[1]
+            .fields
+            .insert("priority".to_string(), "low".to_string());
+
+        app.handle_key(key(KeyCode::Char('t'))).unwrap();
+        assert_eq!(app.board_filters.tag.as_deref(), Some("research"));
+        assert_eq!(app.selected_state_count(), 1);
+
+        app.handle_key(key(KeyCode::Char('p'))).unwrap();
+        assert_eq!(app.board_filters.priority.as_deref(), Some("high"));
+        assert_eq!(app.selected_state_count(), 1);
+
+        app.handle_key(key(KeyCode::Char('F'))).unwrap();
+        assert_eq!(app.board_filters, BoardFilters::default());
+        assert!(app.status.contains("cleared"));
+    }
+
+    #[test]
     fn board_row_expansion_adds_at_a_glance_preview_without_metadata_dump() {
         let theme = TuiTheme::default_dark();
         let mut doc = doc_with_state("task-33", Some("todo"));
@@ -4241,6 +4518,7 @@ mod tests {
             selected_state: 0,
             selected_item: 0,
             selected_review_item: 0,
+            board_filters: BoardFilters::default(),
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -4293,7 +4571,7 @@ mod tests {
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 item · Enter detail · a add · H/L move · ? help"
+            "board · TODO · 1 item · Enter detail · a add · t/p filter · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -4315,7 +4593,7 @@ mod tests {
         app.status.clear();
         assert_eq!(
             app.rules_footer_text(),
-            "Rules · h/l category · a add · e/d edit/delete · ? help"
+            "Rules · h/l category · j/k select · n new · e edit · d delete · ? help"
         );
     }
 
@@ -4757,7 +5035,7 @@ mod tests {
             "in-progress".to_string(),
             "review".to_string(),
         ];
-        let tabs = board_subview_tabs(&states, &docs);
+        let tabs = board_subview_tabs(&states, &docs, &BoardFilters::default());
         assert_eq!(
             tabs,
             vec![
