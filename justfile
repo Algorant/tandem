@@ -6,27 +6,6 @@ set positional-arguments
 dev:
 	cargo run --manifest-path tandem/Cargo.toml -- tui
 
-# Validate the release candidate from this checkout.
-release-check:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	cd tandem
-	cargo fmt --check
-	cargo test
-	cargo build --release
-	cargo run -- --version
-	cargo run -- version
-	cd ../site
-	npm ci
-	npm run build
-	npm audit --audit-level=high
-	cd ..
-	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
-	git diff --check
-
 # Bump tandem to VERSION, validate, commit, tag, push main + tag, and create the GitHub Release.
 # Usage: just release 0.2.1
 release VERSION:
@@ -72,7 +51,22 @@ release VERSION:
 	text = re.sub(r'tandem-v[0-9]+\.[0-9]+\.[0-9]+', f'tandem-v{version}', text)
 	release.write_text(text)
 	PY
-	just release-check
+	cd tandem
+	cargo fmt --check
+	cargo test
+	cargo build --release
+	cargo run -- --version
+	cargo run -- version
+	cd ../site
+	npm ci
+	npm run build
+	npm audit --audit-level=high
+	cd ..
+	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
+	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
+	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
+	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
+	git diff --check
 	git add tandem/Cargo.toml tandem/Cargo.lock tandem/RELEASE.md
 	git commit -m "Release tandem v${version}"
 	git tag -a "$tag" -m "Release tandem v${version}"
