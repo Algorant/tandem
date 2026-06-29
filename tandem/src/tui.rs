@@ -1472,17 +1472,17 @@ impl TuiApp {
             .unwrap_or(0)
     }
 
-    fn selected_state_progress(&self) -> String {
+    fn selected_state_summary(&self) -> String {
         let Some(state) = self.states.get(self.selected_state) else {
-            return "NO STATE 0/0".to_string();
+            return "No state · 0 items".to_string();
         };
         let count = self.selected_state_count();
-        let position = if count == 0 {
-            0
-        } else {
-            self.selected_item.min(count - 1) + 1
-        };
-        format!("{} {position}/{count}", display_state_label(state))
+        format!(
+            "{} · {} item{}",
+            display_state_label(state),
+            count,
+            if count == 1 { "" } else { "s" }
+        )
     }
 
     fn selected_state_name(&self) -> Option<&str> {
@@ -2106,10 +2106,8 @@ impl TuiApp {
         };
 
         let title = format!(
-            " {} · selected state {}/{} · {} item{} ",
+            " {} · {} item{} ",
             display_state_label(state_name),
-            state_index + 1,
-            self.states.len(),
             count,
             if count == 1 { "" } else { "s" }
         );
@@ -2204,6 +2202,46 @@ impl TuiApp {
         frame.render_widget(detail, area);
     }
 
+    fn with_status(&self, base: String) -> String {
+        if self.status.is_empty() {
+            base
+        } else {
+            format!("{base} · {}", self.status)
+        }
+    }
+
+    fn board_footer_text(&self) -> String {
+        let context = match self.focus {
+            FocusPane::Board => "board",
+            FocusPane::Detail => "detail",
+        };
+        let commands = if self.focus == FocusPane::Detail {
+            "Tab board · j/k scroll · e edit · ? help"
+        } else if self.selected_state_name() == Some("validation") {
+            "Enter detail · A/R/C validate · e edit · ? help"
+        } else {
+            "Enter detail · a add · H/L move · ? help"
+        };
+        self.with_status(format!(
+            "{context} · {} · {commands}",
+            self.selected_state_summary()
+        ))
+    }
+
+    fn logs_footer_text(&self) -> String {
+        if !self.log_search_filter.is_empty() {
+            return self.with_status(format!(
+                "Logs filter `{}` · Esc clear · / search · ? help",
+                self.log_search_filter
+            ));
+        }
+        let (context, commands) = match self.focus {
+            FocusPane::Board => ("list", "Enter detail · / search · ? help"),
+            FocusPane::Detail => ("detail", "Enter list · j/k scroll · ? help"),
+        };
+        self.with_status(format!("Logs {context} · {commands}"))
+    }
+
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         let (hints, style) = if let Some(input) = self.quick_add.as_ref() {
             (
@@ -2220,39 +2258,16 @@ impl TuiApp {
         } else if let Some(status) = self.decision_prompt_status() {
             (status, self.theme.status_style(StatusTone::Warning))
         } else if self.view == TuiView::Board {
-            let focus = match self.focus {
-                FocusPane::Board => "board",
-                FocusPane::Detail => "detail",
-            };
-            let validation_hint = if self.selected_state_name() == Some("validation") {
-                " · Validation: e open, A approve hint, R rework hint, C complete hint"
-            } else {
-                ""
-            };
             (
-                format!(
-                    "{focus} · {} · 1..4 views · Enter expand row · Tab toggle detail · a add · e edit · h/l states · H/L move{validation_hint} · j/k select/scroll · ? help · {}",
-                    self.selected_state_progress(),
-                    self.status
-                ),
-                self.theme.status_style(status_tone_for_message(&self.status)),
+                self.board_footer_text(),
+                self.theme
+                    .status_style(status_tone_for_message(&self.status)),
             )
         } else if self.view == TuiView::Logs {
-            let focus = match self.focus {
-                FocusPane::Board => "list",
-                FocusPane::Detail => "detail",
-            };
-            let filter = if self.log_search_filter.is_empty() {
-                String::new()
-            } else {
-                format!("filter `{}` · Esc clear · ", self.log_search_filter)
-            };
             (
-                format!(
-                    "Logs {focus} · {filter}/ search · j/k select/scroll · g/G top/bottom · h/l or Tab list/detail · Enter focus detail/list · e read-only/no editor · r reload · q quit · {}",
-                    self.status
-                ),
-                self.theme.status_style(status_tone_for_message(&self.status)),
+                self.logs_footer_text(),
+                self.theme
+                    .status_style(status_tone_for_message(&self.status)),
             )
         } else if self.view == TuiView::Rules {
             (
@@ -2268,12 +2283,12 @@ impl TuiApp {
             )
         } else {
             (
-                format!(
-                    "{} · 1..4 switch views · local keys stay in view · r reload · q quit · ? help · {}",
-                    self.view.label(),
-                    self.status
-                ),
-                self.theme.status_style(status_tone_for_message(&self.status)),
+                self.with_status(format!(
+                    "{} · r reload · q quit · ? help",
+                    self.view.label()
+                )),
+                self.theme
+                    .status_style(status_tone_for_message(&self.status)),
             )
         };
         let footer = Paragraph::new(Line::from(Span::styled(hints, style)));
@@ -4306,6 +4321,37 @@ mod tests {
         assert_eq!(TuiView::from_digit('3'), Some(TuiView::Rules));
         assert_eq!(TuiView::from_digit('4'), Some(TuiView::Decisions));
         assert_eq!(TuiView::from_digit('5'), None);
+    }
+
+    #[test]
+    fn footer_hints_are_contextual_and_compact() {
+        let mut app = keyboard_test_app();
+        assert_eq!(
+            app.board_footer_text(),
+            "board · TODO · 1 item · Enter detail · a add · H/L move · ? help"
+        );
+        assert!(!app.board_footer_text().contains("1/"));
+        assert!(!app.board_footer_text().contains("1..4"));
+
+        app.focus = FocusPane::Detail;
+        assert_eq!(
+            app.board_footer_text(),
+            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · ? help"
+        );
+
+        app.switch_view(TuiView::Logs);
+        app.status.clear();
+        assert_eq!(
+            app.logs_footer_text(),
+            "Logs list · Enter detail · / search · ? help"
+        );
+
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        assert_eq!(
+            app.rules_footer_text(),
+            "Rules · h/l category · a add · e/d edit/delete · ? help"
+        );
     }
 
     #[test]

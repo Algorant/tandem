@@ -229,14 +229,11 @@ impl TuiApp {
     }
 
     pub(super) fn decisions_footer_text(&self) -> String {
-        let focus = match self.focus {
-            FocusPane::Board => "list",
-            FocusPane::Detail => "body",
+        let (context, commands) = match self.focus {
+            FocusPane::Board => ("list", "Enter body · a add · ? help"),
+            FocusPane::Detail => ("body", "Enter list · j/k scroll · ? help"),
         };
-        format!(
-            "Decisions {focus} · j/k select/scroll · h/l or Tab list/body · PgUp/PgDn body · a add · e editor deferred · 1..5 views · r reload · q quit · ? help · {}",
-            self.status
-        )
+        self.with_status(format!("Decisions {context} · {commands}"))
     }
 
     fn draw_decision_list(&mut self, frame: &mut Frame<'_>, area: Rect) {

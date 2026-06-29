@@ -893,7 +893,7 @@ For terminals >= ~120 columns:
 ┌ Project title ──────────────── health/status/search ┐
 ├ Board | Review | Logs | Rules | Decisions ──────────┤
 │ TO DO 2   IN PROGRESS 1   REVIEW 3                  │
-│ ┌ REVIEW · selected state 3/3 · 3 items ───────────┐ │
+│ ┌ REVIEW · 3 items ────────────────────────────────┐ │
 │ │ [HIGH] Implement review flow [A:delivered] task-8│ │
 │ │ #tui #review · @pi · updated 2026-06-27 · path   │ │
 │ └──────────────────────────────────────────────────┘ │
