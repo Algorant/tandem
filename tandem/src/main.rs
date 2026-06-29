@@ -29,6 +29,7 @@ const REVIEW_STATUSES: &[&str] = &[
     "changes-requested",
     "rejected",
 ];
+const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
@@ -280,7 +281,7 @@ fn print_help() {
     println!("tandem - Tandem CLI");
     println!();
     println!("Usage:");
-    println!("  tandem init --title <title>");
+    println!("  tandem init [--title <title>]");
     println!("  tandem list [--state <state>] [--type <type>] [--json]");
     println!("  tandem show <id> [--json]");
     println!("  tandem add --title <title> [--state <state>] [--description <text>]");
@@ -837,17 +838,17 @@ fn set_single_positional(target: &mut String, value: &str, command: &str) -> Res
 }
 
 fn cmd_init(options: InitOptions) -> Result<(), CliError> {
-    let title = options
-        .title
-        .as_deref()
-        .ok_or_else(|| CliError::usage("init requires --title <title>"))?
-        .trim();
-
-    if title.is_empty() {
-        return Err(CliError::usage("--title must not be empty"));
-    }
-
     let root = env::current_dir()?;
+    let title = match options.title.as_deref() {
+        Some(title) => {
+            let title = title.trim();
+            if title.is_empty() {
+                return Err(CliError::usage("--title must not be empty"));
+            }
+            title.to_string()
+        }
+        None => derive_workspace_title(&root),
+    };
     let tandem_dir = root.join(".tandem");
     let config_path = tandem_dir.join("tandem.md");
 
@@ -869,7 +870,7 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
     let workspace_type = "workspace";
     let config = format!(
         "---\nprotocolVersion: {PROTOCOL_VERSION}\ntype: {workspace_type}\ntitle: {}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: validation\n    title: Validation\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {}\n",
-        yaml_double_quote(title),
+        yaml_double_quote(&title),
         title
     );
     fs::write(&config_path, config)?;
@@ -884,6 +885,14 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
     println!("States: todo, in-progress, validation");
 
     Ok(())
+}
+
+fn derive_workspace_title(root: &Path) -> String {
+    root.file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| DEFAULT_WORKSPACE_TITLE.to_string())
 }
 
 fn cmd_list(options: ListOptions) -> Result<(), CliError> {
@@ -1625,7 +1634,7 @@ fn discover_workspace() -> Result<Workspace, CliError> {
     }
 
     Err(CliError::user(
-        "No Tandem workspace found. Run `tandem init --title <title>` first.",
+        "No Tandem workspace found. Run `tandem init` first.",
     ))
 }
 
@@ -3706,6 +3715,22 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn derives_workspace_title_from_directory_basename() {
+        assert_eq!(
+            derive_workspace_title(Path::new("/tmp/Exact Project.Name")),
+            "Exact Project.Name"
+        );
+        assert_eq!(
+            derive_workspace_title(Path::new("/tmp/  spaced  ")),
+            "  spaced  "
+        );
+        assert_eq!(
+            derive_workspace_title(Path::new("/")),
+            DEFAULT_WORKSPACE_TITLE
+        );
+    }
 
     #[test]
     fn parses_yaml_frontmatter_and_preserves_body() {

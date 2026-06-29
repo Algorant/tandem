@@ -72,7 +72,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Planned minimal-diff write behavior for CLI/TUI mutations, including raw source preservation, atomic writes, concurrent edit detection, timestamp discipline, and separate event appends.
 - [x] Started the Rust implementation inside `tandem/` with a single `tandem` binary package.
 - [x] Implemented the first CLI slice:
-  - `tandem init --title <title>`
+  - `tandem init [--title <title>]`
   - `tandem list [--state <state>] [--type <type>] [--json]`
   - `tandem show <id> [--json]`
   - `tandem tui` stub message

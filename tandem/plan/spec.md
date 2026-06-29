@@ -145,12 +145,12 @@ This section is the implementation-facing CLI reference for v0. Syntax examples 
 - Syntax:
 
 ```text
-tandem init --title <title> [--force]
+tandem init [--title <title>] [--force]
 ```
 
-- Required inputs:
-  - `--title <title>`: workspace title.
+- Required inputs: none.
 - Optional inputs:
+  - `--title <title>`: explicit workspace title override; when omitted, the title is derived from the current directory basename with `Tandem Workspace` as a fallback.
   - `--force`: overwrite existing Tandem workspace files after user intent is explicit.
 - Human output shape: labeled summary of created paths and default states.
 - Exit/error notes:

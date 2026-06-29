@@ -30,7 +30,7 @@ Planning/specification plus implementation mode. A Rust binary package now lives
 From this directory:
 
 ```text
-cargo run -- init --title "Demo"
+cargo run -- init
 cargo run -- add --title "Implement next CLI slice"
 cargo run -- list
 cargo run -- move task-1 --state in-progress
