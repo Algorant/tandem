@@ -2105,19 +2105,46 @@ impl TuiApp {
     }
 
     fn draw_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let content_area = if self.board_filters.is_active() && area.height >= 7 {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Length(3), Constraint::Min(4)])
+                .split(area);
+            self.draw_board_filter_bar(frame, chunks[0]);
+            chunks[1]
+        } else {
+            area
+        };
+
         if self.show_board_detail {
-            let detail_height = (area.height / 3)
+            let detail_height = (content_area.height / 3)
                 .clamp(5, 12)
-                .min(area.height.saturating_sub(4));
+                .min(content_area.height.saturating_sub(4));
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(4), Constraint::Length(detail_height)])
-                .split(area);
+                .split(content_area);
             self.draw_state_tabs(frame, chunks[0]);
             self.draw_detail(frame, chunks[1]);
         } else {
-            self.draw_state_tabs(frame, area);
+            self.draw_state_tabs(frame, content_area);
         }
+    }
+
+    fn draw_board_filter_bar(&self, frame: &mut Frame<'_>, area: Rect) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+        let filter_bar = Paragraph::new(board_filter_bar_line(&self.board_filters, &self.theme))
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" Active Board filters ")
+                    .border_style(self.theme.status_style(StatusTone::Warning))
+                    .style(self.theme.panel_style()),
+            );
+        frame.render_widget(filter_bar, area);
     }
 
     fn draw_state_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -2206,17 +2233,11 @@ impl TuiApp {
                 .collect::<Vec<_>>()
         };
 
-        let filter_suffix = if self.board_filters.is_active() {
-            format!(" · {} ", self.board_filters.summary())
-        } else {
-            String::new()
-        };
         let title = format!(
-            " {} · {} item{}{} ",
+            " {} · {} item{} ",
             display_state_label(state_name),
             count,
-            if count == 1 { "" } else { "s" },
-            filter_suffix
+            if count == 1 { "" } else { "s" }
         );
         let list = List::new(items)
             .style(self.theme.panel_style())
@@ -2331,13 +2352,8 @@ impl TuiApp {
         } else {
             "Enter detail · a add · t/p filter · ? help".to_string()
         };
-        let filter_context = if self.board_filters.is_active() {
-            format!(" · {}", self.board_filters.summary())
-        } else {
-            String::new()
-        };
         self.with_status(format!(
-            "{context} · {}{filter_context} · {commands}",
+            "{context} · {} · {commands}",
             self.selected_state_summary()
         ))
     }
@@ -3223,6 +3239,38 @@ fn research_or_spike_chip(doc: &Document) -> Option<String> {
     } else {
         None
     }
+}
+
+fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) -> Line<'static> {
+    let mut spans = vec![
+        Span::styled(
+            " FILTERS ",
+            theme
+                .status_style(StatusTone::Warning)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::raw(" "),
+    ];
+
+    if let Some(tag) = filters.tag.as_deref() {
+        spans.push(Span::styled(
+            format!(" #{} ", tag),
+            theme
+                .status_style(StatusTone::Accent)
+                .add_modifier(Modifier::BOLD),
+        ));
+        spans.push(Span::raw(" "));
+    }
+    if let Some(priority) = filters.priority.as_deref() {
+        spans.push(Span::styled(" priority ", theme.muted_style()));
+        spans.push(Span::styled(
+            format!(" {} ", priority),
+            theme.priority_chip_style(priority),
+        ));
+        spans.push(Span::raw(" "));
+    }
+    spans.push(Span::styled(" t/p cycle · F clear ", theme.muted_style()));
+    Line::from(spans)
 }
 
 fn board_filters_match(doc: &Document, filters: &BoardFilters) -> bool {
@@ -4163,6 +4211,8 @@ mod tests {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use ratatui::backend::TestBackend;
+
     use super::*;
 
     fn doc_with_state(id: &str, state: Option<&str>) -> Document {
@@ -4296,6 +4346,42 @@ mod tests {
         app.handle_key(key(KeyCode::Char('F'))).unwrap();
         assert_eq!(app.board_filters, BoardFilters::default());
         assert!(app.status.contains("cleared"));
+    }
+
+    #[test]
+    fn active_board_filters_render_as_prominent_bar_not_footer_criteria() {
+        let mut app = keyboard_test_app();
+        app.docs[0]
+            .fields
+            .insert("tags".to_string(), "[\"research\"]".to_string());
+        app.docs[0]
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+        app.board_filters = BoardFilters {
+            tag: Some("research".to_string()),
+            priority: Some("high".to_string()),
+        };
+
+        let footer = app.board_footer_text();
+        assert!(footer.contains("F clear filter"));
+        assert!(!footer.contains("#research"));
+        assert!(!footer.contains("priority high"));
+
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+
+        assert!(rendered.contains("Active Board filters"));
+        assert!(rendered.contains("#research"));
+        assert!(rendered.contains("priority"));
+        assert!(rendered.contains("high"));
+        assert!(rendered.contains("F clear"));
     }
 
     #[test]
