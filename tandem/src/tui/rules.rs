@@ -8,14 +8,22 @@ use ratatui::{
 };
 
 use super::theme::{StatusTone, TuiTheme};
-use super::{centered_rect, detail_field_line, push_optional_detail_line, TuiApp};
+use super::{centered_rect, detail_field_line, TuiApp};
 use crate::{
-    append_event, display_path, document_exists, ensure_file_unchanged, parse_rules_from_content,
+    append_event, document_exists, ensure_file_unchanged, parse_rules_from_content,
     patch_rules_category_content, read_file_snapshot, validate_rule_category, write_atomic,
     CliError, RuleItem, RulesByCategory, Workspace,
 };
 
 const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
+
+fn title_case(value: &str) -> String {
+    let mut chars = value.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
+}
 
 #[derive(Debug, Default)]
 pub(super) struct RulesState {
@@ -182,21 +190,28 @@ impl TuiApp {
             KeyCode::Down | KeyCode::Char('j') => self.next_rule_selection(),
             KeyCode::Home | KeyCode::Char('g') => self.first_rule_selection(),
             KeyCode::End | KeyCode::Char('G') => self.last_rule_selection(),
-            KeyCode::Char('a') => self.start_rule_add_prompt(),
+            KeyCode::Char('n') | KeyCode::Char('a') => self.start_rule_add_prompt(),
             KeyCode::Char('e') => self.start_rule_edit_prompt(),
             KeyCode::Char('d') => self.start_rule_delete_prompt(),
             KeyCode::Enter => {
                 self.status = self
                     .selected_rule()
                     .map(|(category, rule)| {
+                        let source = rule
+                            .source
+                            .as_deref()
+                            .filter(|source| !source.trim().is_empty())
+                            .map(|source| format!(" · source {source}"))
+                            .unwrap_or_default();
                         format!(
-                            "Selected {category} #{}; press e to edit or d to delete.",
-                            rule.id
+                            "{category} #{}: {}{source}",
+                            rule.id,
+                            crate::truncate(&rule.rule, 140)
                         )
                     })
                     .unwrap_or_else(|| {
                         format!(
-                            "{} has no selected rule; press a to add one.",
+                            "No {} rules defined. Press n to add one.",
                             self.selected_rule_category()
                         )
                     });
@@ -215,19 +230,12 @@ impl TuiApp {
 
     pub(super) fn draw_rules_view(&mut self, frame: &mut Frame<'_>, area: Rect) {
         self.rules_view.clamp(&self.rules);
-        let chunks = if area.width >= 92 {
-            Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(46), Constraint::Percentage(54)])
-                .split(area)
-        } else {
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-                .split(area)
-        };
-        self.draw_rules_list(frame, chunks[0]);
-        self.draw_rule_detail(frame, chunks[1]);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(3)])
+            .split(area);
+        self.draw_rule_category_tabs(frame, chunks[0]);
+        self.draw_rules_list(frame, chunks[1]);
     }
 
     pub(super) fn draw_rules_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -272,9 +280,32 @@ impl TuiApp {
 
     pub(super) fn rules_footer_text(&self) -> String {
         format!(
-            "Rules · j/k select · h/l category · Tab no focus fallback · a add · e edit · d delete · 1..5 views · r reload · q quit · ? help · {}",
+            "Rules · h/l category · j/k select · Enter detail · n new · e edit · d delete · 1..4 views · r reload · q quit · ? help · {}",
             self.status
         )
+    }
+
+    fn draw_rule_category_tabs(&self, frame: &mut Frame<'_>, area: Rect) {
+        let mut spans = Vec::new();
+        for (index, category) in RULE_CATEGORIES.iter().enumerate() {
+            if index > 0 {
+                spans.push(Span::raw("  "));
+            }
+            let count = self.rules.get(*category).map(Vec::len).unwrap_or(0);
+            let style = if index == self.rules_view.selected_category {
+                self.theme.tab_selected_style()
+            } else {
+                self.theme.tab_style()
+            };
+            spans.push(Span::styled(
+                format!("{} {count}", title_case(category)),
+                style,
+            ));
+        }
+        frame.render_widget(
+            Paragraph::new(Line::from(spans)).style(self.theme.panel_style()),
+            area,
+        );
     }
 
     fn draw_rules_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -292,8 +323,8 @@ impl TuiApp {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(format!(
-                        " Rules grouped by category · {} selected ",
-                        self.selected_rule_category()
+                        " {} rules ",
+                        title_case(self.selected_rule_category())
                     ))
                     .border_style(self.theme.border_style(true))
                     .style(self.theme.panel_style()),
@@ -301,59 +332,6 @@ impl TuiApp {
             .highlight_style(self.theme.selected_style())
             .highlight_symbol("▸ ");
         frame.render_stateful_widget(list, area, &mut state);
-    }
-
-    fn draw_rule_detail(&self, frame: &mut Frame<'_>, area: Rect) {
-        let mut lines = Vec::new();
-        if let Some((category, rule)) = self.selected_rule() {
-            lines.push(detail_field_line("Category", category, &self.theme));
-            lines.push(detail_field_line("ID", &rule.id.to_string(), &self.theme));
-            lines.push(Line::from(vec![
-                Span::styled("Rule: ", self.theme.label_style()),
-                Span::styled(rule.rule.clone(), self.theme.text_style()),
-            ]));
-            push_optional_detail_line(&mut lines, "Source", rule.source.as_deref(), &self.theme);
-            lines.push(detail_field_line(
-                "Config",
-                &display_path(&self.workspace.config_path),
-                &self.theme,
-            ));
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Actions: a add · e edit selected · d delete selected",
-                self.theme.status_style(StatusTone::Accent),
-            )));
-        } else {
-            lines.push(Line::from(Span::styled(
-                format!("{} rules", self.selected_rule_category()),
-                self.theme.title_style(),
-            )));
-            lines.push(Line::from(Span::styled(
-                "No rules in this category.",
-                self.theme.muted_style(),
-            )));
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Press a to add a rule to the selected category.",
-                self.theme.status_style(StatusTone::Accent),
-            )));
-            lines.push(detail_field_line(
-                "Config",
-                &display_path(&self.workspace.config_path),
-                &self.theme,
-            ));
-        }
-        let detail = Paragraph::new(lines)
-            .style(self.theme.panel_style())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Rule detail ")
-                    .border_style(self.theme.border_style(false))
-                    .style(self.theme.panel_style()),
-            )
-            .wrap(Wrap { trim: false });
-        frame.render_widget(detail, area);
     }
 
     fn selected_rule_category(&self) -> &'static str {
@@ -417,13 +395,11 @@ impl TuiApp {
     }
 
     fn rule_positions(&self) -> Vec<(usize, usize)> {
-        RULE_CATEGORIES
-            .iter()
-            .enumerate()
-            .flat_map(|(category_index, category)| {
-                let count = self.rules.get(*category).map(Vec::len).unwrap_or(0);
-                (0..count).map(move |item_index| (category_index, item_index))
-            })
+        let category_index = self.rules_view.selected_category;
+        let category = RULE_CATEGORIES[category_index.min(RULE_CATEGORIES.len().saturating_sub(1))];
+        let count = self.rules.get(category).map(Vec::len).unwrap_or(0);
+        (0..count)
+            .map(|item_index| (category_index, item_index))
             .collect()
     }
 
@@ -435,62 +411,42 @@ impl TuiApp {
 
     fn rule_display_rows(&self) -> Vec<RuleDisplayRow> {
         let mut rows = Vec::new();
-        for (category_index, category) in RULE_CATEGORIES.iter().enumerate() {
-            let items = self.rules.get(*category).map(Vec::as_slice).unwrap_or(&[]);
+        let category_index = self.rules_view.selected_category;
+        let category = self.selected_rule_category();
+        let items = self.rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
+        if items.is_empty() {
             rows.push(RuleDisplayRow {
                 category_index,
                 item_index: None,
+                empty_marker: true,
+                line: Line::from(Span::styled(
+                    format!("No {category} rules defined. Press n to add one."),
+                    self.theme.muted_style(),
+                )),
+            });
+            return rows;
+        }
+
+        for (item_index, item) in items.iter().enumerate() {
+            let source = item
+                .source
+                .as_ref()
+                .filter(|source| !source.trim().is_empty())
+                .map(|source| format!("  · {source}"))
+                .unwrap_or_default();
+            rows.push(RuleDisplayRow {
+                category_index,
+                item_index: Some(item_index),
                 empty_marker: false,
                 line: Line::from(vec![
                     Span::styled(
-                        format!("{category} "),
-                        self.theme.title_style().add_modifier(
-                            if category_index == self.rules_view.selected_category {
-                                Modifier::UNDERLINED
-                            } else {
-                                Modifier::empty()
-                            },
-                        ),
+                        format!("#{}  ", item.id),
+                        self.theme.status_style(StatusTone::Accent),
                     ),
-                    Span::styled(
-                        format!(
-                            "({} rule{})",
-                            items.len(),
-                            if items.len() == 1 { "" } else { "s" }
-                        ),
-                        self.theme.muted_style(),
-                    ),
+                    Span::styled(crate::truncate(&item.rule, 96), self.theme.text_style()),
+                    Span::styled(source, self.theme.muted_style()),
                 ]),
             });
-            if items.is_empty() {
-                rows.push(RuleDisplayRow {
-                    category_index,
-                    item_index: None,
-                    empty_marker: true,
-                    line: Line::from(Span::styled("  (none)", self.theme.muted_style())),
-                });
-            } else {
-                for (item_index, item) in items.iter().enumerate() {
-                    let source = item
-                        .source
-                        .as_ref()
-                        .map(|source| format!(" · source {source}"))
-                        .unwrap_or_default();
-                    rows.push(RuleDisplayRow {
-                        category_index,
-                        item_index: Some(item_index),
-                        empty_marker: false,
-                        line: Line::from(vec![
-                            Span::styled(
-                                format!("  #{} ", item.id),
-                                self.theme.status_style(StatusTone::Accent),
-                            ),
-                            Span::styled(crate::truncate(&item.rule, 72), self.theme.text_style()),
-                            Span::styled(source, self.theme.muted_style()),
-                        ]),
-                    });
-                }
-            }
         }
         rows
     }
