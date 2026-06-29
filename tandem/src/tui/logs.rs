@@ -200,44 +200,39 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
 }
 
 pub(super) fn list_item_for_log(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
-    let completed = doc.field("completedAt").unwrap_or("-");
-    let summary = completion_summary(doc).unwrap_or("-");
-    let validation = completion_validation(doc).unwrap_or("-");
-    let accord = accord_status(doc).unwrap_or("-");
-    let files = completion_files_changed(doc);
-    ListItem::new(vec![
-        Line::from(vec![
-            Span::styled(
-                truncate_for_log(completed, 20),
-                theme.status_style(StatusTone::Accent),
-            ),
-            Span::raw(" "),
-            Span::styled(
-                truncate_for_log(doc.title(), 64),
-                theme.text_style().add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled(
-                format!("{} ", doc.id()),
-                theme.status_style(StatusTone::Accent),
-            ),
-            Span::styled(format!("A:{accord} "), theme.accord_style(accord)),
-            Span::styled(
-                format!("V:{} ", truncate_for_log(validation, 22)),
-                theme.muted_style(),
-            ),
-            Span::styled(
-                format!(
-                    "{} file{} · ",
-                    files.len(),
-                    if files.len() == 1 { "" } else { "s" }
-                ),
-                theme.muted_style(),
-            ),
-            Span::styled(truncate_for_log(summary, 72), theme.muted_style()),
-        ]),
+    ListItem::new(line_for_log(doc, theme))
+}
+
+fn line_for_log(doc: &Document, theme: &TuiTheme) -> Line<'static> {
+    let completed = completed_at_compact(doc.field("completedAt").unwrap_or("-"));
+    let title = if doc.title().trim().is_empty() {
+        completion_summary(doc).unwrap_or("-")
+    } else {
+        doc.title()
+    };
+    Line::from(vec![
+        Span::styled(
+            format!("{}  ", doc.id()),
+            theme.status_style(StatusTone::Accent),
+        ),
+        Span::styled(
+            truncate_for_log(title, 72),
+            theme.text_style().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!("  completed {completed}"), theme.muted_style()),
     ])
+}
+
+pub(super) fn completed_at_compact(value: &str) -> String {
+    if value == "-" || value == "unknown" || value.trim().is_empty() {
+        return value.to_string();
+    }
+    if let Some((date, time)) = value.split_once('T') {
+        let hhmm = time.get(0..5).unwrap_or(time).trim_end_matches('Z');
+        let short_date = date.get(5..).unwrap_or(date);
+        return format!("{short_date} {hhmm}");
+    }
+    value.to_string()
 }
 
 pub(super) fn detail_lines_for_log(
@@ -435,6 +430,13 @@ mod tests {
 
     use super::*;
 
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
+    }
+
     fn log_doc(id: &str, title: &str, summary: &str, completed_at: &str, body: &str) -> Document {
         let mut fields = HashMap::new();
         fields.insert("id".to_string(), id.to_string());
@@ -485,6 +487,32 @@ mod tests {
         sort_logs_by_recency(&mut logs);
         assert_eq!(logs[0].id(), "task-2");
         assert_eq!(logs[1].id(), "task-1");
+    }
+
+    #[test]
+    fn log_list_item_keeps_row_minimal_and_moves_metadata_to_detail() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = log_doc(
+            "task-36",
+            "Implement Tandem docs site foundation",
+            "Long completion summary belongs in detail",
+            "2026-06-28T17:34:12Z",
+            "Body",
+        );
+        doc.fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        doc.fields.insert(
+            "completion.filesChanged".to_string(),
+            "[\"docs/index.md\", \"tandem/src/tui.rs\"]".to_string(),
+        );
+
+        let row = line_text(&line_for_log(&doc, &theme));
+        assert!(row.starts_with("task-36  Implement Tandem docs site foundation"));
+        assert!(row.contains("completed 06-28 17:34"));
+        assert!(!row.contains("2026-06-28T17:34:12Z"));
+        assert!(!row.contains("accepted"));
+        assert!(!row.contains("docs/index.md"));
+        assert!(!row.contains("Long completion summary"));
     }
 
     #[test]

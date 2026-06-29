@@ -1620,7 +1620,7 @@ impl TuiApp {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
-                Constraint::Length(5),
+                Constraint::Length(4),
                 Constraint::Min(4),
                 Constraint::Length(1),
             ])
@@ -1683,18 +1683,11 @@ impl TuiApp {
     }
 
     fn draw_header(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let counts = format!(
-            "Board {} · Logs {} · Rules {} · Decisions {}",
-            self.docs.len(),
-            self.logs.len(),
-            self.rules_total(),
-            self.decision_docs().len()
-        );
         let context = match self.view {
             TuiView::Board => self
                 .selected_doc()
-                .map(|doc| format!("selected {}", doc.id()))
-                .unwrap_or_else(|| "no selected item".to_string()),
+                .map(|doc| format!("Selected {}", doc.id()))
+                .unwrap_or_else(|| "No selected item".to_string()),
             TuiView::Logs => {
                 let filter = if self.log_search_filter.is_empty() {
                     String::new()
@@ -1704,28 +1697,20 @@ impl TuiApp {
                 self.selected_log()
                     .map(|doc| {
                         format!(
-                            "selected {} completed {}{}",
+                            "Selected {} · completed {}{}",
                             doc.id(),
-                            doc.field("completedAt").unwrap_or("unknown"),
+                            logs::completed_at_compact(
+                                doc.field("completedAt").unwrap_or("unknown")
+                            ),
                             filter
                         )
                     })
-                    .unwrap_or_else(|| format!("no completed log selected{filter}"))
+                    .unwrap_or_else(|| format!("No completed log selected{filter}"))
             }
             TuiView::Rules => self.rules_context(),
             TuiView::Decisions => self.decisions_context(),
         };
         let header = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled(self.title.clone(), self.theme.title_style()),
-                Span::raw("  "),
-                Span::styled(
-                    format!("{} view", self.view.label()),
-                    self.theme.text_style().add_modifier(Modifier::BOLD),
-                ),
-                Span::raw("  "),
-                Span::styled(counts, self.theme.muted_style()),
-            ]),
             self.view_tab_line(),
             Line::from(Span::styled(context, self.theme.muted_style())),
         ])
@@ -1733,15 +1718,30 @@ impl TuiApp {
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Tandem ")
+                .title(Line::from(vec![
+                    Span::raw(" "),
+                    Span::styled(self.title.clone(), self.theme.title_style()),
+                    Span::raw(" · "),
+                    Span::styled(
+                        self.view.label(),
+                        self.theme.text_style().add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                ]))
                 .border_style(self.theme.border_style(false))
                 .style(self.theme.panel_style()),
         );
         frame.render_widget(header, area);
-        self.register_view_tab_hits(header_inner_row(area, 1));
+        self.register_view_tab_hits(header_inner_row(area, 0));
     }
 
     fn view_tab_line(&self) -> Line<'static> {
+        let counts = [
+            self.docs.len(),
+            self.logs.len(),
+            self.rules_total(),
+            self.decision_docs().len(),
+        ];
         let mut spans = Vec::new();
         for (index, view) in TuiView::ALL.into_iter().enumerate() {
             if index > 0 {
@@ -1752,7 +1752,10 @@ impl TuiApp {
             } else {
                 self.theme.tab_style()
             };
-            spans.push(Span::styled(view.tab_label().to_string(), style));
+            spans.push(Span::styled(
+                format!("{} {}", view.tab_label(), counts[index]),
+                style,
+            ));
         }
         Line::from(spans)
     }
@@ -1765,7 +1768,14 @@ impl TuiApp {
         let right = area.x.saturating_add(area.width);
         let y = area.y;
         for view in TuiView::ALL {
-            let width = (view.tab_label().chars().count() as u16).saturating_add(2);
+            let count = match view {
+                TuiView::Board => self.docs.len(),
+                TuiView::Logs => self.logs.len(),
+                TuiView::Rules => self.rules_total(),
+                TuiView::Decisions => self.decision_docs().len(),
+            };
+            let width =
+                (format!("{} {count}", view.tab_label()).chars().count() as u16).saturating_add(2);
             if x >= right {
                 break;
             }
@@ -1892,7 +1902,7 @@ impl TuiApp {
         let width = area.width.saturating_sub(2);
         let bottom = area.y.saturating_add(area.height).saturating_sub(1);
         for index in 0..count {
-            let y = top.saturating_add((index as u16).saturating_mul(2));
+            let y = top.saturating_add(index as u16);
             if y >= bottom {
                 break;
             }
@@ -1901,7 +1911,7 @@ impl TuiApp {
                     x: left,
                     y,
                     width,
-                    height: 2.min(bottom.saturating_sub(y)),
+                    height: 1,
                 },
                 action: HitAction::SelectLog(index),
             });
