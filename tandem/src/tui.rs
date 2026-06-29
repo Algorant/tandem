@@ -223,18 +223,29 @@ enum ValidationPrompt {
         title: String,
         feedback: String,
     },
+    ApplyAccepted {
+        candidates: Vec<ValidationApplyCandidate>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ValidationApplyCandidate {
+    id: String,
+    title: String,
 }
 
 impl ValidationPrompt {
     fn id(&self) -> &str {
         match self {
             Self::Accept { id, .. } | Self::Rework { id, .. } => id,
+            Self::ApplyAccepted { .. } => "accepted candidates",
         }
     }
 
     fn title(&self) -> &str {
         match self {
             Self::Accept { title, .. } | Self::Rework { title, .. } => title,
+            Self::ApplyAccepted { .. } => "Apply accepted",
         }
     }
 }
@@ -646,7 +657,7 @@ impl TuiApp {
             }
             KeyCode::Char('A') if self.view == TuiView::Board => self.start_validation_accept(),
             KeyCode::Char('R') if self.view == TuiView::Board => self.start_validation_rework(),
-            KeyCode::Char('C') if self.view == TuiView::Board => self.show_validation_complete_hint(),
+            KeyCode::Char('C') if self.view == TuiView::Board => self.start_validation_apply_accepted(),
             KeyCode::Char('H') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(-1)
             }
@@ -1118,26 +1129,61 @@ impl TuiApp {
     }
 
     fn show_validation_complete_hint(&mut self) {
-        self.status = "Completion is intentionally de-emphasized in Validation. Accept sign-off first; archive/logging happens later when the task should leave the Board.".to_string();
+        self.status = "Completion is intentionally de-emphasized in Validation. Accept sign-off first; use C / Apply accepted to archive accepted work explicitly.".to_string();
+    }
+
+    fn start_validation_apply_accepted(&mut self) {
+        let candidates = accepted_validation_candidates(&self.docs);
+        if candidates.is_empty() {
+            self.status = "No accepted Validation tasks are ready to apply/archive.".to_string();
+            return;
+        }
+        self.status = format!(
+            "Apply/archive {} accepted Validation task{}? Enter confirms, Esc cancels.",
+            candidates.len(),
+            plural_suffix(candidates.len())
+        );
+        self.validation_prompt = Some(ValidationPrompt::ApplyAccepted { candidates });
     }
 
     fn handle_validation_prompt_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc | KeyCode::Char('n') => {
+            KeyCode::Esc => {
                 let action = match self.validation_prompt.take() {
                     Some(ValidationPrompt::Accept { .. }) => "Acceptance",
                     Some(ValidationPrompt::Rework { .. }) => "Rework request",
+                    Some(ValidationPrompt::ApplyAccepted { .. }) => "Apply accepted",
                     None => "Validation action",
+                };
+                self.status = format!("{action} canceled.");
+            }
+            KeyCode::Char('n')
+                if matches!(
+                    self.validation_prompt,
+                    Some(ValidationPrompt::Accept { .. } | ValidationPrompt::ApplyAccepted { .. })
+                ) =>
+            {
+                let action = match self.validation_prompt.take() {
+                    Some(ValidationPrompt::Accept { .. }) => "Acceptance",
+                    Some(ValidationPrompt::ApplyAccepted { .. }) => "Apply accepted",
+                    _ => "Validation action",
                 };
                 self.status = format!("{action} canceled.");
             }
             KeyCode::Char('y')
                 if matches!(
                     self.validation_prompt,
-                    Some(ValidationPrompt::Accept { .. })
+                    Some(ValidationPrompt::Accept { .. } | ValidationPrompt::ApplyAccepted { .. })
                 ) =>
             {
-                self.finish_validation_accept();
+                if matches!(
+                    self.validation_prompt,
+                    Some(ValidationPrompt::ApplyAccepted { .. })
+                ) {
+                    self.finish_validation_apply_accepted();
+                } else {
+                    self.finish_validation_accept();
+                }
             }
             KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => {
                 if matches!(
@@ -1145,6 +1191,11 @@ impl TuiApp {
                     Some(ValidationPrompt::Accept { .. })
                 ) {
                     self.finish_validation_accept();
+                } else if matches!(
+                    self.validation_prompt,
+                    Some(ValidationPrompt::ApplyAccepted { .. })
+                ) {
+                    self.finish_validation_apply_accepted();
                 } else {
                     self.finish_validation_rework();
                 }
@@ -1193,6 +1244,11 @@ impl TuiApp {
                     feedback.as_str()
                 }
             ),
+            Some(ValidationPrompt::ApplyAccepted { candidates }) => format!(
+                "Apply/archive {} accepted Validation task{}: Enter confirms, Esc cancels.",
+                candidates.len(),
+                plural_suffix(candidates.len())
+            ),
             None => self.status.clone(),
         };
     }
@@ -1210,6 +1266,29 @@ impl TuiApp {
             Err(error) => {
                 let reload_note = self.reload().warning_note();
                 self.status = format!("Accept error: {}{}", error.message, reload_note);
+            }
+        }
+    }
+
+    fn finish_validation_apply_accepted(&mut self) {
+        let Some(ValidationPrompt::ApplyAccepted { candidates }) = self.validation_prompt.take()
+        else {
+            return;
+        };
+        match apply_accepted_validation_tasks(&self.workspace, &candidates) {
+            Ok(outcome) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!(
+                    "Applied/archived {} accepted Validation task{} to logs: {}{}",
+                    outcome.completed_ids.len(),
+                    plural_suffix(outcome.completed_ids.len()),
+                    outcome.completed_ids.join(", "),
+                    reload_note
+                );
+            }
+            Err(error) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Apply accepted error: {}{}", error.message, reload_note);
             }
         }
     }
@@ -2685,7 +2764,7 @@ impl TuiApp {
         let commands = if self.focus == FocusPane::Detail {
             "Tab board · j/k scroll · e edit · ? help".to_string()
         } else if self.selected_state_name() == Some("validation") {
-            "Enter detail · A accept · R rework · e edit · ? help".to_string()
+            "Enter detail · A accept · R rework · C apply accepted · e edit · ? help".to_string()
         } else if self.board_filters.is_active() {
             "Enter detail · F clear filter · H prev · L next · ? help".to_string()
         } else {
@@ -2815,6 +2894,12 @@ impl TuiApp {
                     "R rework",
                     HitAction::ShowValidationAction("rework"),
                 );
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "C apply accepted",
+                    HitAction::ShowValidationAction("apply"),
+                );
                 self.register_footer_hit(area, text, "e edit", HitAction::OpenEditor);
             }
             TuiView::Logs => {
@@ -2853,6 +2938,7 @@ impl TuiApp {
         match action {
             "accept" | "approve" => self.start_validation_accept(),
             "rework" => self.start_validation_rework(),
+            "apply" | "archive" => self.start_validation_apply_accepted(),
             "complete" => self.show_validation_complete_hint(),
             _ => self.status = format!("Unknown Validation action `{action}`."),
         }
@@ -2924,7 +3010,7 @@ impl TuiApp {
         self.push_help_command(
             &mut lines,
             "C",
-            "de-emphasized; accept first, then archive/log outside review",
+            "open Apply accepted dialog to archive accepted Validation tasks",
         );
 
         self.push_help_section(&mut lines, "Logs");
@@ -3007,6 +3093,7 @@ impl TuiApp {
                     .title(match prompt {
                         ValidationPrompt::Accept { .. } => " Accept sign-off ",
                         ValidationPrompt::Rework { .. } => " Request rework ",
+                        ValidationPrompt::ApplyAccepted { .. } => " Apply accepted ",
                     })
                     .border_style(self.theme.border_style(true))
                     .style(self.theme.panel_style()),
@@ -3612,6 +3699,112 @@ fn apply_validation_rework(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ValidationApplyOutcome {
+    completed_ids: Vec<String>,
+}
+
+fn accepted_validation_candidates(docs: &[Document]) -> Vec<ValidationApplyCandidate> {
+    docs.iter()
+        .filter(|doc| doc.doc_type() == "task")
+        .filter(|doc| document_state_label(doc) == "validation")
+        .filter(|doc| normalized_accord_status(accord_status(doc).unwrap_or("")) == "accepted")
+        .filter(|doc| review_status(doc).unwrap_or("") == "accepted")
+        .map(|doc| ValidationApplyCandidate {
+            id: doc.id().to_string(),
+            title: doc.title().to_string(),
+        })
+        .collect()
+}
+
+fn apply_accepted_validation_tasks(
+    workspace: &Workspace,
+    candidates: &[ValidationApplyCandidate],
+) -> Result<ValidationApplyOutcome, CliError> {
+    if candidates.is_empty() {
+        return Err(CliError::usage("no accepted Validation tasks to apply"));
+    }
+    let mut completed_ids = Vec::new();
+    for candidate in candidates {
+        complete_validation_candidate(workspace, &candidate.id)?;
+        completed_ids.push(candidate.id.clone());
+    }
+    Ok(ValidationApplyOutcome { completed_ids })
+}
+
+fn complete_validation_candidate(workspace: &Workspace, id: &str) -> Result<(), CliError> {
+    let doc = find_board_document(workspace, id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can be applied/logged in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    if document_state_label(&doc) != "validation"
+        || normalized_accord_status(accord_status(&doc).unwrap_or("")) != "accepted"
+        || review_status(&doc).unwrap_or("") != "accepted"
+    {
+        return Err(CliError::user(format!(
+            "{} is not an accepted Validation candidate",
+            doc.id()
+        )));
+    }
+    validate_task_document_for_mutation(workspace, &doc)?;
+    let unresolved = unresolved_blockers(workspace, doc.field("blockers"))?;
+    if !unresolved.is_empty() {
+        return Err(CliError::user(format!(
+            "Validation failed: {} has unresolved blockers: {}",
+            doc.id(),
+            unresolved.join(", ")
+        )));
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let summary = format!("Applied accepted Validation sign-off for {}", doc.id());
+    let mut updates = BTreeMap::new();
+    updates.insert("completedAt".to_string(), now.clone());
+    updates.insert("updatedAt".to_string(), now);
+    let patched = patch_frontmatter_content(
+        &content,
+        &updates,
+        &[
+            "state",
+            "completionSummary",
+            "completionValidation",
+            "completionReviewer",
+            "filesChanged",
+        ],
+    )?;
+    let patched = patch_completion_content(
+        &patched,
+        &summary,
+        &[],
+        Some("Accepted by Validation apply-accepted workflow"),
+        Some("tui"),
+    )?;
+    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
+    if log_path.exists() {
+        return Err(CliError::user(format!(
+            "Validation failed: log document already exists: {}",
+            display_path(&log_path)
+        )));
+    }
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&log_path, &patched)?;
+    fs::remove_file(&doc.path).map_err(|error| {
+        CliError::user(format!(
+            "Write failure: could not remove active document {} after writing log {}: {error}",
+            display_path(&doc.path),
+            display_path(&log_path)
+        ))
+    })?;
+    append_event(workspace, "task.completed", doc.id(), &summary)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ValidationAction {
     Accept { note: Option<String> },
     Rework { feedback: String },
@@ -3810,6 +4003,14 @@ fn state_tab_title(state: &str, count: usize) -> String {
     format!(" {} {} ", display_state_label(state), count)
 }
 
+fn plural_suffix(count: usize) -> &'static str {
+    if count == 1 {
+        ""
+    } else {
+        "s"
+    }
+}
+
 fn display_state_label(state: &str) -> String {
     state
         .trim()
@@ -3860,6 +4061,30 @@ fn validation_prompt_lines(prompt: &ValidationPrompt, theme: &TuiTheme) -> Vec<L
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Enter requests rework and moves the item back to in-progress; Esc cancels without writing.",
+                theme.muted_style(),
+            )));
+        }
+        ValidationPrompt::ApplyAccepted { candidates } => {
+            lines.push(Line::from(Span::styled(
+                "These accepted Validation tasks will be completed and moved to logs:",
+                theme.text_style(),
+            )));
+            for candidate in candidates.iter().take(8) {
+                lines.push(Line::from(vec![
+                    Span::styled("• ", theme.muted_style()),
+                    Span::styled(candidate.id.clone(), theme.label_style()),
+                    Span::styled(format!(" — {}", candidate.title), theme.text_style()),
+                ]));
+            }
+            if candidates.len() > 8 {
+                lines.push(Line::from(Span::styled(
+                    format!("… and {} more", candidates.len() - 8),
+                    theme.muted_style(),
+                )));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Enter/y applies; Esc/n cancels without changing files. Delivered or rework items are excluded.",
                 theme.muted_style(),
             )));
         }
@@ -5406,6 +5631,16 @@ mod tests {
         .unwrap();
     }
 
+    fn write_accepted_validation_task(workspace: &Workspace, id: &str, title: &str) {
+        fs::write(
+            workspace.board_dir.join(format!("{id}.md")),
+            format!(
+                "---\nid: {id}\ntype: task\ntitle: {title}\nstate: validation\naccord:\n  status: accepted\nreview:\n  status: accepted\n---\n\nBody for {id}.\n"
+            ),
+        )
+        .unwrap();
+    }
+
     fn keyboard_test_app() -> TuiApp {
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
@@ -5788,8 +6023,29 @@ mod tests {
 
         app.handle_key(key(KeyCode::Esc)).unwrap();
         app.handle_key(key(KeyCode::Char('C'))).unwrap();
-        assert!(app.status.contains("de-emphasized"));
+        assert!(app.status.contains("No accepted Validation tasks"));
         assert!(!app.status.contains("tandem complete"));
+    }
+
+    #[test]
+    fn rework_prompt_owns_hotkey_characters_as_text_input() {
+        let mut app = keyboard_test_app();
+        app.selected_state = 1;
+        app.docs[1]
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+
+        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        for ch in ['n', 'a', 'e', '/'] {
+            app.handle_key(key(KeyCode::Char(ch))).unwrap();
+        }
+
+        assert_eq!(app.view, TuiView::Board);
+        assert!(app.quick_add.is_none());
+        assert!(matches!(
+            app.validation_prompt,
+            Some(ValidationPrompt::Rework { ref feedback, .. }) if feedback == "nae/"
+        ));
     }
 
     #[test]
@@ -5841,6 +6097,80 @@ mod tests {
         let after = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
         assert_eq!(after, before);
         assert!(app.validation_prompt.is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn apply_accepted_candidates_excludes_delivered_and_rework_items() {
+        let mut accepted = doc_with_state("task-1", Some("validation"));
+        accepted
+            .fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        accepted
+            .fields
+            .insert("review.status".to_string(), "accepted".to_string());
+        let mut delivered = doc_with_state("task-2", Some("validation"));
+        delivered
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        let mut rework = doc_with_state("task-3", Some("in-progress"));
+        rework
+            .fields
+            .insert("accord.status".to_string(), "rework".to_string());
+
+        let candidates = accepted_validation_candidates(&[accepted, delivered, rework]);
+
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, "task-1");
+    }
+
+    #[test]
+    fn apply_accepted_cancel_keeps_task_files_unchanged() {
+        let root = unique_test_dir("tandem-apply-cancel");
+        let workspace = temp_workspace(&root);
+        write_accepted_validation_task(&workspace, "task-1", "Accepted one");
+        let before = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.selected_state = app
+            .states
+            .iter()
+            .position(|state| state == "validation")
+            .unwrap();
+
+        app.handle_key(key(KeyCode::Char('C'))).unwrap();
+        assert!(matches!(
+            app.validation_prompt,
+            Some(ValidationPrompt::ApplyAccepted { .. })
+        ));
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap(),
+            before
+        );
+        assert!(!workspace.logs_dir.join("task-1.md").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn apply_accepted_confirm_completes_only_accepted_candidates_to_logs() {
+        let root = unique_test_dir("tandem-apply-confirm");
+        let workspace = temp_workspace(&root);
+        write_accepted_validation_task(&workspace, "task-1", "Accepted one");
+        write_delivered_validation_task(&workspace, "task-2");
+        let candidates = accepted_validation_candidates(
+            &read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap(),
+        );
+
+        let outcome = apply_accepted_validation_tasks(&workspace, &candidates).unwrap();
+
+        assert_eq!(outcome.completed_ids, vec!["task-1"]);
+        assert!(!workspace.board_dir.join("task-1.md").exists());
+        assert!(workspace.board_dir.join("task-2.md").exists());
+        let log = fs::read_to_string(workspace.logs_dir.join("task-1.md")).unwrap();
+        assert!(log.contains("completedAt:"));
+        assert!(log.contains("Applied accepted Validation sign-off for task-1"));
+        assert!(log.contains("  reviewer: \"tui\""));
         fs::remove_dir_all(root).unwrap();
     }
 
