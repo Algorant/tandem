@@ -199,70 +199,36 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
 
 pub(super) fn list_item_for_log(
     doc: &Document,
-    previous_doc: Option<&Document>,
     theme: &TuiTheme,
     available_width: u16,
 ) -> ListItem<'static> {
-    ListItem::new(line_for_log(doc, previous_doc, theme, available_width))
+    ListItem::new(line_for_log(doc, theme, available_width))
 }
 
-fn line_for_log(
-    doc: &Document,
-    previous_doc: Option<&Document>,
-    theme: &TuiTheme,
-    available_width: u16,
-) -> Line<'static> {
-    let completed_at = doc.field("completedAt").unwrap_or("-");
-    let date = completed_at_date_label(completed_at);
-    let previous_date = previous_doc
-        .and_then(|doc| doc.field("completedAt"))
-        .map(completed_at_date_label);
-    let show_date = previous_date.as_deref() != Some(date.as_str());
-    let date_cell = if show_date { date } else { "     ".to_string() };
-    let time = completed_at_time_label(completed_at);
-    let cue = short_log_cue(doc);
+fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
+    let title = log_row_title(doc);
+    let prefix_width = doc.id().chars().count() + 2;
+    let title_width = (available_width as usize).saturating_sub(prefix_width);
 
-    let fixed_width =
-        date_cell.chars().count() + 2 + doc.id().chars().count() + 1 + time.chars().count();
-    let remaining = (available_width as usize).saturating_sub(fixed_width);
-    let cue_width = remaining.saturating_sub(3).min(10);
-
-    let mut spans = vec![
-        Span::styled(format!("{date_cell}  "), theme.muted_style()),
-        Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
-        Span::styled(" ", theme.muted_style()),
-        Span::styled(time, theme.muted_style()),
-    ];
-
-    if cue_width >= 5 && !cue.is_empty() {
-        spans.push(Span::styled("  ", theme.muted_style()));
-        spans.push(Span::styled(
-            truncate_for_log(&cue, cue_width),
-            theme.text_style(),
-        ));
-    }
-
-    Line::from(spans)
+    Line::from(vec![
+        Span::styled(
+            format!("{}  ", doc.id()),
+            theme.status_style(StatusTone::Accent),
+        ),
+        Span::styled(truncate_for_log(&title, title_width), theme.text_style()),
+    ])
 }
 
-fn short_log_cue(doc: &Document) -> String {
-    let files = completion_files_changed(doc);
-    if files.len() > 1 {
-        return format!("{} files", files.len());
+fn log_row_title(doc: &Document) -> String {
+    let title = doc.title().trim();
+    if !title.is_empty() {
+        return title.to_string();
     }
-    if let Some(file) = files.first() {
-        return Path::new(file)
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or(file)
-            .to_string();
+    let summary = completion_summary(doc).unwrap_or("").trim();
+    if !summary.is_empty() {
+        return summary.to_string();
     }
-    if let Some(value) = doc.field("tags").filter(|value| !value.trim().is_empty()) {
-        if let Some(tag) = parse_field_values(value).into_iter().next() {
-            return format!("#{tag}");
-        }
-    }
-    String::new()
+    doc.doc_type().to_string()
 }
 
 pub(super) fn completed_at_compact(value: &str) -> String {
@@ -539,14 +505,21 @@ fn append_event_lines(lines: &mut Vec<Line<'static>>, events: &[LogEvent], theme
 }
 
 fn truncate_for_log(value: &str, max_chars: usize) -> String {
-    let mut output = String::new();
-    for (index, ch) in value.chars().enumerate() {
-        if index >= max_chars {
-            output.push('…');
-            return output;
-        }
-        output.push(ch);
+    let char_count = value.chars().count();
+    if char_count <= max_chars {
+        return value.to_string();
     }
+    if max_chars == 0 {
+        return String::new();
+    }
+
+    let mut output = value
+        .chars()
+        .take(max_chars.saturating_sub(1))
+        .collect::<String>()
+        .trim_end()
+        .to_string();
+    output.push('…');
     output
 }
 
@@ -617,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn log_list_item_keeps_row_minimal_and_moves_metadata_to_detail() {
+    fn log_list_item_is_task_id_and_title_only() {
         let theme = TuiTheme::default_dark();
         let mut doc = log_doc(
             "task-36",
@@ -633,10 +606,10 @@ mod tests {
             "[\"docs/index.md\", \"tandem/src/tui.rs\"]".to_string(),
         );
 
-        let row = line_text(&line_for_log(&doc, None, &theme, 80));
-        assert!(row.starts_with("06-28  task-36 17:34"));
-        assert!(row.contains("2 files"));
-        assert!(!row.contains("Implement"));
+        let row = line_text(&line_for_log(&doc, &theme, 80));
+        assert_eq!(row, "task-36  Implement Tandem docs site foundation");
+        assert!(!row.contains("17:34"));
+        assert!(!row.contains("06-28"));
         assert!(!row.contains("2026-06-28T17:34:12Z"));
         assert!(!row.contains("accepted"));
         assert!(!row.contains("docs/index.md"));
@@ -645,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn log_list_item_preserves_timestamp_at_narrow_width() {
+    fn log_list_item_uses_available_width_for_title_truncation() {
         let theme = TuiTheme::default_dark();
         let doc = log_doc(
             "task-36",
@@ -655,19 +628,26 @@ mod tests {
             "Body",
         );
 
-        let row = line_text(&line_for_log(&doc, None, &theme, 22));
-        assert_eq!(row, "06-28  task-36 17:34");
+        let row = line_text(&line_for_log(&doc, &theme, 32));
+        assert_eq!(row, "task-36  Implement Tandem docs…");
+        assert!(row.chars().count() <= 32);
+        assert!(row.ends_with('…'));
+        assert!(!row.contains("17:34"));
     }
 
     #[test]
-    fn log_list_item_groups_repeated_dates_with_blank_date_cell() {
+    fn log_list_item_falls_back_to_summary_when_title_is_missing() {
         let theme = TuiTheme::default_dark();
-        let previous = log_doc("task-35", "Previous", "", "2026-06-28T18:34:12Z", "");
-        let doc = log_doc("task-36", "Next", "", "2026-06-28T17:34:12Z", "");
+        let doc = log_doc(
+            "task-36",
+            "",
+            "Completed the useful thing",
+            "2026-06-28T17:34:12Z",
+            "Body",
+        );
 
-        let row = line_text(&line_for_log(&doc, Some(&previous), &theme, 80));
-        assert!(row.starts_with("       task-36 17:34"));
-        assert!(!row.contains("06-28"));
+        let row = line_text(&line_for_log(&doc, &theme, 80));
+        assert_eq!(row, "task-36  Completed the useful thing");
     }
 
     #[test]
