@@ -27,7 +27,7 @@ release-check:
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 	git diff --check
 
-# Bump tandem to VERSION, validate, commit, tag, and push main + tag.
+# Bump tandem to VERSION, validate, commit, tag, push main + tag, and create the GitHub Release.
 # Usage: just release 0.2.1
 release VERSION:
 	#!/usr/bin/env bash
@@ -73,8 +73,9 @@ release VERSION:
 	release.write_text(text)
 	PY
 	just release-check
-	git add tandem/Cargo.toml tandem/RELEASE.md
+	git add tandem/Cargo.toml tandem/Cargo.lock tandem/RELEASE.md
 	git commit -m "Release tandem v${version}"
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main
 	git push origin "$tag"
+	gh release create "$tag" --repo Algorant/tandem --title "Tandem v${version}" --notes-file tandem/RELEASE.md
