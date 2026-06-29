@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
 	buildAccordArgs,
 	buildDecisionArgs,
+	buildInitArgs,
 	buildLogArgs,
 	buildRulesArgs,
 	buildSearchArgs,
@@ -90,6 +91,9 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
 
+const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
+assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");
+
 const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
 assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");
 assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
@@ -100,7 +104,7 @@ await runRepoReadSmoke(tandem);
 const workspace = await mkdtemp(join(tmpdir(), "pi-tandem-smoke-"));
 
 try {
-	await runTandem(tandem, ["init", "--title", "Pi Tandem Smoke"], workspace);
+	await runTandem(tandem, buildInitArgs({ title: "Pi Tandem Smoke" }), workspace);
 
 	const emptyList = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), workspace));
 	assert(emptyList.ok === true, "task list JSON should be ok");

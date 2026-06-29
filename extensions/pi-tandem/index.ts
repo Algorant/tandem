@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createTandemToolRenderer } from "/home/ivan/.dotfiles/pi/.pi/agent/extensions/pi-ui/tool-ui/custom-tools/tandem";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -34,6 +35,10 @@ type RunResult = {
 
 type ReadJsonFlag = { json?: boolean };
 type CwdFlag = { cwd?: string; timeoutMs?: number };
+
+export type InitToolParams = CwdFlag & {
+	title: string;
+};
 
 export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	action: "list" | "show" | "add" | "move" | "complete";
@@ -162,6 +167,10 @@ function addRepeatedFlag(args: string[], flag: string, values: unknown): void {
 
 function wantsJson(params: ReadJsonFlag): boolean {
 	return params.json !== false;
+}
+
+export function buildInitArgs(params: InitToolParams): string[] {
+	return ["init", "--title", requireString(params.title, "tandem_init requires title")];
 }
 
 export function buildTaskArgs(params: TaskToolParams): string[] {
@@ -510,7 +519,7 @@ export const tandemTaskParameters = Type.Object({
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -521,6 +530,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_status",
 		label: "Tandem Status",
+		...createTandemToolRenderer("tandem_status", "Tandem Status"),
 		description: "Diagnose the installed `tandem` CLI and the nearest `.tandem` workspace.",
 		promptSnippet: "Use tandem_status to inspect Tandem/tandem health before durable project coordination or when .tandem diagnostics are needed.",
 		promptGuidelines: [
@@ -534,8 +544,33 @@ export default function piTandem(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "tandem_init",
+		label: "Tandem Init",
+		...createTandemToolRenderer("tandem_init", "Tandem Init"),
+		description: "Initialize a Tandem workspace by running `tandem init --title <title>`.",
+		promptSnippet: "Use tandem_init only after tandem_status reports no workspace and the user confirms this directory should become a Tandem workspace.",
+		promptGuidelines: [
+			"Use tandem_status first to inspect the current cwd and nearest .tandem workspace before initializing.",
+			"Ask before initializing a new workspace; do not create `.tandem` state implicitly.",
+			"Use tandem_init instead of bash for workspace initialization; it maps directly to `tandem init --title <title>`.",
+		],
+		parameters: Type.Object({
+			...cwdSchema,
+			title: Type.String({ description: "Workspace title passed to `tandem init --title`." }),
+		}),
+		async execute(_toolCallId, params, signal, onUpdate, ctx) {
+			try {
+				return await executeTandemTool("tandem_init", buildInitArgs(params as InitToolParams), ctx.cwd, params, signal, onUpdate);
+			} catch (err) {
+				return { content: [{ type: "text", text: `tandem_init argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+			}
+		},
+	});
+
+	pi.registerTool({
 		name: "tandem_task",
 		label: "Tandem Task",
+		...createTandemToolRenderer("tandem_task", "Tandem Task"),
 		description: "Run task-oriented `tandem` commands: list, show, add, move, or complete. Read actions default to `--json`; mutations preserve human-readable CLI output.",
 		promptSnippet: "Use tandem_task for Tandem task list/show/add/move/complete operations instead of editing .tandem files directly.",
 		promptGuidelines: [
@@ -559,6 +594,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_accord",
 		label: "Tandem Accord",
+		...createTandemToolRenderer("tandem_accord", "Tandem Accord"),
 		description: "Run `tandem accord ready|claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
 		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (ready, claim, deliver, accept, rework, block, fail).",
 		promptGuidelines: [
@@ -593,6 +629,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_log",
 		label: "Tandem Logs",
+		...createTandemToolRenderer("tandem_log", "Tandem Logs"),
 		description: "Run completed-work log reads: `tandem log list|show|search`. Defaults to JSON output.",
 		promptSnippet: "Use tandem_log for Tandem completed-work history list/show/search.",
 		promptGuidelines: [
@@ -618,6 +655,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_rules",
 		label: "Tandem Rules",
+		...createTandemToolRenderer("tandem_rules", "Tandem Rules"),
 		description: "Run `tandem rules list|add|edit|delete`. List defaults to JSON; mutations preserve human-readable CLI output.",
 		promptSnippet: "Use tandem_rules to inspect or update Tandem project rules through tandem.",
 		promptGuidelines: [
@@ -644,6 +682,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_decision",
 		label: "Tandem Decisions",
+		...createTandemToolRenderer("tandem_decision", "Tandem Decisions"),
 		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output.",
 		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations.",
 		promptGuidelines: [
@@ -671,6 +710,7 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_search",
 		label: "Tandem Search",
+		...createTandemToolRenderer("tandem_search", "Tandem Search"),
 		description: "Run `tandem search <query>` across active Tandem documents and completed logs. Defaults to JSON output.",
 		promptSnippet: "Use tandem_search for project work search across active Tandem documents and logs.",
 		promptGuidelines: [
@@ -702,7 +742,7 @@ export default function piTandem(pi: ExtensionAPI) {
 					"/tandem status  Diagnose tandem and the nearest .tandem workspace.",
 					"/tandem help    Show this help.",
 					"",
-					"LLM-callable tools: tandem_status, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search.",
+					"LLM-callable tools: tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search.",
 					"Adapter rule: these tools call the installed tandem CLI; they do not reimplement Tandem protocol behavior.",
 				].join("\n");
 				ctx.ui.setWidget("pi-tandem", text.split("\n"));
