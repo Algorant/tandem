@@ -1021,8 +1021,16 @@ impl TuiApp {
                 self.select_document_by_id(&outcome.id);
                 self.status = if outcome.changed {
                     format!(
-                        "Moved {}: {} -> {}{}",
-                        outcome.id, outcome.from, outcome.to, reload_note
+                        "Moved {}: {} -> {}{}{}",
+                        outcome.id,
+                        outcome.from,
+                        outcome.to,
+                        outcome
+                            .accord_sync
+                            .as_deref()
+                            .map(|sync| format!("; accord {sync}"))
+                            .unwrap_or_default(),
+                        reload_note
                     )
                 } else {
                     format!(
@@ -2913,66 +2921,6 @@ fn adjacent_configured_state(
     }
 }
 
-#[derive(Debug)]
-struct MoveStateOutcome {
-    id: String,
-    from: String,
-    to: String,
-    changed: bool,
-}
-
-fn move_task_to_state(
-    workspace: &Workspace,
-    id: &str,
-    state: &str,
-) -> Result<MoveStateOutcome, CliError> {
-    validate_state(workspace, state)?;
-
-    let doc = find_board_document(workspace, id)?
-        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
-    if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
-            "Validation failed: only task documents can be moved in v0: {} is type {}",
-            doc.id(),
-            doc.doc_type()
-        )));
-    }
-    validate_task_document_for_mutation(workspace, &doc)?;
-
-    let doc_id = doc.id().to_string();
-    let previous_state = doc.field("state").unwrap_or("-").to_string();
-    if previous_state == state {
-        return Ok(MoveStateOutcome {
-            id: doc_id,
-            from: previous_state,
-            to: state.to_string(),
-            changed: false,
-        });
-    }
-
-    let (content, signature) = read_file_snapshot(&doc.path)?;
-    let now = current_timestamp();
-    let mut updates = BTreeMap::new();
-    updates.insert("state".to_string(), state.to_string());
-    updates.insert("updatedAt".to_string(), now);
-    let patched = patch_frontmatter_content(&content, &updates, &[])?;
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
-        workspace,
-        "task.moved",
-        &doc_id,
-        &format!("Moved {doc_id} from {previous_state} to {state}"),
-    )?;
-
-    Ok(MoveStateOutcome {
-        id: doc_id,
-        from: previous_state,
-        to: state.to_string(),
-        changed: true,
-    })
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BoardSubviewTab {
     state: String,
@@ -3487,6 +3435,13 @@ fn push_board_accord_detail_section(
         accord_detail_status_style(status, theme),
         theme,
     ));
+    if let Some(warning) = accord_state_divergence_warning(doc) {
+        let warning_style = theme.status_style(StatusTone::Warning);
+        lines.push(Line::from(vec![
+            Span::styled("Warning: ", warning_style.add_modifier(Modifier::BOLD)),
+            Span::styled(warning, warning_style),
+        ]));
+    }
     lines.push(detail_field_line(
         "Signal",
         accord_state_signal(status),
@@ -4571,6 +4526,22 @@ mod tests {
             review_attention_reason(&pending).as_deref(),
             Some("review pending")
         );
+    }
+
+    #[test]
+    fn board_detail_warns_about_state_accord_divergence() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = doc_with_state("task-1", Some("todo"));
+        doc.fields
+            .insert("accord.status".to_string(), "claimed".to_string());
+
+        let texts = detail_lines_for_doc(&doc, &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+
+        assert!(texts.iter().any(|text| text
+            .contains("Warning: task-1 has workflow state `todo` but accord.status `claimed` suggests `in-progress`")));
     }
 
     #[test]

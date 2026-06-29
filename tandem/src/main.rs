@@ -905,6 +905,7 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
         println!("{}", list_json(&filtered));
     } else {
         print_list_table(&filtered);
+        print_document_warnings(&filtered);
     }
 
     Ok(())
@@ -1001,64 +1002,20 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
         .state
         .as_deref()
         .ok_or_else(|| CliError::usage("move requires --state <state>"))?;
-    validate_state(&workspace, state)?;
+    let outcome = move_task_to_state(&workspace, &options.id, state)?;
 
-    let doc = find_board_document(&workspace, &options.id)?
-        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
-    if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
-            "Validation failed: only task documents can be moved in v0: {} is type {}",
-            doc.id(),
-            doc.doc_type()
-        )));
-    }
-    validate_task_document_for_mutation(&workspace, &doc)?;
-    let previous_state = doc.field("state").unwrap_or("-").to_string();
-    if previous_state == state {
-        println!("{} is already in state {state}", doc.id());
+    if !outcome.changed {
+        println!("{} is already in state {state}", outcome.id);
         return Ok(());
     }
 
-    let (content, signature) = read_file_snapshot(&doc.path)?;
-    let now = current_timestamp();
-    let mut updates = BTreeMap::new();
-    updates.insert("state".to_string(), state.to_string());
-    updates.insert("updatedAt".to_string(), now.clone());
-    let mut patched = patch_frontmatter_content(&content, &updates, &[])?;
-    let mut synced_accord_event = None;
-    if state == "in-progress" && accord_status(&doc) == Some("ready") {
-        let mut accord = AccordRecord::from_document(&doc, &now);
-        accord.status = "claimed".to_string();
-        if accord.claimed_at.is_none() {
-            accord.claimed_at = Some(now.clone());
-        }
-        patched = patch_accord_content(&patched, &accord)?;
-        synced_accord_event = Some("accord.claimed");
+    println!("Moved {}", outcome.id);
+    println!("From: {}", outcome.from);
+    println!("To:   {}", outcome.to);
+    if let Some(sync) = outcome.accord_sync.as_deref() {
+        println!("Accord: {sync}");
     }
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
-        &workspace,
-        "task.moved",
-        doc.id(),
-        &format!("Moved {} from {previous_state} to {state}", doc.id()),
-    )?;
-    if let Some(event_name) = synced_accord_event {
-        append_event(
-            &workspace,
-            event_name,
-            doc.id(),
-            &format!("Synchronized accord claim for {} after move", doc.id()),
-        )?;
-    }
-
-    println!("Moved {}", doc.id());
-    println!("From: {previous_state}");
-    println!("To:   {state}");
-    if synced_accord_event.is_some() {
-        println!("Accord: ready -> claimed");
-    }
-    println!("Path: {}", display_path(&doc.path));
+    println!("Path: {}", display_path(&outcome.path));
     Ok(())
 }
 
@@ -1994,6 +1951,92 @@ fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document>
         .collect()
 }
 
+#[derive(Debug)]
+struct MoveTaskOutcome {
+    id: String,
+    from: String,
+    to: String,
+    changed: bool,
+    path: PathBuf,
+    accord_sync: Option<String>,
+}
+
+fn move_task_to_state(
+    workspace: &Workspace,
+    id: &str,
+    state: &str,
+) -> Result<MoveTaskOutcome, CliError> {
+    validate_state(workspace, state)?;
+
+    let doc = find_board_document(workspace, id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can be moved in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    validate_task_document_for_mutation(workspace, &doc)?;
+
+    let doc_id = doc.id().to_string();
+    let previous_state = doc.field("state").unwrap_or("-").to_string();
+    if previous_state == state {
+        return Ok(MoveTaskOutcome {
+            id: doc_id,
+            from: previous_state,
+            to: state.to_string(),
+            changed: false,
+            path: doc.path,
+            accord_sync: None,
+        });
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut updates = BTreeMap::new();
+    updates.insert("state".to_string(), state.to_string());
+    updates.insert("updatedAt".to_string(), now.clone());
+    let mut patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let mut synced_accord_event = None;
+    let mut accord_sync = None;
+    if state == "in-progress" && accord_status(&doc) == Some("ready") {
+        let mut accord = AccordRecord::from_document(&doc, &now);
+        accord.status = "claimed".to_string();
+        if accord.claimed_at.is_none() {
+            accord.claimed_at = Some(now.clone());
+        }
+        patched = patch_accord_content(&patched, &accord)?;
+        synced_accord_event = Some("accord.claimed");
+        accord_sync = Some("ready -> claimed".to_string());
+    }
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        workspace,
+        "task.moved",
+        &doc_id,
+        &format!("Moved {doc_id} from {previous_state} to {state}"),
+    )?;
+    if let Some(event_name) = synced_accord_event {
+        append_event(
+            workspace,
+            event_name,
+            &doc_id,
+            &format!("Synchronized accord claim for {doc_id} after move"),
+        )?;
+    }
+
+    Ok(MoveTaskOutcome {
+        id: doc_id,
+        from: previous_state,
+        to: state.to_string(),
+        changed: true,
+        path: doc.path,
+        accord_sync,
+    })
+}
+
 fn accord_state_sync_target<'a>(accord_status: &str, current_state: &'a str) -> Option<&'a str> {
     match accord_status {
         "claimed" if current_state == "todo" => Some("in-progress"),
@@ -2007,6 +2050,20 @@ fn accord_state_sync_target<'a>(accord_status: &str, current_state: &'a str) -> 
         }
         _ => None,
     }
+}
+
+fn accord_state_divergence_warning(doc: &Document) -> Option<String> {
+    let status = accord_status(doc)?;
+    let state = doc.field("state")?;
+    let expected = accord_state_sync_target(status, state)?;
+    Some(format!(
+        "{} has workflow state `{state}` but accord.status `{status}` suggests `{expected}`; preserving recorded state until a mutation synchronizes it.",
+        doc.id()
+    ))
+}
+
+fn document_warnings(doc: &Document) -> Vec<String> {
+    accord_state_divergence_warning(doc).into_iter().collect()
 }
 
 fn state_matches_filter(actual: Option<&str>, requested: &str) -> bool {
@@ -2403,6 +2460,12 @@ fn print_list_table(docs: &[Document]) {
     }
 }
 
+fn print_document_warnings(docs: &[Document]) {
+    for warning in docs.iter().flat_map(document_warnings) {
+        println!("Warning: {warning}");
+    }
+}
+
 fn print_show(doc: &Document) {
     println!("ID:        {}", doc.id());
     println!("Type:      {}", doc.doc_type());
@@ -2433,6 +2496,9 @@ fn print_show(doc: &Document) {
     }
     if let Some(status) = review_status(doc) {
         println!("Review:    {status}");
+    }
+    for warning in document_warnings(doc) {
+        println!("Warning:   {warning}");
     }
     if let Some(summary) = completion_summary(doc) {
         println!("Summary:   {summary}");
@@ -3043,22 +3109,26 @@ fn list_json(docs: &[Document]) -> String {
         .map(|(state, count)| format!("{}:{count}", json_string(state)))
         .collect::<Vec<_>>()
         .join(",");
+    let warnings = docs.iter().flat_map(document_warnings).collect::<Vec<_>>();
 
     format!(
-        "{{\"ok\":true,\"data\":{{\"items\":[{}],\"counts\":{{\"total\":{},\"byState\":{{{}}}}}}},\"warnings\":[]}}",
+        "{{\"ok\":true,\"data\":{{\"items\":[{}],\"counts\":{{\"total\":{},\"byState\":{{{}}}}}}},\"warnings\":{}}}",
         items.join(","),
         docs.len(),
-        states
+        states,
+        json_array_strings(&warnings)
     )
 }
 
 fn show_json(doc: &Document) -> String {
+    let warnings = document_warnings(doc);
     format!(
-        "{{\"ok\":true,\"data\":{{\"document\":{},\"body\":{},\"path\":{},\"location\":{}}},\"warnings\":[]}}",
+        "{{\"ok\":true,\"data\":{{\"document\":{},\"body\":{},\"path\":{},\"location\":{}}},\"warnings\":{}}}",
         document_detail_json(doc),
         json_string(&doc.body),
         json_string(&display_path(&doc.path)),
-        json_string(doc.location.as_str())
+        json_string(doc.location.as_str()),
+        json_array_strings(&warnings)
     )
 }
 
@@ -3861,6 +3931,81 @@ rules:
         assert!(output.contains("  evidence: [\"cargo test passed\"]\n"));
         assert!(output.contains("review:\n  status: pending\n"));
         assert!(output.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn divergence_warning_reports_sync_candidate_without_collapsing_state() {
+        let doc = Document {
+            path: PathBuf::from("task-1.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\ntitle: Demo\nstate: in-progress\naccord:\n  status: delivered\nreview:\n  status: pending\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+
+        let warning = accord_state_divergence_warning(&doc).unwrap();
+        assert!(warning.contains("workflow state `in-progress`"));
+        assert!(warning.contains("accord.status `delivered` suggests `validation`"));
+        assert_eq!(doc.field("state"), Some("in-progress"));
+        assert_eq!(review_status(&doc), Some("pending"));
+    }
+
+    #[test]
+    fn show_and_list_json_include_divergence_warnings() {
+        let doc = Document {
+            path: PathBuf::from("task-1.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\ntitle: Demo\nstate: todo\naccord:\n  status: claimed\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+
+        assert!(show_json(&doc).contains("accord.status `claimed` suggests `in-progress`"));
+        assert!(list_json(&[doc]).contains("accord.status `claimed` suggests `in-progress`"));
+    }
+
+    #[test]
+    fn move_task_to_state_reuses_ready_to_claimed_sync() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-move-sync-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        let task_path = workspace.board_dir.join("task-1.md");
+        fs::write(
+            &task_path,
+            "---\nid: task-1\ntype: task\ntitle: Demo\nstate: todo\naccord:\n  status: ready\n---\n\nBody\n",
+        )
+        .unwrap();
+
+        let outcome = move_task_to_state(&workspace, "task-1", "in-progress").unwrap();
+        let output = fs::read_to_string(&task_path).unwrap();
+        assert!(outcome.changed);
+        assert_eq!(outcome.accord_sync.as_deref(), Some("ready -> claimed"));
+        assert!(output.contains("state: \"in-progress\"\n"));
+        assert!(output.contains("accord:\n  status: \"claimed\"\n"));
+        assert!(output.contains("Body\n"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
