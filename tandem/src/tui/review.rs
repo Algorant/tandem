@@ -540,8 +540,8 @@ fn typed_attention_reasons(doc: &Document) -> Vec<ReviewReason> {
     let accord = normalized(accord_status(doc).unwrap_or(""));
     match accord.as_str() {
         "delivered" => reasons.push(ReviewReason::new(
-            "A:delivered",
-            "accord has been delivered and is awaiting inspection",
+            "sign-off",
+            "delivered work is awaiting human sign-off",
             ReviewReasonKind::AccordDelivered,
         )),
         "blocked" => reasons.push(ReviewReason::new(
@@ -828,7 +828,7 @@ mod tests {
     #[test]
     fn reasons_cover_review_queue_inputs() {
         let delivered = doc_with_fields("task-1", &[("accord.status", "delivered")]);
-        assert!(reason_labels(&delivered).contains(&"A:delivered".to_string()));
+        assert!(reason_labels(&delivered).contains(&"sign-off".to_string()));
 
         let changes = doc_with_fields("task-2", &[("review.status", "changes-requested")]);
         assert!(reason_labels(&changes).contains(&"R:changes".to_string()));

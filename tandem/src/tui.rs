@@ -200,6 +200,33 @@ struct QuickAddInput {
     fallback_note: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ValidationPrompt {
+    Accept {
+        id: String,
+        title: String,
+    },
+    Rework {
+        id: String,
+        title: String,
+        feedback: String,
+    },
+}
+
+impl ValidationPrompt {
+    fn id(&self) -> &str {
+        match self {
+            Self::Accept { id, .. } | Self::Rework { id, .. } => id,
+        }
+    }
+
+    fn title(&self) -> &str {
+        match self {
+            Self::Accept { title, .. } | Self::Rework { title, .. } => title,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct BoardFilters {
     tag: Option<String>,
@@ -312,6 +339,7 @@ struct TuiApp {
     status: String,
     show_help: bool,
     quick_add: Option<QuickAddInput>,
+    validation_prompt: Option<ValidationPrompt>,
     rules_view: RulesState,
     decisions_view: DecisionsState,
     hits: Vec<HitRegion>,
@@ -351,6 +379,7 @@ impl TuiApp {
             status: String::new(),
             show_help: false,
             quick_add: None,
+            validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             hits: Vec::new(),
@@ -495,6 +524,7 @@ impl TuiApp {
 
     fn input_overlay_active(&self) -> bool {
         self.quick_add.is_some()
+            || self.validation_prompt.is_some()
             || self.log_search_input.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
@@ -549,6 +579,11 @@ impl TuiApp {
             return Ok(KeyAction::Continue);
         }
 
+        if self.validation_prompt.is_some() {
+            self.handle_validation_prompt_key(key);
+            return Ok(KeyAction::Continue);
+        }
+
         if self.log_search_input.is_some() {
             self.handle_log_search_key(key);
             return Ok(KeyAction::Continue);
@@ -593,15 +628,9 @@ impl TuiApp {
             KeyCode::Char('a') => {
                 self.status = "Add is available in Board, Rules, and Decisions views.".to_string()
             }
-            KeyCode::Char('A') if self.view == TuiView::Board => {
-                self.show_validation_action_hint("approve")
-            }
-            KeyCode::Char('R') if self.view == TuiView::Board => {
-                self.show_validation_action_hint("rework")
-            }
-            KeyCode::Char('C') if self.view == TuiView::Board => {
-                self.show_validation_action_hint("complete")
-            }
+            KeyCode::Char('A') if self.view == TuiView::Board => self.start_validation_accept(),
+            KeyCode::Char('R') if self.view == TuiView::Board => self.start_validation_rework(),
+            KeyCode::Char('C') if self.view == TuiView::Board => self.show_validation_complete_hint(),
             KeyCode::Char('H') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(-1)
             }
@@ -1014,57 +1043,189 @@ impl TuiApp {
         }
     }
 
-    fn show_validation_action_hint(&mut self, action: &str) {
+    fn selected_validation_doc_summary(&self) -> Result<(String, String, String), String> {
         let Some(doc) = self.selected_doc() else {
-            self.status = "No selected Board task for Validation action.".to_string();
-            return;
+            return Err("No selected Board task for Validation action.".to_string());
         };
         if document_state_label(doc) != "validation" {
-            self.status = format!(
+            return Err(format!(
                 "Validation actions apply in the Validation state; selected {} is in {}.",
                 doc.id(),
                 display_state_label(&document_state_label(doc))
+            ));
+        }
+        Ok((
+            doc.id().to_string(),
+            doc.title().to_string(),
+            accord_status(doc).unwrap_or("missing").to_string(),
+        ))
+    }
+
+    fn start_validation_accept(&mut self) {
+        let (id, title, status) = match self.selected_validation_doc_summary() {
+            Ok(summary) => summary,
+            Err(message) => {
+                self.status = message;
+                return;
+            }
+        };
+        if normalized_accord_status(&status) != "delivered" {
+            self.status = format!(
+                "Accept expects a delivered accord; {id} is {status}. Inspect before signing off."
             );
             return;
         }
+        self.validation_prompt = Some(ValidationPrompt::Accept { id, title });
+        self.status = "Confirm acceptance: Enter/y accepts sign-off, Esc/n cancels.".to_string();
+    }
 
-        let status = accord_status(doc).unwrap_or("missing");
-        self.status = match action {
-            "approve" if normalized_accord_status(status) == "delivered" => format!(
-                "Approve {}: {}",
-                doc.id(),
-                accord_cli_hint(doc.id(), status)
-            ),
-            "approve" => format!(
-                "Approve expects delivered accord; {} is {}. {}",
-                doc.id(),
-                status,
-                accord_cli_hint(doc.id(), status)
-            ),
-            "rework" if normalized_accord_status(status) == "delivered" => format!(
-                "Request changes for {}: tandem accord rework {} --note <text>",
-                doc.id(),
-                doc.id()
-            ),
-            "rework" => format!(
-                "Request changes expects delivered accord; {} is {}. {}",
-                doc.id(),
-                status,
-                accord_cli_hint(doc.id(), status)
-            ),
-            "complete" if normalized_accord_status(status) == "accepted" => format!(
-                "Complete/log {}: {}",
-                doc.id(),
-                accord_cli_hint(doc.id(), status)
-            ),
-            "complete" => format!(
-                "Complete expects accepted accord; {} is {}. {}",
-                doc.id(),
-                status,
-                accord_cli_hint(doc.id(), status)
-            ),
-            _ => format!("Unknown Validation action for {}.", doc.id()),
+    fn start_validation_rework(&mut self) {
+        let (id, title, status) = match self.selected_validation_doc_summary() {
+            Ok(summary) => summary,
+            Err(message) => {
+                self.status = message;
+                return;
+            }
         };
+        if normalized_accord_status(&status) != "delivered" {
+            self.status = format!(
+                "Request rework expects a delivered accord; {id} is {status}. Inspect before changing."
+            );
+            return;
+        }
+        self.validation_prompt = Some(ValidationPrompt::Rework {
+            id,
+            title,
+            feedback: String::new(),
+        });
+        self.status = "Request rework: type feedback, Enter sends, Esc cancels.".to_string();
+    }
+
+    fn show_validation_complete_hint(&mut self) {
+        self.status = "Completion is intentionally de-emphasized in Validation. Accept sign-off first; archive/logging happens later when the task should leave the Board.".to_string();
+    }
+
+    fn handle_validation_prompt_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('n') => {
+                let action = match self.validation_prompt.take() {
+                    Some(ValidationPrompt::Accept { .. }) => "Acceptance",
+                    Some(ValidationPrompt::Rework { .. }) => "Rework request",
+                    None => "Validation action",
+                };
+                self.status = format!("{action} canceled.");
+            }
+            KeyCode::Char('y')
+                if matches!(
+                    self.validation_prompt,
+                    Some(ValidationPrompt::Accept { .. })
+                ) =>
+            {
+                self.finish_validation_accept();
+            }
+            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => {
+                if matches!(
+                    self.validation_prompt,
+                    Some(ValidationPrompt::Accept { .. })
+                ) {
+                    self.finish_validation_accept();
+                } else {
+                    self.finish_validation_rework();
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                    self.validation_prompt.as_mut()
+                {
+                    feedback.pop();
+                }
+                self.refresh_validation_prompt_status();
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                    self.validation_prompt.as_mut()
+                {
+                    feedback.clear();
+                }
+                self.refresh_validation_prompt_status();
+            }
+            KeyCode::Char(ch)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                    self.validation_prompt.as_mut()
+                {
+                    feedback.push(ch);
+                    self.refresh_validation_prompt_status();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn refresh_validation_prompt_status(&mut self) {
+        self.status = match self.validation_prompt.as_ref() {
+            Some(ValidationPrompt::Accept { id, .. }) => {
+                format!("Confirm acceptance for {id}: Enter/y accepts sign-off, Esc/n cancels.")
+            }
+            Some(ValidationPrompt::Rework { id, feedback, .. }) => format!(
+                "Request rework for {id}: {} · Enter sends, Esc cancels",
+                if feedback.trim().is_empty() {
+                    "<feedback>"
+                } else {
+                    feedback.as_str()
+                }
+            ),
+            None => self.status.clone(),
+        };
+    }
+
+    fn finish_validation_accept(&mut self) {
+        let Some(ValidationPrompt::Accept { id, .. }) = self.validation_prompt.take() else {
+            return;
+        };
+        match apply_validation_accept(&self.workspace, &id) {
+            Ok(outcome) => {
+                let reload_note = self.reload().warning_note();
+                self.select_document_by_id(&outcome.id);
+                self.status = format!("Accepted sign-off for {}{}", outcome.id, reload_note);
+            }
+            Err(error) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Accept error: {}{}", error.message, reload_note);
+            }
+        }
+    }
+
+    fn finish_validation_rework(&mut self) {
+        let Some(ValidationPrompt::Rework { id, feedback, .. }) = self.validation_prompt.as_ref()
+        else {
+            return;
+        };
+        let feedback = feedback.trim().to_string();
+        if feedback.is_empty() {
+            self.status = format!(
+                "Request rework for {id} needs feedback. Type feedback, Enter sends, Esc cancels."
+            );
+            return;
+        }
+        let id = id.clone();
+        self.validation_prompt = None;
+        match apply_validation_rework(&self.workspace, &id, &feedback) {
+            Ok(outcome) => {
+                let reload_note = self.reload().warning_note();
+                self.select_document_by_id(&outcome.id);
+                self.status = format!(
+                    "Requested rework for {}; moved to {}{}",
+                    outcome.id, outcome.state, reload_note
+                );
+            }
+            Err(error) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Rework error: {}{}", error.message, reload_note);
+            }
+        }
     }
 
     fn move_selected_task_by_delta(&mut self, delta: isize) {
@@ -1720,6 +1881,10 @@ impl TuiApp {
             }
         }
         self.draw_footer(frame, chunks[2]);
+
+        if self.validation_prompt.is_some() {
+            self.draw_validation_prompt(frame, area);
+        }
 
         if self.rules_prompt_active() {
             self.draw_rules_prompt(frame, area);
@@ -2394,7 +2559,7 @@ impl TuiApp {
         let commands = if self.focus == FocusPane::Detail {
             "Tab board · j/k scroll · e edit · ? help".to_string()
         } else if self.selected_state_name() == Some("validation") {
-            "Enter detail · A/R/C validate · e edit · ? help".to_string()
+            "Enter detail · A accept · R rework · e edit · ? help".to_string()
         } else if self.board_filters.is_active() {
             "Enter detail · F clear filter · H/L move · ? help".to_string()
         } else {
@@ -2427,6 +2592,11 @@ impl TuiApp {
                 self.theme.status_style(StatusTone::Warning),
             )
         } else if self.log_search_input.is_some() {
+            (
+                self.status.clone(),
+                self.theme.status_style(StatusTone::Warning),
+            )
+        } else if self.validation_prompt.is_some() {
             (
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
@@ -2473,6 +2643,29 @@ impl TuiApp {
         frame.render_widget(footer, area);
     }
 
+    fn draw_validation_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
+        let Some(prompt) = self.validation_prompt.as_ref() else {
+            return;
+        };
+        let popup = centered_rect(76, 36, area);
+        frame.render_widget(Clear, popup);
+        let lines = validation_prompt_lines(prompt, &self.theme);
+        let prompt_view = Paragraph::new(lines)
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(match prompt {
+                        ValidationPrompt::Accept { .. } => " Accept sign-off ",
+                        ValidationPrompt::Rework { .. } => " Request rework ",
+                    })
+                    .border_style(self.theme.border_style(true))
+                    .style(self.theme.panel_style()),
+            )
+            .wrap(Wrap { trim: false });
+        frame.render_widget(prompt_view, popup);
+    }
+
     fn draw_help(&self, frame: &mut Frame<'_>, area: Rect) {
         let popup = centered_rect(72, 60, area);
         frame.render_widget(Clear, popup);
@@ -2504,7 +2697,7 @@ impl TuiApp {
             Line::from("Prompts           Type text, Enter advances or saves, Esc cancels, Ctrl-U clears field"),
             Line::from("Log search        Type a query, Enter applies, Esc cancels"),
             Line::from(""),
-            Line::from("Board state subviews include Validation for delivered work awaiting accept/rework/complete, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer mutation prompts remain planned."),
+            Line::from("Board state subviews include Validation for delivered work awaiting human sign-off, inline task previews, optional detail pane, quick-add/H/L moves, $EDITOR for active task documents, Logs browser/search, Rules add/edit/delete, and Decisions browse/add are active. Logs stay read-only for generated history; decision/custom file editing is deferred. Built-in presets, XDG/~/.config user themes, and .tandem/theme.toml selectors/overrides are active; richer mutation prompts remain planned."),
         ])
         .style(self.theme.panel_style())
         .block(
@@ -3067,6 +3260,168 @@ fn create_basic_task(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ValidationActionOutcome {
+    id: String,
+    state: String,
+}
+
+fn apply_validation_accept(
+    workspace: &Workspace,
+    id: &str,
+) -> Result<ValidationActionOutcome, CliError> {
+    apply_validation_action(workspace, id, ValidationAction::Accept { note: None })
+}
+
+fn apply_validation_rework(
+    workspace: &Workspace,
+    id: &str,
+    feedback: &str,
+) -> Result<ValidationActionOutcome, CliError> {
+    let feedback = feedback.trim();
+    if feedback.is_empty() {
+        return Err(CliError::usage("rework feedback must not be empty"));
+    }
+    apply_validation_action(
+        workspace,
+        id,
+        ValidationAction::Rework {
+            feedback: feedback.to_string(),
+        },
+    )
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum ValidationAction {
+    Accept { note: Option<String> },
+    Rework { feedback: String },
+}
+
+fn apply_validation_action(
+    workspace: &Workspace,
+    id: &str,
+    action: ValidationAction,
+) -> Result<ValidationActionOutcome, CliError> {
+    let doc = find_board_document(workspace, id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can use Validation actions in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    if document_state_label(&doc) != "validation" {
+        return Err(CliError::user(format!(
+            "{} is in `{}`; Validation actions require state `validation`",
+            doc.id(),
+            document_state_label(&doc)
+        )));
+    }
+    validate_task_document_for_mutation(workspace, &doc)?;
+
+    let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
+    if normalized_accord_status(&previous_status) != "delivered" {
+        return Err(CliError::user(format!(
+            "{} has accord.status={previous_status}; Validation sign-off actions require delivered",
+            doc.id()
+        )));
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut accord = AccordRecord::from_document(&doc, &now);
+    let (
+        accord_action,
+        status,
+        note,
+        review_status_value,
+        event_name,
+        event_summary,
+        next_state,
+        append_feedback,
+    ) = match action {
+        ValidationAction::Accept { note } => (
+            "accept",
+            "accepted",
+            note,
+            "accepted",
+            "validation.accepted",
+            format!("Accepted sign-off for {}", doc.id()),
+            "validation".to_string(),
+            false,
+        ),
+        ValidationAction::Rework { feedback } => (
+            "rework",
+            "rework",
+            Some(feedback),
+            "changes-requested",
+            "validation.rework",
+            format!("Requested rework for {}", doc.id()),
+            "in-progress".to_string(),
+            true,
+        ),
+    };
+    let options = AccordOptions {
+        id: doc.id().to_string(),
+        note: note.clone(),
+        reviewer: Some("tui".to_string()),
+        ..AccordOptions::default()
+    };
+    apply_accord_action(&mut accord, accord_action, status, &options);
+    let patched = patch_accord_content(&content, &accord)?;
+    validate_state(workspace, &next_state)?;
+    let mut updates = BTreeMap::new();
+    updates.insert("updatedAt".to_string(), now.clone());
+    updates.insert("state".to_string(), next_state.clone());
+    updates.insert("review.status".to_string(), review_status_value.to_string());
+    updates.insert("review.decidedAt".to_string(), now.clone());
+    updates.insert("review.reviewer".to_string(), "tui".to_string());
+    if let Some(note) = note.as_deref().filter(|value| !value.trim().is_empty()) {
+        updates.insert("review.note".to_string(), note.to_string());
+    }
+    let patched = patch_frontmatter_content(&patched, &updates, &[])?;
+    let patched = if append_feedback {
+        append_feedback_entry(&patched, &now, "tui", note.as_deref().unwrap_or(""))?
+    } else {
+        patched
+    };
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(workspace, event_name, doc.id(), &event_summary)?;
+
+    Ok(ValidationActionOutcome {
+        id: doc.id().to_string(),
+        state: next_state,
+    })
+}
+
+fn append_feedback_entry(
+    content: &str,
+    timestamp: &str,
+    source: &str,
+    feedback: &str,
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let mut body = body.to_string();
+    if !body.ends_with('\n') {
+        body.push('\n');
+    }
+    if !body.contains("\n## Feedback\n") && !body.trim_start().starts_with("## Feedback\n") {
+        if !body.trim().is_empty() {
+            body.push('\n');
+        }
+        body.push_str("## Feedback\n\n");
+    } else if !body.ends_with("\n\n") {
+        body.push('\n');
+    }
+    body.push_str(&format!(
+        "- {timestamp} ({source}): {}\n",
+        feedback.replace('\n', " ").trim()
+    ));
+    Ok(format!("---\n{}---\n{}", frontmatter, body))
+}
+
 fn adjacent_configured_state(
     configured_states: &[String],
     current_state: Option<&str>,
@@ -3143,6 +3498,55 @@ fn display_state_label(state: &str) -> String {
         .to_uppercase()
 }
 
+fn validation_prompt_lines(prompt: &ValidationPrompt, theme: &TuiTheme) -> Vec<Line<'static>> {
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Target: ", theme.label_style()),
+            Span::styled(
+                format!("{} — {}", prompt.id(), prompt.title()),
+                theme.text_style().add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+    ];
+    match prompt {
+        ValidationPrompt::Accept { .. } => {
+            lines.push(Line::from(Span::styled(
+                "Accept this delivery as human sign-off?",
+                theme.text_style(),
+            )));
+            lines.push(Line::from(Span::styled(
+                "Enter/y accepts; Esc/n cancels. Completion/logging remains a separate later action.",
+                theme.muted_style(),
+            )));
+        }
+        ValidationPrompt::Rework { feedback, .. } => {
+            lines.push(Line::from(Span::styled(
+                "Feedback to append durably:",
+                theme.label_style(),
+            )));
+            lines.push(Line::from(Span::styled(
+                if feedback.is_empty() {
+                    "<type feedback>".to_string()
+                } else {
+                    feedback.clone()
+                },
+                if feedback.is_empty() {
+                    theme.muted_style()
+                } else {
+                    theme.text_style()
+                },
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Enter requests rework and moves the item back to in-progress; Esc cancels without writing.",
+                theme.muted_style(),
+            )));
+        }
+    }
+    lines
+}
+
 fn list_item_for_doc(
     doc: &Document,
     theme: &TuiTheme,
@@ -3181,8 +3585,11 @@ fn board_item_lines_for_doc(
     if let Some(kind_chip) = research_or_spike_chip(doc) {
         chips.push((kind_chip, theme.progress_chip_style(StatusTone::Accent)));
     }
+    if let Some(visual_chip) = validation_visual_chip(doc) {
+        chips.push((visual_chip, theme.progress_chip_style(StatusTone::Accent)));
+    }
     if let Some(accord) =
-        accord_status(doc).filter(|status| board_should_surface_accord_status(status))
+        accord_status(doc).filter(|status| board_should_surface_accord_status(doc, status))
     {
         chips.push((status_chip(accord), theme.accord_chip_style(accord)));
     }
@@ -3635,11 +4042,24 @@ fn body_summary(body: &str) -> String {
     }
 }
 
-fn board_should_surface_accord_status(status: &str) -> bool {
+fn board_should_surface_accord_status(doc: &Document, status: &str) -> bool {
+    let normalized = normalized_accord_status(status);
+    if document_state_label(doc) == "validation" && normalized == "delivered" {
+        return false;
+    }
     matches!(
-        normalized_accord_status(status).as_str(),
-        "delivered" | "rework" | "blocked" | "failed"
+        normalized.as_str(),
+        "delivered" | "accepted" | "rework" | "blocked" | "failed"
     )
+}
+
+fn validation_visual_chip(doc: &Document) -> Option<String> {
+    if document_state_label(doc) != "validation" {
+        return None;
+    }
+    let tags = doc.field("tags").unwrap_or("").to_ascii_lowercase();
+    (tags.contains("visual") || tags.contains("ui") || tags.contains("ux"))
+        .then(|| chip_text("VISUAL"))
 }
 
 fn board_should_surface_review_status(status: &str) -> bool {
@@ -3824,7 +4244,7 @@ fn push_board_accord_detail_section(
     ]));
     if document_state_label(doc) == "validation" {
         lines.push(Line::from(Span::styled(
-            "Board Validation: use e to open/edit; A/R/C show approve, rework, and complete commands for the selected task.",
+            "Board Validation: A opens accept sign-off confirmation, R opens feedback/rework, e opens the task; completion is intentionally separate.",
             theme.muted_style(),
         )));
     } else {
@@ -4346,6 +4766,36 @@ mod tests {
     }
 
     #[test]
+    fn validation_rows_suppress_redundant_delivered_and_show_review_signals() {
+        let theme = TuiTheme::default_dark();
+        let mut delivered = doc_with_state("task-26", Some("validation"));
+        delivered
+            .fields
+            .insert("title".to_string(), "Inspect visual polish".to_string());
+        delivered
+            .fields
+            .insert("tags".to_string(), "[\"visual\", \"ux\"]".to_string());
+        delivered
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        let delivered_title =
+            line_text(&board_item_lines_for_doc(&delivered, &theme, 120, false, false, false)[0]);
+        assert!(delivered_title.contains(" VISUAL "));
+        assert!(!delivered_title.contains(" DELIVERED "));
+
+        let mut accepted = doc_with_state("task-27", Some("validation"));
+        accepted
+            .fields
+            .insert("title".to_string(), "Signed off".to_string());
+        accepted
+            .fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        let accepted_title =
+            line_text(&board_item_lines_for_doc(&accepted, &theme, 120, false, false, false)[0]);
+        assert!(accepted_title.contains(" ACCEPTED "));
+    }
+
+    #[test]
     fn board_filters_match_existing_tags_and_priorities() {
         let mut research = doc_with_state("task-24", Some("todo"));
         research
@@ -4610,7 +5060,7 @@ mod tests {
         fs::create_dir_all(&workspace.logs_dir).unwrap();
         fs::write(
             &workspace.config_path,
-            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, validation]\n---\n",
+            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
         workspace
@@ -4621,6 +5071,16 @@ mod tests {
             workspace.board_dir.join(format!("{id}.md")),
             format!(
                 "---\nid: {id}\ntype: task\ntitle: {title}\nstate: {state}\n---\n\nBody for {id}.\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    fn write_delivered_validation_task(workspace: &Workspace, id: &str) {
+        fs::write(
+            workspace.board_dir.join(format!("{id}.md")),
+            format!(
+                "---\nid: {id}\ntype: task\ntitle: Delivered task\nstate: validation\naccord:\n  status: delivered\n  updatedAt: 2026-06-28T00:00:00Z\n  deliveredAt: 2026-06-28T00:00:00Z\n  summary: ready for sign-off\n---\n\nBody for {id}.\n"
             ),
         )
         .unwrap();
@@ -4671,6 +5131,7 @@ mod tests {
             status: String::new(),
             show_help: false,
             quick_add: None,
+            validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             hits: Vec::new(),
@@ -4859,7 +5320,7 @@ mod tests {
     }
 
     #[test]
-    fn validation_action_keys_show_selected_task_commands() {
+    fn validation_action_keys_open_signoff_prompts_and_deemphasize_complete() {
         let mut app = keyboard_test_app();
         app.selected_state = 1;
         app.docs[1]
@@ -4867,18 +5328,76 @@ mod tests {
             .insert("accord.status".to_string(), "delivered".to_string());
 
         app.handle_key(key(KeyCode::Char('A'))).unwrap();
-        assert!(app.status.contains("tandem accord accept task-2"));
+        assert!(matches!(
+            app.validation_prompt,
+            Some(ValidationPrompt::Accept { ref id, .. }) if id == "task-2"
+        ));
+        assert!(app.status.contains("Confirm acceptance"));
+
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        assert!(matches!(
+            app.validation_prompt,
+            Some(ValidationPrompt::Rework { ref id, .. }) if id == "task-2"
+        ));
+        assert!(app.status.contains("type feedback"));
+
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        app.handle_key(key(KeyCode::Char('C'))).unwrap();
+        assert!(app.status.contains("de-emphasized"));
+        assert!(!app.status.contains("tandem complete"));
+    }
+
+    #[test]
+    fn accept_confirmation_updates_accord_and_review_without_rework_feedback() {
+        let root = unique_test_dir("tandem-validation-accept");
+        let workspace = temp_workspace(&root);
+        write_delivered_validation_task(&workspace, "task-1");
+
+        let outcome = apply_validation_accept(&workspace, "task-1").unwrap();
+        assert_eq!(outcome.state, "validation");
+        let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        assert!(content.contains("status: \"accepted\""));
+        assert!(content.contains("review.status: \"accepted\""));
+        assert!(!content.contains("## Feedback"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rework_appends_feedback_and_moves_back_to_actionable_state() {
+        let root = unique_test_dir("tandem-validation-rework");
+        let workspace = temp_workspace(&root);
+        write_delivered_validation_task(&workspace, "task-1");
+
+        let outcome =
+            apply_validation_rework(&workspace, "task-1", "Please fix the contrast.").unwrap();
+        assert_eq!(outcome.state, "in-progress");
+        let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        assert!(content.contains("state: \"in-progress\""));
+        assert!(content.contains("status: \"rework\""));
+        assert!(content.contains("review.status: \"changes-requested\""));
+        assert!(content.contains("## Feedback"));
+        assert!(content.contains("Please fix the contrast."));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rework_cancel_keeps_task_file_unchanged() {
+        let root = unique_test_dir("tandem-validation-cancel");
+        let workspace = temp_workspace(&root);
+        write_delivered_validation_task(&workspace, "task-1");
+        let before = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        assert!(app.select_document_by_id("task-1"));
 
         app.handle_key(key(KeyCode::Char('R'))).unwrap();
-        assert!(app
-            .status
-            .contains("tandem accord rework task-2 --note <text>"));
+        app.handle_key(key(KeyCode::Char('x'))).unwrap();
+        app.handle_key(key(KeyCode::Esc)).unwrap();
 
-        app.docs[1]
-            .fields
-            .insert("accord.status".to_string(), "accepted".to_string());
-        app.handle_key(key(KeyCode::Char('C'))).unwrap();
-        assert!(app.status.contains("tandem complete task-2"));
+        let after = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        assert_eq!(after, before);
+        assert!(app.validation_prompt.is_none());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -5093,7 +5612,7 @@ mod tests {
             .any(|text| text.contains("CLI hint: tandem accord accept task-1")));
         assert!(texts
             .iter()
-            .any(|text| text.contains("Board Validation: use e to open/edit")));
+            .any(|text| text.contains("Board Validation: A opens accept sign-off")));
         assert!(texts.contains(&"Description".to_string()));
         assert!(texts.contains(&"Keep this body visible.".to_string()));
 
