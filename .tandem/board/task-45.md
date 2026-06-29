@@ -2,21 +2,27 @@
 id: task-45
 type: task
 title: "Add state/accord divergence warnings and tests"
-state: todo
+state: "validation"
 priority: "high"
 parentId: "task-26"
 blockers: ["task-30"]
 relatedFiles: ["tandem/src/main.rs", "tandem/src/tui.rs", "tandem/plan/spec.md"]
 tags: ["cli", "tui", "accord", "state", "validation", "tests"]
 createdAt: "2026-06-28T17:29:46Z"
-updatedAt: "2026-06-28T17:29:46Z"
+updatedAt: "2026-06-29T00:21:24Z"
 accord:
-  status: "ready"
+  status: "delivered"
+  assignee: "tasks44-45-accord-state"
+  claimedAt: "2026-06-29T00:15:41Z"
+  deliveredAt: "2026-06-29T00:21:24Z"
   deliverables: ["code:tandem/src/main.rs:state/accord divergence warning surfaces for read/lint-style paths", "code:tandem/src/tui.rs:TUI detail/status divergence warning surfaces", "tests:tandem:sync behavior and divergence warning regression coverage", "docs:tandem/plan/spec.md:warning/validation candidate semantics if behavior changes"]
   validation:
     commands: ["cd tandem && cargo fmt --check", "cd tandem && cargo test", "cd tandem && cargo build"]
   constraints: ["Warn about divergence without collapsing workflow state, review metadata, and accord status.", "Coordinate with task-30 for Board Validation warning and acceptance surfaces."]
-  updatedAt: "2026-06-28T17:29:46Z"
+  summary: "Added accord/workflow divergence warnings for read/detail paths without mutating recorded state, review metadata, or accord status. JSON list/show warnings and TUI accord detail warnings now surface sync candidates like todo+claimed and in-progress+delivered; regression tests cover warned-but-preserved divergence and synchronized movement."
+  evidence: ["cd tandem && cargo fmt --check && cargo test", "Commit 6ffa20a on branch herd-task44-45-accord-state"]
+  filesChanged: ["tandem/src/main.rs", "tandem/src/tui.rs"]
+  updatedAt: "2026-06-29T00:21:24Z"
 ---
 
 ## Description

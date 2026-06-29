@@ -2,13 +2,13 @@
 id: task-35
 type: task
 title: "Differentiate research and spike tasks in the TUI"
-state: todo
+state: "validation"
 priority: "medium"
 relatedFiles: ["tandem/src/tui.rs", "protocol/plan/spec.md", "tandem/plan/spec.md"]
 tags: ["tui", "research", "ux"]
 references: ["task-24"]
 createdAt: "2026-06-28T16:17:06Z"
-updatedAt: "2026-06-28T16:20:00Z"
+updatedAt: "2026-06-29T00:20:10Z"
 subtasks:
   - id: task-35-1
     title: "Use tag-driven research/spike badges for v0 rather than introducing a new protocol type"
@@ -22,6 +22,13 @@ subtasks:
   - id: task-35-4
     title: "Add focused TUI tests or snapshots for the visual distinction"
     completed: false
+accord:
+  status: "delivered"
+  deliveredAt: "2026-06-29T00:20:10Z"
+  summary: "Implemented TUI Board research/spike differentiation using existing tags. Board rows now surface RESEARCH/SPIKE chips for tasks tagged research or spike, with focused tests covering task-24-style research examples and spike rows."
+  evidence: ["cd tandem && cargo fmt --check && cargo test (passed: 63 tests)", "Commit fccda7d on branch herd-task35-52-board-ux"]
+  filesChanged: ["tandem/src/tui.rs"]
+  updatedAt: "2026-06-29T00:20:10Z"
 ---
 
 ## Description
