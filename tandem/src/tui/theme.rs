@@ -442,6 +442,31 @@ impl TuiTheme {
         )
     }
 
+    pub(super) fn rule_category_style(&self, category: &str, selected: bool) -> Style {
+        if self.no_color {
+            return if selected {
+                Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+        }
+        let color = match normalized(category).as_str() {
+            "never" => self.colors.error,
+            "prefer" => self.colors.warning,
+            "context" => Color::Rgb(192, 132, 252),
+            _ => self.colors.muted,
+        };
+        if selected {
+            let bg = match normalized(category).as_str() {
+                "always" => self.colors.selected_bg,
+                _ => color,
+            };
+            self.style(self.colors.background, Some(bg), Modifier::BOLD)
+        } else {
+            self.style(color, Some(self.colors.panel), Modifier::empty())
+        }
+    }
+
     pub(super) fn status_style(&self, tone: StatusTone) -> Style {
         let color = match tone {
             StatusTone::Accent => self.colors.accent,

@@ -12,9 +12,7 @@ use crate::{
     Document, DocumentLocation,
 };
 
-use super::{
-    detail_field_line, markdownish_lines, push_optional_detail_line, StatusTone, TuiTheme,
-};
+use super::{markdownish_lines, StatusTone, TuiTheme};
 
 #[derive(Debug, Clone)]
 pub(super) struct LogEvent {
@@ -199,27 +197,37 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
         .contains(&query.to_ascii_lowercase())
 }
 
-pub(super) fn list_item_for_log(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
-    ListItem::new(line_for_log(doc, theme))
+pub(super) fn list_item_for_log(
+    doc: &Document,
+    theme: &TuiTheme,
+    available_width: u16,
+) -> ListItem<'static> {
+    ListItem::new(line_for_log(doc, theme, available_width))
 }
 
-fn line_for_log(doc: &Document, theme: &TuiTheme) -> Line<'static> {
+fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
     let completed = completed_at_compact(doc.field("completedAt").unwrap_or("-"));
     let title = if doc.title().trim().is_empty() {
         completion_summary(doc).unwrap_or("-")
     } else {
         doc.title()
     };
+    let suffix = format!("  {completed}");
+    let fixed_width = doc.id().chars().count() + 2 + suffix.chars().count();
+    let title_width = (available_width as usize)
+        .saturating_sub(fixed_width)
+        .max(12);
+
     Line::from(vec![
         Span::styled(
             format!("{}  ", doc.id()),
             theme.status_style(StatusTone::Accent),
         ),
         Span::styled(
-            truncate_for_log(title, 72),
+            truncate_for_log(title, title_width),
             theme.text_style().add_modifier(Modifier::BOLD),
         ),
-        Span::styled(format!("  completed {completed}"), theme.muted_style()),
+        Span::styled(suffix, theme.muted_style()),
     ])
 }
 
@@ -241,31 +249,49 @@ pub(super) fn detail_lines_for_log(
     theme: &TuiTheme,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
+    lines.push(Line::from(Span::styled(
+        doc.title().to_string(),
+        theme.title_style(),
+    )));
     lines.push(Line::from(vec![
-        Span::styled("Title: ", theme.label_style()),
-        Span::styled(doc.title().to_string(), theme.text_style()),
+        Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
+        Span::styled(" · ", theme.muted_style()),
+        Span::styled(doc.doc_type().to_string(), theme.muted_style()),
+        Span::styled(" · completed ", theme.muted_style()),
+        Span::styled(
+            completed_at_compact(doc.field("completedAt").unwrap_or("unknown")),
+            theme.text_style(),
+        ),
     ]));
-    lines.push(detail_field_line("ID", doc.id(), theme));
-    lines.push(detail_field_line("Type", doc.doc_type(), theme));
-    push_optional_detail_line(&mut lines, "Completed", doc.field("completedAt"), theme);
-    push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
-    push_optional_detail_line(&mut lines, "Summary", completion_summary(doc), theme);
-    push_optional_detail_line(&mut lines, "Validation", completion_validation(doc), theme);
-    push_optional_detail_line(&mut lines, "Reviewer", completion_reviewer(doc), theme);
-    push_optional_detail_line(&mut lines, "Accord", accord_status(doc), theme);
-    push_optional_detail_line(&mut lines, "Review", review_status(doc), theme);
-    push_optional_detail_line(&mut lines, "Priority", doc.field("priority"), theme);
-    push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
-    lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
+    lines.push(Line::from(Span::styled(
+        format!("path {}", display_path(&doc.path)),
+        theme.muted_style(),
+    )));
+
+    let summary = completion_summary(doc);
+    let validation = completion_validation(doc);
+    let reviewer = completion_reviewer(doc);
+    if summary.is_some() || validation.is_some() || reviewer.is_some() {
+        lines.push(Line::from(""));
+        lines.push(section_heading("Completion", theme));
+        push_compact_optional(&mut lines, "summary", summary, theme);
+        push_compact_optional(&mut lines, "validation", validation, theme);
+        push_compact_optional(&mut lines, "reviewer", reviewer, theme);
+    }
+
+    let chips = compact_metadata(doc);
+    if !chips.is_empty() {
+        lines.push(Line::from(""));
+        lines.push(section_heading("Metadata", theme));
+        lines.push(Line::from(Span::styled(
+            chips.join(" · "),
+            theme.text_style(),
+        )));
+    }
 
     let files = completion_files_changed(doc);
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Files changed",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
+    lines.push(section_heading("Files changed", theme));
     if files.is_empty() {
         lines.push(Line::from(Span::styled(
             "(none recorded)",
@@ -284,12 +310,7 @@ pub(super) fn detail_lines_for_log(
     append_event_lines(&mut lines, events, theme);
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Body",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
+    lines.push(section_heading("Body", theme));
     if doc.body.trim().is_empty() {
         lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
     } else {
@@ -297,6 +318,59 @@ pub(super) fn detail_lines_for_log(
     }
 
     lines
+}
+
+fn section_heading(label: &str, theme: &TuiTheme) -> Line<'static> {
+    Line::from(Span::styled(
+        label.to_string(),
+        theme
+            .markdown_heading_style()
+            .add_modifier(Modifier::UNDERLINED),
+    ))
+}
+
+fn push_compact_optional(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    value: Option<&str>,
+    theme: &TuiTheme,
+) {
+    if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
+        lines.push(Line::from(vec![
+            Span::styled("• ", theme.markdown_list_style()),
+            Span::styled(format!("{label}: "), theme.label_style()),
+            Span::styled(value.to_string(), theme.text_style()),
+        ]));
+    }
+}
+
+fn compact_metadata(doc: &Document) -> Vec<String> {
+    let mut items = Vec::new();
+    if let Some(value) = accord_status(doc).filter(|value| !value.trim().is_empty()) {
+        items.push(format!("accord {value}"));
+    }
+    if let Some(value) = review_status(doc).filter(|value| !value.trim().is_empty()) {
+        items.push(format!("review {value}"));
+    }
+    if let Some(value) = doc
+        .field("priority")
+        .filter(|value| !value.trim().is_empty())
+    {
+        items.push(format!("priority {value}"));
+    }
+    if let Some(value) = doc
+        .field("assignee")
+        .filter(|value| !value.trim().is_empty())
+    {
+        items.push(format!("assignee {value}"));
+    }
+    if let Some(value) = doc
+        .field("updatedAt")
+        .filter(|value| !value.trim().is_empty())
+    {
+        items.push(format!("updated {}", completed_at_compact(value)));
+    }
+    items
 }
 
 fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &TuiTheme) {
@@ -320,20 +394,15 @@ fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &T
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Accord detail",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
-    push_optional_detail_line(lines, "Assignee", doc.field("accord.assignee"), theme);
-    push_optional_detail_line(lines, "Claimed", doc.field("accord.claimedAt"), theme);
-    push_optional_detail_line(lines, "Delivered", doc.field("accord.deliveredAt"), theme);
-    push_optional_detail_line(lines, "Accord summary", doc.field("accord.summary"), theme);
-    push_array_detail_lines(lines, "Evidence", doc.field("accord.evidence"), theme);
+    lines.push(section_heading("Accord detail", theme));
+    push_compact_optional(lines, "assignee", doc.field("accord.assignee"), theme);
+    push_compact_optional(lines, "claimed", doc.field("accord.claimedAt"), theme);
+    push_compact_optional(lines, "delivered", doc.field("accord.deliveredAt"), theme);
+    push_compact_optional(lines, "summary", doc.field("accord.summary"), theme);
+    push_array_detail_lines(lines, "evidence", doc.field("accord.evidence"), theme);
     push_array_detail_lines(
         lines,
-        "Validation commands",
+        "validation commands",
         doc.field("accord.validation.commands")
             .or_else(|| doc.field("accord.validation"))
             .or_else(|| doc.field("accord.validations")),
@@ -341,18 +410,18 @@ fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &T
     );
     push_array_detail_lines(
         lines,
-        "Deliverables",
+        "deliverables",
         doc.field("accord.deliverables"),
         theme,
     );
     push_array_detail_lines(
         lines,
-        "Accord files",
+        "accord files",
         doc.field("accord.filesChanged"),
         theme,
     );
-    push_optional_detail_line(lines, "Note", doc.field("accord.note"), theme);
-    push_optional_detail_line(lines, "Reason", doc.field("accord.reason"), theme);
+    push_compact_optional(lines, "note", doc.field("accord.note"), theme);
+    push_compact_optional(lines, "reason", doc.field("accord.reason"), theme);
 }
 
 fn push_array_detail_lines(
@@ -383,12 +452,7 @@ fn append_event_lines(lines: &mut Vec<Line<'static>>, events: &[LogEvent], theme
     }
 
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Event timeline",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
+    lines.push(section_heading("Event timeline", theme));
     for event in events.iter().rev().take(8).rev() {
         let ts = if event.ts.is_empty() {
             "unknown time".to_string()
@@ -506,9 +570,9 @@ mod tests {
             "[\"docs/index.md\", \"tandem/src/tui.rs\"]".to_string(),
         );
 
-        let row = line_text(&line_for_log(&doc, &theme));
+        let row = line_text(&line_for_log(&doc, &theme, 80));
         assert!(row.starts_with("task-36  Implement Tandem docs site foundation"));
-        assert!(row.contains("completed 06-28 17:34"));
+        assert!(row.contains("06-28 17:34"));
         assert!(!row.contains("2026-06-28T17:34:12Z"));
         assert!(!row.contains("accepted"));
         assert!(!row.contains("docs/index.md"));
