@@ -6,6 +6,30 @@ set positional-arguments
 dev:
 	cargo run --manifest-path tandem/Cargo.toml -- tui
 
+# Start the local documentation site with Astro Starlight.
+# The npm dev script syncs ../docs/ into Starlight before serving.
+site:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	cd site
+	if [[ ! -d node_modules ]]; then
+		npm install
+	fi
+	npm run dev
+
+# Alias for the local documentation site.
+alias docs := site
+
+# Build the static documentation site output in site/dist/.
+site-build:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	cd site
+	if [[ ! -d node_modules ]]; then
+		npm install
+	fi
+	npm run build
+
 # Bump tandem to VERSION, validate, commit, tag, push main + tag, and create the GitHub Release.
 # Usage: just release 0.2.1
 release VERSION:
