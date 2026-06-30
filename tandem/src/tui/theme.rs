@@ -31,6 +31,26 @@ struct ResolvedTheme {
     source: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BadgeStyle {
+    FilledMuted,
+    AccentRail,
+    TextOnly,
+    GhostChip,
+    Solid,
+}
+
+impl BadgeStyle {
+    pub(super) fn label(self, text: &str) -> String {
+        match self {
+            Self::FilledMuted | Self::Solid => format!(" {text:<4} "),
+            Self::AccentRail => format!("▏{text}"),
+            Self::TextOnly => text.to_string(),
+            Self::GhostChip => format!("[{text}]"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(super) enum StatusTone {
     Accent,
@@ -47,6 +67,7 @@ pub(super) struct TuiTheme {
     priority: PriorityPalette,
     accord: AccordPalette,
     review: ReviewPalette,
+    badge_style: BadgeStyle,
     transparent_background: bool,
     no_color: bool,
 }
@@ -141,6 +162,7 @@ impl TuiTheme {
                 failed: Color::Rgb(248, 113, 113),
                 unknown: Color::Rgb(107, 114, 128),
             },
+            badge_style: BadgeStyle::FilledMuted,
             transparent_background: false,
             no_color: false,
         }
@@ -188,6 +210,7 @@ impl TuiTheme {
                 failed: Color::Rgb(227, 111, 99),
                 unknown: Color::Rgb(146, 131, 116),
             },
+            badge_style: BadgeStyle::FilledMuted,
             transparent_background: false,
             no_color: false,
         }
@@ -357,6 +380,14 @@ impl TuiTheme {
 
     pub(super) fn board_doc_type_style(&self) -> Style {
         self.muted_style()
+    }
+
+    pub(super) fn badge_label(&self, label: &str) -> String {
+        self.badge_style.label(label)
+    }
+
+    pub(super) fn badge_style_mode(&self) -> BadgeStyle {
+        self.badge_style
     }
 
     pub(super) fn priority_chip_style(&self, priority: &str) -> Style {
@@ -550,11 +581,28 @@ impl TuiTheme {
         self.background_option(self.colors.panel)
     }
 
-    fn chip_style(&self, bg: Color) -> Style {
+    fn chip_style(&self, color: Color) -> Style {
         if self.no_color {
-            return Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED);
+            return match self.badge_style {
+                BadgeStyle::TextOnly | BadgeStyle::AccentRail | BadgeStyle::GhostChip => {
+                    Style::default().add_modifier(Modifier::BOLD)
+                }
+                BadgeStyle::FilledMuted | BadgeStyle::Solid => {
+                    Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
+                }
+            };
         }
-        self.style(self.colors.background, Some(bg), Modifier::BOLD)
+        match self.badge_style {
+            BadgeStyle::FilledMuted => self.style(
+                self.colors.text,
+                Some(mix_color(color, self.colors.panel, 0.72)),
+                Modifier::empty(),
+            ),
+            BadgeStyle::AccentRail => self.style(color, self.panel_background(), Modifier::BOLD),
+            BadgeStyle::TextOnly => self.style(color, self.panel_background(), Modifier::BOLD),
+            BadgeStyle::GhostChip => self.style(color, self.panel_background(), Modifier::empty()),
+            BadgeStyle::Solid => self.style(self.colors.background, Some(color), Modifier::BOLD),
+        }
     }
 
     fn no_color() -> Self {
@@ -605,6 +653,10 @@ impl TuiTheme {
 
     fn set_transparent_background(&mut self, enabled: bool) {
         self.transparent_background = enabled;
+    }
+
+    fn set_badge_style(&mut self, style: BadgeStyle) {
+        self.badge_style = style;
     }
 
     fn apply_theme_content(&mut self, content: &str) -> Vec<String> {
@@ -658,8 +710,26 @@ impl TuiTheme {
                             )),
                         }
                     }
+                    "badge_style" | "badge-style" | "badges" => match parse_badge_style(&value) {
+                        Some(style) => self.set_badge_style(style),
+                        None => warnings.push(format!(
+                            "Theme warning line {line_number}: invalid badge style for `{key}`: use filled-muted, accent-rail, text-only, ghost-chip, or solid"
+                        )),
+                    },
                     _ => warnings.push(format!(
                         "Theme warning line {line_number}: unknown root key `{key}`"
+                    )),
+                }
+                continue;
+            }
+
+            if section == "badges"
+                && matches!(key.as_str(), "style" | "badge_style" | "badge-style")
+            {
+                match parse_badge_style(&value) {
+                    Some(style) => self.set_badge_style(style),
+                    None => warnings.push(format!(
+                        "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use filled-muted, accent-rail, text-only, ghost-chip, or solid"
                     )),
                 }
                 continue;
@@ -1007,6 +1077,17 @@ fn parse_bool(value: &str) -> Option<bool> {
     }
 }
 
+fn parse_badge_style(value: &str) -> Option<BadgeStyle> {
+    match normalized(value).as_str() {
+        "filled-muted" | "muted-filled" | "muted" => Some(BadgeStyle::FilledMuted),
+        "accent-rail" | "rail" => Some(BadgeStyle::AccentRail),
+        "text-only" | "text" => Some(BadgeStyle::TextOnly),
+        "ghost-chip" | "ghost" | "outline" | "outlined" => Some(BadgeStyle::GhostChip),
+        "solid" | "filled" | "legacy" | "legacy-solid" => Some(BadgeStyle::Solid),
+        _ => None,
+    }
+}
+
 fn parse_color(value: &str) -> Result<Color, String> {
     let value = value.trim();
     if value.is_empty() {
@@ -1055,6 +1136,21 @@ fn parse_hex_color(hex: &str) -> Result<Color, String> {
     let green = u8::from_str_radix(&hex[2..4], 16).map_err(|error| error.to_string())?;
     let blue = u8::from_str_radix(&hex[4..6], 16).map_err(|error| error.to_string())?;
     Ok(Color::Rgb(red, green, blue))
+}
+
+fn mix_color(color: Color, base: Color, base_weight: f32) -> Color {
+    match (color, base) {
+        (Color::Rgb(r, g, b), Color::Rgb(br, bg, bb)) => {
+            let base_weight = base_weight.clamp(0.0, 1.0);
+            let color_weight = 1.0 - base_weight;
+            Color::Rgb(
+                ((r as f32 * color_weight) + (br as f32 * base_weight)).round() as u8,
+                ((g as f32 * color_weight) + (bg as f32 * base_weight)).round() as u8,
+                ((b as f32 * color_weight) + (bb as f32 * base_weight)).round() as u8,
+            )
+        }
+        _ => color,
+    }
 }
 
 fn normalized(value: &str) -> String {
@@ -1155,6 +1251,45 @@ changes-requested = "#eb6f92"
         assert!(warnings[0].contains("invalid boolean"));
         assert!(!theme.transparent_background);
         assert_eq!(theme.panel_style().bg, Some(theme.colors.panel));
+    }
+
+    #[test]
+    fn badge_style_defaults_to_muted_fill_and_can_select_all_modes() {
+        let theme = TuiTheme::default_dark();
+        assert_eq!(theme.badge_style_mode(), BadgeStyle::FilledMuted);
+        assert_eq!(theme.badge_label("HIGH"), " HIGH ");
+        let muted = theme.priority_chip_style("high");
+        assert_eq!(muted.fg, Some(theme.colors.text));
+        assert_ne!(muted.bg, Some(theme.priority.high));
+        assert!(!muted.add_modifier.contains(Modifier::BOLD));
+
+        for (value, expected, label) in [
+            ("accent-rail", BadgeStyle::AccentRail, "▏HIGH"),
+            ("text-only", BadgeStyle::TextOnly, "HIGH"),
+            ("ghost-chip", BadgeStyle::GhostChip, "[HIGH]"),
+            ("solid", BadgeStyle::Solid, " HIGH "),
+            ("filled-muted", BadgeStyle::FilledMuted, " HIGH "),
+        ] {
+            let mut theme = TuiTheme::default_dark();
+            let warnings = theme.apply_theme_content(&format!("badge_style = \"{value}\"\n"));
+            assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+            assert_eq!(theme.badge_style_mode(), expected);
+            assert_eq!(theme.badge_label("HIGH"), label);
+        }
+    }
+
+    #[test]
+    fn badge_style_can_be_set_from_badges_section_and_warns_on_invalid_values() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content("[badges]\nstyle = \"ghost-chip\"\n");
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert_eq!(theme.badge_style_mode(), BadgeStyle::GhostChip);
+        assert_eq!(theme.badge_label("MED"), "[MED]");
+
+        let warnings = theme.apply_theme_content("badge_style = \"neon\"\n");
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("invalid badge style"));
+        assert_eq!(theme.badge_style_mode(), BadgeStyle::GhostChip);
     }
 
     #[test]

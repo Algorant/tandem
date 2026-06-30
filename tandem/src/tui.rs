@@ -4110,28 +4110,28 @@ fn board_item_lines_for_doc(
 ) -> Vec<Line<'static>> {
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in the detail pane. Add chips here only when they change the next
-    // action or scan priority, and render them as real terminal badges (fg + bg), not
-    // as another color in a noisy line of metadata.
+    // action or scan priority. The active theme controls whether badges use a muted fill,
+    // accent rail, text-only label, ghost chip, or legacy solid block.
     let priority = doc.field("priority").unwrap_or("-");
     let mut chips: Vec<(String, Style)> = Vec::new();
-    if let Some(priority_chip) = priority_chip(priority) {
+    if let Some(priority_chip) = priority_chip(priority, theme) {
         chips.push((priority_chip, theme.priority_chip_style(priority)));
     }
-    if let Some(kind_chip) = research_or_spike_chip(doc) {
+    if let Some(kind_chip) = research_or_spike_chip(doc, theme) {
         chips.push((kind_chip, theme.progress_chip_style(StatusTone::Accent)));
     }
-    if let Some(visual_chip) = validation_visual_chip(doc) {
+    if let Some(visual_chip) = validation_visual_chip(doc, theme) {
         chips.push((visual_chip, theme.progress_chip_style(StatusTone::Accent)));
     }
     if let Some(accord) =
         accord_status(doc).filter(|status| board_should_surface_accord_status(doc, status))
     {
-        chips.push((status_chip(accord), theme.accord_chip_style(accord)));
+        chips.push((status_chip(accord, theme), theme.accord_chip_style(accord)));
     }
     if let Some(review) =
         review_status(doc).filter(|status| board_should_surface_review_status(status))
     {
-        chips.push((status_chip(review), theme.review_chip_style(review)));
+        chips.push((status_chip(review, theme), theme.review_chip_style(review)));
     }
     if let Some((completed, total)) =
         subtask_progress(doc).filter(|(completed, total)| *completed > 0 || completed == total)
@@ -4142,7 +4142,7 @@ fn board_item_lines_for_doc(
             StatusTone::Warning
         };
         chips.push((
-            chip_text(&format!("{completed}/{total}")),
+            chip_text(&format!("{completed}/{total}"), theme),
             theme.progress_chip_style(tone),
         ));
     }
@@ -4204,28 +4204,24 @@ fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
     }
 }
 
-fn priority_chip(priority: &str) -> Option<String> {
+fn priority_chip(priority: &str, theme: &TuiTheme) -> Option<String> {
     let label = match priority.trim().to_ascii_lowercase().as_str() {
-        "critical" | "urgent" => "CRIT",
-        "high" => "HIGH",
-        "medium" | "med" => "MED",
-        "low" => "LOW",
+        "critical" | "urgent" => "CRIT".to_string(),
+        "high" => "HIGH".to_string(),
+        "medium" | "med" => "MED".to_string(),
+        "low" => "LOW".to_string(),
         "" | "-" | "none" => return None,
-        other => {
-            return Some(chip_text(
-                &other.chars().take(4).collect::<String>().to_uppercase(),
-            ))
-        }
+        other => other.chars().take(4).collect::<String>().to_uppercase(),
     };
-    Some(chip_text(label))
+    Some(chip_text(&label, theme))
 }
 
-fn research_or_spike_chip(doc: &Document) -> Option<String> {
+fn research_or_spike_chip(doc: &Document, theme: &TuiTheme) -> Option<String> {
     let tags = document_tags(doc);
     if tags.iter().any(|tag| tag.eq_ignore_ascii_case("spike")) {
-        Some(chip_text("SPIKE"))
+        Some(chip_text("SPIKE", theme))
     } else if tags.iter().any(|tag| tag.eq_ignore_ascii_case("research")) {
-        Some(chip_text("RESEARCH"))
+        Some(chip_text("RESEARCH", theme))
     } else {
         None
     }
@@ -4244,17 +4240,15 @@ fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) -> Line<'stat
 
     if let Some(tag) = filters.tag.as_deref() {
         spans.push(Span::styled(
-            format!(" #{} ", tag),
-            theme
-                .status_style(StatusTone::Accent)
-                .add_modifier(Modifier::BOLD),
+            chip_text(&format!("#{}", tag), theme),
+            theme.progress_chip_style(StatusTone::Accent),
         ));
         spans.push(Span::raw(" "));
     }
     if let Some(priority) = filters.priority.as_deref() {
         spans.push(Span::styled(" priority ", theme.muted_style()));
         spans.push(Span::styled(
-            format!(" {} ", priority),
+            chip_text(priority, theme),
             theme.priority_chip_style(priority),
         ));
         spans.push(Span::raw(" "));
@@ -4341,12 +4335,12 @@ fn normalize_filter_value(value: &str) -> String {
     value.trim().trim_start_matches('#').to_ascii_lowercase()
 }
 
-fn status_chip(status: &str) -> String {
-    chip_text(&status.trim().replace('_', "-").to_uppercase())
+fn status_chip(status: &str, theme: &TuiTheme) -> String {
+    chip_text(&status.trim().replace('_', "-").to_uppercase(), theme)
 }
 
-fn chip_text(label: &str) -> String {
-    format!(" {label:<4} ")
+fn chip_text(label: &str, theme: &TuiTheme) -> String {
+    theme.badge_label(label)
 }
 
 fn inline_preview_height(doc: &Document, content_width: usize) -> u16 {
@@ -4588,13 +4582,13 @@ fn board_should_surface_accord_status(doc: &Document, status: &str) -> bool {
     )
 }
 
-fn validation_visual_chip(doc: &Document) -> Option<String> {
+fn validation_visual_chip(doc: &Document, theme: &TuiTheme) -> Option<String> {
     if document_state_label(doc) != "validation" {
         return None;
     }
     let tags = doc.field("tags").unwrap_or("").to_ascii_lowercase();
     (tags.contains("visual") || tags.contains("ui") || tags.contains("ux"))
-        .then(|| chip_text("VISUAL"))
+        .then(|| chip_text("VISUAL", theme))
 }
 
 fn board_should_surface_review_status(status: &str) -> bool {

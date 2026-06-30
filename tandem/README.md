@@ -79,9 +79,10 @@ Use the user config for your normal machine-wide preference:
 ```toml
 theme = "verdigris"
 transparent_background = true
+badge_style = "filled-muted"
 ```
 
-Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user/workspace config may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names):
+Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user/workspace config may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names) and supported root settings:
 
 ```toml
 theme = "my-custom-dark"
@@ -110,7 +111,7 @@ accent = "#8ec07c"
 
 Supported built-in presets are `default-dark` (conservative dark/default) and `verdigris` (repo default here). Supported keys:
 
-- root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`)
+- root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`), `badge_style` (optional; default `filled-muted`) or `[badges] style`
 - `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
@@ -119,6 +120,8 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme files are non-fatal and appear as theme warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
 
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
+
+`badge_style` controls Board priority/status/tag chips: `filled-muted` (default softened fill), `accent-rail` (small colored rail), `text-only` (colored label), `ghost-chip` (transparent chip outline), or `solid` (legacy saturated fill).
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 

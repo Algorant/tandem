@@ -8,5 +8,7 @@
 #   printf 'theme = "default-dark"\n' > .tandem/theme.toml
 #
 # NO_COLOR=1 or TANDEM_NO_COLOR=1 keeps Tandem in the terminal/no-color fallback.
+# Badge styles: filled-muted (default), accent-rail, text-only, ghost-chip, solid.
 base = "default-dark"
 name = "default-dark"
+badge_style = "filled-muted"

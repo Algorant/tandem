@@ -1012,6 +1012,7 @@ The TUI starts from `default-dark`, discovers every user `*.toml` theme in the u
 
 ```toml
 theme = "verdigris"
+badge_style = "filled-muted"
 ```
 
 Use `.tandem/theme.toml` only when a workspace should override the user's normal preference. `base`, `builtin`, and `extends` are accepted selector aliases for existing workspace files. User theme files are registered by root `name`, or by their filename stem when `name` is omitted. User themes may inherit from a built-in or previously loaded user theme:
@@ -1024,7 +1025,7 @@ base = "default-dark"
 accent = "#8ec07c"
 ```
 
-After selection, user config and `.tandem/theme.toml` may override any supported color key. The parser intentionally accepts only simple TOML-style root keys, `key = "color"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, and invalid colors are non-fatal TUI status warnings.
+After selection, user config and `.tandem/theme.toml` may override any supported color key and supported root settings such as `transparent_background` and `badge_style`. The parser intentionally accepts only simple TOML-style root keys, `key = "color-or-setting"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names for color entries. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, invalid colors, and invalid badge styles are non-fatal TUI status warnings.
 
 Implemented keys:
 
@@ -1032,6 +1033,11 @@ Implemented keys:
 theme = "verdigris"
 name = "optional-display-name"
 base = "default-dark"
+transparent_background = false
+badge_style = "filled-muted" # filled-muted, accent-rail, text-only, ghost-chip, solid
+
+[badges]
+style = "filled-muted" # optional equivalent to root badge_style
 
 [colors]
 background = "#1d2021"
@@ -1079,13 +1085,15 @@ Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tand
 
 Themes may opt into terminal-default/transparent fills with root `transparent_background = true`. The default is false, so omitted themes continue to force the active palette's opaque `background` and `panel` colors. When enabled, app and panel fills use no explicit background where practical while selection and badge styles may still use explicit backgrounds for legibility.
 
+Themes may set root `badge_style` or `[badges] style` to `filled-muted`, `accent-rail`, `text-only`, `ghost-chip`, or `solid`. `filled-muted` is the default and keeps chip shapes with softer background contrast; `solid` preserves the older saturated filled block behavior for users who prefer it.
+
 ### Theme requirements
 
 - Support truecolor terminals.
 - Support 256-color fallback where possible.
 - Support no-color mode.
 - Keep semantic color names separate from concrete colors.
-- Make priority and status badges configurable.
+- Make priority and status badges configurable. The current supported modes are `filled-muted`, `accent-rail`, `text-only`, `ghost-chip`, and legacy `solid`.
 - Avoid relying only on color; include glyphs/text for status.
 
 ## Mouse support
