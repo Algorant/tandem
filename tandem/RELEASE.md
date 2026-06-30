@@ -1,10 +1,28 @@
-# Tandem CLI/TUI release notes
+# Tandem CLI/TUI release checklist
 
 ## v0.2.3 (recommended tag: `tandem-v0.2.3`)
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
-This release is intended to support global `pi-tandem` testing against a tagged `tandem` CLI. It also includes MIT license metadata for downstream packaging. It includes the renamed `tandem` binary, Validation workflow updates, Board/TUI polish, task/log reconciliation, and the initial docs-site foundation.
+This file is the reusable release checklist and validation record. Do not use it directly as the GitHub Release body. Public GitHub Release notes live in `GITHUB_RELEASE_NOTES.md` so each release can stay concise and version-specific while this checklist keeps install, validation, and operational details available.
+
+### Public GitHub Release notes workflow
+
+Recommendation: maintain curated, per-release public notes in `tandem/GITHUB_RELEASE_NOTES.md`, and maintain reusable validation/install procedure details in this checklist.
+
+| Option | Fit for Tandem |
+| --- | --- |
+| Curated per-release notes | Best default. Produces concise, useful highlights and known limitations, and lets the release owner group work by user impact instead of commit order. |
+| Generated changelog from commits/tags | Useful as an internal drafting aid, but noisy unless commit hygiene and grouping are consistently release-note quality. |
+| GitHub auto-generated release notes (`gh release create --generate-notes`) | Useful as a compare/draft source and can be configured with `.github/release.yml`, but should be reviewed before publishing because PR labels/titles may not explain CLI/TUI user impact. |
+| Reusable checklist as release body | Avoid. It preserves validation detail, but makes public releases verbose and repeats boilerplate. Keep it in this file instead. |
+
+Release flow:
+
+1. Update `GITHUB_RELEASE_NOTES.md` with version-specific highlights, install command, and short known limitations.
+2. Keep reusable validation commands, `pi-tandem` install notes, and operational checks in this checklist.
+3. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
+4. Run `just release <version>`, which publishes the GitHub Release from `GITHUB_RELEASE_NOTES.md`.
 
 ### Current capabilities
 

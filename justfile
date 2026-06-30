@@ -30,8 +30,9 @@ site-build:
 	fi
 	npm run build
 
-# Bump tandem to VERSION, validate, commit, tag, push main + tag, and create the GitHub Release.
+# Bump tandem to VERSION, validate, commit, tag, push main + tag, and create a concise GitHub Release.
 # Usage: just release 0.2.1
+# Before running, curate tandem/GITHUB_RELEASE_NOTES.md; tandem/RELEASE.md is the reusable checklist.
 release VERSION:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -74,6 +75,14 @@ release VERSION:
 	    raise SystemExit("failed to update tandem/RELEASE.md heading")
 	text = re.sub(r'tandem-v[0-9]+\.[0-9]+\.[0-9]+', f'tandem-v{version}', text)
 	release.write_text(text)
+
+	notes = pathlib.Path("tandem/GITHUB_RELEASE_NOTES.md")
+	text = notes.read_text()
+	text, count = re.subn(r'(?m)^# Tandem v[0-9]+\.[0-9]+\.[0-9]+$', f'# Tandem v{version}', text, count=1)
+	if count != 1:
+	    raise SystemExit("failed to update tandem/GITHUB_RELEASE_NOTES.md heading")
+	text = re.sub(r'tandem-v[0-9]+\.[0-9]+\.[0-9]+', f'tandem-v{version}', text)
+	notes.write_text(text)
 	PY
 	cd tandem
 	cargo fmt --check
@@ -91,9 +100,9 @@ release VERSION:
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 	git diff --check
-	git add tandem/Cargo.toml tandem/Cargo.lock tandem/RELEASE.md
+	git add tandem/Cargo.toml tandem/Cargo.lock tandem/RELEASE.md tandem/GITHUB_RELEASE_NOTES.md
 	git commit -m "Release tandem v${version}"
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main
 	git push origin "$tag"
-	gh release create "$tag" --repo Algorant/tandem --title "Tandem v${version}" --notes-file tandem/RELEASE.md
+	gh release create "$tag" --repo Algorant/tandem --title "Tandem v${version}" --notes-file tandem/GITHUB_RELEASE_NOTES.md

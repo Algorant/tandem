@@ -63,7 +63,7 @@ cargo install --path tandem --locked
 tandem --version
 ```
 
-`pi-tandem` should locate the installed binary through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Release notes, known limitations, and the blocked publish commands are in `RELEASE.md`.
+`pi-tandem` should locate the installed binary through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Concise public GitHub Release notes are curated in `GITHUB_RELEASE_NOTES.md`; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
 
 ## Implemented TUI themes and keys
 
