@@ -70,6 +70,7 @@ tandem list
 tandem show <id>
 tandem add ...
 tandem move <id> --state <state>
+tandem update <id> ...
 tandem complete <id>
 tandem log list|show|search
 tandem search <query>
@@ -93,6 +94,7 @@ Command behavior rules:
 - `tandem decision` supports `list`, `show`, and `add` in v0.
 - The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
 - `tandem complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
+- `tandem update <id>` edits active task metadata only. It never updates completed logs, workflow `state`, or `parentId`; state changes remain `tandem move`.
 - The first implementation language is Rust, implemented inside `tandem/`.
 - The current implementation package is a Rust binary crate in `tandem/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
@@ -291,6 +293,31 @@ tandem move <id> --state <state>
   - ambiguous or destructive accord changes are left to explicit `tandem accord ...` commands.
 - Exit/error notes:
   - fails if the task is not active, the ID resolves to a non-task document, the state is unknown, structural validation fails, or the write fails.
+
+### `tandem update`
+
+- Purpose: edit workflow-orthogonal metadata on an active task without changing state.
+- Kind: mutation.
+- Syntax:
+
+```text
+tandem update <id> [--title <title>] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
+```
+
+- Required inputs:
+  - `<id>`: active board task ID.
+- Optional inputs:
+  - scalar replacements: `--title`, `--priority`, `--assignee`, `--due-date`.
+  - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
+- Unsupported by design:
+  - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
+  - no `parentId` update and no clear/remove flags in v0.
+  - completed logs are not updated.
+- Validation:
+  - priority must be one of `critical`, `high`, `medium`, or `low`.
+  - blockers must resolve to existing documents; references warn when unresolved; related files remain path metadata.
+- Human output shape: warnings first, then changed fields with old/new values and the path. If every requested value already exists, the command prints a clear no-op and does not update `updatedAt` or append an event.
+- Mutation notes: raw-source frontmatter patches preserve unknown fields and the Markdown body, update `updatedAt` only on real changes, and append `task.updated` on real changes.
 
 ### `tandem complete`
 

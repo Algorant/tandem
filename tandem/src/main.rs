@@ -30,6 +30,7 @@ const REVIEW_STATUSES: &[&str] = &[
     "changes-requested",
     "rejected",
 ];
+const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
@@ -157,6 +158,34 @@ struct MoveOptions {
 }
 
 #[derive(Debug, Default)]
+struct UpdateOptions {
+    id: String,
+    title: Option<String>,
+    priority: Option<String>,
+    assignee: Option<String>,
+    due_date: Option<String>,
+    tags: Vec<String>,
+    blockers: Vec<String>,
+    references: Vec<String>,
+    related_files: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct UpdateChange {
+    field: String,
+    old: String,
+    new: String,
+}
+
+#[derive(Debug)]
+struct UpdateOutcome {
+    id: String,
+    path: PathBuf,
+    changes: Vec<UpdateChange>,
+    warnings: Vec<String>,
+}
+
+#[derive(Debug, Default)]
 struct CompleteOptions {
     id: String,
     summary: Option<String>,
@@ -260,6 +289,7 @@ fn run() -> Result<(), CliError> {
         "show" => cmd_show(parse_show_args(&args)?)?,
         "add" => cmd_add(parse_add_args(&args)?)?,
         "move" => cmd_move(parse_move_args(&args)?)?,
+        "update" => cmd_update(parse_update_args(&args)?)?,
         "complete" => cmd_complete(parse_complete_args(&args)?)?,
         "search" => cmd_search(parse_search_args(&args)?)?,
         "log" => cmd_log(&args)?,
@@ -271,7 +301,7 @@ fn run() -> Result<(), CliError> {
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, list, show, add, move, complete, search, log, accord, rules, decision, tui, version"
+                "unknown command `{other}`. Supported commands: init, list, show, add, move, update, complete, search, log, accord, rules, decision, tui, version"
             )))
         }
     }
@@ -288,6 +318,7 @@ fn print_help() {
     println!("  tandem show <id> [--json]");
     println!("  tandem add --title <title> [--state <state>] [--description <text>]");
     println!("  tandem move <id> --state <state>");
+    println!("  tandem update <id> [--title <title>] [--priority <priority>] [--tag <tag>] ...");
     println!("  tandem complete <id> --summary <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--json]");
     println!("  tandem log list|show|search ...");
@@ -496,6 +527,72 @@ fn parse_move_args(args: &[String]) -> Result<MoveOptions, CliError> {
     }
     if options.id.is_empty() {
         return Err(CliError::usage("move requires an <id>"));
+    }
+    Ok(options)
+}
+
+fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
+    let mut options = UpdateOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--title" => {
+                index += 1;
+                options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--priority" => {
+                index += 1;
+                options.priority = Some(required_value(args, index, "--priority")?.to_string());
+            }
+            "--assignee" => {
+                index += 1;
+                options.assignee = Some(required_value(args, index, "--assignee")?.to_string());
+            }
+            "--due-date" => {
+                index += 1;
+                options.due_date = Some(required_value(args, index, "--due-date")?.to_string());
+            }
+            "--tag" => {
+                index += 1;
+                options
+                    .tags
+                    .push(required_value(args, index, "--tag")?.to_string());
+            }
+            "--blocker" => {
+                index += 1;
+                options
+                    .blockers
+                    .push(required_value(args, index, "--blocker")?.to_string());
+            }
+            "--reference" => {
+                index += 1;
+                options
+                    .references
+                    .push(required_value(args, index, "--reference")?.to_string());
+            }
+            "--related-file" => {
+                index += 1;
+                options
+                    .related_files
+                    .push(required_value(args, index, "--related-file")?.to_string());
+            }
+            "--state" => {
+                return Err(CliError::usage(
+                    "update does not support --state; use `tandem move <id> --state <state>`",
+                ))
+            }
+            "--parent" | "--parent-id" | "--parentId" => {
+                return Err(CliError::usage("update does not support updating parentId"))
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown update flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.id, value, "update")?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage("update requires an <id>"));
     }
     Ok(options)
 }
@@ -1026,6 +1123,32 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
     println!("To:   {}", outcome.to);
     if let Some(sync) = outcome.accord_sync.as_deref() {
         println!("Accord: {sync}");
+    }
+    println!("Path: {}", display_path(&outcome.path));
+    Ok(())
+}
+
+fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let outcome = update_task_metadata(&workspace, options)?;
+
+    for warning in outcome.warnings {
+        println!("Warning: {warning}");
+    }
+    if outcome.changes.is_empty() {
+        println!("No changes for {}", outcome.id);
+        println!("Path: {}", display_path(&outcome.path));
+        return Ok(());
+    }
+
+    println!("Updated {}", outcome.id);
+    for change in outcome.changes {
+        println!(
+            "{}: {} -> {}",
+            change.field,
+            display_change_value(&change.old),
+            display_change_value(&change.new)
+        );
     }
     println!("Path: {}", display_path(&outcome.path));
     Ok(())
@@ -2047,6 +2170,222 @@ fn move_task_to_state(
         path: doc.path,
         accord_sync,
     })
+}
+
+fn update_task_metadata(
+    workspace: &Workspace,
+    options: UpdateOptions,
+) -> Result<UpdateOutcome, CliError> {
+    let doc = find_board_document(workspace, &options.id)?
+        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only task documents can be updated in v0: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    validate_task_document_for_mutation(workspace, &doc)?;
+    validate_update_options(workspace, &options)?;
+
+    let mut warnings = Vec::new();
+    for reference in &options.references {
+        if !document_exists(workspace, reference)? {
+            warnings.push(format!("reference not found: {reference}"));
+        }
+    }
+
+    let mut updates = BTreeMap::new();
+    let mut changes = Vec::new();
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "title",
+        options.title.as_deref(),
+    )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "priority",
+        options.priority.as_deref(),
+    )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "assignee",
+        options.assignee.as_deref(),
+    )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "dueDate",
+        options.due_date.as_deref(),
+    )?;
+    apply_list_append_update(&mut updates, &mut changes, &doc, "tags", &options.tags);
+    apply_list_append_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "blockers",
+        &options.blockers,
+    );
+    apply_list_append_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "references",
+        &options.references,
+    );
+    apply_list_append_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "relatedFiles",
+        &options.related_files,
+    );
+
+    let doc_id = doc.id().to_string();
+    let path = doc.path.clone();
+    if changes.is_empty() {
+        return Ok(UpdateOutcome {
+            id: doc_id,
+            path,
+            changes,
+            warnings,
+        });
+    }
+
+    updates.insert("updatedAt".to_string(), current_timestamp());
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        workspace,
+        "task.updated",
+        &doc_id,
+        &format!(
+            "Updated {} metadata: {}",
+            doc_id,
+            changes
+                .iter()
+                .map(|change| change.field.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    )?;
+
+    Ok(UpdateOutcome {
+        id: doc_id,
+        path,
+        changes,
+        warnings,
+    })
+}
+
+fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Result<(), CliError> {
+    if let Some(title) = options.title.as_deref() {
+        require_nonempty(Some(title), "update --title must not be empty")?;
+    }
+    if let Some(priority) = options.priority.as_deref() {
+        let priority = require_nonempty(Some(priority), "update --priority must not be empty")?;
+        if !PRIORITIES.contains(&priority) {
+            return Err(CliError::user(format!(
+                "Validation failed: invalid priority `{priority}`; expected one of: {}",
+                PRIORITIES.join(", ")
+            )));
+        }
+    }
+    if let Some(assignee) = options.assignee.as_deref() {
+        require_nonempty(Some(assignee), "update --assignee must not be empty")?;
+    }
+    if let Some(due_date) = options.due_date.as_deref() {
+        require_nonempty(Some(due_date), "update --due-date must not be empty")?;
+    }
+    for (field, values) in [
+        ("--tag", &options.tags),
+        ("--blocker", &options.blockers),
+        ("--reference", &options.references),
+        ("--related-file", &options.related_files),
+    ] {
+        for value in values {
+            require_nonempty(Some(value), &format!("update {field} must not be empty"))?;
+        }
+    }
+    for blocker in &options.blockers {
+        require_existing_document(workspace, blocker, "blocker")?;
+    }
+    Ok(())
+}
+
+fn apply_scalar_update(
+    updates: &mut BTreeMap<String, String>,
+    changes: &mut Vec<UpdateChange>,
+    doc: &Document,
+    key: &str,
+    value: Option<&str>,
+) -> Result<(), CliError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let value = require_nonempty(Some(value), &format!("update --{key} must not be empty"))?;
+    let old = doc.field(key).unwrap_or("");
+    if old != value {
+        updates.insert(key.to_string(), value.to_string());
+        changes.push(UpdateChange {
+            field: key.to_string(),
+            old: old.to_string(),
+            new: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn apply_list_append_update(
+    updates: &mut BTreeMap<String, String>,
+    changes: &mut Vec<UpdateChange>,
+    doc: &Document,
+    key: &str,
+    additions: &[String],
+) {
+    if additions.is_empty() {
+        return;
+    }
+    let old_values = doc.field(key).map(parse_field_values).unwrap_or_default();
+    let mut new_values = old_values.clone();
+    for addition in additions {
+        if !new_values.iter().any(|value| value == addition) {
+            new_values.push(addition.to_string());
+        }
+    }
+    if new_values != old_values {
+        updates.insert(key.to_string(), inline_array(&new_values));
+        changes.push(UpdateChange {
+            field: key.to_string(),
+            old: display_list_value(&old_values),
+            new: display_list_value(&new_values),
+        });
+    }
+}
+
+fn display_list_value(values: &[String]) -> String {
+    if values.is_empty() {
+        "[]".to_string()
+    } else {
+        format!("[{}]", values.join(", "))
+    }
+}
+
+fn display_change_value(value: &str) -> String {
+    if value.is_empty() {
+        "-".to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 fn accord_state_sync_target<'a>(accord_status: &str, current_state: &'a str) -> Option<&'a str> {
@@ -3331,11 +3670,14 @@ fn document_detail_json(doc: &Document) -> String {
         push_optional_json_field(&mut fields, key, doc.field(key));
     }
     push_optional_json_field(&mut fields, "completionSummary", completion_summary(doc));
-    if let Some(tags) = doc.field("tags") {
-        fields.push(format!(
-            "\"tags\":{}",
-            json_array_strings(&parse_field_values(tags))
-        ));
+    for key in ["tags", "blockers", "references", "relatedFiles"] {
+        if let Some(value) = doc.field(key) {
+            fields.push(format!(
+                "{}:{}",
+                json_string(key),
+                json_array_strings(&parse_field_values(value))
+            ));
+        }
     }
     push_status_object_json(&mut fields, "accord", accord_status(doc));
     push_status_object_json(&mut fields, "review", review_status(doc));
@@ -3484,20 +3826,40 @@ fn patch_frontmatter_content(
     let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
     let mut seen = BTreeMap::<String, bool>::new();
     let mut output_frontmatter = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0;
 
-    for raw_line in frontmatter.split_inclusive('\n') {
+    while index < lines.len() {
+        let raw_line = lines[index];
         let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
         if let Some(key) = frontmatter_line_key(line) {
             if removes.iter().any(|remove| *remove == key) {
+                index += 1;
+                while index < lines.len() {
+                    let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                    if is_top_level_frontmatter_boundary(next) {
+                        break;
+                    }
+                    index += 1;
+                }
                 continue;
             }
             if let Some(value) = updates.get(key) {
                 output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
                 seen.insert(key.to_string(), true);
+                index += 1;
+                while index < lines.len() {
+                    let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                    if is_top_level_frontmatter_boundary(next) {
+                        break;
+                    }
+                    index += 1;
+                }
                 continue;
             }
         }
         output_frontmatter.push_str(raw_line);
+        index += 1;
     }
 
     if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
@@ -4098,6 +4460,148 @@ rules:
         };
         let error = validate_task_document_for_mutation(&workspace, &doc).unwrap_err();
         assert!(error.message.contains("invalid review.status `maybe`"));
+    }
+
+    #[test]
+    fn update_task_metadata_changes_scalars_and_appends_lists() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-update-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("task-2.md"),
+            "---\nid: task-2\ntype: task\ntitle: Blocker\nstate: todo\n---\n",
+        )
+        .unwrap();
+        let task_path = workspace.board_dir.join("task-1.md");
+        fs::write(
+            &task_path,
+            "---\nid: task-1\ntype: task\ntitle: Old\nstate: todo\npriority: low\ntags: [cli]\ncustom: keep\ncreatedAt: \"2026-06-26T00:00:00Z\"\nupdatedAt: \"2026-06-26T00:00:00Z\"\n---\n\nBody\n",
+        )
+        .unwrap();
+
+        let outcome = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                title: Some("New".to_string()),
+                priority: Some("high".to_string()),
+                tags: vec!["cli".to_string(), "metadata".to_string()],
+                blockers: vec!["task-2".to_string()],
+                references: vec!["missing-decision".to_string()],
+                related_files: vec!["src/main.rs".to_string()],
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+
+        let output = fs::read_to_string(&task_path).unwrap();
+        assert_eq!(outcome.changes.len(), 6);
+        assert_eq!(
+            outcome.warnings,
+            vec!["reference not found: missing-decision"]
+        );
+        assert!(output.contains("title: \"New\"\n"));
+        assert!(output.contains("priority: \"high\"\n"));
+        assert!(output.contains("tags: [\"cli\", \"metadata\"]\n"));
+        assert!(output.contains("blockers: [\"task-2\"]\n"));
+        assert!(output.contains("references: [\"missing-decision\"]\n"));
+        assert!(output.contains("relatedFiles: [\"src/main.rs\"]\n"));
+        assert!(output.contains("custom: keep\n"));
+        assert!(output.ends_with("\nBody\n"));
+        assert!(fs::read_to_string(&workspace.events_path)
+            .unwrap()
+            .contains("task.updated"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn update_task_metadata_noops_existing_list_entries_without_touching_file() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-update-noop-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(&workspace.config_path, "---\nstates: [todo]\n---\n").unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        let task_path = workspace.board_dir.join("task-1.md");
+        let before = "---\nid: task-1\ntype: task\ntitle: Demo\nstate: todo\ntags: [cli]\nupdatedAt: \"old\"\n---\n\nBody\n";
+        fs::write(&task_path, before).unwrap();
+
+        let outcome = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                tags: vec!["cli".to_string()],
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert!(outcome.changes.is_empty());
+        assert_eq!(fs::read_to_string(&task_path).unwrap(), before);
+        assert_eq!(fs::read_to_string(&workspace.events_path).unwrap(), "");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn update_rejects_invalid_priority_and_show_json_exposes_metadata_lists() {
+        let doc = Document {
+            path: PathBuf::from("task-1.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\ntitle: Demo\nstate: todo\npriority: high\nblockers: [task-2]\nreferences: [decision-1]\nrelatedFiles: [src/main.rs]\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        assert!(document_detail_json(&doc).contains("\"blockers\":[\"task-2\"]"));
+        assert!(document_detail_json(&doc).contains("\"references\":[\"decision-1\"]"));
+        assert!(document_detail_json(&doc).contains("\"relatedFiles\":[\"src/main.rs\"]"));
+
+        let workspace = Workspace {
+            board_dir: PathBuf::from(".tandem/board"),
+            logs_dir: PathBuf::from(".tandem/logs"),
+            config_path: PathBuf::from("missing-tandem.md"),
+            events_path: PathBuf::from(".tandem/events.jsonl"),
+        };
+        let error = validate_update_options(
+            &workspace,
+            &UpdateOptions {
+                id: "task-1".to_string(),
+                priority: Some("urgent".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("invalid priority `urgent`"));
     }
 
     #[test]

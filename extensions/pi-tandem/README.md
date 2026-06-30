@@ -31,12 +31,13 @@ tandem list [filters] --json
 tandem show <id> --json
 tandem add --title <title> [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--subtask <title>] ...
 tandem move <id> --state <state>
+tandem update <id> [--title <title>] [--priority <priority>] [--tag <tag>] ...
 tandem complete <id> --summary <text> ...
 ```
 
 Read actions default to JSON. Mutation actions keep the CLI's human-readable output.
 
-Relationship parameters map directly to Tandem protocol fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, `relatedFiles` → project paths, and `subtasks` → lightweight checklist items. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings.
+Relationship parameters map directly to Tandem protocol fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, `relatedFiles` → project paths, and `subtasks` → lightweight checklist items. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings. Use `action: "update"` for active task metadata edits; state remains `move`, and parentId is intentionally not updatable.
 
 ### `tandem_accord`
 

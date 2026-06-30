@@ -935,6 +935,7 @@ tandem list
 tandem show <id>
 tandem add --title ... --state todo
 tandem move <id> --state validation
+tandem update <id> --priority high --tag cli
 tandem complete <id> --summary ...
 tandem log list|show|search
 tandem search <query>
@@ -944,7 +945,7 @@ tandem decision list|show|add
 tandem tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks; it does not update completed logs, workflow `state`, or `parentId`.
 
 ## Brainfile design mapping/reference only
 

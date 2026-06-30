@@ -94,6 +94,9 @@ assert(taskSchemaProperties.summary, "tandem_task schema should expose summary f
 const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
 assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");
 
+const updateArgs = buildTaskArgs({ action: "update", id: "task-1", priority: "high", tags: ["cli"] });
+assert(updateArgs.join(" ") === "update task-1 --priority high --tag cli", "tandem_task update builder should map metadata flags");
+
 const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
 assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");
 assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
@@ -122,6 +125,23 @@ try {
 
 	const shown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
 	assert(shown.data.document.title === "Smoke task", "show should return created task");
+
+	const updateOutput = await runTandem(tandem, buildTaskArgs({
+		action: "update",
+		id: taskId,
+		title: "Updated smoke task",
+		priority: "high",
+		assignee: "pi-tandem-smoke",
+		dueDate: "2026-07-01",
+		tags: ["smoke", "metadata"],
+		relatedFiles: ["extensions/pi-tandem/index.ts"],
+	}), workspace);
+	assert(updateOutput.includes("Updated"), "update should report changed metadata");
+	const updated = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	assert(updated.data.document.title === "Updated smoke task", "update should change title");
+	assert(updated.data.document.priority === "high", "update should change priority");
+	assert(updated.data.document.tags.includes("metadata"), "update should append tags");
+	assert(updated.data.document.relatedFiles.includes("extensions/pi-tandem/index.ts"), "show JSON should expose relatedFiles");
 
 	await runTandem(tandem, buildTaskArgs({ action: "move", id: taskId, state: "in-progress" }), workspace);
 	const moved = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
