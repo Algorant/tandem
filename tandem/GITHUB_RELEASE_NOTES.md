@@ -1,18 +1,19 @@
-# Tandem v0.2.3
+# Tandem v0.3.0
 
-Concise public notes for the `tandem-v0.2.3` GitHub Release. Keep this file version-specific; keep reusable release validation and install checklist details in `tandem/RELEASE.md`.
+Concise public notes for the `tandem-v0.3.0` GitHub Release. Keep reusable release validation and install checklist details in `tandem/RELEASE.md`.
 
 ## Highlights
 
-- Validation is now the default delivered-work workflow state, with legacy `review` reads still tolerated.
-- The Rust CLI/TUI includes Board, Logs, Rules, and Decisions views plus Board Validation actions for delivered work.
-- Completed logs, task/log reconciliation, accord lifecycle commands, and decision/rules commands are available through the CLI.
-- The release includes initial docs-site sources and GitHub Pages build support.
+- Added `tandem update <id>` for active task metadata edits without using workflow state transitions.
+- Added configurable TUI badge styles for Board chips: `muted`, `accent`, `text`, `ghost`, and `solid`.
+- Improved global/user theme configuration for transparent terminal workflows and softer badge rendering.
+- Split public GitHub Release notes from the reusable release checklist so releases stay concise.
+- Documented docs-site runtime policy: use a supported Node LTS for deploys and keep npm/package-lock workflow for now.
 
 ## Install
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.2.3 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.3.0 --path tandem --locked
 tandem --version
 ```
 
@@ -20,4 +21,4 @@ tandem --version
 
 - No binary artifacts are published yet; install from the git tag with Cargo.
 - Mutation commands remain human-readable only; structured JSON mutation output is deferred.
-- TUI polish remains active work, especially richer Validation prompts, mouse action buttons, and warning surfaces.
+- TUI badge styling is configurable, but visual polish remains active work, including future badge shape options.
