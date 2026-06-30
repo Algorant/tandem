@@ -4111,7 +4111,7 @@ fn board_item_lines_for_doc(
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in the detail pane. Add chips here only when they change the next
     // action or scan priority. The active theme controls whether badges use a muted fill,
-    // accent rail, text-only label, ghost chip, or legacy solid block.
+    // accent rail, text label, ghost chip, or legacy solid block.
     let priority = doc.field("priority").unwrap_or("-");
     let mut chips: Vec<(String, Style)> = Vec::new();
     if let Some(priority_chip) = priority_chip(priority, theme) {
