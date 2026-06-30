@@ -1012,7 +1012,7 @@ The TUI starts from `default-dark`, discovers every user `*.toml` theme in the u
 
 ```toml
 theme = "verdigris"
-badge_style = "filled"
+badge_style = "muted"
 ```
 
 Use `.tandem/theme.toml` only when a workspace should override the user's normal preference. `base`, `builtin`, and `extends` are accepted selector aliases for existing workspace files. User theme files are registered by root `name`, or by their filename stem when `name` is omitted. User themes may inherit from a built-in or previously loaded user theme:
@@ -1034,10 +1034,10 @@ theme = "verdigris"
 name = "optional-display-name"
 base = "default-dark"
 transparent_background = false
-badge_style = "filled" # filled, accent, text, ghost, solid
+badge_style = "muted" # muted, accent, text, ghost, solid
 
 [badges]
-style = "filled" # optional equivalent to root badge_style
+style = "muted" # optional equivalent to root badge_style
 
 [colors]
 background = "#1d2021"
@@ -1085,7 +1085,7 @@ Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tand
 
 Themes may opt into terminal-default/transparent fills with root `transparent_background = true`. The default is false, so omitted themes continue to force the active palette's opaque `background` and `panel` colors. When enabled, app and panel fills use no explicit background where practical while selection and badge styles may still use explicit backgrounds for legibility.
 
-Themes may set root `badge_style` or `[badges] style` to `filled`, `accent`, `text`, `ghost`, or `solid`. `filled` is the default and keeps chip shapes with softer background contrast; `solid` preserves the older saturated filled block behavior for users who prefer it.
+Themes may set root `badge_style` or `[badges] style` to `muted`, `accent`, `text`, `ghost`, or `solid`. `muted` is the default and keeps chip shapes with softer background contrast; `solid` preserves the older saturated filled block behavior for users who prefer it.
 
 ### Theme requirements
 
@@ -1093,7 +1093,7 @@ Themes may set root `badge_style` or `[badges] style` to `filled`, `accent`, `te
 - Support 256-color fallback where possible.
 - Support no-color mode.
 - Keep semantic color names separate from concrete colors.
-- Make priority and status badges configurable. The current supported modes are `filled`, `accent`, `text`, `ghost`, and legacy `solid`.
+- Make priority and status badges configurable. The current supported modes are `muted`, `accent`, `text`, `ghost`, and legacy `solid`.
 - Avoid relying only on color; include glyphs/text for status.
 
 ## Mouse support

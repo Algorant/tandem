@@ -33,7 +33,7 @@ struct ResolvedTheme {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum BadgeStyle {
-    Filled,
+    Muted,
     Accent,
     Text,
     Ghost,
@@ -43,7 +43,7 @@ pub(super) enum BadgeStyle {
 impl BadgeStyle {
     pub(super) fn label(self, text: &str) -> String {
         match self {
-            Self::Filled | Self::Solid => format!(" {text:<4} "),
+            Self::Muted | Self::Solid => format!(" {text:<4} "),
             Self::Accent => format!("▏{text}"),
             Self::Text => format!("{text:<4}"),
             Self::Ghost => format!("[{text}]"),
@@ -162,7 +162,7 @@ impl TuiTheme {
                 failed: Color::Rgb(248, 113, 113),
                 unknown: Color::Rgb(107, 114, 128),
             },
-            badge_style: BadgeStyle::Filled,
+            badge_style: BadgeStyle::Muted,
             transparent_background: false,
             no_color: false,
         }
@@ -210,7 +210,7 @@ impl TuiTheme {
                 failed: Color::Rgb(227, 111, 99),
                 unknown: Color::Rgb(146, 131, 116),
             },
-            badge_style: BadgeStyle::Filled,
+            badge_style: BadgeStyle::Muted,
             transparent_background: false,
             no_color: false,
         }
@@ -587,13 +587,13 @@ impl TuiTheme {
                 BadgeStyle::Text | BadgeStyle::Accent | BadgeStyle::Ghost => {
                     Style::default().add_modifier(Modifier::BOLD)
                 }
-                BadgeStyle::Filled | BadgeStyle::Solid => {
+                BadgeStyle::Muted | BadgeStyle::Solid => {
                     Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
                 }
             };
         }
         match self.badge_style {
-            BadgeStyle::Filled => self.style(
+            BadgeStyle::Muted => self.style(
                 self.colors.text,
                 Some(mix_color(color, self.colors.panel, 0.72)),
                 Modifier::empty(),
@@ -713,7 +713,7 @@ impl TuiTheme {
                     "badge_style" | "badge-style" | "badges" => match parse_badge_style(&value) {
                         Some(style) => self.set_badge_style(style),
                         None => warnings.push(format!(
-                            "Theme warning line {line_number}: invalid badge style for `{key}`: use filled, accent, text, ghost, or solid"
+                            "Theme warning line {line_number}: invalid badge style for `{key}`: use muted, accent, text, ghost, or solid"
                         )),
                     },
                     _ => warnings.push(format!(
@@ -729,7 +729,7 @@ impl TuiTheme {
                 match parse_badge_style(&value) {
                     Some(style) => self.set_badge_style(style),
                     None => warnings.push(format!(
-                        "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use filled, accent, text, ghost, or solid"
+                        "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use muted, accent, text, ghost, or solid"
                     )),
                 }
                 continue;
@@ -1079,7 +1079,7 @@ fn parse_bool(value: &str) -> Option<bool> {
 
 fn parse_badge_style(value: &str) -> Option<BadgeStyle> {
     match normalized(value).as_str() {
-        "filled" | "filled-muted" => Some(BadgeStyle::Filled),
+        "muted" | "filled" | "filled-muted" => Some(BadgeStyle::Muted),
         "accent" | "accent-rail" => Some(BadgeStyle::Accent),
         "text" | "text-only" => Some(BadgeStyle::Text),
         "ghost" | "ghost-chip" => Some(BadgeStyle::Ghost),
@@ -1256,7 +1256,7 @@ changes-requested = "#eb6f92"
     #[test]
     fn badge_style_defaults_to_muted_fill_and_can_select_all_modes() {
         let theme = TuiTheme::default_dark();
-        assert_eq!(theme.badge_style_mode(), BadgeStyle::Filled);
+        assert_eq!(theme.badge_style_mode(), BadgeStyle::Muted);
         assert_eq!(theme.badge_label("HIGH"), " HIGH ");
         let muted = theme.priority_chip_style("high");
         assert_eq!(muted.fg, Some(theme.colors.text));
@@ -1268,7 +1268,7 @@ changes-requested = "#eb6f92"
             ("text", BadgeStyle::Text, "HIGH"),
             ("ghost", BadgeStyle::Ghost, "[HIGH]"),
             ("solid", BadgeStyle::Solid, " HIGH "),
-            ("filled", BadgeStyle::Filled, " HIGH "),
+            ("muted", BadgeStyle::Muted, " HIGH "),
         ] {
             let mut theme = TuiTheme::default_dark();
             let warnings = theme.apply_theme_content(&format!("badge_style = \"{value}\"\n"));
