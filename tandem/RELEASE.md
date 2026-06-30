@@ -18,7 +18,7 @@ This release is intended to support global `pi-tandem` testing against a tagged 
 - Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), manual reload (`r`), inline expanded row previews (`Enter`), optional detail pane (`Tab`), and `$EDITOR` open for selected active tasks (`e`).
 - Idle file-change hot reload with selection preservation where possible and safe warning/error surfacing for reload parse/load issues.
 - Completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
-- Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, and workspace selection/overrides from `.tandem/theme.toml`.
+- Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user theme selection from `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, and workspace selection/overrides from `.tandem/theme.toml`.
 - Mouse tab/click/scroll support and fixed keyboard defaults.
 - Initial `docs/` Markdown source tree and `site/` Astro Starlight docs site with GitHub Pages workflow.
 

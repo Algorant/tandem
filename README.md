@@ -45,7 +45,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - First TUI MVP: board mutations, Board/Logs/Rules/Decisions views plus Board Validation flow, theme support, mouse enabled by default without drag/drop, fixed default keymaps, and styled-basic Markdown rendering; the current Board uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI aliases: none; canonical commands and long flags only.
 - V0 repo shape: CLI/TUI implementation stays under `tandem/`; agent/editor adapters live under `extensions/`; no root Rust workspace, schemas, or fixtures.
-- Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml` (for example `theme = "verdigris"`).
+- Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`.
 - Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `extensions/pi-tandem` is a lightweight Pi adapter over an installed `tandem` CLI. It uses safe argument arrays, prefers `tandem --json` read paths, and does not duplicate Tandem protocol parsing/mutation logic.
 

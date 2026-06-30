@@ -25,6 +25,13 @@ Board supports quick task creation, state movement, reloads, mouse selection/scr
 
 ## Themes
 
-The TUI includes built-in themes and can load user TOML themes from `~/.config/tandem/themes/` or `$XDG_CONFIG_HOME/tandem/themes/`. A workspace can select or override a theme with `.tandem/theme.toml`.
+The TUI includes built-in themes and can load user TOML themes from `~/.config/tandem/themes/` or `$XDG_CONFIG_HOME/tandem/themes/`. Set your normal theme in `~/.config/tandem/config.toml` or `$XDG_CONFIG_HOME/tandem/config.toml`:
 
-Set `transparent_background = true` in a user theme or workspace `.tandem/theme.toml` to let the terminal default/transparent background show through for app and panel fills where practical. The default is `false`, so omitted themes preserve opaque rendering.
+```toml
+theme = "verdigris"
+transparent_background = true
+```
+
+Use workspace `.tandem/theme.toml` only when a project should override the user's global preference.
+
+Set `transparent_background = true` in a user theme, user config, or workspace `.tandem/theme.toml` to let the terminal default/transparent background show through for app and panel fills where practical. The default is `false`, so omitted themes preserve opaque rendering.

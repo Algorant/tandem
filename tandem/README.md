@@ -66,19 +66,21 @@ tandem --version
 
 ## Implemented TUI themes and keys
 
-`tandem tui` starts from the built-in `default-dark` palette. It then discovers user theme files and finally applies the workspace selector/override:
+`tandem tui` starts from the built-in `default-dark` palette, discovers user theme files, applies the user's XDG config, and finally applies any workspace override:
 
 1. built-in presets: `default-dark` and `verdigris`
 2. user theme files: `$XDG_CONFIG_HOME/tandem/themes/*.toml`, or `~/.config/tandem/themes/*.toml` when `XDG_CONFIG_HOME` is unset
-3. workspace selector/override: `.tandem/theme.toml`
+3. user config: `$XDG_CONFIG_HOME/tandem/config.toml`, or `~/.config/tandem/config.toml` when `XDG_CONFIG_HOME` is unset
+4. workspace selector/override: `.tandem/theme.toml`
 
-Use `.tandem/theme.toml` to select a named built-in or user theme without committing a full personal palette:
+Use the user config for your normal machine-wide preference:
 
 ```toml
 theme = "verdigris"
+transparent_background = true
 ```
 
-`base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, `.tandem/theme.toml` may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names):
+Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user/workspace config may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names):
 
 ```toml
 theme = "my-custom-dark"
@@ -113,11 +115,11 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
-In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes either `theme built-in verdigris + .../.tandem/theme.toml` or `theme user theme <name> (.../themes/<name>.toml) + .../.tandem/theme.toml`, the palette remains readable, and the keyboard focus semantics above hold across views 1..4. Invalid user/workspace theme files are non-fatal and appear as theme warnings in the status line. Delete `.tandem/theme.toml` to return to `default-dark`.
+In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme files are non-fatal and appear as theme warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
 
-`transparent_background = true` may be set in a user theme or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
+`transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
 
-`NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when `.tandem/theme.toml` selects Verdigris or a user theme.
+`NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 
 ## Documentation
 
@@ -161,5 +163,5 @@ In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`
 - Validation queue: Board state/subview for delivered work awaiting accept/rework/complete in v0.
 - Keymaps: fixed defaults in v0; custom keymap config later.
 - Markdown rendering: styled basics in v0.
-- Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then workspace selector/override at `.tandem/theme.toml`.
+- Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`.
 - Deferred from v0: non-core command families and integrations listed in `plan/spec.md`, plus schemas, fixtures, and root Rust workspace layout.
