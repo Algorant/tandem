@@ -805,8 +805,8 @@ Board view should support:
 - state subview tabs with counts for configured states plus any active unfiled/unknown-state buckets
 - one selected-state list at a time, using the full Board content width instead of simultaneous narrow columns
 - sparse one-line rows: optional non-default type, title, a small set of action-changing chips, and muted ID
-- chips for priority, delivered/rework/blocked/failed accord states, attention-needing validation states, and checklist progress; chips should use foreground + background styles so they read like labels/stickers
-- no second metadata row by default; tags, assignee, due dates, blockers, related-file counts, timestamps, paths, and full accord/review data belong in the detail pane until proven needed in the Board list
+- chips for only the default/action-changing badges plus configured project tag badges; chips should use foreground + background styles so they read like labels/stickers
+- no second metadata row by default; unconfigured tags, assignee, due dates, blockers, related-file counts, timestamps, paths, and full accord/review data belong in the detail pane until proven needed in the Board list
 - compact first; expanded/detail modes may be added later only when they solve a concrete workflow gap
 - selection and multi-select later
 - click actions when mouse mode is enabled
@@ -822,6 +822,40 @@ Delivered/review item example:
 ```text
 Add decision view  MED  DELIVERED  PENDING                        task-8
 ```
+
+#### Board badge defaults and configuration
+
+Default Board badges are intentionally small and action-oriented:
+
+- Priority badges: `CRIT`, `HIGH`, `MED`, and `LOW` from `priority: critical|urgent`, `high`, `medium|med`, and `low`. Project-defined priority values may render as a short uppercase fallback, but the canonical default labels are the four listed here.
+- Work-type tag badges: `RESEARCH`, `SPIKE`, and `DELIVERABLE` when the matching tag is present.
+- Validation attention: `VISUAL` for items in `validation` tagged `visual`, `ui`, or `ux`.
+- Accord attention: `DELIVERED`, `ACCEPTED`, `REWORK`, `BLOCKED`, and `FAILED` when they affect scan/action priority. `DELIVERED` is suppressed in the `validation` state/subview because the state already carries that signal.
+- Review attention: `PENDING`, `CHANGES-REQUESTED`, `REJECTED`, and `FAILED`.
+- Subtask progress: `2/5`, `5/5`, and similar progress badges after at least one subtask is complete or all subtasks are complete; `0/N` stays in details.
+
+Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are not global defaults. A user or workspace may opt specific tags into Board badges through the existing TUI TOML config stack: user themes, user `config.toml`, then workspace `.tandem/theme.toml`. Workspace config is applied last. Tag definitions merge by tag, while a later `[badges] disabled = [...]` list replaces the earlier disabled list.
+
+```toml
+[badges]
+disabled = ["deliverable", "visual"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "accent"
+
+[badges.tags.docs]
+label = "DOCS"
+tone = "success"
+
+[badges.tags.spec]
+# label defaults to "SPEC" when omitted
+tone = "warning"
+```
+
+For `[badges.tags.<tag>]`, `label` is optional and defaults to the uppercase tag. `tone` is optional and defaults to `accent`; supported tones are the existing semantic tones `accent`, `success`, `warning`, `error`, and `muted`. Raw arbitrary colors, regex matching, arbitrary field badges, custom icons, badge ordering DSLs, and broad theme rewrites are out of scope.
+
+`badges.disabled` is a simple suppression list for built-ins and configured tag badges. Preferred built-in IDs are `priority`, `priority:critical`, `priority:high`, `priority:medium`, `priority:low`, `research`, `spike`, `deliverable`, `visual`, `accord`, `accord:delivered`, `accord:accepted`, `accord:rework`, `accord:blocked`, `accord:failed`, `review`, `review:pending`, `review:changes-requested`, `review:rejected`, `review:failed`, `subtasks`, and `subtask-progress`. Configured tag badges can be disabled by the tag name or `tag:<tag>`.
 
 ### Shared detail pane
 
@@ -1035,6 +1069,13 @@ base = "default-dark"
 transparent_background = false
 badge_style = "muted" # muted, accent, text, ghost, or solid; rounded-edge styles are deferred
 
+[badges]
+disabled = ["deliverable", "visual"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "accent"
+
 [colors]
 background = "#1d2021"
 panel = "#222526"
@@ -1075,7 +1116,7 @@ failed = "#e36f63"
 unknown = "#928374"
 ```
 
-Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tandem/examples/themes/verdigris.toml`. Install them as user themes with `mkdir -p ~/.config/tandem/themes` and `cp tandem/examples/themes/*.toml ~/.config/tandem/themes/`. Select a normal user theme with `~/.config/tandem/config.toml`, for example `theme = "verdigris"`. A manual PTY smoke should confirm the status line reports `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or includes `.tandem/theme.toml` when a workspace override applies; invalid themes should show non-fatal theme warning counts.
+Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tandem/examples/themes/verdigris.toml`. Install them as user themes with `mkdir -p ~/.config/tandem/themes` and `cp tandem/examples/themes/*.toml ~/.config/tandem/themes/`. Select a normal user theme with `~/.config/tandem/config.toml`, for example `theme = "verdigris"`. A manual PTY smoke should confirm the status line reports `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or includes `.tandem/theme.toml` when a workspace override applies; invalid themes should show non-fatal theme warning counts. Badge tag config uses the same files: `[badges.tags.<tag>]` opts project/domain tags into Board badges, and `[badges] disabled = [...]` suppresses built-in or configured badges without adding a badge rule engine.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris or a user theme is selected.
 

@@ -4117,25 +4117,30 @@ fn board_item_lines_for_doc(
     if let Some(priority_chip) = priority_chip(priority, theme) {
         chips.push((priority_chip, theme.priority_chip_style(priority)));
     }
-    if let Some(kind_chip) = research_or_spike_chip(doc, theme) {
-        chips.push((kind_chip, theme.progress_chip_style(StatusTone::Accent)));
+    for (kind_chip, tone) in work_type_tag_chips(doc, theme) {
+        chips.push((kind_chip, theme.progress_chip_style(tone)));
     }
-    if let Some(visual_chip) = validation_visual_chip(doc, theme) {
-        chips.push((visual_chip, theme.progress_chip_style(StatusTone::Accent)));
+    if let Some((visual_chip, tone)) = validation_visual_chip(doc, theme) {
+        chips.push((visual_chip, theme.progress_chip_style(tone)));
+    }
+    for (tag_chip, tone) in configured_tag_chips(doc, theme) {
+        chips.push((tag_chip, theme.progress_chip_style(tone)));
     }
     if let Some(accord) =
-        accord_status(doc).filter(|status| board_should_surface_accord_status(doc, status))
+        accord_status(doc).filter(|status| board_should_surface_accord_status(doc, status, theme))
     {
         chips.push((status_chip(accord, theme), theme.accord_chip_style(accord)));
     }
     if let Some(review) =
-        review_status(doc).filter(|status| board_should_surface_review_status(status))
+        review_status(doc).filter(|status| board_should_surface_review_status(status, theme))
     {
         chips.push((status_chip(review, theme), theme.review_chip_style(review)));
     }
-    if let Some((completed, total)) =
-        subtask_progress(doc).filter(|(completed, total)| *completed > 0 || completed == total)
-    {
+    if let Some((completed, total)) = subtask_progress(doc).filter(|(completed, total)| {
+        !theme.badge_disabled("subtasks")
+            && !theme.badge_disabled("subtask-progress")
+            && (*completed > 0 || completed == total)
+    }) {
         let tone = if completed == total {
             StatusTone::Success
         } else {
@@ -4205,26 +4210,74 @@ fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
 }
 
 fn priority_chip(priority: &str, theme: &TuiTheme) -> Option<String> {
-    let label = match priority.trim().to_ascii_lowercase().as_str() {
-        "critical" | "urgent" => "CRIT".to_string(),
-        "high" => "HIGH".to_string(),
-        "medium" | "med" => "MED".to_string(),
-        "low" => "LOW".to_string(),
+    let normalized = priority.trim().to_ascii_lowercase();
+    let (label, badge_id) = match normalized.as_str() {
+        "critical" | "urgent" => ("CRIT".to_string(), "priority:critical"),
+        "high" => ("HIGH".to_string(), "priority:high"),
+        "medium" | "med" => ("MED".to_string(), "priority:medium"),
+        "low" => ("LOW".to_string(), "priority:low"),
         "" | "-" | "none" => return None,
-        other => other.chars().take(4).collect::<String>().to_uppercase(),
+        other => (
+            other.chars().take(4).collect::<String>().to_uppercase(),
+            "priority:other",
+        ),
     };
+    if theme.badge_disabled("priority") || theme.badge_disabled(badge_id) {
+        return None;
+    }
     Some(chip_text(&label, theme))
 }
 
-fn research_or_spike_chip(doc: &Document, theme: &TuiTheme) -> Option<String> {
+fn work_type_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, StatusTone)> {
     let tags = document_tags(doc);
-    if tags.iter().any(|tag| tag.eq_ignore_ascii_case("spike")) {
-        Some(chip_text("SPIKE", theme))
-    } else if tags.iter().any(|tag| tag.eq_ignore_ascii_case("research")) {
-        Some(chip_text("RESEARCH", theme))
-    } else {
-        None
+    let mut chips = Vec::new();
+    for (tag, default_label) in [
+        ("research", "RESEARCH"),
+        ("spike", "SPIKE"),
+        ("deliverable", "DELIVERABLE"),
+    ] {
+        if tags.iter().any(|candidate| tag_matches(candidate, tag))
+            && !theme.badge_disabled(tag)
+            && !theme.badge_disabled(&format!("tag:{tag}"))
+        {
+            chips.push(configured_or_default_tag_chip(tag, default_label, theme));
+        }
     }
+    chips
+}
+
+fn configured_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, StatusTone)> {
+    document_tags(doc)
+        .into_iter()
+        .filter(|tag| !is_builtin_work_type_tag(tag))
+        .filter_map(|tag| {
+            theme
+                .tag_badge(&tag)
+                .map(|config| (chip_text(&config.label_for(&tag), theme), config.tone()))
+        })
+        .collect()
+}
+
+fn configured_or_default_tag_chip(
+    tag: &str,
+    default_label: &str,
+    theme: &TuiTheme,
+) -> (String, StatusTone) {
+    if let Some(config) = theme.tag_badge(tag) {
+        (chip_text(&config.label_for(tag), theme), config.tone())
+    } else {
+        (chip_text(default_label, theme), StatusTone::Accent)
+    }
+}
+
+fn is_builtin_work_type_tag(tag: &str) -> bool {
+    ["research", "spike", "deliverable"]
+        .iter()
+        .any(|candidate| tag_matches(tag, candidate))
+}
+
+fn tag_matches(candidate: &str, expected: &str) -> bool {
+    candidate.trim().eq_ignore_ascii_case(expected)
 }
 
 fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) -> Line<'static> {
@@ -4571,7 +4624,7 @@ fn body_summary(body: &str) -> String {
     }
 }
 
-fn board_should_surface_accord_status(doc: &Document, status: &str) -> bool {
+fn board_should_surface_accord_status(doc: &Document, status: &str, theme: &TuiTheme) -> bool {
     let normalized = normalized_accord_status(status);
     if document_state_label(doc) == "validation" && normalized == "delivered" {
         return false;
@@ -4579,27 +4632,37 @@ fn board_should_surface_accord_status(doc: &Document, status: &str) -> bool {
     matches!(
         normalized.as_str(),
         "delivered" | "accepted" | "rework" | "blocked" | "failed"
-    )
+    ) && !theme.badge_disabled("accord")
+        && !theme.badge_disabled(&normalized)
+        && !theme.badge_disabled(&format!("accord:{normalized}"))
 }
 
-fn validation_visual_chip(doc: &Document, theme: &TuiTheme) -> Option<String> {
-    if document_state_label(doc) != "validation" {
+fn validation_visual_chip(doc: &Document, theme: &TuiTheme) -> Option<(String, StatusTone)> {
+    if document_state_label(doc) != "validation"
+        || theme.badge_disabled("visual")
+        || theme.badge_disabled("tag:visual")
+        || theme.badge_disabled("validation:visual")
+    {
         return None;
     }
-    let tags = doc.field("tags").unwrap_or("").to_ascii_lowercase();
-    (tags.contains("visual") || tags.contains("ui") || tags.contains("ux"))
-        .then(|| chip_text("VISUAL", theme))
+    let tags = document_tags(doc);
+    tags.iter()
+        .any(|tag| {
+            ["visual", "ui", "ux"]
+                .iter()
+                .any(|expected| tag_matches(tag, expected))
+        })
+        .then(|| configured_or_default_tag_chip("visual", "VISUAL", theme))
 }
 
-fn board_should_surface_review_status(status: &str) -> bool {
+fn board_should_surface_review_status(status: &str, theme: &TuiTheme) -> bool {
+    let normalized = status.trim().replace('_', "-").to_ascii_lowercase();
     matches!(
-        status
-            .trim()
-            .replace('_', "-")
-            .to_ascii_lowercase()
-            .as_str(),
+        normalized.as_str(),
         "pending" | "changes-requested" | "rejected" | "failed"
-    )
+    ) && !theme.badge_disabled("review")
+        && !theme.badge_disabled(&normalized)
+        && !theme.badge_disabled(&format!("review:{normalized}"))
 }
 
 #[derive(Debug, Clone)]
@@ -5269,7 +5332,7 @@ mod tests {
     }
 
     #[test]
-    fn board_row_badges_research_and_spike_from_existing_tags() {
+    fn board_row_badges_work_type_tags() {
         let theme = TuiTheme::default_dark();
         let mut research = doc_with_state("task-24", Some("todo"));
         research
@@ -5292,6 +5355,17 @@ mod tests {
         let spike_title =
             line_text(&board_item_lines_for_doc(&spike, &theme, 120, false, false, false)[0]);
         assert!(spike_title.contains(" SPIKE  Spike rendering approach"));
+
+        let mut deliverable = doc_with_state("task-28", Some("todo"));
+        deliverable
+            .fields
+            .insert("title".to_string(), "Package release notes".to_string());
+        deliverable
+            .fields
+            .insert("tags".to_string(), "[\"deliverable\"]".to_string());
+        let deliverable_title =
+            line_text(&board_item_lines_for_doc(&deliverable, &theme, 120, false, false, false)[0]);
+        assert!(deliverable_title.contains(" DELIVERABLE  Package release notes"));
     }
 
     #[test]
@@ -5322,6 +5396,56 @@ mod tests {
         let accepted_title =
             line_text(&board_item_lines_for_doc(&accepted, &theme, 120, false, false, false)[0]);
         assert!(accepted_title.contains(" ACCEPTED "));
+    }
+
+    #[test]
+    fn board_row_uses_configured_tag_badges_and_disabled_badges() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r#"
+[badges]
+disabled = ["priority:high", "visual", "accord:accepted", "subtasks"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "success"
+"#,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+
+        let mut doc = doc_with_state("task-29", Some("validation"));
+        doc.fields
+            .insert("title".to_string(), "Review TUI badge config".to_string());
+        doc.fields
+            .insert("priority".to_string(), "high".to_string());
+        doc.fields
+            .insert("tags".to_string(), "[\"tui\", \"visual\"]".to_string());
+        doc.fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        doc.fields
+            .insert("subtasks.0.title".to_string(), "Write docs".to_string());
+        doc.fields
+            .insert("subtasks.0.completed".to_string(), "true".to_string());
+
+        let line = board_item_lines_for_doc(&doc, &theme, 140, false, false, false)[0].clone();
+        let title = line_text(&line);
+        assert!(title.contains(" TUI "), "rendered row: {title}");
+        assert!(
+            title.contains("Review TUI badge config"),
+            "rendered row: {title}"
+        );
+        assert!(!title.contains(" HIGH "));
+        assert!(!title.contains(" VISUAL "));
+        assert!(!title.contains(" ACCEPTED "));
+        assert!(!title.contains(" 1/1 "));
+        assert!(
+            line.spans.iter().any(|span| {
+                span.content.trim() == "TUI"
+                    && span.style == theme.progress_chip_style(StatusTone::Success)
+            }),
+            "spans: {:?}",
+            line.spans
+        );
     }
 
     #[test]

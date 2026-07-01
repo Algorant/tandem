@@ -114,6 +114,8 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`), `badge_style` (optional; default `muted`) or `[badges] style`
 - `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
+- `[badges]`: `style`, `disabled` (list of built-in badge IDs or configured tag names to suppress)
+- `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, or `muted`) for project/user opt-in tag badges
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
@@ -122,6 +124,23 @@ In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
 
 `badge_style` controls Board priority/status/tag chips: `muted` (default softened fill), `accent` (small colored rail), `text` (colored label), `ghost` (transparent chip outline), or `solid` (legacy saturated fill). Rounded-edge badge rendering remains deferred.
+
+Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in, not global defaults:
+
+```toml
+[badges]
+disabled = ["deliverable", "visual"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "accent"
+
+[badges.tags.docs]
+# label defaults to "DOCS"
+tone = "success"
+```
+
+User config applies before workspace `.tandem/theme.toml`; workspace badge config is therefore the final override. `disabled` is a simple suppression list for built-ins or configured tag names, not a regex/rule engine.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 

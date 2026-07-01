@@ -48,3 +48,22 @@ badge_style = "solid"   # legacy saturated filled block
 ```
 
 The same key can also be written as `[badges] style = "ghost"` in user themes, user config, or `.tandem/theme.toml`. Rounded-edge badge rendering remains deferred.
+
+Default Board badges are intentionally minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress such as `2/5`. Project/domain tags like `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in rather than global defaults.
+
+Configure extra tag badges or suppress badges in user config or workspace `.tandem/theme.toml`:
+
+```toml
+[badges]
+disabled = ["deliverable", "visual"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "accent"
+
+[badges.tags.docs]
+# label defaults to "DOCS"
+tone = "success"
+```
+
+`label` and `tone` are optional for configured tags. `label` defaults to the uppercase tag, and `tone` defaults to `accent`; supported tones are `accent`, `success`, `warning`, `error`, and `muted`. `disabled` is a simple list of built-in badge IDs or configured tag names to suppress, not a regex/rule engine.

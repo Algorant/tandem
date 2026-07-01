@@ -1,5 +1,5 @@
 use ratatui::style::{Color, Modifier, Style};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -51,7 +51,7 @@ impl BadgeStyle {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum StatusTone {
     Accent,
     Success,
@@ -68,8 +68,35 @@ pub(super) struct TuiTheme {
     accord: AccordPalette,
     review: ReviewPalette,
     badge_style: BadgeStyle,
+    badge_config: BadgeConfig,
     transparent_background: bool,
     no_color: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BadgeConfig {
+    disabled: BTreeSet<String>,
+    tag_badges: BTreeMap<String, TagBadgeConfig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct TagBadgeConfig {
+    label: Option<String>,
+    tone: StatusTone,
+}
+
+impl TagBadgeConfig {
+    pub(super) fn label_for(&self, tag: &str) -> String {
+        self.label
+            .as_deref()
+            .filter(|label| !label.trim().is_empty())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| tag.trim().to_ascii_uppercase())
+    }
+
+    pub(super) fn tone(&self) -> StatusTone {
+        self.tone
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -163,6 +190,7 @@ impl TuiTheme {
                 unknown: Color::Rgb(107, 114, 128),
             },
             badge_style: BadgeStyle::Muted,
+            badge_config: BadgeConfig::default(),
             transparent_background: false,
             no_color: false,
         }
@@ -211,6 +239,7 @@ impl TuiTheme {
                 unknown: Color::Rgb(146, 131, 116),
             },
             badge_style: BadgeStyle::Muted,
+            badge_config: BadgeConfig::default(),
             transparent_background: false,
             no_color: false,
         }
@@ -384,6 +413,20 @@ impl TuiTheme {
 
     pub(super) fn badge_label(&self, label: &str) -> String {
         self.badge_style.label(label)
+    }
+
+    pub(super) fn badge_disabled(&self, id: &str) -> bool {
+        self.badge_config
+            .disabled
+            .contains(&normalized_badge_id(id))
+    }
+
+    pub(super) fn tag_badge(&self, tag: &str) -> Option<&TagBadgeConfig> {
+        let id = normalized_badge_id(tag);
+        if id.is_empty() || self.badge_disabled(&id) || self.badge_disabled(&format!("tag:{id}")) {
+            return None;
+        }
+        self.badge_config.tag_badges.get(&id)
     }
 
     #[cfg(test)]
@@ -660,7 +703,7 @@ impl TuiTheme {
         self.badge_style = style;
     }
 
-    fn apply_theme_content(&mut self, content: &str) -> Vec<String> {
+    pub(super) fn apply_theme_content(&mut self, content: &str) -> Vec<String> {
         let mut section = String::new();
         let mut warnings = Vec::new();
 
@@ -724,15 +767,24 @@ impl TuiTheme {
                 continue;
             }
 
-            if section == "badges"
-                && matches!(key.as_str(), "style" | "badge_style" | "badge-style")
-            {
-                match parse_badge_style(&value) {
-                    Some(style) => self.set_badge_style(style),
-                    None => warnings.push(format!(
-                        "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use muted, accent, text, ghost, or solid"
-                    )),
+            if section == "badges" {
+                if matches!(key.as_str(), "style" | "badge_style" | "badge-style") {
+                    match parse_badge_style(&value) {
+                        Some(style) => self.set_badge_style(style),
+                        None => warnings.push(format!(
+                            "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use muted, accent, text, ghost, or solid"
+                        )),
+                    }
+                    continue;
                 }
+                if matches!(key.as_str(), "disabled" | "disable") {
+                    self.badge_config.disabled = parse_badge_disabled_list(&value);
+                    continue;
+                }
+            }
+
+            if let Some(tag) = section.strip_prefix("badges.tags.") {
+                self.apply_tag_badge_config(tag, &key, &value, line_number, &mut warnings);
                 continue;
             }
 
@@ -751,6 +803,43 @@ impl TuiTheme {
         }
 
         warnings
+    }
+
+    fn apply_tag_badge_config(
+        &mut self,
+        tag: &str,
+        key: &str,
+        value: &str,
+        line_number: usize,
+        warnings: &mut Vec<String>,
+    ) {
+        let tag_id = normalized_badge_id(tag);
+        if tag_id.is_empty() {
+            warnings.push(format!(
+                "Theme warning line {line_number}: empty badge tag name"
+            ));
+            return;
+        }
+        let config = self
+            .badge_config
+            .tag_badges
+            .entry(tag_id)
+            .or_insert_with(|| TagBadgeConfig {
+                label: None,
+                tone: StatusTone::Accent,
+            });
+        match key {
+            "label" => config.label = Some(value.trim().to_string()),
+            "tone" => match parse_status_tone(value) {
+                Some(tone) => config.tone = tone,
+                None => warnings.push(format!(
+                    "Theme warning line {line_number}: invalid badge tone for `badges.tags.{tag}.{key}`: use accent, success, warning, error, or muted"
+                )),
+            },
+            _ => warnings.push(format!(
+                "Theme warning line {line_number}: unknown badge tag key `badges.tags.{tag}.{key}`"
+            )),
+        }
     }
 
     fn apply_color(&mut self, section: &str, key: &str, color: Color) -> bool {
@@ -1089,6 +1178,42 @@ fn parse_badge_style(value: &str) -> Option<BadgeStyle> {
     }
 }
 
+fn parse_status_tone(value: &str) -> Option<StatusTone> {
+    match normalized(value).as_str() {
+        "accent" | "default" | "tag" => Some(StatusTone::Accent),
+        "success" | "ok" => Some(StatusTone::Success),
+        "warning" | "warn" => Some(StatusTone::Warning),
+        "error" | "danger" | "failed" => Some(StatusTone::Error),
+        "muted" | "none" => Some(StatusTone::Muted),
+        _ => None,
+    }
+}
+
+fn parse_badge_disabled_list(value: &str) -> BTreeSet<String> {
+    parse_string_list(value)
+        .into_iter()
+        .map(|item| normalized_badge_id(&item))
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
+fn parse_string_list(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    let inner = trimmed
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(trimmed);
+    inner
+        .split(',')
+        .map(parse_value)
+        .map(|item| item.trim().to_string())
+        .filter(|item| !item.is_empty())
+        .collect()
+}
+
 fn parse_color(value: &str) -> Result<Color, String> {
     let value = value.trim();
     if value.is_empty() {
@@ -1156,6 +1281,10 @@ fn mix_color(color: Color, base: Color, base_weight: f32) -> Color {
 
 fn normalized(value: &str) -> String {
     value.trim().to_ascii_lowercase().replace('_', "-")
+}
+
+fn normalized_badge_id(value: &str) -> String {
+    normalized(value.trim().trim_start_matches('#'))
 }
 
 #[cfg(test)]
@@ -1312,6 +1441,53 @@ changes-requested = "#eb6f92"
     }
 
     #[test]
+    fn badge_config_supports_disabled_ids_and_tag_labels() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r#"
+[badges]
+disabled = ["deliverable", "visual", "accord:failed"]
+
+[badges.tags.tui]
+label = "TUI"
+tone = "success"
+
+[badges.tags.docs]
+tone = "warning"
+"#,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert!(theme.badge_disabled("deliverable"));
+        assert!(theme.badge_disabled("#visual"));
+        assert!(theme.badge_disabled("accord:failed"));
+
+        let tui = theme.tag_badge("tui").expect("tui badge config");
+        assert_eq!(tui.label_for("tui"), "TUI");
+        assert_eq!(tui.tone(), StatusTone::Success);
+
+        let docs = theme.tag_badge("docs").expect("docs badge config");
+        assert_eq!(docs.label_for("docs"), "DOCS");
+        assert_eq!(docs.tone(), StatusTone::Warning);
+    }
+
+    #[test]
+    fn invalid_badge_tone_warns_and_keeps_default_tone() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r#"
+[badges.tags.spec]
+label = "SPEC"
+tone = "neon"
+"#,
+        );
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("invalid badge tone"));
+        let spec = theme.tag_badge("spec").expect("spec badge config");
+        assert_eq!(spec.label_for("spec"), "SPEC");
+        assert_eq!(spec.tone(), StatusTone::Accent);
+    }
+
+    #[test]
     fn selects_and_maps_verdigris_builtin() {
         let theme = TuiTheme::built_in("verdigris").expect("verdigris theme exists");
         assert_eq!(
@@ -1449,6 +1625,55 @@ accent = "#010203"
         assert_eq!(load.theme.name(), "default-dark");
         assert_eq!(load.theme.colors.accent, Color::Rgb(1, 2, 3));
         assert!(load.source.contains(".tandem/theme.toml") || load.source.contains("theme.toml"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn workspace_badge_config_overrides_global_disabled_list() {
+        let root = temp_theme_dir("badge-precedence");
+        let workspace = workspace_at(&root);
+        let user_config_path = root.join("xdg").join("tandem").join("config.toml");
+        std::fs::create_dir_all(user_config_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &user_config_path,
+            r#"
+[badges]
+disabled = ["visual"]
+
+[badges.tags.tui]
+tone = "success"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            workspace.config_path.with_file_name("theme.toml"),
+            r#"
+[badges]
+disabled = ["deliverable"]
+
+[badges.tags.tui]
+label = "TUI"
+"#,
+        )
+        .unwrap();
+
+        let load = TuiTheme::load_for_workspace_with_options(
+            &workspace,
+            None,
+            Some(user_config_path),
+            false,
+        );
+
+        assert!(
+            load.warnings.is_empty(),
+            "unexpected warnings: {:?}",
+            load.warnings
+        );
+        assert!(load.theme.badge_disabled("deliverable"));
+        assert!(!load.theme.badge_disabled("visual"));
+        let tui = load.theme.tag_badge("tui").expect("merged tui badge");
+        assert_eq!(tui.label_for("tui"), "TUI");
+        assert_eq!(tui.tone(), StatusTone::Success);
         let _ = std::fs::remove_dir_all(root);
     }
 

@@ -153,6 +153,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implement `tandem rules add|edit|delete`.
 - [x] Define user-facing messages for write conflicts, parse failures, validation failures, and event append failures.
 - [x] Define accord badge/status visual language for the current Board shell.
+- [x] Specify and implement the default/configurable Board badge set, including `DELIVERABLE`, opt-in tag badges, optional label/tone, and simple badge suppression config.
 - [x] Define minimal implementation layout inside `tandem/` and dependency choices only when implementation begins.
 - [x] Decide initial Ratatui event loop approach.
 - [x] Define exact TOML theme keys for workspace override in the current theme foundation.
