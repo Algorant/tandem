@@ -272,23 +272,23 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 
 ### Decision document fields
 
-Decision documents are first-class v0 documents. They live in `.tandem/board/` and capture durable project, product, or architecture choices. They do not need a workflow lifecycle `state` field in v0. ADR-style `status` is decision metadata and must remain distinct from task workflow state.
+Decision documents are first-class v0 documents. They live in `.tandem/board/` and capture durable project, product, or architecture choices. A Tandem decision is the ADR-compatible record type; do not introduce a separate `adr` document type or workflow state for architecture decisions. Decision documents do not need a workflow lifecycle `state` field in v0. ADR-style `status` is decision metadata and must remain distinct from task workflow state.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
 | `id` | yes | error | Canonical ID. New decision IDs are sequential, e.g. `decision-1`. |
 | `type` | yes | error | Must be `decision`. |
 | `title` | yes | error | Display title. |
-| `status` | no | warning if unrecognized | ADR-style decision status. Suggested values: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`. Not a workflow state. New CLI-created decisions default to `proposed`. |
+| `status` | no | warning if unrecognized | ADR-style decision status. Suggested values: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`. This is decision metadata, not task workflow `state`. New CLI-created decisions default to `proposed`. |
 | `date` | no | warning if malformed | ADR decision date, usually `YYYY-MM-DD`. New CLI-created decisions default to the current UTC date. |
 | `deciders` | no | warning if malformed | Array of humans/agents responsible for the decision. |
 | `context` | no | none | Brief ADR context summary; longer context may live in the Markdown body. |
 | `consequences` | no | warning if malformed | Array of consequence summaries. Longer discussion may live in the Markdown body. |
 | `alternatives` | no | warning if malformed | Array of considered alternatives. |
-| `supersedes` | no | warning if unresolved | Decision IDs this decision supersedes. |
-| `supersededBy` | no | warning if unresolved | Decision IDs that supersede this decision. |
-| `references` | no | warning if unresolved | Related Tandem document IDs. |
-| `tags` | no | error if malformed | Array of strings. |
+| `supersedes` | no | warning if unresolved | Decision IDs this decision supersedes. Mirror IDs in `references` for v0 tool-visible relationships. |
+| `supersededBy` | no | warning if unresolved | Decision IDs that supersede this decision. Mirror IDs in `references` for v0 tool-visible relationships. |
+| `references` | no | warning if unresolved | Related Tandem document IDs. Include superseded/superseding decision IDs here when they should be visible to current CLI/TUI search and relationship views. |
+| `tags` | no | error if malformed | Array of strings. Use tags such as `adr`, `architecture`, `product`, or area names for filtering. |
 | `createdAt` | no | warning if malformed | Timestamp for creation. |
 | `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
 
@@ -562,7 +562,7 @@ Guidance:
 
 ## Decision document
 
-Decision documents are first-class v0 documents. They capture durable project, product, or architecture decisions and may be referenced by tasks, blockers, rules, and other decisions.
+Decision documents are first-class v0 documents. They capture durable project, product, or architecture decisions and may be referenced by tasks, blockers, rules, and other decisions. They are intentionally ADR-compatible without introducing a separate ADR type: use `type: decision`, optional ADR-style metadata, and a Markdown body shaped like an ADR.
 
 Example:
 
@@ -574,22 +574,32 @@ title: Use accord vocabulary for work agreements
 status: accepted
 date: 2026-06-26
 deciders:
-  - ivan
+  - Ivan
+  - Pi
 context: Brainfile's contract term feels legalistic for Tandem's collaborative workflow.
 alternatives:
   - Keep contract vocabulary
   - Use assignment only
 consequences:
   - Work-agreement metadata uses `accord` consistently.
-supersedes: []
-supersededBy: []
+tags: [adr, protocol]
 createdAt: 2026-06-26T12:00:00Z
 updatedAt: 2026-06-26T12:10:00Z
 references:
   - task-1
+supersedes: []
+supersededBy: []
 ---
 
-# Decision
+## Status
+
+Accepted.
+
+## Context
+
+Tandem needs a name for the explicit human/agent work-agreement object.
+
+## Decision
 
 Use `accord` for the collaborative work-agreement object.
 
@@ -604,10 +614,44 @@ Brainfile's `contract` term is technically clear but feels legalistic and one-si
 
 ## Consequences
 
-The term is less legalistic than Brainfile's contract terminology and better matches Tandem's collaborative tone.
+The term is less legalistic than Brainfile's contract terminology and better matches Tandem's collaborative tone. CLI, TUI, protocol, and agent guidance should use `accord` consistently.
+
+## Supersession
+
+- Supersedes: none
+- Superseded by: none
 ```
 
-Required v0 decision fields are `id`, `type: decision`, and `title`. Decision documents do not need a workflow lifecycle `state` in v0. Their durable decision content lives in frontmatter metadata plus the Markdown body. `status`, `date`, `deciders`, `context`, `consequences`, `alternatives`, `supersedes`, and `supersededBy` are the recommended ADR-compatible fields; `status` is not task workflow state.
+Recommended ADR-compatible body template:
+
+```markdown
+## Status
+
+Accepted, proposed, superseded, deprecated, or rejected. This mirrors optional `status:` metadata and is not task workflow `state`.
+
+## Context
+
+What forces, constraints, alternatives, or prior decisions made this choice necessary?
+
+## Decision
+
+What has been decided?
+
+## Consequences
+
+What becomes easier, harder, required, or intentionally deferred?
+
+## Supersession
+
+- Supersedes: decision-N or none
+- Superseded by: decision-M or none
+
+## References
+
+- task-N, decision-N, log-N, code/docs paths, or external links as needed
+```
+
+Required v0 decision fields are `id`, `type: decision`, and `title`. Decision documents do not need a workflow lifecycle `state` in v0. Their durable decision content lives in frontmatter metadata plus the Markdown body. `status`, `date`, `deciders`, `context`, `consequences`, `alternatives`, `supersedes`, and `supersededBy` are the recommended ADR-compatible fields; `status` is not task workflow state. Use `references` as the canonical tool-visible link graph, including supersession relationships when they need to appear in CLI/TUI search or relationship displays.
 
 ## Accord model
 

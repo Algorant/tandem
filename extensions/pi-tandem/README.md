@@ -82,6 +82,8 @@ tandem decision show <id> --json
 tandem decision add --title <title> [--body <markdown>] [--status <status>] [--date <date>] [--decider <name>] [--context <text>] [--consequence <text>] [--alternative <text>] [--supersedes <decision-id>] [--superseded-by <decision-id>] [--reference <id>] [--tag <tag>]
 ```
 
+Use this tool for ADR-compatible durable decisions. The document remains `type: decision`; ADR status and supersession belong in decision metadata/body sections, not task workflow `state` or a separate `adr` type.
+
 ### `tandem_search`
 
 Maps to:
@@ -143,4 +145,4 @@ Do not promote this extension into `~/.pi/agent/extensions` until a separate rev
 
 ## Prompt guidance
 
-The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, to keep workflow state distinct from `review:` metadata and accord status, and to model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior. See `pi-tandem.md` for the human-readable agent guidance.
+The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, to keep workflow state distinct from `review:` metadata and accord status, to model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior, and to use `tandem_decision` for ADR-compatible decisions instead of inventing task lifecycle state. See `pi-tandem.md` for the human-readable agent guidance.

@@ -31,6 +31,42 @@ tandem log list --json
 tandem decision list --json
 ```
 
+## Decision commands
+
+Use `tandem decision` for durable decisions and ADR-compatible records:
+
+```sh
+body=$(cat <<'MD'
+## Status
+
+Accepted.
+
+## Context
+
+Why this choice is needed.
+
+## Decision
+
+What has been decided.
+
+## Consequences
+
+What changes because of it.
+
+## Supersession
+
+- Supersedes: none
+- Superseded by: none
+MD
+)
+
+tandem decision add --title "Use Tandem decisions for ADRs" --body "$body" --reference task-87 --tag adr
+tandem decision list
+tandem decision show decision-1 --json
+```
+
+`decision` documents do not use task workflow `state`. Put ADR status and supersession in body sections, add optional frontmatter metadata only when editing the Markdown record directly, and use `references` for tool-visible links.
+
 ## Command families
 
 V0 command families are `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, and `tui`.

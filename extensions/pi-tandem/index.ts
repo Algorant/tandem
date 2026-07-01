@@ -547,7 +547,7 @@ export const tandemTaskParameters = Type.Object({
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists. Use action=update for task metadata edits; state remains action=move, and parentId is not updatable.\n- Epics are ordinary tasks with \`type: task\` plus \`kind: epic\`; use parent/parentId for epic children and references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists. Use action=update for task metadata edits; state remains action=move, and parentId is not updatable.\n- Epics are ordinary tasks with \`type: task\` plus \`kind: epic\`; use parent/parentId for epic children and references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -714,10 +714,11 @@ export default function piTandem(pi: ExtensionAPI) {
 		label: "Tandem Decisions",
 		...createTandemToolRenderer("tandem_decision", "Tandem Decisions"),
 		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output and supports ADR-compatible metadata.",
-		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations.",
+		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations, including ADR-compatible durable records.",
 		promptGuidelines: [
 			"Use tandem_decision for first-class Tandem decision documents; do not model decisions as task lifecycle state.",
 			"Decision status is ADR metadata (proposed/accepted/rejected/deprecated/superseded), not a workflow state.",
+			"For ADR-compatible records, keep type=decision and put Status/Context/Decision/Consequences/Supersession sections in the body instead of inventing a separate ADR type.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -725,7 +726,7 @@ export default function piTandem(pi: ExtensionAPI) {
 			action: StringEnum(["list", "show", "add"] as const),
 			id: Type.Optional(Type.String()),
 			title: Type.Optional(Type.String()),
-			body: Type.Optional(Type.String()),
+			body: Type.Optional(Type.String({ description: "Markdown body. For ADR-compatible records, include sections such as Status, Context, Decision, Consequences, Supersession, and References." })),
 			status: Type.Optional(StringEnum(["proposed", "accepted", "rejected", "deprecated", "superseded"] as const)),
 			date: Type.Optional(Type.String()),
 			deciders: Type.Optional(Type.Array(Type.String())),

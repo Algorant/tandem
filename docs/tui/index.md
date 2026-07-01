@@ -11,17 +11,16 @@ description: Using the Tandem terminal user interface.
 
 The v0 TUI includes:
 
-- **Board** — active tasks grouped by configured workflow state.
-- **Review / Validation** — work that needs validation attention.
+- **Board** — active tasks grouped by configured workflow state, including the Validation state/subview.
 - **Logs** — completed task history.
 - **Rules** — project coordination rules.
-- **Decisions** — decision documents.
+- **Decisions** — ADR-compatible `decision` documents.
 
 ## Navigation
 
-Use `1` through `5` to switch top-level views, `j`/`k` or arrow keys to move selection, `h`/`l` for local pane or state navigation, `?` for help, and `q` to quit.
+Use `1` through `4` to switch top-level views, `j`/`k` or arrow keys to move selection, `h`/`l` for local pane or state navigation, `?` for help, and `q` to quit.
 
-Board supports quick task creation, state movement, reloads, mouse selection/scrolling, inline preview expansion by clicking the selected row, and opening active task Markdown in `$EDITOR`. Mouse hit regions are intentionally bounded: top tabs switch views, Board state tabs switch states, Board/Logs rows select items, visible footer actions reuse the matching keyboard behavior where safe, wheel events scroll the pane under the pointer, and non-action regions no-op. Drag/drop is out of v0.
+Board supports quick task creation, state movement, reloads, mouse selection/scrolling, inline preview expansion by clicking the selected row, and opening active task Markdown in `$EDITOR`. The Decisions view lists active decision records, displays metadata/body/path, and supports a basic title/body add prompt with `a`; include ADR sections such as Status, Context, Decision, Consequences, and Supersession in the body when recording architecture decisions. Mouse hit regions are intentionally bounded: top tabs switch views, Board state tabs switch states, Board/Logs/Decisions rows select items, visible footer actions reuse the matching keyboard behavior where safe, wheel events scroll the pane under the pointer, and non-action regions no-op. Drag/drop is out of v0.
 
 ## Themes
 

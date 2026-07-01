@@ -12,6 +12,7 @@ Core concepts:
 
 - **Tandem**: the product/protocol/tooling system.
 - **accord**: the explicit agreement for a unit of work, replacing Brainfile's `contract` term.
+- **decision**: a first-class durable project/product/architecture choice; Tandem decisions are ADR-compatible records without a separate ADR type.
 - **review**: human/PM validation state, separate from accord state.
 - **logs**: first-class completed-work history, not just a trash/archive folder.
 - **tandem**: user-facing CLI/TUI binary and Rust app crate. **td** is reserved for future/internal tool prefixes unless explicitly revisited.
@@ -39,7 +40,7 @@ Protocol:
 - Default active states: `todo`, `in-progress`, `review`.
 - Protocol version for the first v0 draft: `0.1.0`.
 - Default task identity: `type: task` with sequential IDs such as `task-1`.
-- First-class document types: `task` and `decision`; decision documents do not need a lifecycle field in v0.
+- First-class document types: `task` and `decision`; decision documents are ADR-compatible durable records and do not need a lifecycle field in v0.
 - Custom document types: allowed in config only; no v0 type-management CLI.
 - Epics: convention-only task documents using `type: task` plus `kind: epic`; children link through `parentId`, related context uses `references`, and there is no separate epic type, command family, ID namespace, or lifecycle in v0.
 - Work agreement object: `accord`.
@@ -196,6 +197,12 @@ Before making changes:
 1. Read this file.
 2. Inspect the files directly relevant to the requested area.
 3. Keep changes scoped to the requested area.
+
+When recording durable decisions:
+
+- Use `tandem_decision` / `tandem decision add` to create first-class `type: decision` documents.
+- Do not model decisions as task lifecycle states, accord statuses, completed logs, or a separate `adr` document type.
+- For ADR-compatible records, include body sections such as Status, Context, Decision, Consequences, and Supersession; optional status/supersession metadata is decision record metadata, not workflow `state`.
 
 When adding implementation code later:
 

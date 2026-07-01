@@ -39,7 +39,7 @@ Current MVP tools:
 - `tandem_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - `tandem_log` — `list`, `show`, `search`.
 - `tandem_rules` — `list`, `add`, `edit`, `delete`.
-- `tandem_decision` — `list`, `show`, `add`.
+- `tandem_decision` — `list`, `show`, `add` for first-class decisions, including ADR-compatible durable records that stay `type: decision`.
 - `tandem_search` — active/log search.
 
 Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details.
@@ -66,7 +66,7 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
-Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, modeling epics as ordinary `type: task` + `kind: epic` parents instead of separate ADR/epic protocol behavior, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
+Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, modeling epics as ordinary `type: task` + `kind: epic` parents instead of separate ADR/epic protocol behavior, recording ADR-compatible choices with `tandem_decision` rather than task lifecycle state, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
 
 ## Testing
 

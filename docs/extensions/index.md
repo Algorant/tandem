@@ -17,6 +17,6 @@ Adapters own tool schemas, editor or agent ergonomics, output formatting, and di
 
 ## Current adapter
 
-`extensions/pi-tandem/` provides a Pi adapter that exposes Tandem task, accord, rule, decision, and log operations through Pi tools and commands.
+`extensions/pi-tandem/` provides a Pi adapter that exposes Tandem task, accord, rule, decision, and log operations through Pi tools and commands. Agents should use `tandem_decision` for ADR-compatible decisions instead of inventing task states or a separate ADR type.
 
 Global Pi config promotion is a separate explicit task. Repository-local extension development should not edit `~/.pi/agent` directly.

@@ -21,6 +21,10 @@ An epic is a convention on a normal task, not a separate protocol object. Mark a
 
 Epics complete through the normal task completion/archive flow after their children are done, canceled, or intentionally superseded. Do not create `type: epic`, ADR-style epic records, or a special done state.
 
+## Decisions
+
+Decision documents are durable project, product, or architecture records. They are ADR-compatible by convention: keep `type: decision`, use optional record metadata such as `status`, `date`, `deciders`, `supersedes`, and `supersededBy`, and put ADR sections like Status, Context, Decision, Consequences, and Supersession in the Markdown body. Do not create a separate ADR type or decision workflow state.
+
 ## State
 
 Task workflow uses `state` values. The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` column.

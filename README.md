@@ -39,7 +39,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in per-actor `.tandem/events/<actor_id>.jsonl` logs, with legacy `.tandem/events.jsonl` still readable during transition.
 - v0 `tandem` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`; `tandem decision` supports `list`, `show`, `add`.
 - Validation: strict structure/core refs; unresolved `parentId`/`blockers` are errors while related `references` are warnings.
-- Decision docs: no lifecycle field required in v0.
+- Decision docs: ADR-compatible durable records using `type: decision`; no separate ADR type or lifecycle field required in v0.
 - First implementation: Rust inside `tandem/`, currently as one `tandem` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a Ratatui/crossterm TUI module.
 - CLI output: human-readable by default using compact tables/detail blocks; all read commands support `--json` envelope objects.
 - TUI invocation: `tandem tui` only in v0.

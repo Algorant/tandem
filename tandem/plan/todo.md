@@ -65,7 +65,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Defined command purpose, canonical long-flag syntax, inputs, output shape, command kind, and obvious exit/error notes.
 - [x] Defined `--json` data payload examples for `list`, `show`, `search`, `log list`, `log show`, `log search`, `rules list`, `decision list`, and `decision show`.
 - [x] Added examples for completion warnings and accord/rules/decision mutations.
-- [x] Defined `tandem decision list|show|add` v0 command model.
+- [x] Defined ADR-compatible `tandem decision list|show|add` v0 command model.
 - [x] Defined v0 `tandem log` output fields for list, show, and search.
 - [x] Defined v0 rules CLI add/edit/delete flow.
 - [x] Preserved review metadata sort/detail lessons for Board Validation and logs rather than a top-level Review view.
@@ -111,7 +111,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - renders selectable queue rows plus inspection detail with reason badges/lines, accord/review/state/priority metadata, blockers, delivered evidence/files, and CLI action hints
 - [x] Implemented useful Rules and Decisions TUI views:
   - Rules lists `always`/`never`/`prefer`/`context` groups with selection plus add/edit/delete prompts.
-  - Decisions lists active decision docs, shows selected metadata/body/path, and adds basic title/body decisions.
+  - Decisions lists active ADR-compatible decision docs, shows selected metadata/body/path, and adds basic title/body decisions.
 - [x] Split Rules and Decisions TUI view code into dedicated `src/tui/rules.rs` and `src/tui/decisions.rs` modules.
 - [x] Implemented the first TUI theme foundation without new dependencies:
   - built-in `default-dark` semantic palette

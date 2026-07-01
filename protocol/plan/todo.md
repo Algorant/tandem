@@ -37,7 +37,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Decided schemas and fixtures are not part of v0.
 - [x] Captured Brainfile design mapping as reference only, with no required conversion command.
 - [x] Drafted task document frontmatter model.
-- [x] Drafted decision document frontmatter model.
+- [x] Drafted ADR-compatible decision document frontmatter/body model.
 - [x] Drafted accord lifecycle.
 - [x] Drafted review model.
 - [x] Drafted completion/logs/events model.

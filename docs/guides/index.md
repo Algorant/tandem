@@ -9,6 +9,7 @@ Guides collect practical workflows for using Tandem.
 
 ## Available guides
 
+- [Decisions and ADRs](./decisions.md) — record durable Tandem decisions as ADR-compatible decision documents.
 - [Docs site workflow](./docs-site.md) — install, preview, sync, and build the documentation site.
 
 ## Planned guides

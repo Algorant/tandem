@@ -51,6 +51,10 @@ references:
 
 `parentId` is strict hierarchy. `references` are loose related links. Epic tasks are completed and archived with the normal task flow; v0 does not define `type: epic`, `epic-N` IDs, a separate ADR/epic record type, or special epic lifecycle behavior.
 
+## Decisions
+
+Decision documents are the ADR-compatible durable record type. Required fields are `id`, `type: decision`, and `title`; optional ADR-style metadata may include `status`, `date`, `deciders`, `tags`, `supersedes`, and `supersededBy`. Supersession links should also appear in `references` when current CLI/TUI relationship views should find them.
+
 ## Events
 
 New event writes append to the current writer's `.tandem/events/<actor_id>.jsonl`; readers aggregate all per-actor logs plus any legacy `.tandem/events.jsonl`. Event records require `ts`, `event`, `id`, `summary`, canonical `actor`, and per-actor `seq`; the event identity is `<actor>:<seq>`. Optional `actorName` is display-only and never determines canonical identity or file ownership.

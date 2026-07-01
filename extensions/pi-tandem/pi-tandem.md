@@ -9,7 +9,7 @@ Use `pi-tandem` when a project has `.tandem/tandem.md` or when the user asks for
 - Use `tandem_accord` for ready/claim/deliver/accept/rework/block/fail transitions.
 - Use `tandem_log` and `tandem_search` for completed-work history and project search.
 - Use `tandem_rules` for project rules.
-- Use `tandem_decision` for first-class decision documents.
+- Use `tandem_decision` for first-class decision documents, including ADR-compatible durable records.
 
 Avoid editing `.tandem/board/*.md`, `.tandem/logs/*.md`, or `.tandem/tandem.md` directly unless the user asks for raw source repair or the CLI cannot perform the needed action.
 
@@ -59,6 +59,43 @@ Example child creation:
 ```text
 tandem_task action=add title="Rewrite Concepts page" parent="task-10" references=["decision-3"] relatedFiles=["docs/concepts/index.md"]
 ```
+
+## Decision / ADR guidance
+
+Use `tandem_decision` for durable project, product, and architecture choices. Tandem decisions are ADR-compatible records using `type: decision`; do not invent `type: adr`, decision task states, accord statuses, or completed logs for decisions.
+
+Recommended body shape:
+
+```markdown
+## Status
+
+Accepted, proposed, superseded, deprecated, or rejected.
+
+## Context
+
+Why this choice is needed.
+
+## Decision
+
+What has been decided.
+
+## Consequences
+
+What changes because of it.
+
+## Supersession
+
+- Supersedes: decision-N or none
+- Superseded by: decision-M or none
+```
+
+Example tool pattern:
+
+```text
+tandem_decision action=add title="Use Tandem decisions for ADRs" references=["task-87"] tags=["adr"] body="## Status\n\nAccepted.\n\n## Context\n..."
+```
+
+If ADR metadata such as `status`, `date`, `deciders`, `supersedes`, or `supersededBy` is needed, keep it as decision record metadata/body content, not workflow `state`. Mirror supersession IDs in `references` so current CLI/TUI search can find the relationship.
 
 ## Lifecycle cautions
 

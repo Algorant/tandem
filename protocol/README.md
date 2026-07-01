@@ -52,7 +52,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 - Protocol version: `0.1.0` for the first v0 draft.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
 - New work items: `type: task`, sequential IDs such as `task-1`.
-- First-class document types: `task` and `decision`; decision docs do not need a lifecycle field in v0; custom types are config-only.
+- First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only.
 - Epics are ordinary `type: task` documents with `kind: epic`; children link with `parentId`, loose related context uses `references`, and v0 has no separate epic type, ID namespace, command family, or lifecycle.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID. Subtasks use parent-based sequential IDs.

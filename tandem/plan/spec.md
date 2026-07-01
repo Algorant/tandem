@@ -719,7 +719,7 @@ tandem decision show <id> [--json]
 
 #### `tandem decision add`
 
-- Purpose: create a decision document.
+- Purpose: create an ADR-compatible `decision` document.
 - Kind: mutation.
 - Syntax:
 
@@ -730,7 +730,7 @@ tandem decision add --title <title> [--body <markdown>] [--status <proposed|acce
 - Required inputs:
   - `--title <title>`.
 - Optional inputs:
-  - `--body <markdown>`.
+  - `--body <markdown>`: recommended ADR-compatible sections are `Status`, `Context`, `Decision`, `Consequences`, `Supersession`, and `References`.
   - `--status <status>` ADR status; defaults to `proposed` when omitted.
   - `--date <date>` ADR decision date; defaults to the current UTC date when omitted.
   - repeated `--decider <name>`.
@@ -739,17 +739,40 @@ tandem decision add --title <title> [--body <markdown>] [--status <proposed|acce
   - repeated `--alternative <text>`.
   - repeated `--supersedes <decision-id>`.
   - repeated `--superseded-by <decision-id>`.
-  - repeated `--reference <ref>`.
-  - repeated `--tag <tag>`.
+  - repeated `--reference <ref>`: related tasks, logs, or decisions; include superseded/superseding decision IDs here when they should be visible to current CLI/TUI search.
+  - repeated `--tag <tag>`: use tags such as `adr`, `architecture`, or product area names for filtering.
 - Human output shape: warnings first, then labeled created-decision summary with ID, status, date, title, and path.
 - Example:
 
 ```text
-tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider ivan --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --body "## Decision\nUse styled-basic rendering first."
+body=$(cat <<'MD'
+## Status
+
+Accepted.
+
+## Context
+
+The TUI needs a minimal Markdown renderer for v0.
+
+## Decision
+
+Use styled-basic Markdown rendering first.
+
+## Consequences
+
+This keeps the MVP small while preserving room for richer rendering later.
+
+## Supersession
+
+- Supersedes: none
+- Superseded by: none
+MD
+)
+tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider ivan --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --tag adr --body "$body"
 ```
 
 - Exit/error notes:
-  - fails on missing title, invalid ADR status, empty metadata flag values, or failed write.
+  - fails on missing title, invalid ADR status, empty metadata flag values, invalid references that are structural errors, or failed write.
   - unresolved `references`, `supersedes`, or `supersededBy` targets are warnings in v0 related-reference semantics.
   - decision documents do not receive a workflow `state`; ADR `status` remains separate from task state filters and board movement.
 
@@ -969,9 +992,9 @@ Actions:
 
 ### 5. Decisions view
 
-The TUI should allow browsing and managing `decision` documents outside normal task flow.
+The TUI should allow browsing and managing ADR-compatible `decision` documents outside normal task flow.
 
-Decision documents do not have a v0 lifecycle field. The Decisions view should show `type: decision` documents and their Markdown body/metadata without inventing separate decision states.
+Decision documents do not have a v0 lifecycle field. The Decisions view should show `type: decision` documents and their Markdown body/metadata without inventing separate decision states. ADR status and supersession are record metadata/body sections, not Board workflow state; current Decisions interactions should at least preserve and display sections such as `Status`, `Context`, `Decision`, `Consequences`, and `Supersession` in the selected body pane.
 
 ## Layout modes
 
