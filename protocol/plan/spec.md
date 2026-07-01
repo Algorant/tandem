@@ -248,6 +248,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | --- | --- | --- | --- |
 | `id` | yes | error | Canonical ID. New task IDs are sequential, e.g. `task-1`. IDs must be unique across board and logs. |
 | `type` | yes | error | Must be `task` for v0 task documents. |
+| `kind` | no | error if unsupported | Optional task sub-kind. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks. |
 | `title` | yes | error | Display title. |
 | `state` | yes in board | error | Must match a configured workspace state. Omitted in logs is allowed. |
 | `priority` | no | warning if unrecognized | Suggested values: `low`, `medium`, `high`, `critical`; projects may extend. |
@@ -265,6 +266,8 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
 | `completedAt` | logs only | error in logs if missing | Timestamp for completion/archive. Active tasks should not normally carry it. |
 | `completion` | logs only | error in logs if missing | Completion metadata; see below. |
+
+`kind` does not change task identity: epic tasks still use `id: task-N`, `type: task`, normal board states, and normal completion/archive behavior. Child work links to an epic through `parentId`; looser association remains `references`.
 
 ### Decision document fields
 
@@ -474,6 +477,7 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | --- | --- | --- |
 | `id` | yes | Stable canonical identifier such as `task-1`. |
 | `type` | no | Defaults to `task` for new task documents. |
+| `kind` | no | Optional task sub-kind. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task`. |
 | `title` | yes | Display title. |
 | `state` | yes for active tasks | Human workflow state. Defaults are `todo`, `in-progress`, and `validation`; `review` is read as a legacy alias for validation. |
 | `priority` | no | `low`, `medium`, `high`, `critical`, or project-defined. |
@@ -490,6 +494,8 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | `createdAt` | no | Creation timestamp. |
 | `updatedAt` | no | Last mutation timestamp. |
 | `completedAt` | logs only | Completion timestamp. |
+
+Epic tasks are normal tasks with `kind: epic`: they remain board-visible, use normal workflow states, allocate `task-N` IDs, and complete/archive into logs like any other task. Child tasks should point at the epic via `parentId`; related-but-not-owned work can use `references`.
 
 ## Decision document
 
@@ -834,12 +840,12 @@ Event records use the v0 audit envelope: `ts`, `event`, `id`, `summary`, `actor`
 
 | Aspect | Semantics |
 | --- | --- |
-| Required inputs | `title`; optional `state`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, subtasks, accord, review. |
+| Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, subtasks, accord, review. |
 | Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and reference validation. |
 | Files written | New `.tandem/board/task-N*.md`; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, `parentId`/`blockers` are unresolved, or nested accord/review/subtasks are malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, or nested accord/review/subtasks are malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
 | Event | `task.created`. |
-| Resulting state | New task document in `.tandem/board/` with `id: task-N`, `type: task`, `title`, `state` defaulting to `todo`, `createdAt`, and `updatedAt`. |
+| Resulting state | New task document in `.tandem/board/` with `id: task-N`, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, `createdAt`, and `updatedAt`. |
 
 Task ID allocation chooses the next available positive integer after scanning existing task IDs in both board and logs. Human-readable filename suffixes are optional and non-canonical.
 
@@ -954,9 +960,9 @@ Using `tandem` as the working CLI binary name:
 tandem init
 tandem list
 tandem show <id>
-tandem add --title ... --state todo
+tandem add --title ... --state todo --kind epic
 tandem move <id> --state validation
-tandem update <id> --priority high --tag cli
+tandem update <id> --kind epic --priority high --tag cli
 tandem complete <id> --summary ...
 tandem log list|show|search
 tandem search <query>

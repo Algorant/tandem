@@ -176,9 +176,9 @@ tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <ta
 - Human output shape: compact table grouped or sorted by state.
 
 ```text
-ID      STATE        PRI   TITLE                         ASSIGNEE  ACCORD      REVIEW
-task-7  in-progress  high  Implement theme loader        pi        claimed     not-ready
-task-8  validation   med   Add decision view             pi        delivered   pending
+ID      STATE        TYPE  KIND  TITLE                         ASSIGNEE
+task-7  in-progress  task  epic  Launch docs epic              pi
+task-8  validation   task  -     Add decision view             pi
 ```
 
 - `--json` data shape:
@@ -191,7 +191,8 @@ task-8  validation   med   Add decision view             pi        delivered   p
       {
         "id": "task-7",
         "type": "task",
-        "title": "Implement theme loader",
+        "kind": "epic",
+        "title": "Launch docs epic",
         "state": "in-progress",
         "priority": "high",
         "assignee": "pi",
@@ -236,14 +237,15 @@ tandem show <id> [--json]
     "document": {
       "id": "task-7",
       "type": "task",
-      "title": "Implement theme loader",
+      "kind": "epic",
+      "title": "Launch docs epic",
       "state": "in-progress",
       "priority": "high",
       "tags": ["tui"],
       "accord": { "status": "claimed" },
       "review": { "status": "not-ready" }
     },
-    "body": "## Description\nBuild the theme loader.",
+    "body": "## Description\nCoordinate docs launch.",
     "path": ".tandem/board/task-7.md",
     "location": "board"
   },
@@ -261,17 +263,18 @@ tandem show <id> [--json]
 - Syntax:
 
 ```text
-tandem add --title <title> [--state <state>] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
+tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
 ```
 
 - Required inputs:
   - `--title <title>`.
 - Optional inputs:
   - `--state <state>` defaults to `todo`.
+  - `--kind epic`: mark the new task as a lightweight epic while preserving `type: task` and `task-N` IDs.
   - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, `--parent`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`, repeated `--subtask`.
 - Human output shape: labeled created-task summary with ID, state, title, and file path.
 - Exit/error notes:
-  - fails on invalid state, invalid referenced parent/blocker, structure errors, or failed write.
+  - fails on invalid state, unsupported kind, invalid referenced parent/blocker, structure errors, or failed write.
 
 ### `tandem move`
 
@@ -301,19 +304,20 @@ tandem move <id> --state <state>
 - Syntax:
 
 ```text
-tandem update <id> [--title <title>] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
+tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
 ```
 
 - Required inputs:
   - `<id>`: active board task ID.
 - Optional inputs:
-  - scalar replacements: `--title`, `--priority`, `--assignee`, `--due-date`.
+  - scalar replacements: `--title`, `--kind`, `--priority`, `--assignee`, `--due-date`.
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
   - no `parentId` update and no clear/remove flags in v0.
   - completed logs are not updated.
 - Validation:
+  - kind, when set, must be `epic`; omit `kind` for normal tasks.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
   - blockers must resolve to existing documents; references warn when unresolved; related files remain path metadata.
 - Human output shape: warnings first, then changed fields with old/new values and the path. If every requested value already exists, the command prints a clear no-op and does not update `updatedAt` or append an event.
@@ -494,7 +498,7 @@ tandem search <query> [--state <state>] [--type <type>] [--json]
   - `--state <state>` filters active board results.
   - `--type <type>` filters by document type.
   - `--json`: emit structured output.
-- Human output shape: compact table with location (`board` or `logs`) and match snippet.
+- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, and match snippet.
 - `--json` data shape:
 
 ```json
@@ -506,10 +510,11 @@ tandem search <query> [--state <state>] [--type <type>] [--json]
       {
         "id": "task-7",
         "type": "task",
-        "title": "Implement theme loader",
+        "kind": "epic",
+        "title": "Launch docs epic",
         "location": "board",
         "state": "in-progress",
-        "snippet": "Build the theme loader."
+        "snippet": "Coordinate docs launch."
       },
       {
         "id": "task-2",

@@ -31,6 +31,7 @@ const REVIEW_STATUSES: &[&str] = &[
     "rejected",
 ];
 const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
+const TASK_KINDS: &[&str] = &["epic"];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
@@ -106,6 +107,12 @@ impl Document {
         self.field("type").unwrap_or("task")
     }
 
+    fn kind(&self) -> Option<&str> {
+        self.field("kind")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+    }
+
     fn title(&self) -> &str {
         self.field("title").unwrap_or("")
     }
@@ -140,6 +147,7 @@ struct AddOptions {
     title: Option<String>,
     state: Option<String>,
     description: Option<String>,
+    kind: Option<String>,
     priority: Option<String>,
     tags: Vec<String>,
     assignee: Option<String>,
@@ -161,6 +169,7 @@ struct MoveOptions {
 struct UpdateOptions {
     id: String,
     title: Option<String>,
+    kind: Option<String>,
     priority: Option<String>,
     assignee: Option<String>,
     due_date: Option<String>,
@@ -316,9 +325,9 @@ fn print_help() {
     println!("  tandem init [--title <title>]");
     println!("  tandem list [--state <state>] [--type <type>] [--json]");
     println!("  tandem show <id> [--json]");
-    println!("  tandem add --title <title> [--state <state>] [--description <text>]");
+    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--description <text>]");
     println!("  tandem move <id> --state <state>");
-    println!("  tandem update <id> [--title <title>] [--priority <priority>] [--tag <tag>] ...");
+    println!("  tandem update <id> [--title <title>] [--kind epic] [--priority <priority>] [--tag <tag>] ...");
     println!("  tandem complete <id> --summary <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--json]");
     println!("  tandem log list|show|search ...");
@@ -449,6 +458,10 @@ fn parse_add_args(args: &[String]) -> Result<AddOptions, CliError> {
                 options.description =
                     Some(required_value(args, index, "--description")?.to_string());
             }
+            "--kind" => {
+                index += 1;
+                options.kind = Some(required_value(args, index, "--kind")?.to_string());
+            }
             "--priority" => {
                 index += 1;
                 options.priority = Some(required_value(args, index, "--priority")?.to_string());
@@ -539,6 +552,10 @@ fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
             "--title" => {
                 index += 1;
                 options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--kind" => {
+                index += 1;
+                options.kind = Some(required_value(args, index, "--kind")?.to_string());
             }
             "--priority" => {
                 index += 1;
@@ -1039,6 +1056,7 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     let title = require_nonempty(options.title.as_deref(), "add requires --title <title>")?;
     let state = options.state.as_deref().unwrap_or("todo");
     validate_state(&workspace, state)?;
+    validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
 
     if let Some(parent) = options.parent.as_deref() {
         require_existing_document(&workspace, parent, "parent")?;
@@ -1061,9 +1079,10 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
         "---".to_string(),
         format!("id: {task_id}"),
         "type: task".to_string(),
-        format!("title: {}", yaml_double_quote(title)),
-        format!("state: {state}"),
     ];
+    push_optional_line(&mut lines, "kind", options.kind.as_deref());
+    lines.push(format!("title: {}", yaml_double_quote(title)));
+    lines.push(format!("state: {state}"));
     push_optional_line(&mut lines, "priority", options.priority.as_deref());
     push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
     push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
@@ -1100,6 +1119,9 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     println!("Created task");
     println!("ID:    {task_id}");
     println!("State: {state}");
+    if let Some(kind) = options.kind.as_deref().map(str::trim) {
+        println!("Kind:  {kind}");
+    }
     println!("Title: {title}");
     println!("Path:  {}", display_path(&task_path));
     Ok(())
@@ -2208,6 +2230,13 @@ fn update_task_metadata(
         &mut updates,
         &mut changes,
         &doc,
+        "kind",
+        options.kind.as_deref(),
+    )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
         "priority",
         options.priority.as_deref(),
     )?;
@@ -2291,6 +2320,7 @@ fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Re
     if let Some(title) = options.title.as_deref() {
         require_nonempty(Some(title), "update --title must not be empty")?;
     }
+    validate_task_kind_option(options.kind.as_deref(), "update --kind")?;
     if let Some(priority) = options.priority.as_deref() {
         let priority = require_nonempty(Some(priority), "update --priority must not be empty")?;
         if !PRIORITIES.contains(&priority) {
@@ -2318,6 +2348,29 @@ fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Re
     }
     for blocker in &options.blockers {
         require_existing_document(workspace, blocker, "blocker")?;
+    }
+    Ok(())
+}
+
+fn validate_task_kind_option(kind: Option<&str>, flag: &str) -> Result<(), CliError> {
+    let Some(kind) = kind else {
+        return Ok(());
+    };
+    let kind = require_nonempty(Some(kind), &format!("{flag} must not be empty"))?;
+    validate_task_kind_value(kind)
+        .map_err(|message| CliError::user(format!("Validation failed: {message}")))
+}
+
+fn validate_task_kind_value(kind: &str) -> Result<(), String> {
+    let kind = kind.trim();
+    if kind.is_empty() {
+        return Err("kind must not be empty when present".to_string());
+    }
+    if !TASK_KINDS.contains(&kind) {
+        return Err(format!(
+            "invalid kind `{kind}`; expected one of: {}",
+            TASK_KINDS.join(", ")
+        ));
     }
     Ok(())
 }
@@ -2492,6 +2545,11 @@ fn validate_task_document_for_mutation(
         Some("task") => {}
         Some(other) => errors.push(format!("expected type `task`, found `{other}`")),
         None => errors.push("missing required field `type`".to_string()),
+    }
+    if let Some(kind) = doc.field("kind") {
+        if let Err(message) = validate_task_kind_value(kind) {
+            errors.push(message);
+        }
     }
     if doc.location == DocumentLocation::Board {
         match doc.field("state") {
@@ -2796,15 +2854,16 @@ fn print_list_table(docs: &[Document]) {
     }
 
     println!(
-        "{:<12} {:<12} {:<8} {:<42} {:<12}",
-        "ID", "STATE", "TYPE", "TITLE", "ASSIGNEE"
+        "{:<12} {:<12} {:<8} {:<8} {:<42} {:<12}",
+        "ID", "STATE", "TYPE", "KIND", "TITLE", "ASSIGNEE"
     );
     for doc in docs {
         println!(
-            "{:<12} {:<12} {:<8} {:<42} {:<12}",
+            "{:<12} {:<12} {:<8} {:<8} {:<42} {:<12}",
             truncate(doc.id(), 12),
             truncate(doc.field("state").unwrap_or("-"), 12),
             truncate(doc.doc_type(), 8),
+            truncate(doc.kind().unwrap_or("-"), 8),
             truncate(doc.title(), 42),
             truncate(doc.field("assignee").unwrap_or("-"), 12)
         );
@@ -2820,6 +2879,9 @@ fn print_document_warnings(docs: &[Document]) {
 fn print_show(doc: &Document) {
     println!("ID:        {}", doc.id());
     println!("Type:      {}", doc.doc_type());
+    if let Some(kind) = doc.kind() {
+        println!("Kind:      {kind}");
+    }
     println!("Title:     {}", doc.title());
     if let Some(state) = doc.field("state") {
         println!("State:     {state}");
@@ -2922,17 +2984,18 @@ fn print_search_table(results: &[SearchResult]) {
         return;
     }
     println!(
-        "{:<12} {:<8} {:<12} {:<8} {:<32} MATCH",
-        "ID", "WHERE", "STATE", "TYPE", "TITLE"
+        "{:<12} {:<8} {:<12} {:<8} {:<8} {:<32} MATCH",
+        "ID", "WHERE", "STATE", "TYPE", "KIND", "TITLE"
     );
     for result in results {
         let doc = &result.doc;
         println!(
-            "{:<12} {:<8} {:<12} {:<8} {:<32} {}",
+            "{:<12} {:<8} {:<12} {:<8} {:<8} {:<32} {}",
             truncate(doc.id(), 12),
             doc.location.as_str(),
             truncate(doc.field("state").unwrap_or("-"), 12),
             truncate(doc.doc_type(), 8),
+            truncate(doc.kind().unwrap_or("-"), 8),
             truncate(doc.title(), 32),
             truncate(&result.snippet, 80)
         );
@@ -3514,6 +3577,7 @@ fn search_json(query: &str, results: &[SearchResult]) -> String {
             let mut fields = Vec::new();
             push_json_field(&mut fields, "id", doc.id());
             push_json_field(&mut fields, "type", doc.doc_type());
+            push_optional_json_field(&mut fields, "kind", doc.kind());
             push_json_field(&mut fields, "title", doc.title());
             push_json_field(&mut fields, "location", doc.location.as_str());
             push_optional_json_field(&mut fields, "state", doc.field("state"));
@@ -3638,6 +3702,7 @@ fn document_summary_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "type", doc.doc_type());
+    push_optional_json_field(&mut fields, "kind", doc.kind());
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "state", doc.field("state"));
     push_optional_json_field(&mut fields, "priority", doc.field("priority"));
@@ -3657,6 +3722,7 @@ fn document_detail_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "type", doc.doc_type());
+    push_optional_json_field(&mut fields, "kind", doc.kind());
     push_json_field(&mut fields, "title", doc.title());
     for key in [
         "state",
@@ -3688,6 +3754,7 @@ fn log_summary_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "type", doc.doc_type());
+    push_optional_json_field(&mut fields, "kind", doc.kind());
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
     push_optional_json_field(&mut fields, "summary", completion_summary(doc));
@@ -4463,6 +4530,27 @@ rules:
     }
 
     #[test]
+    fn validation_reports_invalid_task_kind() {
+        let doc = Document {
+            path: PathBuf::from(".tandem/logs/task-1.md"),
+            location: DocumentLocation::Logs,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\nkind: feature\ntitle: Demo\nstate: todo\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        let workspace = Workspace {
+            board_dir: PathBuf::from(".tandem/board"),
+            logs_dir: PathBuf::from(".tandem/logs"),
+            config_path: PathBuf::from("missing-tandem.md"),
+            events_path: PathBuf::from(".tandem/events.jsonl"),
+        };
+        let error = validate_task_document_for_mutation(&workspace, &doc).unwrap_err();
+        assert!(error.message.contains("invalid kind `feature`"));
+    }
+
+    #[test]
     fn update_task_metadata_changes_scalars_and_appends_lists() {
         let root = std::env::temp_dir().join(format!(
             "tandem-update-{}",
@@ -4502,6 +4590,7 @@ rules:
             UpdateOptions {
                 id: "task-1".to_string(),
                 title: Some("New".to_string()),
+                kind: Some("epic".to_string()),
                 priority: Some("high".to_string()),
                 tags: vec!["cli".to_string(), "metadata".to_string()],
                 blockers: vec!["task-2".to_string()],
@@ -4513,12 +4602,13 @@ rules:
         .unwrap();
 
         let output = fs::read_to_string(&task_path).unwrap();
-        assert_eq!(outcome.changes.len(), 6);
+        assert_eq!(outcome.changes.len(), 7);
         assert_eq!(
             outcome.warnings,
             vec!["reference not found: missing-decision"]
         );
         assert!(output.contains("title: \"New\"\n"));
+        assert!(output.contains("kind: \"epic\"\n"));
         assert!(output.contains("priority: \"high\"\n"));
         assert!(output.contains("tags: [\"cli\", \"metadata\"]\n"));
         assert!(output.contains("blockers: [\"task-2\"]\n"));
@@ -4572,16 +4662,26 @@ rules:
     }
 
     #[test]
-    fn update_rejects_invalid_priority_and_show_json_exposes_metadata_lists() {
+    fn update_rejects_invalid_priority_and_kind_while_json_exposes_metadata() {
         let doc = Document {
             path: PathBuf::from("task-1.md"),
             location: DocumentLocation::Board,
             fields: parse_frontmatter_fields(
-                "id: task-1\ntype: task\ntitle: Demo\nstate: todo\npriority: high\nblockers: [task-2]\nreferences: [decision-1]\nrelatedFiles: [src/main.rs]\n",
+                "id: task-1\ntype: task\nkind: epic\ntitle: Demo\nstate: todo\npriority: high\nblockers: [task-2]\nreferences: [decision-1]\nrelatedFiles: [src/main.rs]\n",
             )
             .unwrap(),
             body: String::new(),
         };
+        assert!(document_summary_json(&doc).contains("\"kind\":\"epic\""));
+        assert!(document_detail_json(&doc).contains("\"kind\":\"epic\""));
+        let search = search_json(
+            "epic",
+            &[SearchResult {
+                doc: doc.clone(),
+                snippet: "epic".to_string(),
+            }],
+        );
+        assert!(search.contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"blockers\":[\"task-2\"]"));
         assert!(document_detail_json(&doc).contains("\"references\":[\"decision-1\"]"));
         assert!(document_detail_json(&doc).contains("\"relatedFiles\":[\"src/main.rs\"]"));
@@ -4602,6 +4702,17 @@ rules:
         )
         .unwrap_err();
         assert!(error.message.contains("invalid priority `urgent`"));
+
+        let error = validate_update_options(
+            &workspace,
+            &UpdateOptions {
+                id: "task-1".to_string(),
+                kind: Some("feature".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("invalid kind `feature`"));
     }
 
     #[test]
