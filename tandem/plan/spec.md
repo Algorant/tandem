@@ -745,7 +745,7 @@ tandem tui
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows minimal.
   - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
-  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context from `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
+  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context aggregated from per-actor `.tandem/events/*.jsonl` logs plus legacy `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
   - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
@@ -1255,7 +1255,7 @@ The app should watch:
 - workspace config
 - `board/`
 - `logs/`
-- `events.jsonl`
+- `events/` per-actor event logs and legacy `events.jsonl`
 - theme files
 
 Theme config loading order is built-in defaults first, then user TOML theme files from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config from `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override `.tandem/theme.toml`. Workspace config wins when settings conflict.
@@ -1302,6 +1302,8 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 - Detect concurrent edits before writing. A command or TUI action should compare the current file metadata/content identity with the snapshot it parsed; if the file changed, reload and revalidate before applying the mutation.
 - Update `updatedAt` only for real mutations. Do not touch timestamps for read commands, no-op commands, failed validation, or unchanged writes.
 - Append lifecycle events separately from document rewrites. The event append should not require reserializing the changed document.
+- Append new lifecycle events to the current actor's `.tandem/events/<actor_id>.jsonl`; do not append to legacy `.tandem/events.jsonl` by default. Readers should aggregate per-actor logs plus the legacy global log when present.
+- Event records must include the protocol envelope `ts`, `event`, `id`, `summary`, `actor`, and `seq`; `<actor>:<seq>` is the event identity. Optional `actorName` is display-only and must not determine canonical identity or file ownership.
 - Event names must use Tandem-native domains, for example `task.created`, `task.moved`, `task.completed`, `decision.created`, `accord.delivered`, `review.updated`, and `rules.updated`.
 - If a document mutation succeeds but event append fails, report the failure clearly. The implementation should either roll back when safe or surface a repair instruction; silently dropping the event is not acceptable.
 

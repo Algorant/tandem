@@ -47,7 +47,7 @@ Protocol:
 - References: `parentId`, blockers, and related references may point to any Tandem document by ID.
 - Subtask IDs: parent-based sequential IDs such as `task-1-1`.
 - Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0.
-- Events: `.tandem/events.jsonl` stores minimal audit-only lifecycle records requiring `ts`, `event`, `id`, and `summary`.
+- Events: per-actor `.tandem/events/<actor_id>.jsonl` logs store minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`; legacy `.tandem/events.jsonl` remains readable during transition.
 - Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
 - Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings.
 - Brainfile migration/import: no v0 requirement and no required command.
@@ -151,7 +151,7 @@ Protocol:
 - Keep one active work document per file.
 - Keep active work in `.tandem/board/`.
 - Keep completed work in `.tandem/logs/`.
-- Use `.tandem/events.jsonl` for append-only lifecycle history.
+- Use per-actor `.tandem/events/<actor_id>.jsonl` logs for append-only lifecycle history; readers should aggregate those logs plus legacy `.tandem/events.jsonl` if present.
 - Treat completion as an action/archive transition, not a persistent `done` column.
 - Keep human workflow state, accord state, and review state separate.
 - Preserve unknown fields and minimize file rewrites.

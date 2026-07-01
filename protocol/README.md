@@ -12,7 +12,7 @@ The protocol area owns:
 - `.tandem/tandem.md` workspace config shape
 - active work documents in `.tandem/board/`
 - completed work documents in `.tandem/logs/`
-- `.tandem/events.jsonl` lifecycle ledger
+- per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with legacy `.tandem/events.jsonl` reads during transition
 - `accord` work-agreement model
 - review and completion semantics
 - Brainfile-inspired protocol parity decisions
@@ -56,6 +56,6 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
 - Completion warns but allows completion in v0.
-- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in `.tandem/events.jsonl`.
+- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition.
 - Validation is built-in structural validation only, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.

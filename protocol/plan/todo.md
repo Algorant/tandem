@@ -13,7 +13,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
   - `.tandem/tandem.md`
   - `.tandem/board/`
   - `.tandem/logs/`
-  - `.tandem/events.jsonl`
+  - `.tandem/events/<actor_id>.jsonl` per-actor logs (with legacy `.tandem/events.jsonl` reads during transition)
 - [x] Chose `accord` as the work-agreement object replacing Brainfile contract terminology.
 - [x] Chose canonical workflow fields: `state` on documents and `states` in workspace config.
 - [x] Chose default active states: `todo`, `in-progress`, and `review`.
@@ -28,10 +28,10 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Chose parent-based sequential subtask IDs such as `task-1-1`.
 - [x] Decided completion warns about missing accepted review or accord but allows completion in v0.
 - [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed history.
-- [x] Decided `.tandem/events.jsonl` enriches timeline/audit history.
+- [x] Decided per-actor event logs under `.tandem/events/<actor_id>.jsonl` enrich timeline/audit history while avoiding a shared Git append hotspot; legacy `.tandem/events.jsonl` remains readable during transition.
 - [x] Decided v0 validation/lint is built-in structural validation only.
 - [x] Chose `protocolVersion: 0.1.0` for the first v0 draft.
-- [x] Chose minimal audit-only event payloads requiring `ts`, `event`, `id`, and `summary`.
+- [x] Chose minimal audit-only event payloads requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`, with event identity `<actor>:<seq>` and optional cosmetic `actorName`.
 - [x] Chose strict-core-reference validation severity: unresolved `parentId`/`blockers` are errors; unresolved related `references` and rule sources are warnings.
 - [x] Decided `type: decision` documents do not need a lifecycle field in v0.
 - [x] Decided schemas and fixtures are not part of v0.
@@ -44,7 +44,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Drafted protocol-facing CLI surface using `tandem`.
 - [x] Added `protocol/README.md` for protocol-area documentation.
 - [x] Added implementation-facing v0 field reference for workspace config, task documents, decision documents, accords, reviews, completion metadata, logs, and rules.
-- [x] Added minimal audit event envelope and event name catalog.
+- [x] Added minimal audit event envelope, actor identity/sequence rules, legacy-read behavior, and event name catalog.
 - [x] Added validation diagnostics with error/warning categories and examples.
 - [x] Defined completed-log document expectations.
 - [x] Defined mutation semantics for adding tasks/decisions, moving state, updating accords, review decisions, complete/archive, and post-v0 restore/reopen boundaries.

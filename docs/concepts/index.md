@@ -9,7 +9,7 @@ Tandem coordinates project work through plain files and explicit lifecycle state
 
 ## Workspace
 
-A Tandem workspace stores coordination data in `.tandem/` inside a repository. Active work lives in `.tandem/board/`, completed work lives in `.tandem/logs/`, and `.tandem/events.jsonl` records a lightweight audit trail.
+A Tandem workspace stores coordination data in `.tandem/` inside a repository. Active work lives in `.tandem/board/`, completed work lives in `.tandem/logs/`, and per-actor `.tandem/events/<actor_id>.jsonl` logs record a lightweight audit trail while legacy `.tandem/events.jsonl` remains readable during transition.
 
 ## Work documents
 

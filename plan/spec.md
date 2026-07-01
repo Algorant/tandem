@@ -84,7 +84,7 @@ Protocol:
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References may point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
 - Completion warns but does not block on review/accord acceptance in v0.
-- Archived markdown docs in `.tandem/logs/` are the completed-log source of truth; `.tandem/events.jsonl` records minimal audit-only lifecycle events.
+- Archived markdown docs in `.tandem/logs/` are the completed-log source of truth; per-actor `.tandem/events/<actor_id>.jsonl` logs record minimal audit-only lifecycle events, with legacy `.tandem/events.jsonl` read during transition.
 - Validation is built-in structural validation only for v0, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.
 

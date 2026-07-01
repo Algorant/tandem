@@ -35,7 +35,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - Default states: `todo`, `in-progress`, `validation` (existing `state: review` files are legacy-compatible reads).
 - Document types: `task` and `decision`; custom types are config-only.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
-- Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in `.tandem/events.jsonl`.
+- Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in per-actor `.tandem/events/<actor_id>.jsonl` logs, with legacy `.tandem/events.jsonl` still readable during transition.
 - v0 `tandem` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`; `tandem decision` supports `list`, `show`, `add`.
 - Validation: strict structure/core refs; unresolved `parentId`/`blockers` are errors while related `references` are warnings.
 - Decision docs: no lifecycle field required in v0.
