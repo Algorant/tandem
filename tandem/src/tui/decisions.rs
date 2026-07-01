@@ -21,6 +21,7 @@ use crate::{
 pub(super) struct DecisionsState {
     selected: usize,
     detail_scroll: u16,
+    expanded_doc_id: Option<String>,
     prompt: Option<DecisionPrompt>,
 }
 
@@ -147,17 +148,10 @@ impl TuiApp {
                 self.scroll_decision_detail_down(6)
             }
             KeyCode::Char('a') => self.start_decision_add_prompt(),
-            KeyCode::Enter => {
-                self.status = self
-                    .selected_decision_doc()
-                    .map(|doc| {
-                        format!(
-                            "Selected decision {}; body and metadata are shown in the detail pane. Use Tab or l to focus the body.",
-                            doc.id()
-                        )
-                    })
-                    .unwrap_or_else(|| "No decision selected; press a to add one.".to_string());
-            }
+            KeyCode::Enter => match self.focus {
+                FocusPane::Board => self.toggle_decision_expansion(),
+                FocusPane::Detail => self.focus = FocusPane::Board,
+            },
             _ => {}
         }
     }
@@ -166,6 +160,7 @@ impl TuiApp {
         if self.decisions_view.selected > 0 {
             self.decisions_view.selected -= 1;
             self.decisions_view.detail_scroll = 0;
+            self.decisions_view.expanded_doc_id = None;
         }
     }
 
@@ -174,6 +169,7 @@ impl TuiApp {
         if self.decisions_view.selected + 1 < count {
             self.decisions_view.selected += 1;
             self.decisions_view.detail_scroll = 0;
+            self.decisions_view.expanded_doc_id = None;
         }
     }
 
@@ -230,7 +226,10 @@ impl TuiApp {
 
     pub(super) fn decisions_footer_text(&self) -> String {
         let (context, commands) = match self.focus {
-            FocusPane::Board => ("list", "Enter body · a add · ? help"),
+            FocusPane::Board if self.selected_decision_is_expanded() => {
+                ("list", "Enter collapse · Tab body · a add · ? help")
+            }
+            FocusPane::Board => ("list", "Enter expand · Tab body · a add · ? help"),
             FocusPane::Detail => ("body", "Enter list · j/k scroll · ? help"),
         };
         self.with_status(format!("Decisions {context} · {commands}"))
@@ -238,6 +237,8 @@ impl TuiApp {
 
     fn draw_decision_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let decisions = self.sorted_decision_docs();
+        let selected_index = self.decisions_view.selected;
+        let expanded_id = self.decisions_view.expanded_doc_id.as_deref();
         let items = if decisions.is_empty() {
             vec![ListItem::new(Line::from(Span::styled(
                 "No decision documents. Press a to add one.",
@@ -247,7 +248,12 @@ impl TuiApp {
             let content_width = area.width.saturating_sub(4) as usize;
             decisions
                 .iter()
-                .map(|doc| decision_list_item(doc, &self.theme, content_width))
+                .enumerate()
+                .map(|(index, doc)| {
+                    let selected = index == selected_index;
+                    let expanded = selected && expanded_id == Some(doc.id());
+                    decision_list_item(doc, &self.theme, content_width, selected, expanded)
+                })
                 .collect::<Vec<_>>()
         };
         let mut state = ListState::default();
@@ -267,8 +273,8 @@ impl TuiApp {
                     .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )
-            .highlight_style(self.theme.selected_style())
-            .highlight_symbol("▸ ");
+            .highlight_style(Style::default())
+            .highlight_symbol("");
         frame.render_stateful_widget(list, area, &mut state);
     }
 
@@ -323,10 +329,34 @@ impl TuiApp {
             .nth(self.decisions_view.selected)
     }
 
+    fn selected_decision_is_expanded(&self) -> bool {
+        self.selected_decision_doc()
+            .map(|doc| self.decisions_view.expanded_doc_id.as_deref() == Some(doc.id()))
+            .unwrap_or(false)
+    }
+
+    fn toggle_decision_expansion(&mut self) {
+        let Some(doc) = self.selected_decision_doc() else {
+            self.status = "No decision selected; press a to add one.".to_string();
+            return;
+        };
+        let id = doc.id().to_string();
+        if self.decisions_view.expanded_doc_id.as_deref() == Some(id.as_str()) {
+            self.decisions_view.expanded_doc_id = None;
+            self.status = format!("Collapsed decision {id}.");
+        } else {
+            self.decisions_view.expanded_doc_id = Some(id.clone());
+            self.status = format!(
+                "Expanded decision {id}; press Enter to collapse or Tab for the full body."
+            );
+        }
+    }
+
     fn first_decision_selection(&mut self) {
         if !self.sorted_decision_docs().is_empty() {
             self.decisions_view.selected = 0;
             self.decisions_view.detail_scroll = 0;
+            self.decisions_view.expanded_doc_id = None;
         }
     }
 
@@ -335,6 +365,7 @@ impl TuiApp {
         if count > 0 {
             self.decisions_view.selected = count - 1;
             self.decisions_view.detail_scroll = 0;
+            self.decisions_view.expanded_doc_id = None;
         }
     }
 
@@ -400,6 +431,7 @@ impl TuiApp {
             self.decisions_view.selected = index;
             if reset_scroll {
                 self.decisions_view.detail_scroll = 0;
+                self.decisions_view.expanded_doc_id = None;
             }
             true
         } else {
@@ -533,132 +565,131 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
     ])
 }
 
-fn decision_list_item(doc: &Document, theme: &TuiTheme, content_width: usize) -> ListItem<'static> {
-    ListItem::new(decision_list_lines(doc, theme, content_width))
+fn decision_list_item(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+    selected: bool,
+    expanded: bool,
+) -> ListItem<'static> {
+    ListItem::new(decision_list_lines(
+        doc,
+        theme,
+        content_width,
+        selected,
+        expanded,
+    ))
 }
 
 fn decision_list_lines(
     doc: &Document,
     theme: &TuiTheme,
     content_width: usize,
+    selected: bool,
+    expanded: bool,
 ) -> Vec<Line<'static>> {
     let content_width = content_width.max(24);
+    let cursor = if selected {
+        if expanded {
+            "▾ "
+        } else {
+            "▸ "
+        }
+    } else {
+        "  "
+    };
     let title_width = content_width
+        .saturating_sub(text_width(cursor))
         .saturating_sub(text_width(doc.id()).saturating_add(1))
         .max(12);
     let title = crate::truncate(doc.title(), title_width);
-    let summary = decision_body_summary(doc);
-    let summary = if summary.is_empty() {
-        "(no decision body yet)".to_string()
+    let title_style = if selected {
+        theme.text_style().add_modifier(Modifier::BOLD)
     } else {
-        crate::truncate(&summary, content_width.saturating_sub(2).max(12))
+        theme.text_style()
     };
 
     let mut lines = vec![
         Line::from(vec![
+            Span::styled(cursor.to_string(), theme.status_style(StatusTone::Accent)),
             Span::styled(
                 format!("{} ", doc.id()),
                 theme.status_style(StatusTone::Accent),
             ),
-            Span::styled(title, theme.text_style().add_modifier(Modifier::BOLD)),
+            Span::styled(title, title_style),
         ]),
         Line::from(vec![
             Span::raw("  "),
-            Span::styled(summary, theme.muted_style()),
+            Span::styled(
+                decision_list_metadata_text(doc, content_width.saturating_sub(2).max(12)),
+                theme.muted_style(),
+            ),
         ]),
     ];
 
-    let metadata = decision_list_metadata_spans(doc, theme, content_width.saturating_sub(2));
-    if !metadata.is_empty() {
-        let mut spans = vec![Span::raw("  ")];
-        spans.extend(metadata);
-        lines.push(Line::from(spans));
+    if expanded {
+        lines.extend(decision_list_expanded_lines(doc, theme, content_width));
     }
 
     lines
 }
 
-fn decision_list_metadata_spans(
+fn decision_list_metadata_text(doc: &Document, max_width: usize) -> String {
+    let status = decision_field(doc, DECISION_STATUS_KEYS)
+        .map(|status| status.trim().replace('_', "-"))
+        .filter(|status| !status.is_empty())
+        .unwrap_or_else(|| "status -".to_string());
+    let date = decision_field(doc, DECISION_LIST_DATE_KEYS)
+        .map(compact_decision_date)
+        .unwrap_or_else(|| "date -".to_string());
+    let tags =
+        formatted_decision_values(doc, &["tags"], "#", " ").unwrap_or_else(|| "tags -".to_string());
+    crate::truncate(&format!("{status} · {date} · {tags}"), max_width)
+}
+
+fn decision_list_expanded_lines(
     doc: &Document,
     theme: &TuiTheme,
-    max_width: usize,
-) -> Vec<Span<'static>> {
-    let chips = decision_list_metadata_chips(doc, theme);
-    let mut spans = Vec::new();
-    let mut used = 0usize;
-
-    for (chip, style) in chips {
-        let separator_width = usize::from(!spans.is_empty());
-        let chip_width = text_width(&chip);
-        if used + separator_width + chip_width > max_width {
-            if !spans.is_empty() && used + separator_width < max_width {
-                spans.push(Span::raw(" "));
-                spans.push(Span::styled("…", theme.muted_style()));
-            }
-            break;
-        }
-        if !spans.is_empty() {
-            spans.push(Span::raw(" "));
-            used += 1;
-        }
-        spans.push(Span::styled(chip, style));
-        used += chip_width;
-    }
-
-    spans
-}
-
-fn decision_list_metadata_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, Style)> {
-    let mut chips = Vec::new();
-    if let Some(status) = decision_field(doc, DECISION_STATUS_KEYS) {
-        chips.push((
-            decision_chip_text(&status.replace('_', "-"), theme),
-            theme.progress_chip_style(decision_status_tone(status)),
-        ));
-    }
-    if let Some(date) = decision_field(doc, DECISION_LIST_DATE_KEYS) {
-        chips.push((
-            decision_chip_text(&compact_decision_date(date), theme),
-            theme.progress_chip_style(StatusTone::Muted),
-        ));
-    }
+    content_width: usize,
+) -> Vec<Line<'static>> {
+    let mut details = Vec::new();
     if let Some(deciders) = formatted_decision_values(doc, DECISION_DECIDER_KEYS, "", ", ") {
-        chips.push((
-            decision_chip_text(&crate::truncate(&deciders, 24), theme),
-            theme.progress_chip_style(StatusTone::Accent),
-        ));
+        details.push(format!("Deciders: {deciders}"));
+    } else if let Some(references) = formatted_decision_values(doc, &["references"], "", ", ") {
+        details.push(format!("References: {references}"));
+    }
+
+    if let Some(preview) = decision_list_body_preview(doc) {
+        details.push(format!("Preview: {preview}"));
+    }
+
+    if details.is_empty() {
+        details.push("No extra preview; Tab opens the full Decision record.".to_string());
+    }
+
+    details
+        .into_iter()
+        .take(2)
+        .map(|detail| {
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    crate::truncate(&detail, content_width.saturating_sub(2).max(12)),
+                    theme.muted_style(),
+                ),
+            ])
+        })
+        .collect()
+}
+
+fn decision_list_body_preview(doc: &Document) -> Option<String> {
+    let summary = decision_body_summary(doc);
+    let summary = summary.trim();
+    if summary.is_empty() || summary.eq_ignore_ascii_case(doc.title().trim()) {
+        None
     } else {
-        let tags = decision_field(doc, &["tags"])
-            .map(decision_field_values)
-            .unwrap_or_default();
-        for tag in tags.iter().take(2) {
-            chips.push((
-                decision_chip_text(&format!("#{tag}"), theme),
-                theme.progress_chip_style(StatusTone::Accent),
-            ));
-        }
-        if tags.len() > 2 {
-            chips.push((
-                decision_chip_text(&format!("+{}", tags.len() - 2), theme),
-                theme.progress_chip_style(StatusTone::Muted),
-            ));
-        }
+        Some(summary.to_string())
     }
-    chips
-}
-
-fn decision_status_tone(status: &str) -> StatusTone {
-    match status.trim().to_ascii_lowercase().as_str() {
-        "accepted" | "approved" | "adopted" => StatusTone::Success,
-        "rejected" | "deprecated" | "failed" => StatusTone::Error,
-        "superseded" => StatusTone::Muted,
-        "proposed" | "draft" | "pending" => StatusTone::Warning,
-        _ => StatusTone::Accent,
-    }
-}
-
-fn decision_chip_text(label: &str, theme: &TuiTheme) -> String {
-    theme.badge_label(label)
 }
 
 fn text_width(value: &str) -> usize {
@@ -980,23 +1011,36 @@ mod tests {
     }
 
     #[test]
-    fn decision_list_uses_title_summary_then_metadata_chips() {
+    fn decision_list_uses_compact_status_date_tags_without_decider_or_body_summary() {
         let theme = TuiTheme::default_dark();
         let doc = adr_decision_doc();
-        let lines = decision_list_lines(&doc, &theme, 84);
+        let lines = decision_list_lines(&doc, &theme, 84, false, false);
         let texts = lines.iter().map(line_text).collect::<Vec<_>>();
 
-        assert_eq!(lines.len(), 3);
-        assert!(texts[0].starts_with("decision-42 Choose the TUI layout"));
+        assert_eq!(lines.len(), 2);
+        assert!(texts[0].starts_with("  decision-42 Choose the TUI layout"));
+        assert_eq!(texts[1], "  accepted · 2026-07-01 · #adr #tui");
+        assert!(!texts.join("\n").contains("Ada, Grace"));
+        assert!(!texts.join("\n").contains("The Board is noisy"));
+    }
+
+    #[test]
+    fn expanded_decision_list_row_adds_cursor_and_non_redundant_preview() {
+        let theme = TuiTheme::default_dark();
+        let doc = adr_decision_doc();
+        let lines = decision_list_lines(&doc, &theme, 84, true, true);
+        let texts = lines.iter().map(line_text).collect::<Vec<_>>();
+
+        assert_eq!(lines.len(), 4);
+        assert!(texts[0].starts_with("▾ decision-42 Choose the TUI layout"));
+        assert_eq!(texts[1], "  accepted · 2026-07-01 · #adr #tui");
+        assert_eq!(texts[2], "  Deciders: Ada, Grace");
         assert_eq!(
-            texts[1],
-            "  The Board is noisy when decisions are mixed into task state buckets."
+            texts[3],
+            "  Preview: The Board is noisy when decisions are mixed into task state buckets."
         );
-        assert!(texts[2].contains("accepted"));
-        assert!(texts[2].contains("2026-07-01"));
-        assert!(texts[2].contains("Ada, Grace"));
-        assert!(!texts[2].contains("status:"));
-        assert!(!texts[2].contains("deciders:"));
+        assert!(!texts[2].contains("accepted"));
+        assert!(!texts[3].contains("#adr"));
     }
 
     #[test]
