@@ -180,6 +180,7 @@ enum HitAction {
     SelectBoardItem(usize, usize),
     ToggleBoardExpansion,
     ToggleBoardDetail,
+    ToggleBoardArrangement,
     StartQuickAdd,
     CycleBoardTagFilter,
     CycleBoardPriorityFilter,
@@ -246,6 +247,28 @@ impl ValidationPrompt {
         match self {
             Self::Accept { title, .. } | Self::Rework { title, .. } => title,
             Self::ApplyAccepted { .. } => "Apply accepted",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BoardArrangement {
+    State,
+    Epic,
+}
+
+impl BoardArrangement {
+    fn label(self) -> &'static str {
+        match self {
+            Self::State => "State",
+            Self::Epic => "Epic",
+        }
+    }
+
+    fn toggled(self) -> Self {
+        match self {
+            Self::State => Self::Epic,
+            Self::Epic => Self::State,
         }
     }
 }
@@ -350,6 +373,7 @@ struct TuiApp {
     selected_item: usize,
     selected_review_item: usize,
     board_filters: BoardFilters,
+    board_arrangement: BoardArrangement,
     selected_log: usize,
     focus: FocusPane,
     show_board_detail: bool,
@@ -390,6 +414,7 @@ impl TuiApp {
             selected_item: 0,
             selected_review_item: 0,
             board_filters: BoardFilters::default(),
+            board_arrangement: BoardArrangement::State,
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -664,6 +689,7 @@ impl TuiApp {
             KeyCode::Char('L') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(1)
             }
+            KeyCode::Char('E') if self.view == TuiView::Board => self.toggle_board_arrangement(),
             KeyCode::Char('t') if self.view == TuiView::Board => self.cycle_board_tag_filter(),
             KeyCode::Char('p') if self.view == TuiView::Board => self.cycle_board_priority_filter(),
             KeyCode::Char('F') if self.view == TuiView::Board => self.clear_board_filters(),
@@ -723,7 +749,7 @@ impl TuiApp {
         }
         self.status = match view {
             TuiView::Board => {
-                "Board view active. Use h/l for states, j/k for rows, t/p for tag/priority filters, F to clear filters.".to_string()
+                "Board view active. Use E to toggle State/Epic arrangement, h/l for states, j/k for rows, t/p filters, F clear.".to_string()
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
@@ -1467,6 +1493,21 @@ impl TuiApp {
     }
 
     fn select_document_by_id_with_scroll(&mut self, id: &str, reset_scroll: bool) -> bool {
+        if self.board_arrangement == BoardArrangement::Epic {
+            let epic_index = self
+                .epic_board_entries()
+                .iter()
+                .position(|entry| entry.doc.id() == id);
+            if let Some(index) = epic_index {
+                self.selected_item = index;
+                if reset_scroll {
+                    self.detail_scroll = 0;
+                }
+                self.clamp_selection();
+                return true;
+            }
+        }
+
         for state_index in 0..self.states.len() {
             let Some(state_name) = self.states.get(state_index) else {
                 continue;
@@ -1540,6 +1581,10 @@ impl TuiApp {
                             self.toggle_board_detail()
                         }
                         HitAction::ToggleBoardDetail => {}
+                        HitAction::ToggleBoardArrangement if self.view == TuiView::Board => {
+                            self.toggle_board_arrangement()
+                        }
+                        HitAction::ToggleBoardArrangement => {}
                         HitAction::StartQuickAdd if self.view == TuiView::Board => {
                             self.start_quick_add()
                         }
@@ -1702,6 +1747,22 @@ impl TuiApp {
         };
     }
 
+    fn toggle_board_arrangement(&mut self) {
+        let selected_id = self.selected_doc().map(|doc| doc.id().to_string());
+        self.board_arrangement = self.board_arrangement.toggled();
+        self.selected_item = 0;
+        self.detail_scroll = 0;
+        if let Some(id) = selected_id.as_deref() {
+            self.select_document_by_id_preserving_scroll(id);
+        } else {
+            self.clamp_selection();
+        }
+        self.status = format!(
+            "Board arrangement: {}. Press E to toggle State/Epic.",
+            self.board_arrangement.label()
+        );
+    }
+
     fn toggle_board_expansion(&mut self) {
         let Some(doc_id) = self.selected_doc().map(|doc| doc.id().to_string()) else {
             self.status = "No selected Board item to expand.".to_string();
@@ -1717,6 +1778,12 @@ impl TuiApp {
     }
 
     fn previous_state(&mut self) {
+        if self.board_arrangement == BoardArrangement::Epic {
+            self.status =
+                "Epic arrangement groups all workflow states; press E for State Board tabs."
+                    .to_string();
+            return;
+        }
         if self.selected_state > 0 {
             self.selected_state -= 1;
             self.selected_item = 0;
@@ -1726,6 +1793,12 @@ impl TuiApp {
     }
 
     fn next_state(&mut self) {
+        if self.board_arrangement == BoardArrangement::Epic {
+            self.status =
+                "Epic arrangement groups all workflow states; press E for State Board tabs."
+                    .to_string();
+            return;
+        }
         if self.selected_state + 1 < self.states.len() {
             self.selected_state += 1;
             self.selected_item = 0;
@@ -1907,6 +1980,9 @@ impl TuiApp {
     }
 
     fn selected_state_count(&self) -> usize {
+        if self.board_arrangement == BoardArrangement::Epic {
+            return self.epic_board_entries().len();
+        }
         self.states
             .get(self.selected_state)
             .map(|state| self.docs_for_state(state).len())
@@ -1914,6 +1990,10 @@ impl TuiApp {
     }
 
     fn selected_state_summary(&self) -> String {
+        if self.board_arrangement == BoardArrangement::Epic {
+            let count = self.selected_state_count();
+            return format!("EPIC · {} row{}", count, if count == 1 { "" } else { "s" });
+        }
         let Some(state) = self.states.get(self.selected_state) else {
             return "No state · 0 items".to_string();
         };
@@ -1926,11 +2006,14 @@ impl TuiApp {
         )
     }
 
-    fn selected_state_name(&self) -> Option<&str> {
-        self.states.get(self.selected_state).map(String::as_str)
-    }
-
     fn selected_doc(&self) -> Option<&Document> {
+        if self.board_arrangement == BoardArrangement::Epic {
+            return self
+                .epic_board_entries()
+                .into_iter()
+                .nth(self.selected_item)
+                .map(|entry| entry.doc);
+        }
         let state = self.states.get(self.selected_state)?;
         self.docs_for_state(state)
             .into_iter()
@@ -1945,17 +2028,17 @@ impl TuiApp {
             .collect()
     }
 
+    fn epic_board_entries(&self) -> Vec<EpicBoardEntry<'_>> {
+        epic_board_entries(&self.docs, &self.logs, &self.board_filters)
+    }
+
     fn detail_line_count(&self) -> usize {
-        let relationship_hints = relationship_hints_by_parent(&self.docs, &self.logs);
         self.selected_doc()
             .map(|doc| {
-                detail_lines_for_doc_with_hints(
+                detail_lines_for_doc_with_context(
                     doc,
                     &self.theme,
-                    relationship_hints
-                        .get(doc.id())
-                        .copied()
-                        .unwrap_or_default(),
+                    &relationship_context_for_doc(doc, &self.docs, &self.logs),
                 )
             })
             .map(|lines| lines.len())
@@ -2542,8 +2625,14 @@ impl TuiApp {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(4), Constraint::Length(detail_height)])
                 .split(content_area);
-            self.draw_state_tabs(frame, chunks[0]);
+            if self.board_arrangement == BoardArrangement::Epic {
+                self.draw_epic_board(frame, chunks[0]);
+            } else {
+                self.draw_state_tabs(frame, chunks[0]);
+            }
             self.draw_detail(frame, chunks[1]);
+        } else if self.board_arrangement == BoardArrangement::Epic {
+            self.draw_epic_board(frame, content_area);
         } else {
             self.draw_state_tabs(frame, content_area);
         }
@@ -2563,6 +2652,98 @@ impl TuiApp {
                     .style(self.theme.panel_style()),
             );
         frame.render_widget(filter_bar, area);
+    }
+
+    fn draw_epic_board(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(area);
+        let mode_line = Line::from(vec![
+            Span::styled(" Board arrangement ", self.theme.muted_style()),
+            Span::styled(" State ", self.theme.tab_style()),
+            Span::raw(" "),
+            Span::styled(" Epic ", self.theme.state_tab_selected_style()),
+            Span::styled("  E toggle ", self.theme.muted_style()),
+        ]);
+        frame.render_widget(Paragraph::new(mode_line), chunks[0]);
+        self.draw_epic_board_list(frame, chunks[1]);
+    }
+
+    fn draw_epic_board_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::SelectState(self.selected_state),
+        });
+
+        let entries = self.epic_board_entries();
+        let count = entries.len();
+        let content_width = area.width.saturating_sub(4) as usize;
+        let items = if entries.is_empty() {
+            let empty_text = if self.board_filters.is_active() {
+                "No Epic Board rows match the active filters. Press F to clear filters."
+            } else {
+                "No Board tasks are available for Epic arrangement. Press E for State Board."
+            };
+            vec![ListItem::new(Line::from(Span::styled(
+                empty_text,
+                self.theme.muted_style(),
+            )))]
+        } else {
+            entries
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| {
+                    let context = relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                    epic_list_item_for_entry(
+                        entry,
+                        &context,
+                        &self.theme,
+                        content_width,
+                        self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()),
+                        index == self.selected_item,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let title = format!(
+            " Epic Board · {} row{} ",
+            count,
+            if count == 1 { "" } else { "s" }
+        );
+        let list = List::new(items)
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .border_style(self.theme.border_style(self.focus == FocusPane::Board))
+                    .style(self.theme.panel_style()),
+            )
+            .highlight_style(self.theme.board_selected_style())
+            .highlight_symbol("▸ ");
+
+        if count > 0 {
+            let mut state = ListState::default();
+            state.select(Some(self.selected_item.min(count - 1)));
+            frame.render_stateful_widget(list, area, &mut state);
+            let row_heights = entries
+                .iter()
+                .map(|entry| {
+                    if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
+                        let context =
+                            relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                        inline_preview_height_with_context(entry.doc, &context, content_width)
+                    } else {
+                        1
+                    }
+                })
+                .collect::<Vec<_>>();
+            self.register_board_row_hits(area, self.selected_state, &row_heights);
+        } else {
+            frame.render_widget(list, area);
+        }
     }
 
     fn draw_state_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -2622,7 +2803,6 @@ impl TuiApp {
             return;
         };
         let docs = self.docs_for_state(state_name);
-        let relationship_hints = relationship_hints_by_parent(&self.docs, &self.logs);
         let count = docs.len();
         let content_width = area.width.saturating_sub(4) as usize;
         let items = if docs.is_empty() {
@@ -2640,15 +2820,13 @@ impl TuiApp {
             docs.iter()
                 .enumerate()
                 .map(|(index, doc)| {
+                    let context = relationship_context_for_doc(doc, &self.docs, &self.logs);
                     list_item_for_doc(
                         doc,
                         &self.theme,
                         content_width,
                         show_doc_type,
-                        relationship_hints
-                            .get(doc.id())
-                            .copied()
-                            .unwrap_or_default(),
+                        &context,
                         self.expanded_board_doc_id.as_deref() == Some(doc.id()),
                         index == self.selected_item,
                     )
@@ -2682,7 +2860,8 @@ impl TuiApp {
                 .iter()
                 .map(|doc| {
                     if self.expanded_board_doc_id.as_deref() == Some(doc.id()) {
-                        inline_preview_height(doc, content_width)
+                        let context = relationship_context_for_doc(doc, &self.docs, &self.logs);
+                        inline_preview_height_with_context(doc, &context, content_width)
                     } else {
                         1
                     }
@@ -2726,17 +2905,13 @@ impl TuiApp {
         });
 
         let focused = self.focus == FocusPane::Detail;
-        let relationship_hints = relationship_hints_by_parent(&self.docs, &self.logs);
         let (title, lines) = match self.selected_doc() {
             Some(doc) => (
                 format!(" Detail {} ", doc.id()),
-                detail_lines_for_doc_with_hints(
+                detail_lines_for_doc_with_context(
                     doc,
                     &self.theme,
-                    relationship_hints
-                        .get(doc.id())
-                        .copied()
-                        .unwrap_or_default(),
+                    &relationship_context_for_doc(doc, &self.docs, &self.logs),
                 ),
             ),
             None => (
@@ -2774,14 +2949,22 @@ impl TuiApp {
             FocusPane::Board => "board",
             FocusPane::Detail => "detail",
         };
+        let selected_is_validation = self
+            .selected_doc()
+            .map(|doc| document_state_label(doc) == "validation")
+            .unwrap_or(false);
+        let arrangement_hint = match self.board_arrangement {
+            BoardArrangement::State => "E epic",
+            BoardArrangement::Epic => "E state",
+        };
         let commands = if self.focus == FocusPane::Detail {
-            "Tab board · j/k scroll · e edit · ? help".to_string()
-        } else if self.selected_state_name() == Some("validation") {
-            "Enter detail · A accept · R rework · C apply accepted · e edit · ? help".to_string()
+            format!("Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
+        } else if selected_is_validation {
+            format!("Enter detail · A accept · R rework · C apply accepted · e edit · {arrangement_hint} · ? help")
         } else if self.board_filters.is_active() {
-            "Enter detail · F clear filter · H prev · L next · ? help".to_string()
+            format!("Enter detail · F clear filter · H prev · L next · {arrangement_hint} · ? help")
         } else {
-            "Enter detail · a add · t tag · p priority · ? help".to_string()
+            format!("Enter detail · a add · t tag · p priority · {arrangement_hint} · ? help")
         };
         self.with_status(format!(
             "{context} · {} · {commands}",
@@ -2879,6 +3062,8 @@ impl TuiApp {
                     HitAction::ToggleBoardExpansion,
                 );
                 self.register_footer_hit(area, text, "Tab board", HitAction::ToggleBoardDetail);
+                self.register_footer_hit(area, text, "E epic", HitAction::ToggleBoardArrangement);
+                self.register_footer_hit(area, text, "E state", HitAction::ToggleBoardArrangement);
                 self.register_footer_hit(area, text, "a add", HitAction::StartQuickAdd);
                 self.register_footer_hit(area, text, "t tag", HitAction::CycleBoardTagFilter);
                 self.register_footer_hit(
@@ -3000,6 +3185,7 @@ impl TuiApp {
 
         self.push_help_section(&mut lines, "Board");
         self.push_help_command(&mut lines, "Enter", "expand/collapse row preview");
+        self.push_help_command(&mut lines, "E", "toggle State/Epic Board arrangement");
         self.push_help_command(&mut lines, "a", "quick-add a task in the selected state");
         self.push_help_command(&mut lines, "e", "open the selected active task in $EDITOR");
         self.push_help_command(
@@ -4121,26 +4307,178 @@ impl BoardRelationshipHints {
     }
 }
 
-fn relationship_hints_by_parent(
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BoardRelatedChild {
+    id: String,
+    title: String,
+    state: String,
+    completed: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct BoardRelationshipContext {
+    parent_id: Option<String>,
+    parent_title: Option<String>,
+    parent_missing: bool,
+    active_children: Vec<BoardRelatedChild>,
+    completed_children: Vec<BoardRelatedChild>,
+}
+
+impl BoardRelationshipContext {
+    fn hints(&self) -> BoardRelationshipHints {
+        BoardRelationshipHints {
+            active_children: self.active_children.len(),
+            completed_children: self.completed_children.len(),
+        }
+    }
+
+    fn has_parent(&self) -> bool {
+        self.parent_id.is_some()
+    }
+
+    fn has_children(&self) -> bool {
+        self.hints().has_children()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EpicBoardEntryRole {
+    Epic,
+    Child,
+    Unparented,
+    Orphan,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct EpicBoardEntry<'a> {
+    doc: &'a Document,
+    role: EpicBoardEntryRole,
+    depth: usize,
+}
+
+fn epic_board_entries<'a>(
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    filters: &BoardFilters,
+) -> Vec<EpicBoardEntry<'a>> {
+    let mut entries = Vec::new();
+    let mut assigned = BTreeSet::new();
+    let active_epic_ids = active_docs
+        .iter()
+        .filter(|doc| is_epic_task(doc))
+        .map(|doc| doc.id().to_string())
+        .collect::<BTreeSet<_>>();
+
+    for epic in active_docs.iter().filter(|doc| is_epic_task(doc)) {
+        let visible_children = active_docs
+            .iter()
+            .filter(|doc| normalized_parent_id(doc).as_deref() == Some(epic.id()))
+            .filter(|doc| doc.id() != epic.id())
+            .filter(|doc| board_filters_match(doc, filters))
+            .collect::<Vec<_>>();
+        if !board_filters_match(epic, filters) && visible_children.is_empty() {
+            continue;
+        }
+        entries.push(EpicBoardEntry {
+            doc: epic,
+            role: EpicBoardEntryRole::Epic,
+            depth: 0,
+        });
+        assigned.insert(epic.id().to_string());
+        for child in visible_children {
+            entries.push(EpicBoardEntry {
+                doc: child,
+                role: EpicBoardEntryRole::Child,
+                depth: 1,
+            });
+            assigned.insert(child.id().to_string());
+        }
+    }
+
+    let known_ids = active_docs
+        .iter()
+        .chain(completed_logs.iter())
+        .map(|doc| doc.id().to_string())
+        .collect::<BTreeSet<_>>();
+    for doc in active_docs {
+        if assigned.contains(doc.id()) || !board_filters_match(doc, filters) {
+            continue;
+        }
+        if is_epic_task(doc) {
+            continue;
+        }
+        let role = match normalized_parent_id(doc) {
+            Some(parent_id)
+                if !known_ids.contains(&parent_id) || !active_epic_ids.contains(&parent_id) =>
+            {
+                EpicBoardEntryRole::Orphan
+            }
+            Some(_) => EpicBoardEntryRole::Child,
+            None => EpicBoardEntryRole::Unparented,
+        };
+        entries.push(EpicBoardEntry {
+            doc,
+            role,
+            depth: 0,
+        });
+    }
+    entries
+}
+
+fn relationship_context_for_doc(
+    doc: &Document,
     active_docs: &[Document],
     completed_logs: &[Document],
-) -> BTreeMap<String, BoardRelationshipHints> {
-    let mut hints: BTreeMap<String, BoardRelationshipHints> = BTreeMap::new();
-    for doc in active_docs {
-        if let Some(parent_id) =
-            normalized_parent_id(doc).filter(|parent_id| parent_id.as_str() != doc.id())
-        {
-            hints.entry(parent_id).or_default().active_children += 1;
-        }
+) -> BoardRelationshipContext {
+    let parent_id = normalized_parent_id(doc).filter(|parent_id| parent_id.as_str() != doc.id());
+    let parent_title = parent_id
+        .as_deref()
+        .and_then(|parent_id| document_title_by_id(active_docs, completed_logs, parent_id));
+    let parent_missing = parent_id.is_some() && parent_title.is_none();
+    let active_children = active_docs
+        .iter()
+        .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
+        .filter(|child| child.id() != doc.id())
+        .map(|child| related_child_summary(child, false))
+        .collect::<Vec<_>>();
+    let completed_children = completed_logs
+        .iter()
+        .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
+        .filter(|child| child.id() != doc.id())
+        .map(|child| related_child_summary(child, true))
+        .collect::<Vec<_>>();
+    BoardRelationshipContext {
+        parent_id,
+        parent_title,
+        parent_missing,
+        active_children,
+        completed_children,
     }
-    for doc in completed_logs {
-        if let Some(parent_id) =
-            normalized_parent_id(doc).filter(|parent_id| parent_id.as_str() != doc.id())
-        {
-            hints.entry(parent_id).or_default().completed_children += 1;
-        }
+}
+
+fn document_title_by_id(
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    id: &str,
+) -> Option<String> {
+    active_docs
+        .iter()
+        .chain(completed_logs.iter())
+        .find(|doc| doc.id() == id)
+        .map(|doc| doc.title().to_string())
+}
+
+fn related_child_summary(doc: &Document, completed: bool) -> BoardRelatedChild {
+    BoardRelatedChild {
+        id: doc.id().to_string(),
+        title: doc.title().to_string(),
+        state: if completed {
+            "log".to_string()
+        } else {
+            document_state_label(doc)
+        },
+        completed,
     }
-    hints
 }
 
 fn normalized_parent_id(doc: &Document) -> Option<String> {
@@ -4155,16 +4493,16 @@ fn list_item_for_doc(
     theme: &TuiTheme,
     content_width: usize,
     show_doc_type: bool,
-    relationship_hints: BoardRelationshipHints,
+    relationship_context: &BoardRelationshipContext,
     expanded: bool,
     selected: bool,
 ) -> ListItem<'static> {
-    ListItem::new(board_item_lines_for_doc_with_hints(
+    ListItem::new(board_item_lines_for_doc_with_context(
         doc,
         theme,
         content_width,
         show_doc_type,
-        relationship_hints,
+        relationship_context,
         expanded,
         selected,
     ))
@@ -4179,30 +4517,29 @@ fn board_item_lines_for_doc(
     expanded: bool,
     selected: bool,
 ) -> Vec<Line<'static>> {
-    board_item_lines_for_doc_with_hints(
+    board_item_lines_for_doc_with_context(
         doc,
         theme,
         content_width,
         show_doc_type,
-        BoardRelationshipHints::default(),
+        &BoardRelationshipContext::default(),
         expanded,
         selected,
     )
 }
 
-fn board_item_lines_for_doc_with_hints(
+fn board_item_lines_for_doc_with_context(
     doc: &Document,
     theme: &TuiTheme,
     content_width: usize,
     show_doc_type: bool,
-    relationship_hints: BoardRelationshipHints,
+    relationship_context: &BoardRelationshipContext,
     expanded: bool,
     selected: bool,
 ) -> Vec<Line<'static>> {
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
-    // details belong in the detail pane. Add chips here only when they change the next
-    // action or scan priority. The active theme controls whether badges use a muted fill,
-    // accent rail, text label, ghost chip, or legacy solid block.
+    // details belong in expanded rows and the detail pane. Relationship context is shown
+    // as nesting/expanded-row content, not noisy parent-id chips.
     let priority = doc.field("priority").unwrap_or("-");
     let mut chips: Vec<(String, Style)> = Vec::new();
     if let Some(priority_chip) = priority_chip(priority, theme) {
@@ -4213,9 +4550,6 @@ fn board_item_lines_for_doc_with_hints(
             chip_text("EPIC", theme),
             theme.progress_chip_style(StatusTone::Accent),
         ));
-    }
-    if let Some(parent_chip) = relationship_parent_chip(doc, theme) {
-        chips.push((parent_chip, theme.progress_chip_style(StatusTone::Accent)));
     }
     for (kind_chip, tone) in work_type_tag_chips(doc, theme) {
         chips.push((kind_chip, theme.progress_chip_style(tone)));
@@ -4251,14 +4585,90 @@ fn board_item_lines_for_doc_with_hints(
             theme.progress_chip_style(tone),
         ));
     }
-    if let Some(child_count_chip) = relationship_child_count_chip(relationship_hints, theme) {
-        chips.push((
-            child_count_chip,
-            theme.progress_chip_style(relationship_child_count_tone(relationship_hints)),
+
+    let mut lines = vec![board_row_line(
+        doc,
+        theme,
+        content_width,
+        show_doc_type,
+        chips,
+        doc.id().to_string(),
+        0,
+        selected,
+    )];
+    if expanded {
+        lines.extend(inline_preview_lines_for_doc_with_context(
+            doc,
+            theme,
+            relationship_context,
+            content_width,
         ));
     }
+    lines
+}
 
+fn epic_list_item_for_entry(
+    entry: &EpicBoardEntry<'_>,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+    content_width: usize,
+    expanded: bool,
+    selected: bool,
+) -> ListItem<'static> {
+    let doc = entry.doc;
+    let left_label = match entry.role {
+        EpicBoardEntryRole::Epic => "EPIC".to_string(),
+        EpicBoardEntryRole::Child => display_state_label(&document_state_label(doc)),
+        EpicBoardEntryRole::Unparented => display_state_label(&document_state_label(doc)),
+        EpicBoardEntryRole::Orphan => "ORPHAN".to_string(),
+    };
+    let left_tone = match entry.role {
+        EpicBoardEntryRole::Epic => StatusTone::Accent,
+        EpicBoardEntryRole::Orphan => StatusTone::Warning,
+        _ => StatusTone::Muted,
+    };
+    let meta = match entry.role {
+        EpicBoardEntryRole::Epic => relationship_rollup(relationship_context),
+        EpicBoardEntryRole::Child => doc.id().to_string(),
+        EpicBoardEntryRole::Unparented => format!("unparented · {}", doc.id()),
+        EpicBoardEntryRole::Orphan => orphan_meta(relationship_context, doc),
+    };
+    let mut lines = vec![board_row_line(
+        doc,
+        theme,
+        content_width,
+        false,
+        vec![(
+            chip_text(&left_label, theme),
+            theme.progress_chip_style(left_tone),
+        )],
+        meta,
+        entry.depth,
+        selected,
+    )];
+    if expanded {
+        lines.extend(inline_preview_lines_for_doc_with_context(
+            doc,
+            theme,
+            relationship_context,
+            content_width,
+        ));
+    }
+    ListItem::new(lines)
+}
+
+fn board_row_line(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+    show_doc_type: bool,
+    chips: Vec<(String, Style)>,
+    right_meta: String,
+    depth: usize,
+    selected: bool,
+) -> Line<'static> {
     let doc_type = doc_type_badge(doc, show_doc_type);
+    let indent_width = depth.saturating_mul(3);
     let chip_width = chips
         .iter()
         .map(|(chip, _)| text_width(chip))
@@ -4268,102 +4678,71 @@ fn board_item_lines_for_doc_with_hints(
         .as_ref()
         .map(|badge| text_width(badge) + 1)
         .unwrap_or(0);
-    let fixed_width = doc_type_width + chip_width + 1 + text_width(doc.id());
+    let meta_width = text_width(&right_meta);
+    let fixed_width = indent_width + doc_type_width + chip_width + 1 + meta_width;
     let title_width = content_width.saturating_sub(fixed_width).max(12);
     let title = truncate(doc.title(), title_width);
-    let used_before_id = doc_type_width + chip_width + text_width(&title);
+    let used_before_meta = indent_width + doc_type_width + chip_width + text_width(&title);
     let spacer_width = content_width
-        .saturating_sub(used_before_id + text_width(doc.id()))
+        .saturating_sub(used_before_meta + meta_width)
         .max(1);
 
-    let mut title_spans = Vec::new();
+    let mut spans = Vec::new();
+    if indent_width > 0 {
+        spans.push(Span::styled("  └".to_string(), theme.muted_style()));
+        if indent_width > 3 {
+            spans.push(Span::raw(" ".repeat(indent_width - 3)));
+        }
+    }
     if let Some(doc_type) = doc_type {
-        title_spans.push(Span::styled(doc_type, theme.board_doc_type_style()));
-        title_spans.push(Span::raw(" "));
+        spans.push(Span::styled(doc_type, theme.board_doc_type_style()));
+        spans.push(Span::raw(" "));
     }
     for (index, (chip, style)) in chips.into_iter().enumerate() {
-        if index > 0 || doc_type_width > 0 {
-            title_spans.push(Span::raw(" "));
+        if index > 0 || doc_type_width > 0 || indent_width > 0 {
+            spans.push(Span::raw(" "));
         }
-        title_spans.push(Span::styled(chip, style));
+        spans.push(Span::styled(chip, style));
     }
-    if chip_width > 0 || doc_type_width > 0 {
-        title_spans.push(Span::raw(" "));
+    if chip_width > 0 || doc_type_width > 0 || indent_width > 0 {
+        spans.push(Span::raw(" "));
     }
     let title_style = if selected {
         theme.board_selected_title_style()
     } else {
         theme.text_style().add_modifier(Modifier::BOLD)
     };
-    title_spans.push(Span::styled(title, title_style));
-    title_spans.push(Span::raw(" ".repeat(spacer_width)));
-    title_spans.push(Span::styled(doc.id().to_string(), theme.muted_style()));
-
-    let mut lines = vec![Line::from(title_spans)];
-    if expanded {
-        lines.extend(inline_preview_lines_for_doc(doc, theme, content_width));
-    }
-    lines
+    spans.push(Span::styled(title, title_style));
+    spans.push(Span::raw(" ".repeat(spacer_width)));
+    spans.push(Span::styled(right_meta, theme.muted_style()));
+    Line::from(spans)
 }
 
-fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
-    let doc_type = doc.doc_type().trim();
-    if doc_type.is_empty() || (!show_doc_type && doc_type.eq_ignore_ascii_case("task")) {
-        None
-    } else {
-        Some(doc_type.to_ascii_lowercase())
-    }
-}
-
-fn is_epic_task(doc: &Document) -> bool {
-    doc.doc_type().eq_ignore_ascii_case("task")
-        && doc
-            .field("kind")
-            .map(|kind| kind.trim().eq_ignore_ascii_case("epic"))
-            .unwrap_or(false)
-}
-
-fn relationship_parent_chip(doc: &Document, theme: &TuiTheme) -> Option<String> {
-    normalized_parent_id(doc)
-        .filter(|parent_id| parent_id.as_str() != doc.id())
-        .map(|parent_id| chip_text(&format!("P:{}", truncate(&parent_id, 18)), theme))
-}
-
-fn relationship_child_count_chip(
-    hints: BoardRelationshipHints,
-    theme: &TuiTheme,
-) -> Option<String> {
+fn relationship_rollup(context: &BoardRelationshipContext) -> String {
+    let hints = context.hints();
     if !hints.has_children() {
-        return None;
+        return "0 children".to_string();
     }
-    let noun = if hints.total_children() == 1 {
-        "CHILD"
-    } else {
-        "CHILDREN"
-    };
-    let label = if hints.completed_children > 0 {
-        format!(
-            "{}/{} {noun}",
-            hints.completed_children,
-            hints.total_children()
-        )
-    } else {
-        format!("{} {noun}", hints.active_children)
-    };
-    Some(chip_text(&label, theme))
+    let mut parts = Vec::new();
+    if hints.active_children > 0 {
+        parts.push(format!("{} active", hints.active_children));
+    }
+    if hints.completed_children > 0 {
+        parts.push(format!("{} done", hints.completed_children));
+    }
+    parts.join(" · ")
 }
 
-fn relationship_child_count_tone(hints: BoardRelationshipHints) -> StatusTone {
-    if hints.completed_children > 0 && hints.active_children == 0 {
-        StatusTone::Success
-    } else if hints.completed_children > 0 {
-        StatusTone::Warning
-    } else {
-        StatusTone::Accent
+fn orphan_meta(context: &BoardRelationshipContext, doc: &Document) -> String {
+    match context.parent_id.as_deref() {
+        Some(parent_id) if context.parent_missing => format!("missing parent {parent_id}"),
+        Some(parent_id) => format!("parent {parent_id} is not an active epic"),
+        None => format!("invalid parent · {}", doc.id()),
     }
 }
 
-fn relationship_detail_summary(hints: BoardRelationshipHints) -> String {
+fn relationship_detail_summary(context: &BoardRelationshipContext) -> String {
+    let hints = context.hints();
     let mut parts = Vec::new();
     if hints.active_children > 0 {
         parts.push(format!(
@@ -4381,9 +4760,28 @@ fn relationship_detail_summary(hints: BoardRelationshipHints) -> String {
     }
     if parts.len() > 1 {
         format!("{} ({} total)", parts.join(", "), hints.total_children())
+    } else if parts.is_empty() {
+        "no linked children".to_string()
     } else {
         parts.join(", ")
     }
+}
+
+fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
+    let doc_type = doc.doc_type().trim();
+    if doc_type.is_empty() || (!show_doc_type && doc_type.eq_ignore_ascii_case("task")) {
+        None
+    } else {
+        Some(doc_type.to_ascii_lowercase())
+    }
+}
+
+fn is_epic_task(doc: &Document) -> bool {
+    doc.doc_type().eq_ignore_ascii_case("task")
+        && doc
+            .field("kind")
+            .map(|kind| kind.trim().eq_ignore_ascii_case("epic"))
+            .unwrap_or(false)
 }
 
 fn priority_chip(priority: &str, theme: &TuiTheme) -> Option<String> {
@@ -4573,13 +4971,24 @@ fn chip_text(label: &str, theme: &TuiTheme) -> String {
     theme.badge_label(label)
 }
 
-fn inline_preview_height(doc: &Document, content_width: usize) -> u16 {
-    inline_preview_lines_for_doc(doc, &TuiTheme::default_dark(), content_width).len() as u16
+fn inline_preview_height_with_context(
+    doc: &Document,
+    relationship_context: &BoardRelationshipContext,
+    content_width: usize,
+) -> u16 {
+    inline_preview_lines_for_doc_with_context(
+        doc,
+        &TuiTheme::default_dark(),
+        relationship_context,
+        content_width,
+    )
+    .len() as u16
 }
 
-fn inline_preview_lines_for_doc(
+fn inline_preview_lines_for_doc_with_context(
     doc: &Document,
     theme: &TuiTheme,
+    relationship_context: &BoardRelationshipContext,
     content_width: usize,
 ) -> Vec<Line<'static>> {
     const INLINE_PREVIEW_MAX_LINES: usize = 25;
@@ -4590,11 +4999,15 @@ fn inline_preview_lines_for_doc(
         .unwrap_or_default();
     let subtasks = board_subtasks(doc);
     let checklist_progress = subtask_progress(doc);
+    let relationship_lines = inline_relationship_preview_lines(doc, relationship_context, theme);
 
     let has_tags = doc.field("tags").is_some();
     let mut fixed_lines = 1; // footer
     if has_tags {
         fixed_lines += 1;
+    }
+    if !relationship_lines.is_empty() {
+        fixed_lines += relationship_lines.len();
     }
     if !files.is_empty() {
         fixed_lines += 1 + files.len();
@@ -4602,10 +5015,11 @@ fn inline_preview_lines_for_doc(
     if !subtasks.is_empty() {
         fixed_lines += 1 + subtasks.len();
     }
-    let separator_lines = usize::from(has_tags) // Tags → Summary
-        + usize::from(!files.is_empty()) // Summary → Files
-        + usize::from(!subtasks.is_empty()) // Files/Summary → Checklist
-        + 1; // content → footer
+    let separator_lines = usize::from(has_tags)
+        + usize::from(!relationship_lines.is_empty())
+        + usize::from(!files.is_empty())
+        + usize::from(!subtasks.is_empty())
+        + 1;
     let summary_capacity = INLINE_PREVIEW_MAX_LINES
         .saturating_sub(fixed_lines + separator_lines + 1)
         .max(3);
@@ -4619,6 +5033,11 @@ fn inline_preview_lines_for_doc(
             theme,
             content_width,
         ));
+        lines.push(Line::from(""));
+    }
+
+    if !relationship_lines.is_empty() {
+        lines.extend(relationship_lines);
         lines.push(Line::from(""));
     }
 
@@ -4662,6 +5081,77 @@ fn inline_preview_lines_for_doc(
         "   Enter collapse · Tab detail pane · e edit",
         theme.muted_style(),
     )));
+    lines
+}
+
+fn inline_relationship_preview_lines(
+    doc: &Document,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    if is_epic_task(doc) || relationship_context.has_children() {
+        lines.push(inline_preview_heading("Epic", theme));
+        if relationship_context.has_children() {
+            lines.push(Line::from(vec![
+                Span::styled("   Children: ", theme.label_style()),
+                Span::styled(
+                    relationship_detail_summary(relationship_context),
+                    theme.text_style(),
+                ),
+            ]));
+            for child in relationship_context
+                .active_children
+                .iter()
+                .chain(relationship_context.completed_children.iter())
+                .take(8)
+            {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("   • {} ", display_state_label(&child.state)),
+                        theme.muted_style(),
+                    ),
+                    Span::styled(child.title.clone(), theme.text_style()),
+                    Span::styled(format!(" ({})", child.id), theme.muted_style()),
+                ]));
+            }
+        } else {
+            lines.push(Line::from(Span::styled(
+                "   No linked children yet. Set parentId on child tasks to attach them.",
+                theme.muted_style(),
+            )));
+        }
+    }
+
+    if relationship_context.has_parent() {
+        if !lines.is_empty() {
+            lines.push(Line::from(""));
+        }
+        lines.push(inline_preview_heading("Relationship", theme));
+        if relationship_context.parent_missing {
+            let parent_id = relationship_context
+                .parent_id
+                .as_deref()
+                .unwrap_or("unknown");
+            lines.push(Line::from(vec![
+                Span::styled("   Missing parent: ", theme.label_style()),
+                Span::styled(
+                    parent_id.to_string(),
+                    theme.status_style(StatusTone::Warning),
+                ),
+            ]));
+        } else if let Some(parent_id) = relationship_context.parent_id.as_deref() {
+            let parent_title = relationship_context
+                .parent_title
+                .as_deref()
+                .unwrap_or("untitled parent");
+            lines.push(Line::from(vec![
+                Span::styled("   Parent epic: ", theme.label_style()),
+                Span::styled(parent_title.to_string(), theme.text_style()),
+                Span::styled(format!(" ({parent_id})"), theme.muted_style()),
+            ]));
+        }
+    }
     lines
 }
 
@@ -4893,13 +5383,13 @@ fn text_width(value: &str) -> usize {
 
 #[cfg(test)]
 fn detail_lines_for_doc(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
-    detail_lines_for_doc_with_hints(doc, theme, BoardRelationshipHints::default())
+    detail_lines_for_doc_with_context(doc, theme, &BoardRelationshipContext::default())
 }
 
-fn detail_lines_for_doc_with_hints(
+fn detail_lines_for_doc_with_context(
     doc: &Document,
     theme: &TuiTheme,
-    relationship_hints: BoardRelationshipHints,
+    relationship_context: &BoardRelationshipContext,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
     lines.push(Line::from(vec![
@@ -4914,11 +5404,18 @@ fn detail_lines_for_doc_with_hints(
     push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
     push_optional_detail_line(&mut lines, "Due", doc.field("dueDate"), theme);
     push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
-    push_optional_detail_line(&mut lines, "Parent", doc.field("parentId"), theme);
-    if relationship_hints.has_children() {
+    if let Some(parent_id) = relationship_context.parent_id.as_deref() {
+        let parent = relationship_context
+            .parent_title
+            .as_deref()
+            .map(|title| format!("{title} ({parent_id})"))
+            .unwrap_or_else(|| format!("missing parent {parent_id}"));
+        lines.push(detail_field_line("Parent", &parent, theme));
+    }
+    if relationship_context.has_children() {
         lines.push(detail_field_line(
             "Children",
-            &relationship_detail_summary(relationship_hints),
+            &relationship_detail_summary(relationship_context),
             theme,
         ));
     }
@@ -5604,13 +6101,11 @@ mod tests {
             .fields
             .insert("parentId".to_string(), "task-80".to_string());
 
-        let hints = relationship_hints_by_parent(
-            &[epic.clone(), active_child.clone()],
-            &[completed_child.clone()],
-        );
-        let epic_hints = hints.get("task-80").copied().unwrap_or_default();
+        let active_docs = vec![epic.clone(), active_child.clone()];
+        let completed_logs = vec![completed_child.clone()];
+        let epic_context = relationship_context_for_doc(&epic, &active_docs, &completed_logs);
         assert_eq!(
-            epic_hints,
+            epic_context.hints(),
             BoardRelationshipHints {
                 active_children: 1,
                 completed_children: 1,
@@ -5618,27 +6113,53 @@ mod tests {
         );
 
         let title = line_text(
-            &board_item_lines_for_doc_with_hints(
-                &epic, &theme, 120, false, epic_hints, false, false,
+            &board_item_lines_for_doc_with_context(
+                &epic,
+                &theme,
+                120,
+                false,
+                &epic_context,
+                false,
+                false,
             )[0],
         );
-        assert!(title.contains(" EPIC "));
-        assert!(title.contains(" 1/2 CHILDREN  Launch docs epic"));
+        assert!(title.contains(" EPIC  Launch docs epic"));
+        assert!(!title.contains("CHILDREN"));
 
+        let child_context =
+            relationship_context_for_doc(&active_child, &active_docs, &completed_logs);
         let child_title = line_text(
-            &board_item_lines_for_doc_with_hints(
+            &board_item_lines_for_doc_with_context(
                 &active_child,
                 &theme,
                 120,
                 false,
-                BoardRelationshipHints::default(),
+                &child_context,
                 false,
                 false,
             )[0],
         );
-        assert!(child_title.contains(" P:task-80  Task task-81"));
+        assert!(!child_title.contains("P:task-80"));
 
-        let parent_detail = detail_lines_for_doc_with_hints(&epic, &theme, epic_hints)
+        let expanded_text = board_item_lines_for_doc_with_context(
+            &epic,
+            &theme,
+            120,
+            false,
+            &epic_context,
+            true,
+            false,
+        )
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+        assert!(expanded_text.contains("Epic"));
+        assert!(expanded_text.contains("Children: 1 active child, 1 completed child (2 total)"));
+        assert!(expanded_text.contains("Task task-81"));
+        assert!(expanded_text.contains("Task task-82"));
+
+        let parent_detail = detail_lines_for_doc_with_context(&epic, &theme, &epic_context)
             .iter()
             .map(line_text)
             .collect::<Vec<_>>();
@@ -5646,15 +6167,15 @@ mod tests {
         assert!(parent_detail
             .contains(&"Children: 1 active child, 1 completed child (2 total)".to_string()));
 
-        let child_detail = detail_lines_for_doc(&active_child, &theme)
+        let child_detail = detail_lines_for_doc_with_context(&active_child, &theme, &child_context)
             .iter()
             .map(line_text)
             .collect::<Vec<_>>();
-        assert!(child_detail.contains(&"Parent: task-80".to_string()));
+        assert!(child_detail.contains(&"Parent: Launch docs epic (task-80)".to_string()));
     }
 
     #[test]
-    fn actual_board_render_surfaces_epic_and_relationship_chips() {
+    fn actual_board_render_surfaces_epic_grouping_and_expanded_relationships() {
         let root = unique_test_dir("tandem-epic-render");
         let workspace = temp_workspace(&root);
         fs::write(
@@ -5674,9 +6195,11 @@ mod tests {
         .unwrap();
 
         let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.board_arrangement = BoardArrangement::Epic;
         assert!(app.select_document_by_id("task-100"));
+        app.expanded_board_doc_id = Some("task-100".to_string());
         app.show_board_detail = true;
-        let mut terminal = Terminal::new(TestBackend::new(140, 36)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(150, 40)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
         let rendered = terminal
             .backend()
@@ -5691,12 +6214,16 @@ mod tests {
             "rendered Board should include EPIC badge: {rendered}"
         );
         assert!(
-            rendered.contains("1/2 CHILDREN"),
-            "rendered Board should include derived child-count chip: {rendered}"
+            rendered.contains("1 active") && rendered.contains("1 done"),
+            "Epic Board row should include title-based child rollup text: {rendered}"
         );
         assert!(
-            rendered.contains("P:task-100"),
-            "rendered Board should include parent relationship chip on child row: {rendered}"
+            rendered.contains("Write refreshed docs"),
+            "Epic Board should nest active child rows under the epic: {rendered}"
+        );
+        assert!(
+            !rendered.contains("P:task-100"),
+            "Epic Board should avoid noisy parent-id chips: {rendered}"
         );
         assert!(
             rendered.contains("Kind: epic"),
@@ -6123,6 +6650,7 @@ tone = "success"
             selected_item: 0,
             selected_review_item: 0,
             board_filters: BoardFilters::default(),
+            board_arrangement: BoardArrangement::State,
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -6187,7 +6715,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · ? help"
+            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · E epic · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -6195,7 +6723,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · ? help"
+            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · E epic · ? help"
         );
 
         app.switch_view(TuiView::Logs);
