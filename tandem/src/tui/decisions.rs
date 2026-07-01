@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::Modifier,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
@@ -244,9 +244,10 @@ impl TuiApp {
                 self.theme.muted_style(),
             )))]
         } else {
+            let content_width = area.width.saturating_sub(4) as usize;
             decisions
                 .iter()
-                .map(|doc| decision_list_item(doc, &self.theme))
+                .map(|doc| decision_list_item(doc, &self.theme, content_width))
                 .collect::<Vec<_>>()
         };
         let mut state = ListState::default();
@@ -532,41 +533,136 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
     ])
 }
 
-fn decision_list_item(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
-    let status = decision_field(doc, DECISION_STATUS_KEYS)
-        .map(|status| format!("status:{status}"))
-        .unwrap_or_else(|| "status:-".to_string());
-    let date = decision_field(doc, DECISION_LIST_DATE_KEYS)
-        .map(|date| format!("date:{}", compact_decision_date(date)))
-        .unwrap_or_else(|| "date:-".to_string());
-    let deciders = formatted_decision_values(doc, DECISION_DECIDER_KEYS, "", ", ")
-        .map(|deciders| format!("deciders:{deciders}"))
-        .unwrap_or_else(|| "deciders:-".to_string());
+fn decision_list_item(doc: &Document, theme: &TuiTheme, content_width: usize) -> ListItem<'static> {
+    ListItem::new(decision_list_lines(doc, theme, content_width))
+}
+
+fn decision_list_lines(
+    doc: &Document,
+    theme: &TuiTheme,
+    content_width: usize,
+) -> Vec<Line<'static>> {
+    let content_width = content_width.max(24);
+    let title_width = content_width
+        .saturating_sub(text_width(doc.id()).saturating_add(1))
+        .max(12);
+    let title = crate::truncate(doc.title(), title_width);
     let summary = decision_body_summary(doc);
-    let metadata = format!("{status} · {date} · {deciders}");
+    let summary = if summary.is_empty() {
+        "(no decision body yet)".to_string()
+    } else {
+        crate::truncate(&summary, content_width.saturating_sub(2).max(12))
+    };
 
-    let mut metadata_spans = vec![Span::styled(metadata, theme.muted_style())];
-    if !summary.is_empty() {
-        metadata_spans.push(Span::styled(" — ".to_string(), theme.muted_style()));
-        metadata_spans.push(Span::styled(
-            crate::truncate(&summary, 48),
-            theme.muted_style(),
-        ));
-    }
-
-    ListItem::new(vec![
+    let mut lines = vec![
         Line::from(vec![
             Span::styled(
                 format!("{} ", doc.id()),
                 theme.status_style(StatusTone::Accent),
             ),
-            Span::styled(
-                doc.title().to_string(),
-                theme.text_style().add_modifier(Modifier::BOLD),
-            ),
+            Span::styled(title, theme.text_style().add_modifier(Modifier::BOLD)),
         ]),
-        Line::from(metadata_spans),
-    ])
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(summary, theme.muted_style()),
+        ]),
+    ];
+
+    let metadata = decision_list_metadata_spans(doc, theme, content_width.saturating_sub(2));
+    if !metadata.is_empty() {
+        let mut spans = vec![Span::raw("  ")];
+        spans.extend(metadata);
+        lines.push(Line::from(spans));
+    }
+
+    lines
+}
+
+fn decision_list_metadata_spans(
+    doc: &Document,
+    theme: &TuiTheme,
+    max_width: usize,
+) -> Vec<Span<'static>> {
+    let chips = decision_list_metadata_chips(doc, theme);
+    let mut spans = Vec::new();
+    let mut used = 0usize;
+
+    for (chip, style) in chips {
+        let separator_width = usize::from(!spans.is_empty());
+        let chip_width = text_width(&chip);
+        if used + separator_width + chip_width > max_width {
+            if !spans.is_empty() && used + separator_width < max_width {
+                spans.push(Span::raw(" "));
+                spans.push(Span::styled("…", theme.muted_style()));
+            }
+            break;
+        }
+        if !spans.is_empty() {
+            spans.push(Span::raw(" "));
+            used += 1;
+        }
+        spans.push(Span::styled(chip, style));
+        used += chip_width;
+    }
+
+    spans
+}
+
+fn decision_list_metadata_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, Style)> {
+    let mut chips = Vec::new();
+    if let Some(status) = decision_field(doc, DECISION_STATUS_KEYS) {
+        chips.push((
+            decision_chip_text(&status.replace('_', "-"), theme),
+            theme.progress_chip_style(decision_status_tone(status)),
+        ));
+    }
+    if let Some(date) = decision_field(doc, DECISION_LIST_DATE_KEYS) {
+        chips.push((
+            decision_chip_text(&compact_decision_date(date), theme),
+            theme.progress_chip_style(StatusTone::Muted),
+        ));
+    }
+    if let Some(deciders) = formatted_decision_values(doc, DECISION_DECIDER_KEYS, "", ", ") {
+        chips.push((
+            decision_chip_text(&crate::truncate(&deciders, 24), theme),
+            theme.progress_chip_style(StatusTone::Accent),
+        ));
+    } else {
+        let tags = decision_field(doc, &["tags"])
+            .map(decision_field_values)
+            .unwrap_or_default();
+        for tag in tags.iter().take(2) {
+            chips.push((
+                decision_chip_text(&format!("#{tag}"), theme),
+                theme.progress_chip_style(StatusTone::Accent),
+            ));
+        }
+        if tags.len() > 2 {
+            chips.push((
+                decision_chip_text(&format!("+{}", tags.len() - 2), theme),
+                theme.progress_chip_style(StatusTone::Muted),
+            ));
+        }
+    }
+    chips
+}
+
+fn decision_status_tone(status: &str) -> StatusTone {
+    match status.trim().to_ascii_lowercase().as_str() {
+        "accepted" | "approved" | "adopted" => StatusTone::Success,
+        "rejected" | "deprecated" | "failed" => StatusTone::Error,
+        "superseded" => StatusTone::Muted,
+        "proposed" | "draft" | "pending" => StatusTone::Warning,
+        _ => StatusTone::Accent,
+    }
+}
+
+fn decision_chip_text(label: &str, theme: &TuiTheme) -> String {
+    theme.badge_label(label)
+}
+
+fn text_width(value: &str) -> usize {
+    value.chars().count()
 }
 
 fn decision_detail_lines(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
@@ -881,6 +977,26 @@ mod tests {
         assert!(texts.contains(&"Context".to_string()));
         assert!(texts.contains(&"Decision".to_string()));
         assert!(!texts.contains(&"State: todo".to_string()));
+    }
+
+    #[test]
+    fn decision_list_uses_title_summary_then_metadata_chips() {
+        let theme = TuiTheme::default_dark();
+        let doc = adr_decision_doc();
+        let lines = decision_list_lines(&doc, &theme, 84);
+        let texts = lines.iter().map(line_text).collect::<Vec<_>>();
+
+        assert_eq!(lines.len(), 3);
+        assert!(texts[0].starts_with("decision-42 Choose the TUI layout"));
+        assert_eq!(
+            texts[1],
+            "  The Board is noisy when decisions are mixed into task state buckets."
+        );
+        assert!(texts[2].contains("accepted"));
+        assert!(texts[2].contains("2026-07-01"));
+        assert!(texts[2].contains("Ada, Grace"));
+        assert!(!texts[2].contains("status:"));
+        assert!(!texts[2].contains("deciders:"));
     }
 
     #[test]
