@@ -16,9 +16,9 @@ Do not edit generated Markdown copies under `site/src/content/docs/`. Run the sy
 
 The docs site should use a supported even-numbered Node.js LTS runtime, not an arbitrary older pin. The current Astro/Starlight dependency set resolves Astro `7.0.3`, whose published `engines` require Node.js `>=22.12.0`. Astro's install docs also state that Astro requires Node.js `v22.12.0 or higher` and does not support odd-numbered Node.js releases. Node's release policy says production use should stay on Active LTS or Maintenance LTS lines; as of 2026-06-30, Node 20 is EOL, while Node 22 and Node 24 are LTS.
 
-Recommended workflow change: update `.github/workflows/docs.yml` from `node-version: 20` to `node-version: 24`. Node 24 is the current LTS line and satisfies Astro's `>=22.12.0` requirement without pinning to an obsolete or odd-numbered release. Node 22 would also satisfy the minimum, but it is already a Maintenance LTS line; prefer Node 24 for the deployment workflow unless a compatibility issue appears.
+The GitHub Pages workflow and local shortcuts read `site/.node-version`, currently `24`. Node 24 is the current LTS line and satisfies Astro's `>=22.12.0` requirement without pinning to an obsolete or odd-numbered release. Node 22 would also satisfy the minimum, but it is already a Maintenance LTS line; prefer Node 24 for the deployment workflow unless a compatibility issue appears.
 
-Keep docs-site dependency management on npm for now. The site already has `site/package-lock.json`, the workflow uses `npm ci`, and Astro documents npm as a first-class install path. Bun is appropriate for the Pi extension checks in this repository, but standardizing the docs site on Bun would require an intentional lockfile/tooling migration (`bun.lock`, `oven-sh/setup-bun`, and package-manager metadata) without solving Astro's Node runtime requirement. Revisit Bun only if the project decides to migrate all JavaScript package management together.
+Keep docs-site dependency management on npm for now. The site has `site/package-lock.json`, CI uses `npm ci`, and the local `just site-build` shortcut mirrors that lockfile install before running `npm run build`. Astro documents npm as a first-class install path. Bun is appropriate for the Pi extension checks in this repository, but standardizing the docs site on Bun would require an intentional lockfile/tooling migration (`bun.lock`, `oven-sh/setup-bun`, and package-manager metadata) without solving Astro's Node runtime requirement. Revisit Bun only if the project decides to migrate all JavaScript package management together.
 
 Upstream references:
 
@@ -28,7 +28,7 @@ Upstream references:
 
 ## Install dependencies
 
-From the repository root with a supported Node.js LTS release (recommended: Node 24):
+From the repository root with Node.js 24 active (see `site/.node-version`):
 
 ```sh
 cd site
@@ -47,11 +47,10 @@ The `predev` hook syncs `../docs/` into Starlight before the dev server starts.
 ## Build static output
 
 ```sh
-cd site
-npm run build
+just site-build
 ```
 
-The `prebuild` hook runs `npm run sync:docs`, then Astro writes static output to `site/dist/`.
+The shortcut runs `npm ci` to mirror the GitHub Pages workflow, then the `prebuild` hook runs `npm run sync:docs`, and Astro writes static output to `site/dist/`.
 
 ## Manual sync
 

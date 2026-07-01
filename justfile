@@ -6,9 +6,23 @@ set positional-arguments
 dev:
 	cargo run --manifest-path tandem/Cargo.toml -- tui
 
+# Verify the local docs runtime matches site/.node-version and Astro's Node floor.
+_check-docs-node:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	expected="$(tr -d '[:space:]' < site/.node-version)"
+	node -e '
+		const expected = process.argv[1];
+		const [major, minor] = process.versions.node.split(".").map(Number);
+		if (String(major) !== expected || (major === 22 && minor < 12)) {
+			console.error(`Docs site expects Node ${expected}.x from site/.node-version (Astro requires >=22.12.0); found ${process.version}.`);
+			process.exit(1);
+		}
+	' "$expected"
+
 # Start the local documentation site with Astro Starlight.
 # The npm dev script syncs ../docs/ into Starlight before serving.
-site:
+site: _check-docs-node
 	#!/usr/bin/env bash
 	set -euo pipefail
 	cd site
@@ -21,13 +35,12 @@ site:
 alias docs := site
 
 # Build the static documentation site output in site/dist/.
-site-build:
+# Mirrors the GitHub Pages workflow by installing from package-lock.json.
+site-build: _check-docs-node
 	#!/usr/bin/env bash
 	set -euo pipefail
 	cd site
-	if [[ ! -d node_modules ]]; then
-		npm install
-	fi
+	npm ci
 	npm run build
 
 # Bump tandem to VERSION, validate, commit, tag, push main + tag, and create a concise GitHub Release.

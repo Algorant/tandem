@@ -6,11 +6,15 @@ Canonical Markdown source lives in `../docs/`. The site project owns rendering, 
 
 ## Local workflow
 
+Use Node.js 24 (see `.node-version`) and npm. The GitHub Pages workflow also reads this version file and installs from `package-lock.json` with `npm ci`.
+
 ```sh
 npm install
 npm run dev
 npm run build
 ```
+
+From the repository root, `just site` starts the dev server and `just site-build` mirrors CI with `npm ci && npm run build`.
 
 Useful scripts:
 
