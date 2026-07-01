@@ -19,10 +19,12 @@ Recommendation: maintain curated, per-release public notes in `tandem/GITHUB_REL
 
 Release flow:
 
-1. Update `GITHUB_RELEASE_NOTES.md` with version-specific highlights, install command, and short known limitations.
-2. Keep reusable validation commands, `pi-tandem` install notes, and operational checks in this checklist.
-3. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
-4. Run `just release <version>`, which publishes the GitHub Release from `GITHUB_RELEASE_NOTES.md`.
+1. Update `GITHUB_RELEASE_NOTES.md` with version-specific highlights, user-facing changes, install command, and any current limitations users need to know.
+2. Group release notes by product surface when a release includes distinct kinds of work. Prefer sections such as `Protocol`, `CLI`, `TUI`, `Docs`, and `Integrations` over a flat commit list when multiple areas changed.
+3. Keep reusable validation commands, `pi-tandem` install notes, and operational checks in this checklist.
+4. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
+5. Do not include a `Not included` section in public release notes. Readers do not have context for rejected, shelved, or never-shipped work; mention only shipped behavior and current user-facing limitations when useful.
+6. Run `just release <version>`, which publishes the GitHub Release from `GITHUB_RELEASE_NOTES.md`.
 
 ### Current capabilities
 
