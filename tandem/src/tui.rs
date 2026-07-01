@@ -1514,7 +1514,12 @@ impl TuiApp {
             };
             let mut item_index = 0;
             for doc in &self.docs {
-                if document_state_label(doc) == state_name.as_str() {
+                if !is_board_visible_doc(doc) {
+                    continue;
+                }
+                if document_state_label(doc) == state_name.as_str()
+                    && board_filters_match(doc, &self.board_filters)
+                {
                     if doc.id() == id {
                         self.selected_state = state_index;
                         self.selected_item = item_index;
@@ -2023,6 +2028,7 @@ impl TuiApp {
     fn docs_for_state(&self, state: &str) -> Vec<&Document> {
         self.docs
             .iter()
+            .filter(|doc| is_board_visible_doc(doc))
             .filter(|doc| document_state_label(doc) == state)
             .filter(|doc| board_filters_match(doc, &self.board_filters))
             .collect()
@@ -2124,10 +2130,17 @@ impl TuiApp {
         review::detail_line_count(item.as_ref(), &self.theme)
     }
 
+    fn board_docs(&self) -> Vec<&Document> {
+        self.docs
+            .iter()
+            .filter(|doc| is_board_visible_doc(doc))
+            .collect()
+    }
+
     fn decision_docs(&self) -> Vec<&Document> {
         self.docs
             .iter()
-            .filter(|doc| doc.doc_type() == "decision")
+            .filter(|doc| is_decision_doc(doc))
             .collect()
     }
 
@@ -2299,7 +2312,7 @@ impl TuiApp {
 
     fn view_counts(&self) -> [usize; 4] {
         [
-            self.docs.len(),
+            self.board_docs().len(),
             self.logs.len(),
             self.rules_total(),
             self.decision_docs().len(),
@@ -3509,7 +3522,7 @@ fn default_workspace_states() -> Vec<String> {
 }
 
 fn states_with_board_docs(mut states: Vec<String>, docs: &[Document]) -> Vec<String> {
-    for doc in docs {
+    for doc in docs.iter().filter(|doc| is_board_visible_doc(doc)) {
         let state = document_state_label(doc);
         if !states.iter().any(|known| known == &state) {
             states.push(state);
@@ -3526,6 +3539,14 @@ fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
+}
+
+fn is_decision_doc(doc: &Document) -> bool {
+    doc.doc_type().eq_ignore_ascii_case("decision")
+}
+
+fn is_board_visible_doc(doc: &Document) -> bool {
+    doc.location == DocumentLocation::Board && !is_decision_doc(doc)
 }
 
 fn read_documents_tolerant(
@@ -4191,6 +4212,7 @@ fn board_subview_tabs(
             state: state.clone(),
             count: docs
                 .iter()
+                .filter(|doc| is_board_visible_doc(doc))
                 .filter(|doc| document_state_label(doc) == state.as_str())
                 .filter(|doc| board_filters_match(doc, filters))
                 .count(),
@@ -4904,7 +4926,7 @@ fn board_filters_match(doc: &Document, filters: &BoardFilters) -> bool {
 
 fn board_filter_tags(docs: &[Document]) -> Vec<String> {
     let mut tags = BTreeSet::new();
-    for doc in docs {
+    for doc in docs.iter().filter(|doc| is_board_visible_doc(doc)) {
         for tag in document_tags(doc) {
             tags.insert(tag);
         }
@@ -4915,6 +4937,7 @@ fn board_filter_tags(docs: &[Document]) -> Vec<String> {
 fn board_filter_priorities(docs: &[Document]) -> Vec<String> {
     let mut priorities = docs
         .iter()
+        .filter(|doc| is_board_visible_doc(doc))
         .filter_map(|doc| {
             let priority = normalize_filter_value(doc.field("priority").unwrap_or(""));
             if priority.is_empty() || priority == "-" || priority == "none" {
@@ -6632,11 +6655,7 @@ tone = "success"
             },
             title: "Test".to_string(),
             view: TuiView::Board,
-            states: vec![
-                "todo".to_string(),
-                "validation".to_string(),
-                "unfiled".to_string(),
-            ],
+            states: vec!["todo".to_string(), "validation".to_string()],
             configured_states: vec!["todo".to_string(), "validation".to_string()],
             docs,
             logs: Vec::new(),
@@ -6673,11 +6692,12 @@ tone = "success"
     }
 
     #[test]
-    fn states_include_unfiled_and_unknown_board_docs() {
+    fn states_include_unfiled_and_unknown_board_tasks_but_not_decisions() {
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
             doc_with_state("task-2", Some("blocked")),
-            doc_with_state("decision-1", None),
+            doc_with_state("task-3", None),
+            decision_doc("decision-1"),
         ];
         let states =
             states_with_board_docs(vec!["todo".to_string(), "validation".to_string()], &docs);
@@ -6686,7 +6706,7 @@ tone = "success"
 
     #[test]
     fn document_without_state_uses_unfiled_label() {
-        let doc = doc_with_state("decision-1", None);
+        let doc = doc_with_state("task-3", None);
         assert_eq!(document_state_label(&doc), "unfiled");
     }
 
@@ -6703,7 +6723,7 @@ tone = "success"
     fn top_header_tabs_separate_shortcuts_labels_and_counts() {
         let app = keyboard_test_app();
         let line = line_text(&app.view_tab_line(96));
-        assert!(line.contains("[1] Board (3)"));
+        assert!(line.contains("[1] Board (2)"));
         assert!(line.contains("[2] Logs (0)"));
         assert!(line.contains("[3] Rules (0)"));
         assert!(line.contains("[4] Decisions (1)"));
@@ -6969,10 +6989,12 @@ tone = "success"
     fn editor_targets_active_tasks_from_board_only() {
         let mut app = keyboard_test_app();
         assert_eq!(app.selected_editor_target().unwrap().id, "task-1");
+        assert!(!app.select_document_by_id("decision-1"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-1"));
 
-        app.selected_state = 2;
+        app.switch_view(TuiView::Decisions);
         let error = app.selected_editor_target().unwrap_err();
-        assert!(error.contains("type `decision`"));
+        assert!(error.contains("Decision document editing"));
     }
 
     #[test]
@@ -7450,10 +7472,15 @@ tone = "success"
 
     #[test]
     fn board_subview_tabs_count_visible_states() {
+        let mut decision = decision_doc("decision-1");
+        decision
+            .fields
+            .insert("state".to_string(), "todo".to_string());
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
             doc_with_state("task-2", Some("todo")),
             doc_with_state("task-3", Some("review")),
+            decision,
         ];
         let states = vec![
             "todo".to_string(),

@@ -9,12 +9,12 @@ use ratatui::{
 
 use super::theme::{StatusTone, TuiTheme};
 use super::{
-    centered_rect, detail_field_line, markdownish_lines, push_optional_detail_line, FocusPane,
-    TuiApp,
+    centered_rect, detail_field_line, detail_section_heading, is_decision_doc, markdownish_lines,
+    FocusPane, TuiApp,
 };
 use crate::{
-    append_event, current_timestamp, date_from_timestamp, display_path, first_body_line,
-    next_sequential_id, write_atomic, yaml_double_quote, CliError, Document, Workspace,
+    append_event, current_timestamp, date_from_timestamp, display_path, next_sequential_id,
+    parse_field_values, write_atomic, yaml_double_quote, CliError, Document, Workspace,
 };
 
 #[derive(Debug, Default)]
@@ -219,13 +219,13 @@ impl TuiApp {
             .get(self.decisions_view.selected)
             .map(|doc| {
                 format!(
-                    "selected {} · {} active decision{} loaded",
+                    "selected {} · {} decision document{} loaded",
                     doc.id(),
                     decisions.len(),
                     if decisions.len() == 1 { "" } else { "s" }
                 )
             })
-            .unwrap_or_else(|| "no active decision documents loaded".to_string())
+            .unwrap_or_else(|| "no decision documents loaded".to_string())
     }
 
     pub(super) fn decisions_footer_text(&self) -> String {
@@ -240,7 +240,7 @@ impl TuiApp {
         let decisions = self.sorted_decision_docs();
         let items = if decisions.is_empty() {
             vec![ListItem::new(Line::from(Span::styled(
-                "No active decisions. Press a to add one.",
+                "No decision documents. Press a to add one.",
                 self.theme.muted_style(),
             )))]
         } else {
@@ -310,7 +310,7 @@ impl TuiApp {
         let mut docs = self
             .docs
             .iter()
-            .filter(|doc| doc.doc_type() == "decision")
+            .filter(|doc| is_decision_doc(doc))
             .collect::<Vec<_>>();
         docs.sort_by(|a, b| a.id().cmp(b.id()));
         docs
@@ -533,11 +533,27 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
 }
 
 fn decision_list_item(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
-    let status = doc.field("status").unwrap_or("-");
-    let date = doc.field("date").unwrap_or("-");
-    let references = doc.field("references").unwrap_or("");
-    let tags = doc.field("tags").unwrap_or("");
-    let summary = first_body_line(doc);
+    let status = decision_field(doc, DECISION_STATUS_KEYS)
+        .map(|status| format!("status:{status}"))
+        .unwrap_or_else(|| "status:-".to_string());
+    let date = decision_field(doc, DECISION_LIST_DATE_KEYS)
+        .map(|date| format!("date:{}", compact_decision_date(date)))
+        .unwrap_or_else(|| "date:-".to_string());
+    let deciders = formatted_decision_values(doc, DECISION_DECIDER_KEYS, "", ", ")
+        .map(|deciders| format!("deciders:{deciders}"))
+        .unwrap_or_else(|| "deciders:-".to_string());
+    let summary = decision_body_summary(doc);
+    let metadata = format!("{status} · {date} · {deciders}");
+
+    let mut metadata_spans = vec![Span::styled(metadata, theme.muted_style())];
+    if !summary.is_empty() {
+        metadata_spans.push(Span::styled(" — ".to_string(), theme.muted_style()));
+        metadata_spans.push(Span::styled(
+            crate::truncate(&summary, 48),
+            theme.muted_style(),
+        ));
+    }
+
     ListItem::new(vec![
         Line::from(vec![
             Span::styled(
@@ -545,34 +561,11 @@ fn decision_list_item(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
                 theme.status_style(StatusTone::Accent),
             ),
             Span::styled(
-                format!("[{status}] "),
-                theme.status_style(StatusTone::Accent),
-            ),
-            Span::styled(
                 doc.title().to_string(),
                 theme.text_style().add_modifier(Modifier::BOLD),
             ),
         ]),
-        Line::from(vec![
-            Span::styled(format!("date:{date} "), theme.muted_style()),
-            Span::styled(
-                if references.is_empty() {
-                    "refs:- ".to_string()
-                } else {
-                    format!("refs:{references} ")
-                },
-                theme.muted_style(),
-            ),
-            Span::styled(
-                if tags.is_empty() {
-                    "tags:- ".to_string()
-                } else {
-                    format!("tags:{tags} ")
-                },
-                theme.muted_style(),
-            ),
-            Span::styled(crate::truncate(&summary, 44), theme.muted_style()),
-        ]),
+        Line::from(metadata_spans),
     ])
 }
 
@@ -584,37 +577,189 @@ fn decision_detail_lines(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>>
     ]));
     lines.push(detail_field_line("ID", doc.id(), theme));
     lines.push(detail_field_line("Type", doc.doc_type(), theme));
-    push_optional_detail_line(&mut lines, "Status", doc.field("status"), theme);
-    push_optional_detail_line(&mut lines, "Date", doc.field("date"), theme);
-    push_optional_detail_line(&mut lines, "Deciders", doc.field("deciders"), theme);
-    push_optional_detail_line(&mut lines, "Context", doc.field("context"), theme);
-    push_optional_detail_line(&mut lines, "Consequences", doc.field("consequences"), theme);
-    push_optional_detail_line(&mut lines, "Alternatives", doc.field("alternatives"), theme);
-    push_optional_detail_line(&mut lines, "Supersedes", doc.field("supersedes"), theme);
-    push_optional_detail_line(
+    lines.push(Line::from(""));
+    lines.push(detail_section_heading("Decision metadata", theme));
+    push_optional_decision_scalar_line(&mut lines, "Status", doc, DECISION_STATUS_KEYS, theme);
+    push_optional_decision_scalar_line(&mut lines, "Date", doc, DECISION_DATE_KEYS, theme);
+    push_optional_decision_list_line(
         &mut lines,
-        "Superseded by",
-        doc.field("supersededBy"),
+        "Deciders",
+        doc,
+        DECISION_DECIDER_KEYS,
+        "",
+        ", ",
         theme,
     );
-    push_optional_detail_line(&mut lines, "References", doc.field("references"), theme);
-    push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
-    push_optional_detail_line(&mut lines, "Created", doc.field("createdAt"), theme);
-    push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
+    push_optional_decision_scalar_line(&mut lines, "Context", doc, &["context"], theme);
+    push_optional_decision_list_line(
+        &mut lines,
+        "Consequences",
+        doc,
+        &["consequences"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(
+        &mut lines,
+        "Alternatives",
+        doc,
+        &["alternatives"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(
+        &mut lines,
+        "Consulted",
+        doc,
+        &["consulted"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(&mut lines, "Informed", doc, &["informed"], "", ", ", theme);
+    push_optional_decision_list_line(
+        &mut lines,
+        "Supersedes",
+        doc,
+        &["supersedes"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(
+        &mut lines,
+        "Superseded by",
+        doc,
+        &["supersededBy", "superseded-by"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(
+        &mut lines,
+        "References",
+        doc,
+        &["references"],
+        "",
+        ", ",
+        theme,
+    );
+    push_optional_decision_list_line(&mut lines, "Tags", doc, &["tags"], "#", " ", theme);
+    push_optional_decision_scalar_line(&mut lines, "Created", doc, &["createdAt"], theme);
+    push_optional_decision_scalar_line(&mut lines, "Updated", doc, &["updatedAt"], theme);
     lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "Body",
-        theme
-            .markdown_heading_style()
-            .add_modifier(Modifier::UNDERLINED),
-    )));
+    lines.push(detail_section_heading("Decision record", theme));
     if doc.body.trim().is_empty() {
-        lines.push(Line::from(Span::styled("(empty)", theme.muted_style())));
+        lines.push(Line::from(Span::styled(
+            "(empty; recommended sections: Context, Decision, Consequences, Alternatives)",
+            theme.muted_style(),
+        )));
     } else {
         lines.extend(markdownish_lines(&doc.body, theme));
     }
     lines
+}
+
+const DECISION_STATUS_KEYS: &[&str] = &["status", "decisionStatus", "decision.status"];
+const DECISION_DATE_KEYS: &[&str] = &["date", "decidedAt", "decision.date"];
+const DECISION_LIST_DATE_KEYS: &[&str] = &["date", "decidedAt", "decision.date", "createdAt"];
+const DECISION_DECIDER_KEYS: &[&str] = &["deciders", "decisionMakers", "decision.deciders"];
+
+fn decision_field<'a>(doc: &'a Document, keys: &[&str]) -> Option<&'a str> {
+    keys.iter()
+        .find_map(|key| doc.field(key).filter(|value| !value.trim().is_empty()))
+}
+
+fn push_optional_decision_scalar_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    doc: &Document,
+    keys: &[&str],
+    theme: &TuiTheme,
+) {
+    if let Some(value) = decision_field(doc, keys) {
+        lines.push(detail_field_line(label, value, theme));
+    }
+}
+
+fn push_optional_decision_list_line(
+    lines: &mut Vec<Line<'static>>,
+    label: &str,
+    doc: &Document,
+    keys: &[&str],
+    prefix: &str,
+    separator: &str,
+    theme: &TuiTheme,
+) {
+    if let Some(value) = formatted_decision_values(doc, keys, prefix, separator) {
+        lines.push(detail_field_line(label, &value, theme));
+    }
+}
+
+fn formatted_decision_values(
+    doc: &Document,
+    keys: &[&str],
+    prefix: &str,
+    separator: &str,
+) -> Option<String> {
+    let raw = decision_field(doc, keys)?;
+    let values = decision_field_values(raw);
+    if values.is_empty() {
+        return None;
+    }
+    Some(
+        values
+            .into_iter()
+            .map(|value| format!("{prefix}{value}"))
+            .collect::<Vec<_>>()
+            .join(separator),
+    )
+}
+
+fn decision_field_values(raw: &str) -> Vec<String> {
+    let mut values = parse_field_values(raw);
+    if values.len() == 1 && !raw.trim().starts_with('[') && values[0].contains(',') {
+        values = values[0]
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+    values
+}
+
+fn compact_decision_date(value: &str) -> String {
+    value.split('T').next().unwrap_or(value).to_string()
+}
+
+fn decision_body_summary(doc: &Document) -> String {
+    let mut first_heading = None;
+    for line in doc.body.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with("```") {
+            continue;
+        }
+        if line.starts_with('#') {
+            first_heading.get_or_insert_with(|| clean_decision_summary_line(line));
+            continue;
+        }
+        return clean_decision_summary_line(line);
+    }
+    first_heading.unwrap_or_default()
+}
+
+fn clean_decision_summary_line(line: &str) -> String {
+    line.trim()
+        .trim_start_matches('#')
+        .trim_start_matches('>')
+        .trim_start_matches('-')
+        .trim_start_matches('*')
+        .trim()
+        .trim_matches('`')
+        .to_string()
 }
 
 fn create_basic_decision(
@@ -663,7 +808,44 @@ fn require_decision_title(value: &str) -> Result<&str, CliError> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
     use super::*;
+    use crate::DocumentLocation;
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
+    }
+
+    fn adr_decision_doc() -> Document {
+        let mut fields = HashMap::new();
+        fields.insert("id".to_string(), "decision-42".to_string());
+        fields.insert("type".to_string(), "decision".to_string());
+        fields.insert("title".to_string(), "Choose the TUI layout".to_string());
+        fields.insert("status".to_string(), "accepted".to_string());
+        fields.insert("date".to_string(), "2026-07-01".to_string());
+        fields.insert("deciders".to_string(), "[\"Ada\", \"Grace\"]".to_string());
+        fields.insert("supersedes".to_string(), "[\"decision-7\"]".to_string());
+        fields.insert("supersededBy".to_string(), "decision-99".to_string());
+        fields.insert(
+            "references".to_string(),
+            "[\"task-1\", \"task-2\"]".to_string(),
+        );
+        fields.insert("tags".to_string(), "[\"adr\", \"tui\"]".to_string());
+        fields.insert("state".to_string(), "todo".to_string());
+        fields.insert("createdAt".to_string(), "2026-07-01T10:00:00Z".to_string());
+        fields.insert("updatedAt".to_string(), "2026-07-01T11:00:00Z".to_string());
+        Document {
+            path: PathBuf::from(".tandem/board/decision-42.md"),
+            location: DocumentLocation::Board,
+            fields,
+            body: "## Context\n\nThe Board is noisy when decisions are mixed into task state buckets.\n\n## Decision\n\nRender decisions in their own pane.".to_string(),
+        }
+    }
 
     #[test]
     fn prompt_requires_title_before_body_step() {
@@ -675,6 +857,38 @@ mod tests {
         let action = prompt.handle_key(KeyEvent::from(KeyCode::Enter));
         assert!(
             matches!(action, DecisionPromptAction::Status(message) if message.contains("required"))
+        );
+    }
+
+    #[test]
+    fn decision_detail_renders_adr_metadata_without_workflow_state() {
+        let theme = TuiTheme::default_dark();
+        let doc = adr_decision_doc();
+        let texts = decision_detail_lines(&doc, &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+
+        assert!(texts.contains(&"Decision metadata".to_string()));
+        assert!(texts.contains(&"Status: accepted".to_string()));
+        assert!(texts.contains(&"Date: 2026-07-01".to_string()));
+        assert!(texts.contains(&"Deciders: Ada, Grace".to_string()));
+        assert!(texts.contains(&"Supersedes: decision-7".to_string()));
+        assert!(texts.contains(&"Superseded by: decision-99".to_string()));
+        assert!(texts.contains(&"References: task-1, task-2".to_string()));
+        assert!(texts.contains(&"Tags: #adr #tui".to_string()));
+        assert!(texts.contains(&"Decision record".to_string()));
+        assert!(texts.contains(&"Context".to_string()));
+        assert!(texts.contains(&"Decision".to_string()));
+        assert!(!texts.contains(&"State: todo".to_string()));
+    }
+
+    #[test]
+    fn decision_body_summary_skips_adr_section_headings() {
+        let doc = adr_decision_doc();
+        assert_eq!(
+            decision_body_summary(&doc),
+            "The Board is noisy when decisions are mixed into task state buckets."
         );
     }
 }
