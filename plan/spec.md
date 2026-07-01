@@ -81,6 +81,7 @@ Protocol:
 - Canonical workflow field is `state`; default states are `todo`, `in-progress`, `review`.
 - New work items use `type: task` and sequential IDs such as `task-1`.
 - First-class document types are `task` and `decision`; decision documents do not need a lifecycle field in v0; custom types are config-only in v0.
+- Epics are convention-only task documents using `type: task` plus `kind: epic`; child work links through `parentId`, loose context uses `references`, and v0 has no separate epic type or lifecycle.
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References may point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
 - Completion warns but does not block on review/accord acceptance in v0.

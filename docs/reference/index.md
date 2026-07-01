@@ -11,6 +11,7 @@ Initial references to expand:
 
 - CLI command reference.
 - Task frontmatter fields.
+- Epic convention (`type: task` plus `kind: epic`).
 - Accord status reference.
 - Workspace config and rules.
 - Theme configuration keys.

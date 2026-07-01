@@ -15,6 +15,12 @@ A Tandem workspace stores coordination data in `.tandem/` inside a repository. A
 
 Each active task or decision is a Markdown document with YAML frontmatter. Markdown stays readable in any editor while Tandem tools provide structured views and safe mutations.
 
+## Epics
+
+An epic is a convention on a normal task, not a separate protocol object. Mark a grouping task with `type: task` and `kind: epic`, then create child tasks with `parentId` pointing at the epic. Use `references` for loose related context such as decisions, sibling tasks, or completed logs.
+
+Epics complete through the normal task completion/archive flow after their children are done, canceled, or intentionally superseded. Do not create `type: epic`, ADR-style epic records, or a special done state.
+
 ## State
 
 Task workflow uses `state` values. The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` column.

@@ -34,6 +34,7 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - Protocol fields: `state`/`states`, `type: task`, sequential `task-N` IDs.
 - Default states: `todo`, `in-progress`, `validation` (existing `state: review` files are legacy-compatible reads).
 - Document types: `task` and `decision`; custom types are config-only.
+- Epics: convention-only `type: task` documents with `kind: epic`; child tasks use `parentId`, loose context uses `references`, and v0 has no separate epic type, ID namespace, or lifecycle.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Logs: archived markdown docs in `.tandem/logs/`; minimal audit-only lifecycle events in per-actor `.tandem/events/<actor_id>.jsonl` logs, with legacy `.tandem/events.jsonl` still readable during transition.
 - v0 `tandem` commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`; `tandem decision` supports `list`, `show`, `add`.

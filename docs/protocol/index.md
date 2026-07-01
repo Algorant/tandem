@@ -25,6 +25,32 @@ V0 supports `task` and `decision` documents. Task IDs are sequential by default,
 
 Task documents use frontmatter for structured fields and Markdown for the human-readable body. Tools should preserve unknown fields and minimize rewrites.
 
+## Epic convention
+
+Epics are ordinary task documents with an optional classifier:
+
+```yaml
+id: task-10
+type: task
+kind: epic
+title: Ship documentation refresh
+state: in-progress
+```
+
+Child work links to the epic through `parentId`:
+
+```yaml
+id: task-11
+type: task
+title: Rewrite Concepts page
+state: todo
+parentId: task-10
+references:
+  - decision-3
+```
+
+`parentId` is strict hierarchy. `references` are loose related links. Epic tasks are completed and archived with the normal task flow; v0 does not define `type: epic`, `epic-N` IDs, a separate ADR/epic record type, or special epic lifecycle behavior.
+
 ## Events
 
 New event writes append to the current writer's `.tandem/events/<actor_id>.jsonl`; readers aggregate all per-actor logs plus any legacy `.tandem/events.jsonl`. Event records require `ts`, `event`, `id`, `summary`, canonical `actor`, and per-actor `seq`; the event identity is `<actor>:<seq>`. Optional `actorName` is display-only and never determines canonical identity or file ownership.

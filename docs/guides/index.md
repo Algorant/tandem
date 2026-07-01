@@ -15,6 +15,7 @@ Guides collect practical workflows for using Tandem.
 
 - Start a workspace.
 - Add and claim work.
+- Plan epics with parent/child tasks.
 - Deliver work for validation.
 - Accept and complete work.
 - Browse completed logs.

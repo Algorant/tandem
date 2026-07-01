@@ -41,6 +41,7 @@ Protocol:
 - Default task identity: `type: task` with sequential IDs such as `task-1`.
 - First-class document types: `task` and `decision`; decision documents do not need a lifecycle field in v0.
 - Custom document types: allowed in config only; no v0 type-management CLI.
+- Epics: convention-only task documents using `type: task` plus `kind: epic`; children link through `parentId`, related context uses `references`, and there is no separate epic type, command family, ID namespace, or lifecycle in v0.
 - Work agreement object: `accord`.
 - Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
@@ -141,6 +142,15 @@ Use these names consistently unless the user explicitly changes them:
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
 Avoid reintroducing `contract` except when discussing Brainfile design mapping from `contract` to Tandem `accord`.
+
+## Epic convention for agents
+
+- Model epics as ordinary tasks with `type: task` and `kind: epic`; do not invent `type: epic`, `epic-N` IDs, ADR-style epic records, custom folders, or special workflow states.
+- Use `parentId` for strict epic-to-child hierarchy. Create or inspect the epic task before adding children, because unresolved parents are validation errors.
+- Use `references` for loose related context such as decisions, sibling tasks, or completed logs. References are not hierarchy and unresolved references are warnings.
+- Use child tasks when work needs its own owner, accord, review, blockers, or validation; use inline `subtasks` only for checklist items inside one task.
+- Complete/archive epics with the normal task completion flow only after children are completed, intentionally canceled/superseded, or the project owner decides the epic is done. Do not create a persistent `done` state.
+- Keep decisions/ADR-style documents for durable decisions only; do not use them as a substitute for epic tracking.
 
 ## Design direction
 

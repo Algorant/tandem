@@ -33,6 +33,33 @@ tandem_task action=add title="Render blockers and references" parent="task-1" bl
 
 After creating linked work, inspect with `tandem_task show` and `tandem_search`. If relationship fields are present in the document but hard to see in CLI/TUI output, report that as a display UX gap; do not invent replacement fields.
 
+## Epic convention
+
+Epics are ordinary tasks with a lightweight classifier:
+
+```yaml
+id: task-10
+type: task
+kind: epic
+title: Ship documentation refresh
+state: in-progress
+```
+
+When planning or decomposing an epic:
+
+- Create/inspect the epic task first, then create child tasks with `parent` so the CLI writes `parentId`.
+- Use `references` for loose related decisions, sibling tasks, or completed logs; do not use references as a substitute for hierarchy.
+- Do not create `type: epic`, `epic-N` IDs, separate ADR/epic documents, custom folders, or special lifecycle states.
+- Do not use `tandem_decision` for epics. Decisions/ADR-style records are only for durable choices.
+- If the installed CLI cannot set `kind: epic`, do not invent a tool parameter. Use the normal task/parent relationship fields, then either report the metadata gap or make a minimal frontmatter edit only when explicitly needed and safe.
+- Complete/archive an epic only through the normal task completion flow after its children are done, canceled/superseded, or the human/orchestrator decides the epic is complete.
+
+Example child creation:
+
+```text
+tandem_task action=add title="Rewrite Concepts page" parent="task-10" references=["decision-3"] relatedFiles=["docs/concepts/index.md"]
+```
+
 ## Lifecycle cautions
 
 - Claim or deliver only when assigned/asked.

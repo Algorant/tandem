@@ -66,7 +66,7 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
-Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
+Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, modeling epics as ordinary `type: task` + `kind: epic` parents instead of separate ADR/epic protocol behavior, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
 
 ## Testing
 

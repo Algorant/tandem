@@ -1014,7 +1014,7 @@ My Project  in-progress 4 · review 3 · blocked 1 · completed this week 7
 
 Optional progress bars:
 
-- epic progress: completed children / total children
+- epic progress for `type: task` + `kind: epic` parents: completed children / total children
 - Board Validation flow: delivered / accepted work awaiting accept, rework, or completion
 - validation: passed / total delivered
 - decision/review progress if useful

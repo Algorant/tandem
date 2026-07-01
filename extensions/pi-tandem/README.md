@@ -39,6 +39,8 @@ Read actions default to JSON. Mutation actions keep the CLI's human-readable out
 
 Relationship parameters map directly to Tandem protocol fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, `relatedFiles` → project paths, and `subtasks` → lightweight checklist items. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings. Use `action: "update"` for active task metadata edits; state remains `move`, and parentId is intentionally not updatable.
 
+For epics, use ordinary task hierarchy: the epic is `type: task` with the lightweight `kind: epic` classifier, children use `parent`/`parentId`, and loose decisions/sibling/log context uses `references`. The adapter does not create `type: epic`, ADR-style epic documents, custom folders, or special lifecycle states.
+
 ### `tandem_accord`
 
 Maps to:
@@ -141,4 +143,4 @@ Do not promote this extension into `~/.pi/agent/extensions` until a separate rev
 
 ## Prompt guidance
 
-The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, and to keep workflow state distinct from `review:` metadata and accord status. See `pi-tandem.md` for the human-readable agent guidance.
+The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, to keep workflow state distinct from `review:` metadata and accord status, and to model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior. See `pi-tandem.md` for the human-readable agent guidance.

@@ -29,6 +29,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - New task items use `type: task` and sequential IDs such as `task-1`.
 - First-class document types are `task` and `decision`.
 - Custom document types are allowed in config only; v0 has no type-management CLI.
+- Epics are a convention on task documents: use `type: task` plus `kind: epic`, link children through `parentId`, and use `references` for loose related documents. No separate epic document type, command family, or lifecycle is part of v0.
 - The work-agreement object is `accord`.
 - Accord statuses are `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`.
 - Rules are structured objects with stable IDs: `{ id, rule, source? }`.
@@ -248,7 +249,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | --- | --- | --- | --- |
 | `id` | yes | error | Canonical ID. New task IDs are sequential, e.g. `task-1`. IDs must be unique across board and logs. |
 | `type` | yes | error | Must be `task` for v0 task documents. |
-| `kind` | no | error if unsupported | Optional task sub-kind. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks. |
+| `kind` | no | error if unsupported | Optional task sub-kind/convention classifier. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks without changing task identity, ID allocation, workflow, accord, review, or completion behavior. |
 | `title` | yes | error | Display title. |
 | `state` | yes in board | error | Must match a configured workspace state. Omitted in logs is allowed. |
 | `priority` | no | warning if unrecognized | Suggested values: `low`, `medium`, `high`, `critical`; projects may extend. |
@@ -477,7 +478,7 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | --- | --- | --- |
 | `id` | yes | Stable canonical identifier such as `task-1`. |
 | `type` | no | Defaults to `task` for new task documents. |
-| `kind` | no | Optional task sub-kind. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task`. |
+| `kind` | no | Optional task sub-kind/convention classifier. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task` and normal task semantics. |
 | `title` | yes | Display title. |
 | `state` | yes for active tasks | Human workflow state. Defaults are `todo`, `in-progress`, and `validation`; `review` is read as a legacy alias for validation. |
 | `priority` | no | `low`, `medium`, `high`, `critical`, or project-defined. |
@@ -495,7 +496,60 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | `updatedAt` | no | Last mutation timestamp. |
 | `completedAt` | logs only | Completion timestamp. |
 
-Epic tasks are normal tasks with `kind: epic`: they remain board-visible, use normal workflow states, allocate `task-N` IDs, and complete/archive into logs like any other task. Child tasks should point at the epic via `parentId`; related-but-not-owned work can use `references`.
+## Epic convention
+
+Epics are normal tasks with `kind: epic`: they remain board-visible, use normal workflow states, allocate `task-N` IDs, and complete/archive into logs like any other task. Use an epic when a task mainly groups a larger outcome or milestone.
+
+Example epic task:
+
+```markdown
+---
+id: task-10
+type: task
+kind: epic
+title: Ship documentation IA refresh
+state: in-progress
+priority: high
+references:
+  - decision-3
+relatedFiles:
+  - docs/index.md
+---
+
+## Outcome
+
+Coordinate the docs information architecture refresh across smaller child tasks.
+```
+
+Example child task:
+
+```markdown
+---
+id: task-11
+type: task
+title: Rewrite Concepts page
+state: todo
+parentId: task-10
+references:
+  - decision-3
+  - task-7
+relatedFiles:
+  - docs/concepts/index.md
+---
+
+## Description
+
+Update the public concepts page as one deliverable under the docs IA epic.
+```
+
+Guidance:
+
+- Keep epic IDs in the normal task sequence (`task-N`), not a separate `epic-N` namespace.
+- Use `parentId` for the strict parent/child hierarchy. The target may be an active board document or a completed log document, and unresolved `parentId` remains a validation error.
+- Use `references` for loose related context such as decisions, sibling tasks, or completed logs. References are intentionally not hierarchy and unresolved references remain warnings.
+- Use child tasks when work needs its own owner, accord, review, blockers, or validation. Use inline `subtasks` only for checklist items inside one task.
+- Complete/archive an epic with the normal task completion flow only when its children are completed, intentionally canceled/superseded, or the human/project owner decides the epic is done. Completion moves the epic task to `.tandem/logs/`; it does not create a persistent `done` state or special epic archive.
+- Do not model epics as `type: decision`, ADRs, custom protocol folders, or separate lifecycle states. Decisions remain for durable choices; epics remain task coordination records.
 
 ## Decision document
 
@@ -750,6 +804,8 @@ First-class v0 types:
 - `task` — normal task/work item. Completable by default.
 - `decision` — durable project, product, or architecture decision. Not completable by default.
 
+Epics use the `task` document type with the optional `kind: epic` convention. They are not a first-class v0 type and should not require custom type configuration.
+
 Custom types are allowed only through workspace config in v0:
 
 ```yaml
@@ -989,6 +1045,7 @@ Brainfile column             → Tandem state
 Brainfile contract concept   → Tandem accord
 Brainfile archived task      → Tandem completed log document
 ADR-style record             → Tandem decision document
+Epic/theme/milestone         → Tandem task with `kind: epic` and child tasks linked by `parentId`
 ```
 
 ## Open protocol questions
