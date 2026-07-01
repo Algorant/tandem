@@ -12,5 +12,7 @@
 #   cd tandem && cargo run -- tui
 #
 # NO_COLOR=1 or TANDEM_NO_COLOR=1 keeps Tandem in the terminal/no-color fallback.
+# Badge styles: muted (default), accent, text, ghost, solid.
 base = "verdigris"
 name = "verdigris"
+badge_style = "muted"

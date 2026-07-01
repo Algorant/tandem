@@ -20,4 +20,4 @@ tandem --version
 
 - No binary artifacts are published yet; install from the git tag with Cargo.
 - Mutation commands remain human-readable only; structured JSON mutation output is deferred.
-- TUI visual polish remains active work; badge styling is fixed for now.
+- TUI visual polish remains active work; badge style modes are available, while rounded-edge badge experiments remain deferred.

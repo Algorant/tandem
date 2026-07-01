@@ -1024,7 +1024,7 @@ base = "default-dark"
 accent = "#8ec07c"
 ```
 
-After selection, user config and `.tandem/theme.toml` may override any supported color key and supported root settings such as `transparent_background`. The parser intentionally accepts only simple TOML-style root keys, `key = "color-or-setting"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names for color entries. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, and invalid colors are non-fatal TUI status warnings.
+After selection, user config and `.tandem/theme.toml` may override any supported color key and supported root settings such as `transparent_background` and `badge_style`. The parser intentionally accepts only simple TOML-style root keys, `key = "color-or-setting"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names for color entries. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, invalid colors, and invalid badge styles are non-fatal TUI status warnings.
 
 Implemented keys:
 
@@ -1033,6 +1033,7 @@ theme = "verdigris"
 name = "optional-display-name"
 base = "default-dark"
 transparent_background = false
+badge_style = "muted" # muted, accent, text, ghost, or solid; rounded-edge styles are deferred
 
 [colors]
 background = "#1d2021"
@@ -1078,7 +1079,7 @@ Checked-in examples live in `tandem/examples/themes/default-dark.toml` and `tand
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` selects the terminal/no-color fallback even when Verdigris or a user theme is selected.
 
-Themes may opt into terminal-default/transparent fills with root `transparent_background = true`. The default is false, so omitted themes continue to force the active palette's opaque `background` and `panel` colors. When enabled, app and panel fills use no explicit background where practical while selection and fixed badge fills may still use explicit backgrounds for legibility.
+Themes may opt into terminal-default/transparent fills with root `transparent_background = true`. The default is false, so omitted themes continue to force the active palette's opaque `background` and `panel` colors. Themes may also set `badge_style` to `muted` (default), `accent`, `text`, `ghost`, or `solid`; rounded-edge badge rendering is deferred. When transparent backgrounds are enabled, app and panel fills use no explicit background where practical while selection and badge styles that require fills may still use explicit backgrounds for legibility.
 
 ### Theme requirements
 
@@ -1086,7 +1087,7 @@ Themes may opt into terminal-default/transparent fills with root `transparent_ba
 - Support 256-color fallback where possible.
 - Support no-color mode.
 - Keep semantic color names separate from concrete colors.
-- Keep priority and status badges legible with fixed saturated filled rendering.
+- Keep priority and status badges legible across configurable `badge_style` modes without adding rounded-edge badge rendering yet.
 - Avoid relying only on color; include glyphs/text for status.
 
 ## Mouse support
