@@ -647,7 +647,7 @@ tandem decision list [--json]
 - Required inputs: none.
 - Optional inputs:
   - `--json`: emit structured output.
-- Human output shape: compact table with ID, title, references, and first-line summary.
+- Human output shape: compact table with ID, ADR status, date, title, references, and first-line summary. `status` is decision metadata, not task workflow `state`.
 - `--json` data shape:
 
 ```json
@@ -659,6 +659,13 @@ tandem decision list [--json]
         "id": "decision-1",
         "type": "decision",
         "title": "Use styled-basic Markdown in v0",
+        "status": "accepted",
+        "date": "2026-06-26",
+        "deciders": ["ivan"],
+        "context": "The TUI needs a deterministic v0 Markdown scope.",
+        "consequences": ["Advanced Markdown blocks remain deferred."],
+        "alternatives": ["Add a full Markdown renderer immediately."],
+        "supersedes": ["decision-0"],
         "references": ["task-7"],
         "summary": "Record the v0 rendering scope."
       }
@@ -694,6 +701,13 @@ tandem decision show <id> [--json]
       "id": "decision-1",
       "type": "decision",
       "title": "Use styled-basic Markdown in v0",
+      "status": "accepted",
+      "date": "2026-06-26",
+      "deciders": ["ivan"],
+      "context": "The TUI needs a deterministic v0 Markdown scope.",
+      "consequences": ["Advanced Markdown blocks remain deferred."],
+      "alternatives": ["Add a full Markdown renderer immediately."],
+      "supersedes": ["decision-0"],
       "references": ["task-7"]
     },
     "body": "## Decision\nUse styled-basic Markdown rendering for v0.",
@@ -710,24 +724,34 @@ tandem decision show <id> [--json]
 - Syntax:
 
 ```text
-tandem decision add --title <title> [--body <markdown>] [--reference <ref>] [--tag <tag>]
+tandem decision add --title <title> [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--date <date>] [--decider <name>] [--context <text>] [--consequence <text>] [--alternative <text>] [--supersedes <decision-id>] [--superseded-by <decision-id>] [--reference <ref>] [--tag <tag>]
 ```
 
 - Required inputs:
   - `--title <title>`.
 - Optional inputs:
   - `--body <markdown>`.
+  - `--status <status>` ADR status; defaults to `proposed` when omitted.
+  - `--date <date>` ADR decision date; defaults to the current UTC date when omitted.
+  - repeated `--decider <name>`.
+  - `--context <text>`.
+  - repeated `--consequence <text>`.
+  - repeated `--alternative <text>`.
+  - repeated `--supersedes <decision-id>`.
+  - repeated `--superseded-by <decision-id>`.
   - repeated `--reference <ref>`.
   - repeated `--tag <tag>`.
-- Human output shape: labeled created-decision summary with ID and path.
+- Human output shape: warnings first, then labeled created-decision summary with ID, status, date, title, and path.
 - Example:
 
 ```text
-tandem decision add --title "Use styled-basic Markdown in v0" --body "## Decision\nUse styled-basic rendering first." --reference task-7
+tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider ivan --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --body "## Decision\nUse styled-basic rendering first."
 ```
 
 - Exit/error notes:
-  - fails on missing title, invalid references that are structural errors, or failed write.
+  - fails on missing title, invalid ADR status, empty metadata flag values, or failed write.
+  - unresolved `references`, `supersedes`, or `supersededBy` targets are warnings in v0 related-reference semantics.
+  - decision documents do not receive a workflow `state`; ADR `status` remains separate from task state filters and board movement.
 
 ### `tandem tui`
 

@@ -173,12 +173,20 @@ try {
 		action: "add",
 		title: "Smoke decision",
 		body: "## Decision\nExercise pi-tandem decision command mapping.",
+		status: "accepted",
+		date: "2026-07-01",
+		deciders: ["pi-tandem-smoke"],
+		context: "Exercise ADR-compatible decision metadata.",
+		consequences: ["Decision adapter flags are covered."],
+		alternatives: ["Only test title/body."],
 		references: [taskId],
 		tags: ["smoke"],
 	}), workspace);
 	const decisionId = parseId(decisionOutput);
 	const decision = parseJson(await runTandem(tandem, buildDecisionArgs({ action: "show", id: decisionId }), workspace));
 	assert(decision.data.decision.title === "Smoke decision", "decision show should return created decision");
+	assert(decision.data.decision.status === "accepted", "decision show should expose ADR status");
+	assert(decision.data.decision.deciders.includes("pi-tandem-smoke"), "decision show should expose deciders");
 
 	const search = parseJson(await runTandem(tandem, buildSearchArgs({ query: "Smoke" }), workspace));
 	assert(search.data.results.length >= 2, "search should find smoke task and decision");

@@ -79,7 +79,7 @@ Maps to:
 ```text
 tandem decision list --json
 tandem decision show <id> --json
-tandem decision add --title <title> [--body <markdown>] [--reference <id>] [--tag <tag>]
+tandem decision add --title <title> [--body <markdown>] [--status <status>] [--date <date>] [--decider <name>] [--context <text>] [--consequence <text>] [--alternative <text>] [--supersedes <decision-id>] [--superseded-by <decision-id>] [--reference <id>] [--tag <tag>]
 ```
 
 ### `tandem_search`

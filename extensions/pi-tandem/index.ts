@@ -99,6 +99,14 @@ export type DecisionToolParams = CwdFlag & ReadJsonFlag & {
 	id?: string;
 	title?: string;
 	body?: string;
+	status?: "proposed" | "accepted" | "rejected" | "deprecated" | "superseded";
+	date?: string;
+	deciders?: string[];
+	context?: string;
+	consequences?: string[];
+	alternatives?: string[];
+	supersedes?: string[];
+	supersededBy?: string[];
 	references?: string[];
 	tags?: string[];
 };
@@ -304,6 +312,14 @@ export function buildDecisionArgs(params: DecisionToolParams): string[] {
 	if (params.action === "add") {
 		const args = ["decision", "add", "--title", requireString(params.title, "tandem_decision add requires title")];
 		addOptionalFlag(args, "--body", params.body);
+		addOptionalFlag(args, "--status", params.status);
+		addOptionalFlag(args, "--date", params.date);
+		addRepeatedFlag(args, "--decider", params.deciders);
+		addOptionalFlag(args, "--context", params.context);
+		addRepeatedFlag(args, "--consequence", params.consequences);
+		addRepeatedFlag(args, "--alternative", params.alternatives);
+		addRepeatedFlag(args, "--supersedes", params.supersedes);
+		addRepeatedFlag(args, "--superseded-by", params.supersededBy);
 		addRepeatedFlag(args, "--reference", params.references);
 		addRepeatedFlag(args, "--tag", params.tags);
 		return args;
@@ -697,10 +713,11 @@ export default function piTandem(pi: ExtensionAPI) {
 		name: "tandem_decision",
 		label: "Tandem Decisions",
 		...createTandemToolRenderer("tandem_decision", "Tandem Decisions"),
-		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output.",
+		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output and supports ADR-compatible metadata.",
 		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations.",
 		promptGuidelines: [
 			"Use tandem_decision for first-class Tandem decision documents; do not model decisions as task lifecycle state.",
+			"Decision status is ADR metadata (proposed/accepted/rejected/deprecated/superseded), not a workflow state.",
 		],
 		parameters: Type.Object({
 			...cwdSchema,
@@ -709,6 +726,14 @@ export default function piTandem(pi: ExtensionAPI) {
 			id: Type.Optional(Type.String()),
 			title: Type.Optional(Type.String()),
 			body: Type.Optional(Type.String()),
+			status: Type.Optional(StringEnum(["proposed", "accepted", "rejected", "deprecated", "superseded"] as const)),
+			date: Type.Optional(Type.String()),
+			deciders: Type.Optional(Type.Array(Type.String())),
+			context: Type.Optional(Type.String()),
+			consequences: Type.Optional(Type.Array(Type.String())),
+			alternatives: Type.Optional(Type.Array(Type.String())),
+			supersedes: Type.Optional(Type.Array(Type.String())),
+			supersededBy: Type.Optional(Type.Array(Type.String())),
 			references: Type.Optional(Type.Array(Type.String())),
 			tags: Type.Optional(Type.Array(Type.String())),
 		}),

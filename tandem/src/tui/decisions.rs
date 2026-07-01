@@ -13,8 +13,8 @@ use super::{
     TuiApp,
 };
 use crate::{
-    append_event, current_timestamp, display_path, first_body_line, next_sequential_id,
-    write_atomic, yaml_double_quote, CliError, Document, Workspace,
+    append_event, current_timestamp, date_from_timestamp, display_path, first_body_line,
+    next_sequential_id, write_atomic, yaml_double_quote, CliError, Document, Workspace,
 };
 
 #[derive(Debug, Default)]
@@ -489,7 +489,7 @@ impl DecisionPrompt {
             Self::Add { title, body, step } => vec![
                 Line::from(Span::styled("Create a basic decision", theme.title_style())),
                 Line::from(Span::styled(
-                    "Matches `tandem decision add --title <title> --body <markdown>` without references/tags.",
+                    "Matches `tandem decision add --title <title> --body <markdown>` with default ADR status/date and without references/tags.",
                     theme.muted_style(),
                 )),
                 Line::from(""),
@@ -533,6 +533,8 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
 }
 
 fn decision_list_item(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
+    let status = doc.field("status").unwrap_or("-");
+    let date = doc.field("date").unwrap_or("-");
     let references = doc.field("references").unwrap_or("");
     let tags = doc.field("tags").unwrap_or("");
     let summary = first_body_line(doc);
@@ -543,11 +545,16 @@ fn decision_list_item(doc: &Document, theme: &TuiTheme) -> ListItem<'static> {
                 theme.status_style(StatusTone::Accent),
             ),
             Span::styled(
+                format!("[{status}] "),
+                theme.status_style(StatusTone::Accent),
+            ),
+            Span::styled(
                 doc.title().to_string(),
                 theme.text_style().add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
+            Span::styled(format!("date:{date} "), theme.muted_style()),
             Span::styled(
                 if references.is_empty() {
                     "refs:- ".to_string()
@@ -577,6 +584,19 @@ fn decision_detail_lines(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>>
     ]));
     lines.push(detail_field_line("ID", doc.id(), theme));
     lines.push(detail_field_line("Type", doc.doc_type(), theme));
+    push_optional_detail_line(&mut lines, "Status", doc.field("status"), theme);
+    push_optional_detail_line(&mut lines, "Date", doc.field("date"), theme);
+    push_optional_detail_line(&mut lines, "Deciders", doc.field("deciders"), theme);
+    push_optional_detail_line(&mut lines, "Context", doc.field("context"), theme);
+    push_optional_detail_line(&mut lines, "Consequences", doc.field("consequences"), theme);
+    push_optional_detail_line(&mut lines, "Alternatives", doc.field("alternatives"), theme);
+    push_optional_detail_line(&mut lines, "Supersedes", doc.field("supersedes"), theme);
+    push_optional_detail_line(
+        &mut lines,
+        "Superseded by",
+        doc.field("supersededBy"),
+        theme,
+    );
     push_optional_detail_line(&mut lines, "References", doc.field("references"), theme);
     push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
     push_optional_detail_line(&mut lines, "Created", doc.field("createdAt"), theme);
@@ -605,12 +625,15 @@ fn create_basic_decision(
     let title = require_decision_title(title)?;
     let decision_id = next_sequential_id(workspace, "decision")?;
     let now = current_timestamp();
+    let date = date_from_timestamp(&now);
     let decision_path = workspace.board_dir.join(format!("{decision_id}.md"));
     let mut lines = vec![
         "---".to_string(),
         format!("id: {decision_id}"),
         "type: decision".to_string(),
         format!("title: {}", yaml_double_quote(title)),
+        "status: \"proposed\"".to_string(),
+        format!("date: {}", yaml_double_quote(&date)),
         format!("createdAt: {}", yaml_double_quote(&now)),
         format!("updatedAt: {}", yaml_double_quote(&now)),
         "---".to_string(),

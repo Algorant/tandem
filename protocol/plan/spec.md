@@ -43,7 +43,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Validation/lint is built-in structural validation only in v0.
 - Schemas and fixtures are not part of v0.
 - Validation severity is strict for structure and core references: invalid/missing required structure and unresolved `parentId`/`blockers` are errors; unresolved related `references`/rule sources and completion-policy issues are warnings.
-- Decision documents do not need a lifecycle field in v0.
+- Decision documents do not need a workflow lifecycle `state` field in v0. They may carry an ADR-style `status` such as `proposed` or `accepted`; this status is decision metadata, not task workflow state.
 
 ## Naming model
 
@@ -272,14 +272,23 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 
 ### Decision document fields
 
-Decision documents are first-class v0 documents. They live in `.tandem/board/` and capture durable project, product, or architecture choices. They do not need a lifecycle field in v0.
+Decision documents are first-class v0 documents. They live in `.tandem/board/` and capture durable project, product, or architecture choices. They do not need a workflow lifecycle `state` field in v0. ADR-style `status` is decision metadata and must remain distinct from task workflow state.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
 | `id` | yes | error | Canonical ID. New decision IDs are sequential, e.g. `decision-1`. |
 | `type` | yes | error | Must be `decision`. |
 | `title` | yes | error | Display title. |
+| `status` | no | warning if unrecognized | ADR-style decision status. Suggested values: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`. Not a workflow state. New CLI-created decisions default to `proposed`. |
+| `date` | no | warning if malformed | ADR decision date, usually `YYYY-MM-DD`. New CLI-created decisions default to the current UTC date. |
+| `deciders` | no | warning if malformed | Array of humans/agents responsible for the decision. |
+| `context` | no | none | Brief ADR context summary; longer context may live in the Markdown body. |
+| `consequences` | no | warning if malformed | Array of consequence summaries. Longer discussion may live in the Markdown body. |
+| `alternatives` | no | warning if malformed | Array of considered alternatives. |
+| `supersedes` | no | warning if unresolved | Decision IDs this decision supersedes. |
+| `supersededBy` | no | warning if unresolved | Decision IDs that supersede this decision. |
 | `references` | no | warning if unresolved | Related Tandem document IDs. |
+| `tags` | no | error if malformed | Array of strings. |
 | `createdAt` | no | warning if malformed | Timestamp for creation. |
 | `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
 
@@ -562,6 +571,18 @@ Example:
 id: decision-1
 type: decision
 title: Use accord vocabulary for work agreements
+status: accepted
+date: 2026-06-26
+deciders:
+  - ivan
+context: Brainfile's contract term feels legalistic for Tandem's collaborative workflow.
+alternatives:
+  - Keep contract vocabulary
+  - Use assignment only
+consequences:
+  - Work-agreement metadata uses `accord` consistently.
+supersedes: []
+supersededBy: []
 createdAt: 2026-06-26T12:00:00Z
 updatedAt: 2026-06-26T12:10:00Z
 references:
@@ -572,12 +593,21 @@ references:
 
 Use `accord` for the collaborative work-agreement object.
 
-## Rationale
+## Context
+
+Brainfile's `contract` term is technically clear but feels legalistic and one-sided for Tandem.
+
+## Alternatives considered
+
+- Keep `contract` vocabulary.
+- Use assignment metadata without a named work-agreement object.
+
+## Consequences
 
 The term is less legalistic than Brainfile's contract terminology and better matches Tandem's collaborative tone.
 ```
 
-Required v0 decision fields are `id`, `type: decision`, and `title`. Decision documents do not need a lifecycle field in v0; their durable decision content lives in frontmatter metadata plus the Markdown body.
+Required v0 decision fields are `id`, `type: decision`, and `title`. Decision documents do not need a workflow lifecycle `state` in v0. Their durable decision content lives in frontmatter metadata plus the Markdown body. `status`, `date`, `deciders`, `context`, `consequences`, `alternatives`, `supersedes`, and `supersededBy` are the recommended ADR-compatible fields; `status` is not task workflow state.
 
 ## Accord model
 
@@ -909,12 +939,12 @@ Task ID allocation chooses the next available positive integer after scanning ex
 
 | Aspect | Semantics |
 | --- | --- |
-| Required inputs | `title`; optional body/decision text, `references`, `createdAt`/`updatedAt` override only for trusted bulk-authoring tooling outside normal v0 commands. |
-| Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and related reference validation. |
+| Required inputs | `title`; optional body/decision text, ADR `status`, `date`, repeated `deciders`, `context`, repeated `consequences`, repeated `alternatives`, repeated `supersedes`, repeated `supersededBy`, `references`, tags, and `createdAt`/`updatedAt` override only for trusted bulk-authoring tooling outside normal v0 commands. |
+| Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and related reference/supersession validation. |
 | Files written | New `.tandem/board/decision-N*.md`; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if workspace is invalid or generated ID would duplicate. Warn for unresolved `references` or malformed optional timestamps. No decision lifecycle field is required or written in v0. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, or a requested decision `status` is outside the recommended ADR values. Warn for unresolved `references`, unresolved/mis-typed `supersedes`/`supersededBy`, or malformed optional timestamps/arrays. No decision workflow `state` field is required or written in v0. |
 | Event | `decision.created`. |
-| Resulting state | New decision document in `.tandem/board/` with `id: decision-N`, `type: decision`, `title`, `createdAt`, `updatedAt`, and Markdown body. |
+| Resulting state | New decision document in `.tandem/board/` with `id: decision-N`, `type: decision`, `title`, ADR metadata (`status` defaulting to `proposed` and `date` defaulting to the current UTC date for CLI-created decisions), `createdAt`, `updatedAt`, and Markdown body. |
 
 Decision ID allocation chooses the next available positive integer after scanning existing decision IDs in both board and logs.
 

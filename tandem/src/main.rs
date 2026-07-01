@@ -30,6 +30,13 @@ const REVIEW_STATUSES: &[&str] = &[
     "changes-requested",
     "rejected",
 ];
+const DECISION_STATUSES: &[&str] = &[
+    "proposed",
+    "accepted",
+    "rejected",
+    "deprecated",
+    "superseded",
+];
 const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
 const TASK_KINDS: &[&str] = &["epic"];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
@@ -333,7 +340,7 @@ fn print_help() {
     println!("  tandem log list|show|search ...");
     println!("  tandem accord ready|claim|deliver|accept|rework|block|fail ...");
     println!("  tandem rules list|add|edit|delete ...");
-    println!("  tandem decision list|show|add ...");
+    println!("  tandem decision list|show|add ... [--status <status>] [--date <date>]");
     println!("  tandem tui");
     println!("  tandem version");
     println!("  tandem --version");
@@ -1595,6 +1602,14 @@ fn cmd_decision(args: &[String]) -> Result<(), CliError> {
 struct DecisionAddOptions {
     title: Option<String>,
     body: Option<String>,
+    status: Option<String>,
+    date: Option<String>,
+    deciders: Vec<String>,
+    context: Option<String>,
+    consequences: Vec<String>,
+    alternatives: Vec<String>,
+    supersedes: Vec<String>,
+    superseded_by: Vec<String>,
     references: Vec<String>,
     tags: Vec<String>,
 }
@@ -1611,6 +1626,48 @@ fn parse_decision_add_args(args: &[String]) -> Result<DecisionAddOptions, CliErr
             "--body" => {
                 index += 1;
                 options.body = Some(required_value(args, index, "--body")?.to_string());
+            }
+            "--status" => {
+                index += 1;
+                options.status = Some(required_value(args, index, "--status")?.to_string());
+            }
+            "--date" => {
+                index += 1;
+                options.date = Some(required_value(args, index, "--date")?.to_string());
+            }
+            "--decider" => {
+                index += 1;
+                options
+                    .deciders
+                    .push(required_value(args, index, "--decider")?.to_string());
+            }
+            "--context" => {
+                index += 1;
+                options.context = Some(required_value(args, index, "--context")?.to_string());
+            }
+            "--consequence" => {
+                index += 1;
+                options
+                    .consequences
+                    .push(required_value(args, index, "--consequence")?.to_string());
+            }
+            "--alternative" => {
+                index += 1;
+                options
+                    .alternatives
+                    .push(required_value(args, index, "--alternative")?.to_string());
+            }
+            "--supersedes" => {
+                index += 1;
+                options
+                    .supersedes
+                    .push(required_value(args, index, "--supersedes")?.to_string());
+            }
+            "--superseded-by" => {
+                index += 1;
+                options
+                    .superseded_by
+                    .push(required_value(args, index, "--superseded-by")?.to_string());
             }
             "--reference" => {
                 index += 1;
@@ -1680,19 +1737,34 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
         options.title.as_deref(),
         "decision add requires --title <title>",
     )?;
-    for reference in &options.references {
-        require_existing_document(&workspace, reference, "reference")?;
-    }
+    let status = options.status.as_deref().unwrap_or("proposed");
+    validate_decision_status(status)?;
+    validate_decision_add_options(&options)?;
+    let warnings = decision_add_warnings(&workspace, &options)?;
 
     let decision_id = next_sequential_id(&workspace, "decision")?;
     let now = current_timestamp();
+    let date = match options.date.as_deref() {
+        Some(date) => {
+            require_nonempty(Some(date), "decision add --date must not be empty")?.to_string()
+        }
+        None => date_from_timestamp(&now),
+    };
     let decision_path = workspace.board_dir.join(format!("{decision_id}.md"));
     let mut lines = vec![
         "---".to_string(),
         format!("id: {decision_id}"),
         "type: decision".to_string(),
         format!("title: {}", yaml_double_quote(title)),
+        format!("status: {}", yaml_double_quote(status)),
+        format!("date: {}", yaml_double_quote(&date)),
     ];
+    push_array_line(&mut lines, "deciders", &options.deciders);
+    push_optional_line(&mut lines, "context", options.context.as_deref());
+    push_array_line(&mut lines, "consequences", &options.consequences);
+    push_array_line(&mut lines, "alternatives", &options.alternatives);
+    push_array_line(&mut lines, "supersedes", &options.supersedes);
+    push_array_line(&mut lines, "supersededBy", &options.superseded_by);
     push_array_line(&mut lines, "references", &options.references);
     push_array_line(&mut lines, "tags", &options.tags);
     lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
@@ -1706,10 +1778,86 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
     write_atomic(&decision_path, &lines.join("\n"))?;
     append_event(&workspace, "decision.created", &decision_id, title)?;
 
+    for warning in warnings {
+        println!("Warning: {warning}");
+    }
     println!("Created decision");
-    println!("ID:    {decision_id}");
-    println!("Title: {title}");
-    println!("Path:  {}", display_path(&decision_path));
+    println!("ID:     {decision_id}");
+    println!("Status: {status}");
+    println!("Date:   {date}");
+    println!("Title:  {title}");
+    println!("Path:   {}", display_path(&decision_path));
+    Ok(())
+}
+
+fn validate_decision_add_options(options: &DecisionAddOptions) -> Result<(), CliError> {
+    if let Some(context) = options.context.as_deref() {
+        require_nonempty(Some(context), "decision add --context must not be empty")?;
+    }
+    for (flag, values) in [
+        ("--decider", &options.deciders),
+        ("--consequence", &options.consequences),
+        ("--alternative", &options.alternatives),
+        ("--supersedes", &options.supersedes),
+        ("--superseded-by", &options.superseded_by),
+        ("--reference", &options.references),
+        ("--tag", &options.tags),
+    ] {
+        for value in values {
+            require_nonempty(
+                Some(value),
+                &format!("decision add {flag} must not be empty"),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_decision_status(status: &str) -> Result<(), CliError> {
+    let status = require_nonempty(Some(status), "decision add --status must not be empty")?;
+    if DECISION_STATUSES.contains(&status) {
+        Ok(())
+    } else {
+        Err(CliError::user(format!(
+            "Validation failed: invalid decision status `{status}`; expected one of: {}",
+            DECISION_STATUSES.join(", ")
+        )))
+    }
+}
+
+fn decision_add_warnings(
+    workspace: &Workspace,
+    options: &DecisionAddOptions,
+) -> Result<Vec<String>, CliError> {
+    let mut warnings = Vec::new();
+    for reference in &options.references {
+        if !document_exists(workspace, reference)? {
+            warnings.push(format!("reference not found: {reference}"));
+        }
+    }
+    for target in &options.supersedes {
+        push_decision_reference_warning(workspace, &mut warnings, "supersedes", target)?;
+    }
+    for target in &options.superseded_by {
+        push_decision_reference_warning(workspace, &mut warnings, "supersededBy", target)?;
+    }
+    Ok(warnings)
+}
+
+fn push_decision_reference_warning(
+    workspace: &Workspace,
+    warnings: &mut Vec<String>,
+    field: &str,
+    id: &str,
+) -> Result<(), CliError> {
+    match find_document(workspace, id)? {
+        Some(doc) if doc.doc_type() == "decision" => {}
+        Some(doc) => warnings.push(format!(
+            "{field} target {id} is type {}, not decision",
+            doc.doc_type()
+        )),
+        None => warnings.push(format!("{field} decision not found: {id}")),
+    }
     Ok(())
 }
 
@@ -2530,6 +2678,42 @@ fn completion_files_changed(doc: &Document) -> Vec<String> {
         .unwrap_or_default()
 }
 
+fn decision_status(doc: &Document) -> Option<&str> {
+    doc.field("status")
+}
+
+fn decision_date(doc: &Document) -> Option<&str> {
+    doc.field("date")
+}
+
+fn decision_context(doc: &Document) -> Option<&str> {
+    doc.field("context")
+}
+
+fn decision_deciders(doc: &Document) -> Vec<String> {
+    decision_values(doc, "deciders")
+}
+
+fn decision_consequences(doc: &Document) -> Vec<String> {
+    decision_values(doc, "consequences")
+}
+
+fn decision_alternatives(doc: &Document) -> Vec<String> {
+    decision_values(doc, "alternatives")
+}
+
+fn decision_supersedes(doc: &Document) -> Vec<String> {
+    decision_values(doc, "supersedes")
+}
+
+fn decision_superseded_by(doc: &Document) -> Vec<String> {
+    decision_values(doc, "supersededBy")
+}
+
+fn decision_values(doc: &Document, key: &str) -> Vec<String> {
+    doc.field(key).map(parse_field_values).unwrap_or_default()
+}
+
 fn validate_task_document_for_mutation(
     workspace: &Workspace,
     doc: &Document,
@@ -2876,6 +3060,41 @@ fn print_document_warnings(docs: &[Document]) {
     }
 }
 
+fn print_decision_metadata(doc: &Document) {
+    if let Some(status) = decision_status(doc) {
+        println!("Status:    {status}");
+    }
+    if let Some(date) = decision_date(doc) {
+        println!("Date:      {date}");
+    }
+    print_metadata_values("Deciders", decision_deciders(doc));
+    if let Some(context) = decision_context(doc) {
+        println!("Context:   {context}");
+    }
+    print_metadata_values("Consequences", decision_consequences(doc));
+    print_metadata_values("Alternatives", decision_alternatives(doc));
+    print_metadata_values("Supersedes", decision_supersedes(doc));
+    print_metadata_values("Superseded by", decision_superseded_by(doc));
+    print_metadata_values(
+        "References",
+        doc.field("references")
+            .map(parse_field_values)
+            .unwrap_or_default(),
+    );
+    print_metadata_values(
+        "Tags",
+        doc.field("tags")
+            .map(parse_field_values)
+            .unwrap_or_default(),
+    );
+}
+
+fn print_metadata_values(label: &str, values: Vec<String>) {
+    if !values.is_empty() {
+        println!("{label}: {}", values.join(", "));
+    }
+}
+
 fn print_show(doc: &Document) {
     println!("ID:        {}", doc.id());
     println!("Type:      {}", doc.doc_type());
@@ -2883,6 +3102,9 @@ fn print_show(doc: &Document) {
         println!("Kind:      {kind}");
     }
     println!("Title:     {}", doc.title());
+    if doc.doc_type() == "decision" {
+        print_decision_metadata(doc);
+    }
     if let Some(state) = doc.field("state") {
         println!("State:     {state}");
     }
@@ -3040,13 +3262,18 @@ fn print_decision_table(docs: &[Document]) {
         println!("No Tandem decisions found.");
         return;
     }
-    println!("{:<14} {:<42} {:<24} SUMMARY", "ID", "TITLE", "REFERENCES");
+    println!(
+        "{:<14} {:<12} {:<10} {:<34} {:<20} SUMMARY",
+        "ID", "STATUS", "DATE", "TITLE", "REFERENCES"
+    );
     for doc in docs {
         println!(
-            "{:<14} {:<42} {:<24} {}",
+            "{:<14} {:<12} {:<10} {:<34} {:<20} {}",
             truncate(doc.id(), 14),
-            truncate(doc.title(), 42),
-            truncate(doc.field("references").unwrap_or("-"), 24),
+            truncate(decision_status(doc).unwrap_or("-"), 12),
+            truncate(decision_date(doc).unwrap_or("-"), 10),
+            truncate(doc.title(), 34),
+            truncate(doc.field("references").unwrap_or("-"), 20),
             truncate(&first_body_line(doc), 80)
         );
     }
@@ -3647,10 +3874,17 @@ fn decision_list_json(docs: &[Document]) -> String {
             push_json_field(&mut fields, "id", doc.id());
             push_json_field(&mut fields, "type", doc.doc_type());
             push_json_field(&mut fields, "title", doc.title());
+            push_decision_metadata_json_fields(&mut fields, doc);
             fields.push(format!(
                 "\"references\":{}",
                 json_array_strings(&references)
             ));
+            if let Some(tags) = doc.field("tags") {
+                fields.push(format!(
+                    "\"tags\":{}",
+                    json_array_strings(&parse_field_values(tags))
+                ));
+            }
             push_json_field(&mut fields, "summary", &first_body_line(doc));
             format!("{{{}}}", fields.join(","))
         })
@@ -3667,6 +3901,7 @@ fn decision_show_json(doc: &Document) -> String {
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "type", doc.doc_type());
     push_json_field(&mut fields, "title", doc.title());
+    push_decision_metadata_json_fields(&mut fields, doc);
     let references = doc
         .field("references")
         .map(parse_field_values)
@@ -3713,6 +3948,9 @@ fn document_summary_json(doc: &Document) -> String {
             json_array_strings(&parse_field_values(tags))
         ));
     }
+    if doc.doc_type() == "decision" {
+        push_decision_metadata_json_fields(&mut fields, doc);
+    }
     push_status_object_json(&mut fields, "accord", accord_status(doc));
     push_status_object_json(&mut fields, "review", review_status(doc));
     format!("{{{}}}", fields.join(","))
@@ -3744,6 +3982,9 @@ fn document_detail_json(doc: &Document) -> String {
                 json_array_strings(&parse_field_values(value))
             ));
         }
+    }
+    if doc.doc_type() == "decision" {
+        push_decision_metadata_json_fields(&mut fields, doc);
     }
     push_status_object_json(&mut fields, "accord", accord_status(doc));
     push_status_object_json(&mut fields, "review", review_status(doc));
@@ -3780,6 +4021,27 @@ fn push_optional_json_field(fields: &mut Vec<String>, key: &str, value: Option<&
     if let Some(value) = value {
         push_json_field(fields, key, value);
     }
+}
+
+fn push_optional_json_array_field(fields: &mut Vec<String>, key: &str, values: Vec<String>) {
+    if !values.is_empty() {
+        fields.push(format!(
+            "{}:{}",
+            json_string(key),
+            json_array_strings(&values)
+        ));
+    }
+}
+
+fn push_decision_metadata_json_fields(fields: &mut Vec<String>, doc: &Document) {
+    push_optional_json_field(fields, "status", decision_status(doc));
+    push_optional_json_field(fields, "date", decision_date(doc));
+    push_optional_json_field(fields, "context", decision_context(doc));
+    push_optional_json_array_field(fields, "deciders", decision_deciders(doc));
+    push_optional_json_array_field(fields, "consequences", decision_consequences(doc));
+    push_optional_json_array_field(fields, "alternatives", decision_alternatives(doc));
+    push_optional_json_array_field(fields, "supersedes", decision_supersedes(doc));
+    push_optional_json_array_field(fields, "supersededBy", decision_superseded_by(doc));
 }
 
 fn json_array_strings(values: &[String]) -> String {
@@ -4172,6 +4434,10 @@ fn current_timestamp() -> String {
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0);
     format_unix_seconds(seconds)
+}
+
+fn date_from_timestamp(timestamp: &str) -> String {
+    timestamp.chars().take(10).collect()
 }
 
 fn format_unix_seconds(seconds: i64) -> String {
@@ -4713,6 +4979,95 @@ rules:
         )
         .unwrap_err();
         assert!(error.message.contains("invalid kind `feature`"));
+    }
+
+    #[test]
+    fn decision_metadata_is_status_not_workflow_state() {
+        let doc = Document {
+            path: PathBuf::from("decision-1.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: decision-1\ntype: decision\ntitle: Choose cache\nstatus: accepted\ndate: 2026-07-01\ndeciders: [ivan, pi]\ncontext: Need a cache policy\nconsequences: [Faster reads]\nalternatives: [No cache]\nsupersedes: [decision-0]\nsupersededBy: [decision-2]\n",
+            )
+            .unwrap(),
+            body: "## Decision\nUse the small cache.\n".to_string(),
+        };
+
+        let detail = document_detail_json(&doc);
+        assert!(detail.contains("\"status\":\"accepted\""));
+        assert!(detail.contains("\"date\":\"2026-07-01\""));
+        assert!(detail.contains("\"deciders\":[\"ivan\",\"pi\"]"));
+        assert!(detail.contains("\"supersededBy\":[\"decision-2\"]"));
+        assert!(!detail.contains("\"state\""));
+
+        let filtered = filter_documents(
+            vec![doc],
+            &ListOptions {
+                state: Some("accepted".to_string()),
+                ..ListOptions::default()
+            },
+        );
+        assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn decision_status_validation_rejects_workflow_states() {
+        assert!(validate_decision_status("accepted").is_ok());
+        let error = validate_decision_status("todo").unwrap_err();
+        assert!(error.message.contains("invalid decision status `todo`"));
+        assert!(error.message.contains("proposed, accepted, rejected"));
+    }
+
+    #[test]
+    fn decision_add_reference_and_supersession_diagnostics_are_warnings() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-decision-warnings-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(&workspace.config_path, "---\nstates: [todo]\n---\n").unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Task\nstate: todo\n---\n",
+        )
+        .unwrap();
+
+        let warnings = decision_add_warnings(
+            &workspace,
+            &DecisionAddOptions {
+                references: vec!["missing-ref".to_string()],
+                supersedes: vec!["task-1".to_string()],
+                superseded_by: vec!["missing-decision".to_string()],
+                ..DecisionAddOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            warnings,
+            vec![
+                "reference not found: missing-ref".to_string(),
+                "supersedes target task-1 is type task, not decision".to_string(),
+                "supersededBy decision not found: missing-decision".to_string(),
+            ]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn date_from_timestamp_uses_utc_calendar_date() {
+        assert_eq!(date_from_timestamp("2026-07-01T18:05:47Z"), "2026-07-01");
     }
 
     #[test]

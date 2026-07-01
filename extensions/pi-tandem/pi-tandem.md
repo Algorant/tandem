@@ -27,7 +27,7 @@ Example tool pattern:
 
 ```text
 tandem_task action=add title="Ship relationship UI" relatedFiles=["tandem/src/tui.rs"] subtasks=["Define display", "Review copy"]
-tandem_decision action=add title="Relationship display policy" references=["task-1"]
+tandem_decision action=add title="Relationship display policy" status="accepted" deciders=["ivan"] references=["task-1"]
 tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"] subtasks=["Show parent", "Show blockers", "Show references"]
 ```
 
