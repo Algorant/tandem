@@ -4110,8 +4110,7 @@ fn board_item_lines_for_doc(
 ) -> Vec<Line<'static>> {
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in the detail pane. Add chips here only when they change the next
-    // action or scan priority. The active theme controls whether badges use a muted fill,
-    // accent rail, text label, ghost chip, or legacy solid block.
+    // action or scan priority. Chips use fixed saturated filled rendering as visual scan signals.
     let priority = doc.field("priority").unwrap_or("-");
     let mut chips: Vec<(String, Style)> = Vec::new();
     if let Some(priority_chip) = priority_chip(priority, theme) {
@@ -6185,9 +6184,13 @@ mod tests {
         assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
 
         write_task_doc(&workspace, "task-2", "Task two", "todo");
-        let outcome = app.reload();
+        app.reload();
 
-        assert_eq!(outcome.warning_count, 0);
+        assert!(
+            app.load_errors.is_empty(),
+            "unexpected document reload warnings: {:?}",
+            app.load_errors
+        );
         assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
         assert_eq!(
             app.states.get(app.selected_state).map(String::as_str),

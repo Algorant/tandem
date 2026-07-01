@@ -30,21 +30,10 @@ The TUI includes built-in themes and can load user TOML themes from `~/.config/t
 ```toml
 theme = "verdigris"
 transparent_background = true
-badge_style = "muted"
 ```
 
 Use workspace `.tandem/theme.toml` only when a project should override the user's global preference.
 
 Set `transparent_background = true` in a user theme, user config, or workspace `.tandem/theme.toml` to let the terminal default/transparent background show through for app and panel fills where practical. The default is `false`, so omitted themes preserve opaque rendering.
 
-Set `badge_style` to control Board priority/status/tag chips. The default, `muted`, keeps the compact badge shape with a softer fill for transparent and image-backed terminals. Other options are:
-
-```toml
-badge_style = "muted" # muted chip, default
-badge_style = "accent"  # small colored rail plus label
-badge_style = "text"    # colored label, no chip fill
-badge_style = "ghost"   # outlined/chip text with transparent fill
-badge_style = "solid"        # legacy saturated filled block
-```
-
-The same key can also be written as `[badges] style = "ghost"` in user themes, user config, or `.tandem/theme.toml`.
+Board priority/status/tag chips use fixed saturated filled badge rendering; badge style is not configurable.

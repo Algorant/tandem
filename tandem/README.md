@@ -79,7 +79,6 @@ Use the user config for your normal machine-wide preference:
 ```toml
 theme = "verdigris"
 transparent_background = true
-badge_style = "muted"
 ```
 
 Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user/workspace config may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names) and supported root settings:
@@ -111,7 +110,7 @@ accent = "#8ec07c"
 
 Supported built-in presets are `default-dark` (conservative dark/default) and `verdigris` (repo default here). Supported keys:
 
-- root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`), `badge_style` (optional; default `muted`) or `[badges] style`
+- root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`)
 - `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
@@ -121,7 +120,7 @@ In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`
 
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
 
-`badge_style` controls Board priority/status/tag chips: `muted` (default softened fill), `accent` (small colored rail), `text` (colored label), `ghost` (transparent chip outline), or `solid` (legacy saturated fill).
+Board priority/status/tag chips use fixed saturated filled badge rendering.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 
