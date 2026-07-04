@@ -26,6 +26,24 @@ Upstream references:
 - Node.js release policy: <https://nodejs.org/en/about/previous-releases>
 - Bun GitHub Actions docs, if a future migration is chosen: <https://bun.com/docs/guides/runtime/cicd>
 
+## Gruvbox theme workaround
+
+The Starlight themes catalog lists Starlight Gruvbox as a community theme, and its install guide recommends installing `starlight-theme-gruvbox` and adding `plugins: [gruvbox()]` to the Starlight config. As of `starlight-theme-gruvbox@2.0.0`, the package itself is not compatible with this docs site's dependency stack: it declares peer dependencies on Astro `^6.0.0` and Starlight `^0.38.0`, while this site intentionally uses Astro `^7.0.3` and Starlight `^0.41.1`.
+
+To keep Astro 7 and Starlight 0.41, the site vendors only the theme assets that are compatible with current Starlight APIs:
+
+- `site/src/styles/gruvbox.css` sets Starlight CSS variables via `customCss`.
+- `site/src/styles/shiki/gruvbox-*-medium.jsonc` provides the Gruvbox Expressive Code themes via `ExpressiveCodeTheme.fromJSONString(...)`.
+- `site/src/styles/shiki/starlight-theme-gruvbox.LICENSE` preserves the upstream MIT license for the adapted assets.
+
+Do not add the incompatible `starlight-theme-gruvbox` package or downgrade Astro/Starlight unless that trade-off is explicitly approved. If the upstream theme publishes Astro 7-compatible peer ranges later, this vendored workaround can be replaced with the package integration.
+
+Relevant theme references:
+
+- Starlight themes catalog: <https://starlight.astro.build/resources/themes/>
+- Starlight Gruvbox install guide: <https://starlight-theme-gruvbox.otterlord.dev/guides/install/>
+- Theme package/repository: <https://github.com/TheOtterlord/starlight-theme-gruvbox>
+
 ## Install dependencies
 
 From the repository root with Node.js 24 active (see `site/.node-version`):

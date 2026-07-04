@@ -6,19 +6,19 @@ set positional-arguments
 dev:
 	cargo run --manifest-path tandem/Cargo.toml -- tui
 
-# Verify the local docs runtime matches site/.node-version and Astro's Node floor.
+# Verify the local docs runtime satisfies site/.node-version and Astro's Node floor.
 _check-docs-node:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	expected="$(tr -d '[:space:]' < site/.node-version)"
+	minimum="$(tr -d '[:space:]' < site/.node-version)"
 	node -e '
-		const expected = process.argv[1];
+		const minimum = Number(process.argv[1]);
 		const [major, minor] = process.versions.node.split(".").map(Number);
-		if (String(major) !== expected || (major === 22 && minor < 12)) {
-			console.error(`Docs site expects Node ${expected}.x from site/.node-version (Astro requires >=22.12.0); found ${process.version}.`);
+		if (major < minimum || (major === 22 && minor < 12)) {
+			console.error(`Docs site expects Node ${minimum}.x or newer from site/.node-version (Astro requires >=22.12.0); found ${process.version}.`);
 			process.exit(1);
 		}
-	' "$expected"
+	' "$minimum"
 
 # Start the local documentation site with Astro Starlight.
 # The npm dev script syncs ../docs/ into Starlight before serving.
