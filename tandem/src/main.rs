@@ -3,6 +3,7 @@ use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::{Yaml, YamlLoader};
@@ -40,6 +41,9 @@ const DECISION_STATUSES: &[&str] = &[
 const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
 const TASK_KINDS: &[&str] = &["epic"];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
+const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
+
+static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
@@ -164,6 +168,16 @@ struct AddOptions {
     references: Vec<String>,
     related_files: Vec<String>,
     subtasks: Vec<String>,
+}
+
+#[derive(Debug)]
+struct AddOutcome {
+    id: String,
+    state: String,
+    title: String,
+    kind: Option<String>,
+    path: PathBuf,
+    warnings: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -1060,78 +1074,98 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
 
 fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let title = require_nonempty(options.title.as_deref(), "add requires --title <title>")?;
-    let state = options.state.as_deref().unwrap_or("todo");
-    validate_state(&workspace, state)?;
+    let outcome = add_task(&workspace, options)?;
+
+    for warning in outcome.warnings {
+        println!("Warning: {warning}");
+    }
+    println!("Created task");
+    println!("ID:    {}", outcome.id);
+    println!("State: {}", outcome.state);
+    if let Some(kind) = outcome.kind.as_deref() {
+        println!("Kind:  {kind}");
+    }
+    println!("Title: {}", outcome.title);
+    println!("Path:  {}", display_path(&outcome.path));
+    Ok(())
+}
+
+fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, CliError> {
+    let title =
+        require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
+    let state = options.state.as_deref().unwrap_or("todo").to_string();
+    validate_state(workspace, &state)?;
     validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
+    let kind = options
+        .kind
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
 
     if let Some(parent) = options.parent.as_deref() {
-        require_existing_document(&workspace, parent, "parent")?;
+        require_existing_document(workspace, parent, "parent")?;
     }
     for blocker in &options.blockers {
-        require_existing_document(&workspace, blocker, "blocker")?;
+        require_existing_document(workspace, blocker, "blocker")?;
     }
 
     let mut warnings = Vec::new();
     for reference in &options.references {
-        if !document_exists(&workspace, reference)? {
+        if !document_exists(workspace, reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
 
-    let task_id = next_sequential_id(&workspace, "task")?;
     let now = current_timestamp();
-    let task_path = workspace.board_dir.join(format!("{task_id}.md"));
-    let mut lines = vec![
-        "---".to_string(),
-        format!("id: {task_id}"),
-        "type: task".to_string(),
-    ];
-    push_optional_line(&mut lines, "kind", options.kind.as_deref());
-    lines.push(format!("title: {}", yaml_double_quote(title)));
-    lines.push(format!("state: {state}"));
-    push_optional_line(&mut lines, "priority", options.priority.as_deref());
-    push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
-    push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
-    push_optional_line(&mut lines, "parentId", options.parent.as_deref());
-    push_array_line(&mut lines, "blockers", &options.blockers);
-    push_array_line(&mut lines, "references", &options.references);
-    push_array_line(&mut lines, "relatedFiles", &options.related_files);
-    push_array_line(&mut lines, "tags", &options.tags);
-    lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
-    lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-    if !options.subtasks.is_empty() {
-        lines.push("subtasks:".to_string());
-        for (index, subtask) in options.subtasks.iter().enumerate() {
-            let subtask_id = format!("{task_id}-{}", index + 1);
-            lines.push(format!("  - id: {subtask_id}"));
-            lines.push(format!("    title: {}", yaml_double_quote(subtask)));
-            lines.push("    completed: false".to_string());
+    let created = create_new_sequential_document(workspace, "task", |task_id| {
+        let mut lines = vec![
+            "---".to_string(),
+            format!("id: {task_id}"),
+            "type: task".to_string(),
+        ];
+        push_optional_line(&mut lines, "kind", kind.as_deref());
+        lines.push(format!("title: {}", yaml_double_quote(&title)));
+        lines.push(format!("state: {state}"));
+        push_optional_line(&mut lines, "priority", options.priority.as_deref());
+        push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
+        push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
+        push_optional_line(&mut lines, "parentId", options.parent.as_deref());
+        push_array_line(&mut lines, "blockers", &options.blockers);
+        push_array_line(&mut lines, "references", &options.references);
+        push_array_line(&mut lines, "relatedFiles", &options.related_files);
+        push_array_line(&mut lines, "tags", &options.tags);
+        lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+        lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+        if !options.subtasks.is_empty() {
+            lines.push("subtasks:".to_string());
+            for (index, subtask) in options.subtasks.iter().enumerate() {
+                let subtask_id = format!("{task_id}-{}", index + 1);
+                lines.push(format!("  - id: {subtask_id}"));
+                lines.push(format!("    title: {}", yaml_double_quote(subtask)));
+                lines.push("    completed: false".to_string());
+            }
         }
-    }
-    lines.push("---".to_string());
-    lines.push(String::new());
-    if let Some(description) = options.description.as_deref() {
-        lines.push("## Description".to_string());
+        lines.push("---".to_string());
         lines.push(String::new());
-        lines.push(description.to_string());
-    }
-    lines.push(String::new());
-    write_atomic(&task_path, &lines.join("\n"))?;
-    append_event(&workspace, "task.created", &task_id, title)?;
+        if let Some(description) = options.description.as_deref() {
+            lines.push("## Description".to_string());
+            lines.push(String::new());
+            lines.push(description.to_string());
+        }
+        lines.push(String::new());
+        lines.join("\n")
+    })?;
+    append_event(workspace, "task.created", &created.id, &title)?;
 
-    for warning in warnings {
-        println!("Warning: {warning}");
-    }
-    println!("Created task");
-    println!("ID:    {task_id}");
-    println!("State: {state}");
-    if let Some(kind) = options.kind.as_deref().map(str::trim) {
-        println!("Kind:  {kind}");
-    }
-    println!("Title: {title}");
-    println!("Path:  {}", display_path(&task_path));
-    Ok(())
+    Ok(AddOutcome {
+        id: created.id,
+        state,
+        title,
+        kind,
+        path: created.path,
+        warnings,
+    })
 }
 
 fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
@@ -1742,7 +1776,6 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
     validate_decision_add_options(&options)?;
     let warnings = decision_add_warnings(&workspace, &options)?;
 
-    let decision_id = next_sequential_id(&workspace, "decision")?;
     let now = current_timestamp();
     let date = match options.date.as_deref() {
         Some(date) => {
@@ -1750,43 +1783,44 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
         }
         None => date_from_timestamp(&now),
     };
-    let decision_path = workspace.board_dir.join(format!("{decision_id}.md"));
-    let mut lines = vec![
-        "---".to_string(),
-        format!("id: {decision_id}"),
-        "type: decision".to_string(),
-        format!("title: {}", yaml_double_quote(title)),
-        format!("status: {}", yaml_double_quote(status)),
-        format!("date: {}", yaml_double_quote(&date)),
-    ];
-    push_array_line(&mut lines, "deciders", &options.deciders);
-    push_optional_line(&mut lines, "context", options.context.as_deref());
-    push_array_line(&mut lines, "consequences", &options.consequences);
-    push_array_line(&mut lines, "alternatives", &options.alternatives);
-    push_array_line(&mut lines, "supersedes", &options.supersedes);
-    push_array_line(&mut lines, "supersededBy", &options.superseded_by);
-    push_array_line(&mut lines, "references", &options.references);
-    push_array_line(&mut lines, "tags", &options.tags);
-    lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
-    lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-    lines.push("---".to_string());
-    lines.push(String::new());
-    if let Some(body) = options.body.as_deref() {
-        lines.push(body.to_string());
-    }
-    lines.push(String::new());
-    write_atomic(&decision_path, &lines.join("\n"))?;
-    append_event(&workspace, "decision.created", &decision_id, title)?;
+    let created = create_new_sequential_document(&workspace, "decision", |decision_id| {
+        let mut lines = vec![
+            "---".to_string(),
+            format!("id: {decision_id}"),
+            "type: decision".to_string(),
+            format!("title: {}", yaml_double_quote(title)),
+            format!("status: {}", yaml_double_quote(status)),
+            format!("date: {}", yaml_double_quote(&date)),
+        ];
+        push_array_line(&mut lines, "deciders", &options.deciders);
+        push_optional_line(&mut lines, "context", options.context.as_deref());
+        push_array_line(&mut lines, "consequences", &options.consequences);
+        push_array_line(&mut lines, "alternatives", &options.alternatives);
+        push_array_line(&mut lines, "supersedes", &options.supersedes);
+        push_array_line(&mut lines, "supersededBy", &options.superseded_by);
+        push_array_line(&mut lines, "references", &options.references);
+        push_array_line(&mut lines, "tags", &options.tags);
+        lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+        lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+        lines.push("---".to_string());
+        lines.push(String::new());
+        if let Some(body) = options.body.as_deref() {
+            lines.push(body.to_string());
+        }
+        lines.push(String::new());
+        lines.join("\n")
+    })?;
+    append_event(&workspace, "decision.created", &created.id, title)?;
 
     for warning in warnings {
         println!("Warning: {warning}");
     }
     println!("Created decision");
-    println!("ID:     {decision_id}");
+    println!("ID:     {}", created.id);
     println!("Status: {status}");
     println!("Date:   {date}");
     println!("Title:  {title}");
-    println!("Path:   {}", display_path(&decision_path));
+    println!("Path:   {}", display_path(&created.path));
     Ok(())
 }
 
@@ -4132,7 +4166,44 @@ fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
     }
 }
 
-fn next_sequential_id(workspace: &Workspace, prefix: &str) -> Result<String, CliError> {
+#[derive(Debug)]
+struct CreatedDocument {
+    id: String,
+    path: PathBuf,
+}
+
+fn create_new_sequential_document<F>(
+    workspace: &Workspace,
+    prefix: &str,
+    mut content_for_id: F,
+) -> Result<CreatedDocument, CliError>
+where
+    F: FnMut(&str) -> String,
+{
+    let mut next_number = next_sequential_number(workspace, prefix)?
+        .checked_add(1)
+        .ok_or_else(|| {
+            CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
+        })?;
+
+    for _ in 0..MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS {
+        let id = format!("{prefix}-{next_number}");
+        let path = workspace.board_dir.join(format!("{id}.md"));
+        let content = content_for_id(&id);
+        if write_new_atomic(&path, &content)? {
+            return Ok(CreatedDocument { id, path });
+        }
+        next_number = next_number.checked_add(1).ok_or_else(|| {
+            CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
+        })?;
+    }
+
+    Err(CliError::user(format!(
+        "ID allocation failure: could not reserve a new {prefix} document after {MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS} attempts; concurrent writers may be too active, rerun the command"
+    )))
+}
+
+fn next_sequential_number(workspace: &Workspace, prefix: &str) -> Result<usize, CliError> {
     let mut max_number = 0usize;
     let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
     docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
@@ -4144,7 +4215,7 @@ fn next_sequential_id(workspace: &Workspace, prefix: &str) -> Result<String, Cli
             }
         }
     }
-    Ok(format!("{prefix}-{}", max_number + 1))
+    Ok(max_number)
 }
 
 fn patch_frontmatter_content(
@@ -4263,6 +4334,41 @@ fn file_signature(path: &Path) -> Result<FileSignature, CliError> {
 }
 
 fn write_atomic(path: &Path, content: &str) -> Result<(), CliError> {
+    let temp_path = write_temp_file_for(path, content)?;
+    if let Err(error) = fs::rename(&temp_path, path) {
+        let _ = fs::remove_file(&temp_path);
+        return Err(CliError::user(format!(
+            "Write failure: could not replace {}: {error}",
+            display_path(path)
+        )));
+    }
+    Ok(())
+}
+
+fn write_new_atomic(path: &Path, content: &str) -> Result<bool, CliError> {
+    // Hard-linking the fully written temp file reserves `path` without replacing
+    // an existing document, letting concurrent adders retry with the next ID.
+    let temp_path = write_temp_file_for(path, content)?;
+    match fs::hard_link(&temp_path, path) {
+        Ok(()) => {
+            let _ = fs::remove_file(&temp_path);
+            Ok(true)
+        }
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            let _ = fs::remove_file(&temp_path);
+            Ok(false)
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&temp_path);
+            Err(CliError::user(format!(
+                "Write failure: could not create {}: {error}",
+                display_path(path)
+            )))
+        }
+    }
+}
+
+fn write_temp_file_for(path: &Path, content: &str) -> Result<PathBuf, CliError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -4288,14 +4394,8 @@ fn write_atomic(path: &Path, content: &str) -> Result<(), CliError> {
             display_path(path)
         )));
     }
-    if let Err(error) = fs::rename(&temp_path, path) {
-        let _ = fs::remove_file(&temp_path);
-        return Err(CliError::user(format!(
-            "Write failure: could not replace {}: {error}",
-            display_path(path)
-        )));
-    }
-    Ok(())
+    drop(file);
+    Ok(temp_path)
 }
 
 fn temporary_path_for(path: &Path) -> PathBuf {
@@ -4303,14 +4403,16 @@ fn temporary_path_for(path: &Path) -> PathBuf {
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("document.md");
-    let millis = SystemTime::now()
+    let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis())
+        .map(|duration| duration.as_nanos())
         .unwrap_or(0);
+    let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
     path.with_file_name(format!(
-        ".{file_name}.tmp.{}.{}",
+        ".{file_name}.tmp.{}.{}.{}",
         std::process::id(),
-        millis
+        nanos,
+        counter
     ))
 }
 
@@ -4515,6 +4617,77 @@ mod tests {
             derive_workspace_title(Path::new("/")),
             DEFAULT_WORKSPACE_TITLE
         );
+    }
+
+    #[test]
+    fn concurrent_task_adds_allocate_unique_ids_without_overwrite() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-concurrent-add-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+
+        let thread_count = 8;
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(thread_count));
+        let handles = (0..thread_count)
+            .map(|index| {
+                let workspace = workspace.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    add_task(
+                        &workspace,
+                        AddOptions {
+                            title: Some(format!("Concurrent task {index}")),
+                            ..AddOptions::default()
+                        },
+                    )
+                    .unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let outcomes = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        let mut ids = outcomes
+            .iter()
+            .map(|outcome| outcome.id.clone())
+            .collect::<Vec<_>>();
+        ids.sort_by_key(|id| id.strip_prefix("task-").unwrap().parse::<usize>().unwrap());
+        assert_eq!(
+            ids,
+            (1..=thread_count)
+                .map(|number| format!("task-{number}"))
+                .collect::<Vec<_>>()
+        );
+
+        let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
+        assert_eq!(docs.len(), thread_count);
+        for outcome in outcomes {
+            let content = fs::read_to_string(outcome.path).unwrap();
+            assert!(content.contains(&format!("id: {}", outcome.id)));
+            assert!(content.contains(&outcome.title));
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -3868,21 +3868,20 @@ fn create_basic_task(
     }
     validate_state(workspace, state)?;
 
-    let task_id = next_sequential_id(workspace, "task")?;
     let now = current_timestamp();
-    let task_path = workspace.board_dir.join(format!("{task_id}.md"));
-    let content = format!(
-        "---\nid: {task_id}\ntype: task\ntitle: {}\nstate: {}\ncreatedAt: {}\nupdatedAt: {}\n---\n\n",
-        yaml_double_quote(title),
-        yaml_double_quote(state),
-        yaml_double_quote(&now),
-        yaml_double_quote(&now)
-    );
-    write_atomic(&task_path, &content)?;
-    append_event(workspace, "task.created", &task_id, title)?;
+    let created = create_new_sequential_document(workspace, "task", |task_id| {
+        format!(
+            "---\nid: {task_id}\ntype: task\ntitle: {}\nstate: {}\ncreatedAt: {}\nupdatedAt: {}\n---\n\n",
+            yaml_double_quote(title),
+            yaml_double_quote(state),
+            yaml_double_quote(&now),
+            yaml_double_quote(&now)
+        )
+    })?;
+    append_event(workspace, "task.created", &created.id, title)?;
 
     Ok(QuickAddOutcome {
-        id: task_id,
+        id: created.id,
         state: state.to_string(),
         title: title.to_string(),
     })

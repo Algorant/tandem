@@ -13,8 +13,8 @@ use super::{
     FocusPane, TuiApp,
 };
 use crate::{
-    append_event, current_timestamp, date_from_timestamp, display_path, next_sequential_id,
-    parse_field_values, write_atomic, yaml_double_quote, CliError, Document, Workspace,
+    append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
+    display_path, parse_field_values, yaml_double_quote, CliError, Document, Workspace,
 };
 
 #[derive(Debug, Default)]
@@ -895,31 +895,31 @@ fn create_basic_decision(
     body: &str,
 ) -> Result<DecisionMutationOutcome, CliError> {
     let title = require_decision_title(title)?;
-    let decision_id = next_sequential_id(workspace, "decision")?;
     let now = current_timestamp();
     let date = date_from_timestamp(&now);
-    let decision_path = workspace.board_dir.join(format!("{decision_id}.md"));
-    let mut lines = vec![
-        "---".to_string(),
-        format!("id: {decision_id}"),
-        "type: decision".to_string(),
-        format!("title: {}", yaml_double_quote(title)),
-        "status: \"proposed\"".to_string(),
-        format!("date: {}", yaml_double_quote(&date)),
-        format!("createdAt: {}", yaml_double_quote(&now)),
-        format!("updatedAt: {}", yaml_double_quote(&now)),
-        "---".to_string(),
-        String::new(),
-    ];
-    if !body.trim().is_empty() {
-        lines.push(body.trim().to_string());
-    }
-    lines.push(String::new());
-    write_atomic(&decision_path, &lines.join("\n"))?;
-    append_event(workspace, "decision.created", &decision_id, title)?;
+    let created = create_new_sequential_document(workspace, "decision", |decision_id| {
+        let mut lines = vec![
+            "---".to_string(),
+            format!("id: {decision_id}"),
+            "type: decision".to_string(),
+            format!("title: {}", yaml_double_quote(title)),
+            "status: \"proposed\"".to_string(),
+            format!("date: {}", yaml_double_quote(&date)),
+            format!("createdAt: {}", yaml_double_quote(&now)),
+            format!("updatedAt: {}", yaml_double_quote(&now)),
+            "---".to_string(),
+            String::new(),
+        ];
+        if !body.trim().is_empty() {
+            lines.push(body.trim().to_string());
+        }
+        lines.push(String::new());
+        lines.join("\n")
+    })?;
+    append_event(workspace, "decision.created", &created.id, title)?;
 
     Ok(DecisionMutationOutcome {
-        id: decision_id,
+        id: created.id,
         title: title.to_string(),
     })
 }
