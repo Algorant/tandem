@@ -35,6 +35,7 @@ export default defineConfig({
           label: 'Docs',
           items: [
             { label: 'Overview', link: '/' },
+            { label: 'Quickstart', link: '/quick-start/' },
             { label: 'Concepts', link: '/concepts/' },
             { label: 'Protocol', link: '/protocol/' },
             { label: 'CLI', link: '/cli/' },
