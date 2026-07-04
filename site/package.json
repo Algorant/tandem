@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.11",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
-    "predev": "npm run sync:docs",
+    "predev": "bun run sync:docs",
     "dev": "astro dev",
-    "prestart": "npm run sync:docs",
+    "prestart": "bun run sync:docs",
     "start": "astro dev",
-    "prebuild": "npm run sync:docs",
+    "prebuild": "bun run sync:docs",
     "build": "astro build",
     "preview": "astro preview",
     "sync:docs": "node scripts/sync-docs.mjs"

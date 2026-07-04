@@ -574,7 +574,7 @@ title: Use accord vocabulary for work agreements
 status: accepted
 date: 2026-06-26
 deciders:
-  - Ivan
+  - Algorant
   - Pi
 context: Brainfile's contract term feels legalistic for Tandem's collaborative workflow.
 alternatives:
@@ -711,7 +711,7 @@ The protocol should preserve the distinction between accord state and human work
 ```yaml
 review:
   status: pending     # not-ready | pending | accepted | changes-requested | rejected
-  reviewer: ivan
+  reviewer: Algorant
   requestedAt: 2026-06-26T13:00:00Z
   decidedAt: null
   notes: []
@@ -748,7 +748,7 @@ completion:
     commands:
       - command: cargo test
         status: passed
-  reviewer: ivan
+  reviewer: Algorant
 accord:
   status: accepted
 ```
@@ -791,10 +791,10 @@ V0 intentionally does not define typed per-event payload schemas. Consumers must
 Example per-actor events:
 
 ```jsonl
-{"ts":"2026-06-26T12:00:00Z","event":"task.created","id":"task-1","summary":"Created task: Implement Ratatui theme system","actor":"actor_01HV9ABC","seq":1,"actorName":"ivan"}
+{"ts":"2026-06-26T12:00:00Z","event":"task.created","id":"task-1","summary":"Created task: Implement Ratatui theme system","actor":"actor_01HV9ABC","seq":1,"actorName":"Algorant"}
 {"ts":"2026-06-26T12:05:00Z","event":"accord.claimed","id":"task-1","summary":"pi claimed the accord","actor":"actor_01HV9XYZ","seq":1,"actorName":"pi"}
 {"ts":"2026-06-26T13:30:00Z","event":"accord.delivered","id":"task-1","summary":"Initial implementation ready","actor":"actor_01HV9XYZ","seq":2}
-{"ts":"2026-06-26T15:00:00Z","event":"task.completed","id":"task-1","summary":"Completed and archived to logs","actor":"actor_01HV9ABC","seq":2,"actorName":"ivan"}
+{"ts":"2026-06-26T15:00:00Z","event":"task.completed","id":"task-1","summary":"Completed and archived to logs","actor":"actor_01HV9ABC","seq":2,"actorName":"Algorant"}
 ```
 
 Per-actor logs remove the shared Git file-level append hotspot. They do not eliminate semantic conflicts: two actors can still make conflicting task, accord, review, rule, or decision changes. Readers should preserve all actor events and may surface or detect contradictory histories; resolution UX and resolution-specific events are out of scope for the minimum per-actor event-log change.

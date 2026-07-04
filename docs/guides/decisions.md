@@ -19,7 +19,7 @@ type: decision
 title: Store completed work in logs
 status: accepted # proposed | accepted | superseded | deprecated | rejected
 date: 2026-07-01
-deciders: [Ivan, Pi]
+deciders: [Algorant, Pi]
 tags: [adr, protocol]
 references:
   - task-87

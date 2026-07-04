@@ -6,22 +6,22 @@ Canonical Markdown source lives in `../docs/`. The site project owns rendering, 
 
 ## Local workflow
 
-Use Node.js 24 (see `.node-version`) and npm. The GitHub Pages workflow also reads this version file and installs from `package-lock.json` with `npm ci`.
+Use Node.js 24 (see `.node-version`) and Bun for local dependency management and scripts.
 
 ```sh
-npm install
-npm run dev
-npm run build
+bun install
+bun run dev
+bun run build
 ```
 
-From the repository root, `just site` starts the dev server and `just site-build` mirrors CI with `npm ci && npm run build`.
+The docs-site package state is locked in `bun.lock`; use `bun install --frozen-lockfile` for reproducible validation.
 
 Useful scripts:
 
-- `npm run sync:docs` — copy canonical Markdown from `../docs/` into Starlight's content collection.
-- `npm run dev` — sync docs, then start Astro's local dev server.
-- `npm run build` — sync docs, then write static output to `dist/`.
-- `npm run preview` — preview the built `dist/` output locally.
+- `bun run sync:docs` — copy canonical Markdown from `../docs/` into Starlight's content collection.
+- `bun run dev` — sync docs, then start Astro's local dev server.
+- `bun run build` — sync docs, then write static output to `dist/`.
+- `bun run preview` — preview the built `dist/` output locally.
 
 Do not commit `node_modules/`, `.astro/`, `dist/`, or generated Markdown copies under `src/content/docs/`.
 ## GitHub Pages deployment

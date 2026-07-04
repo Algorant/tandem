@@ -6,42 +6,40 @@ set positional-arguments
 dev:
 	cargo run --manifest-path tandem/Cargo.toml -- tui
 
-# Verify the local docs runtime satisfies site/.node-version and Astro's Node floor.
+# Verify the local docs runtime satisfies Astro's Node floor.
 _check-docs-node:
 	#!/usr/bin/env bash
 	set -euo pipefail
-	minimum="$(tr -d '[:space:]' < site/.node-version)"
 	node -e '
-		const minimum = Number(process.argv[1]);
 		const [major, minor] = process.versions.node.split(".").map(Number);
-		if (major < minimum || (major === 22 && minor < 12)) {
-			console.error(`Docs site expects Node ${minimum}.x or newer from site/.node-version (Astro requires >=22.12.0); found ${process.version}.`);
+		if (major < 22 || (major === 22 && minor < 12)) {
+			console.error(`Docs site expects Node >=22.12.0 for Astro; found ${process.version}.`);
 			process.exit(1);
 		}
-	' "$minimum"
+	'
 
 # Start the local documentation site with Astro Starlight.
-# The npm dev script syncs ../docs/ into Starlight before serving.
+# The Bun dev script syncs ../docs/ into Starlight before serving.
 site: _check-docs-node
 	#!/usr/bin/env bash
 	set -euo pipefail
 	cd site
 	if [[ ! -d node_modules ]]; then
-		npm install
+		bun install
 	fi
-	npm run dev
+	bun run dev
 
 # Alias for the local documentation site.
 alias docs := site
 
 # Build the static documentation site output in site/dist/.
-# Mirrors the GitHub Pages workflow by installing from package-lock.json.
+# Mirrors the GitHub Pages workflow by installing from bun.lock.
 site-build: _check-docs-node
 	#!/usr/bin/env bash
 	set -euo pipefail
 	cd site
-	npm ci
-	npm run build
+	bun install --frozen-lockfile
+	bun run build
 
 # Bump tandem to VERSION, validate, commit, tag, push main + tag, and create a concise GitHub Release.
 # Usage: just release 0.2.1
@@ -104,9 +102,9 @@ release VERSION:
 	cargo run -- --version
 	cargo run -- version
 	cd ../site
-	npm ci
-	npm run build
-	npm audit --audit-level=high
+	bun install --frozen-lockfile
+	bun run build
+	bun audit --audit-level=high
 	cd ..
 	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts

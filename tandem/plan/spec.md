@@ -435,7 +435,7 @@ tandem log show <id> [--json]
       "summary": "Theme loader complete",
       "filesChanged": ["src/tui/theme.rs"],
       "validation": { "status": "passed", "summary": "cargo test passed" },
-      "reviewer": "ivan"
+      "reviewer": "Algorant"
     },
     "accord": { "status": "accepted" },
     "body": "## Description\nBuild the theme loader.",
@@ -661,7 +661,7 @@ tandem decision list [--json]
         "title": "Use styled-basic Markdown in v0",
         "status": "accepted",
         "date": "2026-06-26",
-        "deciders": ["ivan"],
+        "deciders": ["Algorant"],
         "context": "The TUI needs a deterministic v0 Markdown scope.",
         "consequences": ["Advanced Markdown blocks remain deferred."],
         "alternatives": ["Add a full Markdown renderer immediately."],
@@ -703,7 +703,7 @@ tandem decision show <id> [--json]
       "title": "Use styled-basic Markdown in v0",
       "status": "accepted",
       "date": "2026-06-26",
-      "deciders": ["ivan"],
+      "deciders": ["Algorant"],
       "context": "The TUI needs a deterministic v0 Markdown scope.",
       "consequences": ["Advanced Markdown blocks remain deferred."],
       "alternatives": ["Add a full Markdown renderer immediately."],
@@ -768,7 +768,7 @@ This keeps the MVP small while preserving room for richer rendering later.
 - Superseded by: none
 MD
 )
-tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider ivan --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --tag adr --body "$body"
+tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider Algorant --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --tag adr --body "$body"
 ```
 
 - Exit/error notes:
@@ -1308,7 +1308,7 @@ views:
   needs-review:
     query: "state:validation OR accord:delivered"
   mine:
-    query: "assignee:ivan OR assignee:pi"
+    query: "assignee:Algorant OR assignee:pi"
 ```
 
 ## Markdown rendering
@@ -1556,7 +1556,7 @@ Complete task-7?
 
 Summary: [ Theme system implemented and tested                    ]
 Validation: cargo test passed, cargo clippy passed
-Accord: accepted by ivan
+Accord: accepted by Algorant
 Files: 3 changed
 
 [Complete] [Cancel]
@@ -1570,7 +1570,7 @@ Expanded log item should show:
 
 ```text
 task-7 Implement Ratatui theme system
-Completed: 2026-06-26 15:00 by ivan
+Completed: 2026-06-26 15:00 by Algorant
 Summary: Theme loading, built-in palettes, runtime style mapping.
 Validation: passed
 Files changed:

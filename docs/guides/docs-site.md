@@ -18,13 +18,13 @@ The docs site should use a supported even-numbered Node.js LTS runtime, not an a
 
 The GitHub Pages workflow and local shortcuts read `site/.node-version`, currently `24`. Node 24 is the current LTS line and satisfies Astro's `>=22.12.0` requirement without pinning to an obsolete or odd-numbered release. Node 22 would also satisfy the minimum, but it is already a Maintenance LTS line; prefer Node 24 for the deployment workflow unless a compatibility issue appears.
 
-Keep docs-site dependency management on npm for now. The site has `site/package-lock.json`, CI uses `npm ci`, and the local `just site-build` shortcut mirrors that lockfile install before running `npm run build`. Astro documents npm as a first-class install path. Bun is appropriate for the Pi extension checks in this repository, but standardizing the docs site on Bun would require an intentional lockfile/tooling migration (`bun.lock`, `oven-sh/setup-bun`, and package-manager metadata) without solving Astro's Node runtime requirement. Revisit Bun only if the project decides to migrate all JavaScript package management together.
+Use Bun for docs-site dependency management and script execution. The site has `site/bun.lock`; use `bun install --frozen-lockfile` when validating the committed lockfile. Keep `site/package.json` package-manager metadata aligned with the Bun version used to generate the lockfile. Bun is the default package manager per decision-2; preserve an npm fallback only if a concrete Bun incompatibility is validated and documented. The GitHub Pages workflow and `just` shortcuts install from `bun.lock` and run docs scripts with Bun.
 
 Upstream references:
 
 - Astro install docs: <https://docs.astro.build/en/install-and-setup/>
 - Node.js release policy: <https://nodejs.org/en/about/previous-releases>
-- Bun GitHub Actions docs, if a future migration is chosen: <https://bun.com/docs/guides/runtime/cicd>
+- Bun package manager install docs: <https://bun.com/docs/pm/cli/install>
 
 ## Gruvbox theme workaround
 
@@ -50,14 +50,14 @@ From the repository root with Node.js 24 active (see `site/.node-version`):
 
 ```sh
 cd site
-npm install
+bun install
 ```
 
 ## Preview locally
 
 ```sh
 cd site
-npm run dev
+bun run dev
 ```
 
 The `predev` hook syncs `../docs/` into Starlight before the dev server starts.
@@ -68,13 +68,13 @@ The `predev` hook syncs `../docs/` into Starlight before the dev server starts.
 just site-build
 ```
 
-The shortcut runs `npm ci` to mirror the GitHub Pages workflow, then the `prebuild` hook runs `npm run sync:docs`, and Astro writes static output to `site/dist/`.
+The shortcut mirrors the GitHub Pages workflow with `bun install --frozen-lockfile`, then `bun run build`; the `prebuild` hook runs `bun run sync:docs`, and Astro writes static output to `site/dist/`.
 
 ## Manual sync
 
 ```sh
 cd site
-npm run sync:docs
+bun run sync:docs
 ```
 
 Use this when you want to inspect the generated Starlight content before previewing or building.
@@ -86,7 +86,7 @@ Use this when you want to inspect the generated Starlight content before preview
 - Keep generated `site/src/content/docs/**/*.md` out of version control; it exists only to bridge canonical docs into Starlight.
 ## GitHub Pages deployment
 
-The workflow `.github/workflows/docs.yml` builds the Starlight site and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
+The workflow `.github/workflows/docs.yml` builds the Starlight site with Node from `site/.node-version`, installs Bun with `oven-sh/setup-bun`, runs `bun install --frozen-lockfile`, and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
 
 Repository setup required in GitHub:
 

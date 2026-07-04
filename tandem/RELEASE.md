@@ -90,9 +90,9 @@ cargo build --release
 cargo run -- --version
 cargo run -- version
 cd ../site
-npm ci
-npm run build
-npm audit --audit-level=high
+bun install --frozen-lockfile
+bun run build
+bun audit --audit-level=high
 cd ..
 bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts

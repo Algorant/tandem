@@ -4731,7 +4731,7 @@ rules:
             "Done",
             &["src/main.rs".to_string()],
             Some("cargo test passed"),
-            Some("ivan"),
+            Some("Algorant"),
         )
         .unwrap();
         assert!(!output.contains("completionSummary:"));
@@ -4739,7 +4739,7 @@ rules:
         assert!(output.contains("completion:\n  summary: \"Done\"\n"));
         assert!(output.contains("  filesChanged: [\"src/main.rs\"]\n"));
         assert!(output.contains("  validation: \"cargo test passed\"\n"));
-        assert!(output.contains("  reviewer: \"ivan\"\n"));
+        assert!(output.contains("  reviewer: \"Algorant\"\n"));
         assert!(output.ends_with("\nBody\n"));
     }
 
@@ -4749,28 +4749,28 @@ rules:
             path: PathBuf::from("task-1.md"),
             location: DocumentLocation::Logs,
             fields: parse_frontmatter_fields(
-                "completion:\n  summary: Done\n  validation: passed\n  reviewer: ivan\n  filesChanged: [src/main.rs]\n",
+                "completion:\n  summary: Done\n  validation: passed\n  reviewer: Algorant\n  filesChanged: [src/main.rs]\n",
             )
             .unwrap(),
             body: String::new(),
         };
         assert_eq!(completion_summary(&nested), Some("Done"));
         assert_eq!(completion_validation(&nested), Some("passed"));
-        assert_eq!(completion_reviewer(&nested), Some("ivan"));
+        assert_eq!(completion_reviewer(&nested), Some("Algorant"));
         assert_eq!(completion_files_changed(&nested), vec!["src/main.rs"]);
 
         let legacy = Document {
             path: PathBuf::from("task-2.md"),
             location: DocumentLocation::Logs,
             fields: parse_frontmatter_fields(
-                "completionSummary: Done\ncompletionValidation: passed\ncompletionReviewer: ivan\nfilesChanged: [src/lib.rs]\n",
+                "completionSummary: Done\ncompletionValidation: passed\ncompletionReviewer: Algorant\nfilesChanged: [src/lib.rs]\n",
             )
             .unwrap(),
             body: String::new(),
         };
         assert_eq!(completion_summary(&legacy), Some("Done"));
         assert_eq!(completion_validation(&legacy), Some("passed"));
-        assert_eq!(completion_reviewer(&legacy), Some("ivan"));
+        assert_eq!(completion_reviewer(&legacy), Some("Algorant"));
         assert_eq!(completion_files_changed(&legacy), vec!["src/lib.rs"]);
     }
 
@@ -4987,7 +4987,7 @@ rules:
             path: PathBuf::from("decision-1.md"),
             location: DocumentLocation::Board,
             fields: parse_frontmatter_fields(
-                "id: decision-1\ntype: decision\ntitle: Choose cache\nstatus: accepted\ndate: 2026-07-01\ndeciders: [ivan, pi]\ncontext: Need a cache policy\nconsequences: [Faster reads]\nalternatives: [No cache]\nsupersedes: [decision-0]\nsupersededBy: [decision-2]\n",
+                "id: decision-1\ntype: decision\ntitle: Choose cache\nstatus: accepted\ndate: 2026-07-01\ndeciders: [Algorant, pi]\ncontext: Need a cache policy\nconsequences: [Faster reads]\nalternatives: [No cache]\nsupersedes: [decision-0]\nsupersededBy: [decision-2]\n",
             )
             .unwrap(),
             body: "## Decision\nUse the small cache.\n".to_string(),
@@ -4996,7 +4996,7 @@ rules:
         let detail = document_detail_json(&doc);
         assert!(detail.contains("\"status\":\"accepted\""));
         assert!(detail.contains("\"date\":\"2026-07-01\""));
-        assert!(detail.contains("\"deciders\":[\"ivan\",\"pi\"]"));
+        assert!(detail.contains("\"deciders\":[\"Algorant\",\"pi\"]"));
         assert!(detail.contains("\"supersededBy\":[\"decision-2\"]"));
         assert!(!detail.contains("\"state\""));
 
