@@ -1,0 +1,265 @@
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Tandem Verdigris Light",
+  "type": "light",
+  "semanticHighlighting": true,
+  "colors": {
+    "editor.background": "#f3ebcf",
+    "editor.foreground": "#2b332e",
+    "editorLineNumber.foreground": "#8a9184",
+    "editorLineNumber.activeForeground": "#23412f",
+    "editor.selectionBackground": "#d5e7d0",
+    "editor.inactiveSelectionBackground": "#d5e7d080",
+    "editor.findMatchBackground": "#f4dfb6",
+    "editor.findMatchBorder": "#a9642a",
+    "editorCursor.foreground": "#427b58",
+    "editorWhitespace.foreground": "#c5bea4",
+    "editorIndentGuide.background1": "#ddd2b2",
+    "editorIndentGuide.activeBackground1": "#8a9184",
+    "editorGroupHeader.tabsBackground": "#eee4c2",
+    "editorGroupHeader.tabsBorder": "#c5bea4",
+    "tab.activeBackground": "#f3ebcf",
+    "tab.activeForeground": "#2b332e",
+    "tab.activeBorderTop": "#427b58",
+    "tab.inactiveBackground": "#eee4c2",
+    "tab.inactiveForeground": "#6f7466",
+    "titleBar.activeBackground": "#eee4c2",
+    "titleBar.activeForeground": "#2b332e",
+    "titleBar.border": "#c5bea4",
+    "terminal.background": "#f3ebcf",
+    "terminal.foreground": "#2b332e",
+    "terminal.ansiBlack": "#1d2021",
+    "terminal.ansiBrightBlack": "#6f7466",
+    "terminal.ansiRed": "#a13d35",
+    "terminal.ansiBrightRed": "#5a211e",
+    "terminal.ansiGreen": "#427b58",
+    "terminal.ansiBrightGreen": "#23412f",
+    "terminal.ansiYellow": "#a9642a",
+    "terminal.ansiBrightYellow": "#61330e",
+    "terminal.ansiBlue": "#528b85",
+    "terminal.ansiBrightBlue": "#204a4d",
+    "terminal.ansiMagenta": "#8f3f71",
+    "terminal.ansiBrightMagenta": "#4b2140",
+    "terminal.ansiCyan": "#427b58",
+    "terminal.ansiBrightCyan": "#204a4d",
+    "terminal.ansiWhite": "#6f7466",
+    "terminal.ansiBrightWhite": "#2b332e",
+    "textLink.foreground": "#528b85",
+    "textLink.activeForeground": "#23412f"
+  },
+  "tokenColors": [
+    {
+      "name": "Base text",
+      "settings": {
+        "foreground": "#2b332e"
+      }
+    },
+    {
+      "name": "Comments",
+      "scope": [
+        "comment",
+        "punctuation.definition.comment"
+      ],
+      "settings": {
+        "foreground": "#6f7466",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Strings",
+      "scope": [
+        "string",
+        "string.quoted",
+        "string.template",
+        "string.regexp",
+        "markup.inline.raw.string"
+      ],
+      "settings": {
+        "foreground": "#427b58"
+      }
+    },
+    {
+      "name": "Numbers and constants",
+      "scope": [
+        "constant",
+        "constant.numeric",
+        "constant.language",
+        "support.constant",
+        "variable.language"
+      ],
+      "settings": {
+        "foreground": "#8f3f71"
+      }
+    },
+    {
+      "name": "Keywords",
+      "scope": [
+        "keyword",
+        "keyword.control",
+        "keyword.operator",
+        "storage",
+        "storage.modifier"
+      ],
+      "settings": {
+        "foreground": "#a13d35"
+      }
+    },
+    {
+      "name": "Types and classes",
+      "scope": [
+        "entity.name.type",
+        "entity.name.class",
+        "support.type",
+        "support.class",
+        "meta.type.annotation"
+      ],
+      "settings": {
+        "foreground": "#a9642a"
+      }
+    },
+    {
+      "name": "Functions and methods",
+      "scope": [
+        "entity.name.function",
+        "support.function",
+        "meta.function-call",
+        "variable.function"
+      ],
+      "settings": {
+        "foreground": "#427b58"
+      }
+    },
+    {
+      "name": "Variables and parameters",
+      "scope": [
+        "variable",
+        "variable.parameter",
+        "meta.definition.variable"
+      ],
+      "settings": {
+        "foreground": "#2b332e"
+      }
+    },
+    {
+      "name": "Properties and attributes",
+      "scope": [
+        "variable.other.property",
+        "support.type.property-name",
+        "entity.other.attribute-name",
+        "meta.object-literal.key",
+        "meta.mapping.key"
+      ],
+      "settings": {
+        "foreground": "#528b85"
+      }
+    },
+    {
+      "name": "Tags and selectors",
+      "scope": [
+        "entity.name.tag",
+        "entity.name.selector",
+        "punctuation.definition.tag"
+      ],
+      "settings": {
+        "foreground": "#427b58"
+      }
+    },
+    {
+      "name": "Punctuation",
+      "scope": [
+        "punctuation",
+        "meta.brace",
+        "meta.delimiter"
+      ],
+      "settings": {
+        "foreground": "#5f695f"
+      }
+    },
+    {
+      "name": "Markdown headings",
+      "scope": [
+        "markup.heading",
+        "markup.heading punctuation.definition.heading"
+      ],
+      "settings": {
+        "foreground": "#23412f",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Markdown links",
+      "scope": [
+        "markup.underline.link",
+        "string.other.link",
+        "meta.link.inline"
+      ],
+      "settings": {
+        "foreground": "#528b85",
+        "fontStyle": "underline"
+      }
+    },
+    {
+      "name": "Markdown emphasis",
+      "scope": "markup.italic",
+      "settings": {
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Markdown strong",
+      "scope": "markup.bold",
+      "settings": {
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Inserted diff",
+      "scope": [
+        "markup.inserted",
+        "meta.diff.header.to-file"
+      ],
+      "settings": {
+        "foreground": "#427b58"
+      }
+    },
+    {
+      "name": "Deleted diff and invalid",
+      "scope": [
+        "markup.deleted",
+        "invalid",
+        "invalid.illegal"
+      ],
+      "settings": {
+        "foreground": "#a13d35"
+      }
+    },
+    {
+      "name": "Changed diff and warnings",
+      "scope": [
+        "markup.changed",
+        "invalid.deprecated"
+      ],
+      "settings": {
+        "foreground": "#a9642a"
+      }
+    }
+  ],
+  "semanticTokenColors": {
+    "comment": "#6f7466",
+    "string": "#427b58",
+    "number": "#8f3f71",
+    "regexp": "#a9642a",
+    "keyword": "#a13d35",
+    "operator": "#a13d35",
+    "type": "#a9642a",
+    "class": "#a9642a",
+    "interface": "#a9642a",
+    "enum": "#a9642a",
+    "enumMember": "#8f3f71",
+    "function": "#427b58",
+    "method": "#427b58",
+    "property": "#528b85",
+    "parameter": "#528b85",
+    "variable": "#2b332e"
+  }
+}

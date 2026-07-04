@@ -18,7 +18,7 @@ The docs site should use a supported even-numbered Node.js LTS runtime, not an a
 
 The GitHub Pages workflow and local shortcuts read `site/.node-version`, currently `24`. Node 24 is the current LTS line and satisfies Astro's `>=22.12.0` requirement without pinning to an obsolete or odd-numbered release. Node 22 would also satisfy the minimum, but it is already a Maintenance LTS line; prefer Node 24 for the deployment workflow unless a compatibility issue appears.
 
-Use Bun for docs-site dependency management and script execution. The site has `site/bun.lock`; use `bun install --frozen-lockfile` when validating the committed lockfile. Keep `site/package.json` package-manager metadata aligned with the Bun version used to generate the lockfile. Bun is the default package manager per decision-2; preserve an npm fallback only if a concrete Bun incompatibility is validated and documented. The GitHub Pages workflow and `just` shortcuts install from `bun.lock` and run docs scripts with Bun.
+Use Bun for docs-site dependency management and script execution. The site has `site/bun.lock`; use `bun install --frozen-lockfile` when validating the committed lockfile. Keep `site/package.json` package-manager metadata aligned with the Bun version used to generate the lockfile. Bun is the default package manager per decision-2. Preserve an npm fallback only as a documented exception that records what Bun avenues were tried, why they failed, and what condition would allow revisiting the exception. The GitHub Pages workflow and `just` shortcuts install from `bun.lock` and run docs scripts with Bun.
 
 Upstream references:
 
@@ -26,23 +26,27 @@ Upstream references:
 - Node.js release policy: <https://nodejs.org/en/about/previous-releases>
 - Bun package manager install docs: <https://bun.com/docs/pm/cli/install>
 
-## Gruvbox theme workaround
+## Standalone Verdigris theme
 
-The Starlight themes catalog lists Starlight Gruvbox as a community theme, and its install guide recommends installing `starlight-theme-gruvbox` and adding `plugins: [gruvbox()]` to the Starlight config. As of `starlight-theme-gruvbox@2.0.0`, the package itself is not compatible with this docs site's dependency stack: it declares peer dependencies on Astro `^6.0.0` and Starlight `^0.38.0`, while this site intentionally uses Astro `^7.0.3` and Starlight `^0.41.1`.
+The docs site uses a standalone vendored Verdigris theme rather than a Starlight theme package. This keeps Astro 7/Starlight 0.41 compatibility, avoids peer-dependency drift from third-party theme packages, and makes the theme easy to review or vendor elsewhere.
 
-To keep Astro 7 and Starlight 0.41, the site vendors only the theme assets that are compatible with current Starlight APIs:
+Theme ownership is intentionally scoped to the site project:
 
-- `site/src/styles/gruvbox.css` sets Starlight CSS variables via `customCss`.
-- `site/src/styles/shiki/gruvbox-*-medium.jsonc` provides the Gruvbox Expressive Code themes via `ExpressiveCodeTheme.fromJSONString(...)`.
-- `site/src/styles/shiki/starlight-theme-gruvbox.LICENSE` preserves the upstream MIT license for the adapted assets.
+- `site/astro.config.mjs` wires Starlight `customCss` to `site/src/styles/verdigris.css` and loads paired Expressive Code themes with `ExpressiveCodeTheme.fromJSONString(...)`.
+- `site/src/styles/verdigris.css` defines the Verdigris palette, maps it to Starlight color roles, and styles headings, links, badges/tags, cards, callouts, sidebars, pagination, inline code, and Expressive Code frames.
+- `site/src/styles/shiki/verdigris-dark.jsonc` and `site/src/styles/shiki/verdigris-light.jsonc` provide syntax highlighting themes whose UI chrome is synchronized with Starlight via `useStarlightUiThemeColors: true`.
+- Expressive Code external stylesheet emission is disabled in the Starlight config so generated code blocks remain self-contained and do not point at stale hashed `ec.*.css` assets after theme changes.
+- `site/scripts/sync-docs.mjs` clears Astro's generated `.astro/` content cache before syncing Markdown, and the dev/build scripts pass Astro `--force`, so code-fence HTML is regenerated when theme or Expressive Code settings change.
+- `docs/guides/theme-tester.md` is the canonical visual maintenance page for exercising headings, links, code blocks, asides, cards, tags, lists, and tables.
+- `site/src/styles/README.md` is the vendoring boundary note for future packaging work.
 
-Do not add the incompatible `starlight-theme-gruvbox` package or downgrade Astro/Starlight unless that trade-off is explicitly approved. If the upstream theme publishes Astro 7-compatible peer ranges later, this vendored workaround can be replaced with the package integration.
+Do not add `starlight-theme-gruvbox`, downgrade Astro/Starlight, or introduce another theme package unless that trade-off is explicitly approved. If the Verdigris theme is later published as a reusable package, keep this local CSS/Shiki asset boundary as the source to extract from and preserve any third-party license notices for newly vendored assets.
 
 Relevant theme references:
 
+- Starlight CSS customization: <https://starlight.astro.build/guides/css-and-tailwind/>
+- Expressive Code themes: <https://expressive-code.com/guides/themes/>
 - Starlight themes catalog: <https://starlight.astro.build/resources/themes/>
-- Starlight Gruvbox install guide: <https://starlight-theme-gruvbox.otterlord.dev/guides/install/>
-- Theme package/repository: <https://github.com/TheOtterlord/starlight-theme-gruvbox>
 
 ## Install dependencies
 
@@ -60,7 +64,7 @@ cd site
 bun run dev
 ```
 
-The `predev` hook syncs `../docs/` into Starlight before the dev server starts.
+The `predev` hook syncs `../docs/` into Starlight before the dev server starts. The sync script and Astro `--force` flag clear generated content caches so code blocks pick up theme changes.
 
 ## Build static output
 

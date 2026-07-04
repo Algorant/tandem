@@ -9,11 +9,11 @@
   },
   "scripts": {
     "predev": "bun run sync:docs",
-    "dev": "astro dev",
+    "dev": "astro dev --force",
     "prestart": "bun run sync:docs",
-    "start": "astro dev",
+    "start": "astro dev --force",
     "prebuild": "bun run sync:docs",
-    "build": "astro build",
+    "build": "astro build --force",
     "preview": "astro preview",
     "sync:docs": "node scripts/sync-docs.mjs"
   },

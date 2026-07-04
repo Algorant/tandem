@@ -6,6 +6,7 @@ const siteRoot = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(siteRoot, '..', '..');
 const sourceDir = join(repoRoot, 'docs');
 const targetDir = join(repoRoot, 'site', 'src', 'content', 'docs');
+const astroCacheDir = join(repoRoot, 'site', '.astro');
 const keepFiles = new Set(['.gitignore', 'README.txt']);
 
 async function* walk(dir) {
@@ -18,6 +19,11 @@ async function* walk(dir) {
     }
   }
 }
+
+// Starlight renders code fences during content collection. Clear Astro's
+// generated content cache before syncing so theme/Expressive Code changes do
+// not leave stale rendered HTML pointing at removed hashed stylesheets.
+await rm(astroCacheDir, { recursive: true, force: true });
 
 await mkdir(targetDir, { recursive: true });
 

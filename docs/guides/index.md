@@ -11,6 +11,7 @@ Guides collect practical workflows for using Tandem.
 
 - [Decisions and ADRs](./decisions.md) — record durable Tandem decisions as ADR-compatible decision documents.
 - [Docs site workflow](./docs-site.md) — install, preview, sync, and build the documentation site.
+- [Theme tester](./theme-tester.md) — visual maintenance page for the Verdigris docs theme.
 
 ## Planned guides
 

@@ -4,11 +4,11 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { ExpressiveCodeTheme } from 'astro-expressive-code';
 
-const gruvboxLight = ExpressiveCodeTheme.fromJSONString(
-  fs.readFileSync(new URL('./src/styles/shiki/gruvbox-light-medium.jsonc', import.meta.url), 'utf-8')
+const verdigrisLight = ExpressiveCodeTheme.fromJSONString(
+  fs.readFileSync(new URL('./src/styles/shiki/verdigris-light.jsonc', import.meta.url), 'utf-8')
 );
-const gruvboxDark = ExpressiveCodeTheme.fromJSONString(
-  fs.readFileSync(new URL('./src/styles/shiki/gruvbox-dark-medium.jsonc', import.meta.url), 'utf-8')
+const verdigrisDark = ExpressiveCodeTheme.fromJSONString(
+  fs.readFileSync(new URL('./src/styles/shiki/verdigris-dark.jsonc', import.meta.url), 'utf-8')
 );
 
 export default defineConfig({
@@ -24,9 +24,11 @@ export default defineConfig({
           href: 'https://github.com/Algorant/tandem',
         },
       ],
-      customCss: ['./src/styles/gruvbox.css'],
+      customCss: ['./src/styles/verdigris.css'],
       expressiveCode: {
-        themes: [gruvboxLight, gruvboxDark],
+        themes: [verdigrisDark, verdigrisLight],
+        useStarlightUiThemeColors: true,
+        emitExternalStylesheet: false,
       },
       sidebar: [
         {
@@ -43,6 +45,7 @@ export default defineConfig({
               items: [
                 { label: 'Guides overview', link: '/guides/' },
                 { label: 'Docs site workflow', link: '/guides/docs-site/' },
+                { label: 'Theme tester', link: '/guides/theme-tester/' },
               ],
             },
             { label: 'Reference', link: '/reference/' },
