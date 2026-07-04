@@ -213,6 +213,128 @@ body {
 	text-shadow: 0 0 20px color-mix(in srgb, var(--sl-color-accent) 28%, transparent);
 }
 
+.site-title img {
+	filter: drop-shadow(0 0 14px color-mix(in srgb, var(--sl-color-accent) 34%, transparent));
+}
+
+.hero {
+	position: relative;
+	isolation: isolate;
+}
+
+.hero::before {
+	content: '';
+	position: absolute;
+	inset: 7% 6% auto auto;
+	z-index: -1;
+	width: min(24rem, 52vw);
+	aspect-ratio: 1;
+	border-radius: 999px;
+	background: radial-gradient(circle, color-mix(in srgb, var(--sl-color-accent) 28%, transparent), transparent 68%);
+	filter: blur(0.35rem);
+	opacity: 0.78;
+}
+
+.hero h1 {
+	max-width: 12ch;
+	background: linear-gradient(110deg, var(--sl-color-white), var(--td-vg-heading-h1) 58%, var(--td-vg-heading-h2));
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	letter-spacing: -0.055em;
+	text-wrap: balance;
+}
+
+.hero h1::after {
+	display: none;
+}
+
+.hero .tagline {
+	max-width: 43rem;
+	color: var(--sl-color-gray-2);
+	text-wrap: pretty;
+}
+
+.hero .actions a {
+	box-shadow: var(--sl-shadow-sm);
+}
+
+.hero .actions a[aria-current],
+.hero .actions a:hover {
+	box-shadow: var(--sl-shadow-md);
+}
+
+.td-hero-mark {
+	width: min(100%, 23rem);
+	height: auto;
+	overflow: visible;
+	filter: drop-shadow(0 1.5rem 3rem rgb(0 0 0 / 28%));
+}
+
+/* Homepage landing helpers. */
+.td-home-card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+	gap: 1rem;
+	margin-block: 1.25rem 2rem;
+}
+
+.td-home-card-grid--compact {
+	grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
+}
+
+.td-home-card {
+	display: flex;
+	min-height: 11.5rem;
+	flex-direction: column;
+	gap: 0.65rem;
+	justify-content: flex-start;
+	border: 1px solid color-mix(in srgb, var(--sl-color-accent) 34%, var(--sl-color-gray-5));
+	border-radius: 1rem;
+	background:
+		linear-gradient(145deg, color-mix(in srgb, var(--sl-color-accent-low) 34%, transparent), transparent 72%),
+		var(--td-vg-card-bg);
+	box-shadow: var(--sl-shadow-sm);
+	color: var(--sl-color-gray-2);
+	padding: 1rem;
+	text-decoration: none !important;
+}
+
+.td-home-card--compact {
+	min-height: 8.5rem;
+}
+
+.td-home-card:hover,
+.td-home-card:focus-visible {
+	border-color: var(--sl-color-accent);
+	box-shadow: var(--sl-shadow-md);
+	color: var(--sl-color-gray-1);
+	transform: translateY(-1px);
+}
+
+.td-home-card strong {
+	color: var(--sl-color-accent-high);
+	font-size: var(--sl-text-lg);
+	letter-spacing: -0.02em;
+	line-height: var(--sl-line-height-headings);
+}
+
+.td-home-card span:not(.td-home-card__eyebrow) {
+	font-size: var(--sl-text-sm);
+}
+
+.td-home-card__eyebrow {
+	color: var(--td-vg-heading-h3);
+	font-size: var(--sl-text-xs);
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.td-home-card code {
+	font-size: 0.85em;
+}
+
 /* Headings: distinct but restrained, matching the approved Verdigris direction. */
 .main-pane h1:not(:where(.not-content *)),
 .sl-markdown-content h1:not(:where(.not-content *)) {
@@ -344,6 +466,23 @@ body {
 	display: block;
 	min-width: max-content;
 	font-family: var(--__sl-font-mono);
+	tab-size: 2;
+}
+
+.expressive-code .frame pre,
+.sl-markdown-content pre:not(:where(.not-content *)) {
+	font-size: clamp(0.86rem, 0.82rem + 0.15vw, 0.94rem);
+	line-height: 1.62;
+}
+
+.expressive-code .frame pre {
+	scrollbar-color: var(--td-vg-code-border) var(--td-vg-code-bg);
+}
+
+.expressive-code .frame pre::selection,
+.expressive-code .frame code ::selection,
+.sl-markdown-content pre code::selection {
+	background: color-mix(in srgb, var(--sl-color-accent) 30%, transparent);
 }
 
 .expressive-code .ec-line {
@@ -643,11 +782,13 @@ body {
 	.sidebar-content a,
 	.card,
 	.theme-card,
+	.td-home-card,
 	.pagination-links a {
 		transition:
 			background-color 160ms ease,
 			border-color 160ms ease,
 			box-shadow 160ms ease,
-			color 160ms ease;
+			color 160ms ease,
+			transform 160ms ease;
 	}
 }
