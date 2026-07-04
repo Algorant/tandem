@@ -689,7 +689,7 @@ impl TuiApp {
             KeyCode::Char('L') if self.view == TuiView::Board => {
                 self.move_selected_task_by_delta(1)
             }
-            KeyCode::Char('E') if self.view == TuiView::Board => self.toggle_board_arrangement(),
+            KeyCode::Char('b') if self.view == TuiView::Board => self.toggle_board_arrangement(),
             KeyCode::Char('t') if self.view == TuiView::Board => self.cycle_board_tag_filter(),
             KeyCode::Char('p') if self.view == TuiView::Board => self.cycle_board_priority_filter(),
             KeyCode::Char('F') if self.view == TuiView::Board => self.clear_board_filters(),
@@ -749,7 +749,7 @@ impl TuiApp {
         }
         self.status = match view {
             TuiView::Board => {
-                "Board view active. Use E to toggle State/Epic arrangement, h/l for states, j/k for rows, t/p filters, F clear.".to_string()
+                "Board view active. Use b to switch State/Epic Board arrangement, h/l for states, j/k for rows, t/p filters, F clear.".to_string()
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
@@ -1763,7 +1763,7 @@ impl TuiApp {
             self.clamp_selection();
         }
         self.status = format!(
-            "Board arrangement: {}. Press E to toggle State/Epic.",
+            "Board arrangement: {}. Press b to switch State/Epic Board.",
             self.board_arrangement.label()
         );
     }
@@ -1785,8 +1785,7 @@ impl TuiApp {
     fn previous_state(&mut self) {
         if self.board_arrangement == BoardArrangement::Epic {
             self.status =
-                "Epic arrangement groups all workflow states; press E for State Board tabs."
-                    .to_string();
+                "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
             return;
         }
         if self.selected_state > 0 {
@@ -1800,8 +1799,7 @@ impl TuiApp {
     fn next_state(&mut self) {
         if self.board_arrangement == BoardArrangement::Epic {
             self.status =
-                "Epic arrangement groups all workflow states; press E for State Board tabs."
-                    .to_string();
+                "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
             return;
         }
         if self.selected_state + 1 < self.states.len() {
@@ -2035,7 +2033,7 @@ impl TuiApp {
     }
 
     fn epic_board_entries(&self) -> Vec<EpicBoardEntry<'_>> {
-        epic_board_entries(&self.docs, &self.logs, &self.board_filters)
+        epic_board_entries(&self.docs, &self.board_filters)
     }
 
     fn detail_line_count(&self) -> usize {
@@ -2677,7 +2675,7 @@ impl TuiApp {
             Span::styled(" State ", self.theme.tab_style()),
             Span::raw(" "),
             Span::styled(" Epic ", self.theme.state_tab_selected_style()),
-            Span::styled("  E toggle ", self.theme.muted_style()),
+            Span::styled("  b switch ", self.theme.muted_style()),
         ]);
         frame.render_widget(Paragraph::new(mode_line), chunks[0]);
         self.draw_epic_board_list(frame, chunks[1]);
@@ -2697,7 +2695,7 @@ impl TuiApp {
             let empty_text = if self.board_filters.is_active() {
                 "No Epic Board rows match the active filters. Press F to clear filters."
             } else {
-                "No Board tasks are available for Epic arrangement. Press E for State Board."
+                "No epic groups are available. Press b for State Board."
             };
             vec![ListItem::new(Line::from(Span::styled(
                 empty_text,
@@ -2981,8 +2979,8 @@ impl TuiApp {
             .map(|doc| document_state_label(doc) == "validation")
             .unwrap_or(false);
         let arrangement_hint = match self.board_arrangement {
-            BoardArrangement::State => "E epic",
-            BoardArrangement::Epic => "E state",
+            BoardArrangement::State => "b Epic Board",
+            BoardArrangement::Epic => "b State Board",
         };
         let commands = if self.focus == FocusPane::Detail {
             format!("Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
@@ -3089,8 +3087,18 @@ impl TuiApp {
                     HitAction::ToggleBoardExpansion,
                 );
                 self.register_footer_hit(area, text, "Tab board", HitAction::ToggleBoardDetail);
-                self.register_footer_hit(area, text, "E epic", HitAction::ToggleBoardArrangement);
-                self.register_footer_hit(area, text, "E state", HitAction::ToggleBoardArrangement);
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "b Epic Board",
+                    HitAction::ToggleBoardArrangement,
+                );
+                self.register_footer_hit(
+                    area,
+                    text,
+                    "b State Board",
+                    HitAction::ToggleBoardArrangement,
+                );
                 self.register_footer_hit(area, text, "a add", HitAction::StartQuickAdd);
                 self.register_footer_hit(area, text, "t tag", HitAction::CycleBoardTagFilter);
                 self.register_footer_hit(
@@ -3212,7 +3220,7 @@ impl TuiApp {
 
         self.push_help_section(&mut lines, "Board");
         self.push_help_command(&mut lines, "Enter", "expand/collapse row preview");
-        self.push_help_command(&mut lines, "E", "toggle State/Epic Board arrangement");
+        self.push_help_command(&mut lines, "b", "toggle State/Epic Board arrangement");
         self.push_help_command(&mut lines, "a", "quick-add a task in the selected state");
         self.push_help_command(&mut lines, "e", "open the selected active task in $EDITOR");
         self.push_help_command(
@@ -4381,8 +4389,6 @@ impl BoardRelationshipContext {
 enum EpicBoardEntryRole {
     Epic,
     Child,
-    Unparented,
-    Orphan,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -4394,20 +4400,17 @@ struct EpicBoardEntry<'a> {
 
 fn epic_board_entries<'a>(
     active_docs: &'a [Document],
-    completed_logs: &[Document],
     filters: &BoardFilters,
 ) -> Vec<EpicBoardEntry<'a>> {
     let mut entries = Vec::new();
-    let mut assigned = BTreeSet::new();
-    let active_epic_ids = active_docs
-        .iter()
-        .filter(|doc| is_epic_task(doc))
-        .map(|doc| doc.id().to_string())
-        .collect::<BTreeSet<_>>();
 
-    for epic in active_docs.iter().filter(|doc| is_epic_task(doc)) {
+    for epic in active_docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc) && is_epic_task(doc))
+    {
         let visible_children = active_docs
             .iter()
+            .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
             .filter(|doc| normalized_parent_id(doc).as_deref() == Some(epic.id()))
             .filter(|doc| doc.id() != epic.id())
             .filter(|doc| board_filters_match(doc, filters))
@@ -4420,43 +4423,13 @@ fn epic_board_entries<'a>(
             role: EpicBoardEntryRole::Epic,
             depth: 0,
         });
-        assigned.insert(epic.id().to_string());
         for child in visible_children {
             entries.push(EpicBoardEntry {
                 doc: child,
                 role: EpicBoardEntryRole::Child,
                 depth: 1,
             });
-            assigned.insert(child.id().to_string());
         }
-    }
-
-    let known_ids = active_docs
-        .iter()
-        .chain(completed_logs.iter())
-        .map(|doc| doc.id().to_string())
-        .collect::<BTreeSet<_>>();
-    for doc in active_docs {
-        if assigned.contains(doc.id()) || !board_filters_match(doc, filters) {
-            continue;
-        }
-        if is_epic_task(doc) {
-            continue;
-        }
-        let role = match normalized_parent_id(doc) {
-            Some(parent_id)
-                if !known_ids.contains(&parent_id) || !active_epic_ids.contains(&parent_id) =>
-            {
-                EpicBoardEntryRole::Orphan
-            }
-            Some(_) => EpicBoardEntryRole::Child,
-            None => EpicBoardEntryRole::Unparented,
-        };
-        entries.push(EpicBoardEntry {
-            doc,
-            role,
-            depth: 0,
-        });
     }
     entries
 }
@@ -4681,19 +4654,14 @@ fn epic_list_item_for_entry(
     let left_label = match entry.role {
         EpicBoardEntryRole::Epic => "EPIC".to_string(),
         EpicBoardEntryRole::Child => display_state_label(&document_state_label(doc)),
-        EpicBoardEntryRole::Unparented => display_state_label(&document_state_label(doc)),
-        EpicBoardEntryRole::Orphan => "ORPHAN".to_string(),
     };
     let left_tone = match entry.role {
         EpicBoardEntryRole::Epic => StatusTone::Accent,
-        EpicBoardEntryRole::Orphan => StatusTone::Warning,
-        _ => StatusTone::Muted,
+        EpicBoardEntryRole::Child => StatusTone::Muted,
     };
     let meta = match entry.role {
         EpicBoardEntryRole::Epic => relationship_rollup(relationship_context),
         EpicBoardEntryRole::Child => doc.id().to_string(),
-        EpicBoardEntryRole::Unparented => format!("unparented · {}", doc.id()),
-        EpicBoardEntryRole::Orphan => orphan_meta(relationship_context, doc),
     };
     let mut lines = vec![board_row_line(
         doc,
@@ -4796,14 +4764,6 @@ fn relationship_rollup(context: &BoardRelationshipContext) -> String {
     parts.join(" · ")
 }
 
-fn orphan_meta(context: &BoardRelationshipContext, doc: &Document) -> String {
-    match context.parent_id.as_deref() {
-        Some(parent_id) if context.parent_missing => format!("missing parent {parent_id}"),
-        Some(parent_id) => format!("parent {parent_id} is not an active epic"),
-        None => format!("invalid parent · {}", doc.id()),
-    }
-}
-
 fn relationship_detail_summary(context: &BoardRelationshipContext) -> String {
     let hints = context.hints();
     let mut parts = Vec::new();
@@ -4839,8 +4799,12 @@ fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
     }
 }
 
-fn is_epic_task(doc: &Document) -> bool {
+fn is_task_doc(doc: &Document) -> bool {
     doc.doc_type().eq_ignore_ascii_case("task")
+}
+
+fn is_epic_task(doc: &Document) -> bool {
+    is_task_doc(doc)
         && doc
             .field("kind")
             .map(|kind| kind.trim().eq_ignore_ascii_case("epic"))
@@ -6467,6 +6431,49 @@ mod tests {
     }
 
     #[test]
+    fn epic_board_entries_only_include_epics_and_their_task_children() {
+        let mut epic = doc_with_state("task-80", Some("in-progress"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut epic_child = doc_with_state("task-81", Some("todo"));
+        epic_child
+            .fields
+            .insert("parentId".to_string(), "task-80".to_string());
+        let unparented_validation = doc_with_state("task-82", Some("validation"));
+        let mut decision_child = decision_doc("decision-1");
+        decision_child
+            .fields
+            .insert("parentId".to_string(), "task-80".to_string());
+        let non_epic_parent = doc_with_state("task-83", Some("todo"));
+        let mut non_epic_child = doc_with_state("task-84", Some("todo"));
+        non_epic_child
+            .fields
+            .insert("parentId".to_string(), "task-83".to_string());
+
+        let docs = vec![
+            epic,
+            epic_child,
+            unparented_validation,
+            decision_child,
+            non_epic_parent,
+            non_epic_child,
+        ];
+        let entries = epic_board_entries(&docs, &BoardFilters::default());
+        let ids = entries
+            .iter()
+            .map(|entry| entry.doc.id())
+            .collect::<Vec<_>>();
+        let roles = entries.iter().map(|entry| entry.role).collect::<Vec<_>>();
+        let depths = entries.iter().map(|entry| entry.depth).collect::<Vec<_>>();
+
+        assert_eq!(ids, vec!["task-80", "task-81"]);
+        assert_eq!(
+            roles,
+            vec![EpicBoardEntryRole::Epic, EpicBoardEntryRole::Child]
+        );
+        assert_eq!(depths, vec![0, 1]);
+    }
+
+    #[test]
     fn actual_board_render_surfaces_epic_grouping_and_expanded_relationships() {
         let root = unique_test_dir("tandem-epic-render");
         let workspace = temp_workspace(&root);
@@ -7122,7 +7129,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · E epic · ? help"
+            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · b Epic Board · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -7130,7 +7137,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · E epic · ? help"
+            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · b Epic Board · ? help"
         );
 
         app.switch_view(TuiView::Logs);
@@ -7265,6 +7272,8 @@ tone = "success"
             assert!(text.contains(heading), "missing help heading {heading}");
         }
         assert!(text.contains("1 2 3 4"));
+        assert!(text.contains("b           toggle State/Epic Board arrangement"));
+        assert!(!text.contains("E           toggle State/Epic Board arrangement"));
         assert!(text.contains("A           open accept confirmation"));
         assert!(text.contains("/           search id, title"));
         assert!(text.contains("e / d       edit or delete"));
@@ -7282,6 +7291,31 @@ tone = "success"
         app.handle_key(key(KeyCode::Char('1'))).unwrap();
         assert_eq!(app.view, TuiView::Board);
         assert_eq!(app.focus, FocusPane::Board);
+    }
+
+    #[test]
+    fn board_arrangement_shortcut_uses_b_not_uppercase_e() {
+        let mut app = keyboard_test_app();
+        assert_eq!(app.board_arrangement, BoardArrangement::State);
+
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('E'))).unwrap(),
+            KeyAction::Continue
+        );
+        assert_eq!(app.board_arrangement, BoardArrangement::State);
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('e'))).unwrap(),
+            KeyAction::OpenEditor
+        );
+
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('b'))).unwrap(),
+            KeyAction::Continue
+        );
+        assert_eq!(app.board_arrangement, BoardArrangement::Epic);
+        assert!(app.status.contains("Press b"));
+        assert!(!app.status.contains("Press E"));
+        assert!(app.board_footer_text().contains("b State Board"));
     }
 
     #[test]
