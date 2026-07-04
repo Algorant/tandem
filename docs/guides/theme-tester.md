@@ -71,7 +71,7 @@ theme = "verdigris"
 transparent_background = false
 badge_style = "muted"
 
-[badges.tags.docs]
+[board.badges.tags.docs]
 tone = "success"
 ```
 

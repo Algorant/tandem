@@ -32,7 +32,7 @@ transparent_background = true
 badge_style = "muted"
 ```
 
-Use workspace `.tandem/theme.toml` only when a project should override the user's global preference.
+Use workspace `.tandem/theme.toml` only when a project should override the user's global theme preference. Use workspace `.tandem/config.toml` for project display semantics such as Board tag badge opt-ins.
 
 Set `transparent_background = true` in a user theme, user config, or workspace `.tandem/theme.toml` to let the terminal default/transparent background show through for app and panel fills where practical. The default is `false`, so omitted themes preserve opaque rendering.
 
@@ -50,19 +50,19 @@ The same key can also be written as `[badges] style = "ghost"` in user themes, u
 
 Default Board badges are intentionally minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress such as `2/5`. Project/domain tags like `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in rather than global defaults.
 
-Configure extra tag badges or suppress badges in user config or workspace `.tandem/theme.toml`:
+Configure extra tag badges or suppress badges in user config or workspace `.tandem/config.toml`:
 
 ```toml
-[badges]
+[board.badges]
 disabled = ["deliverable", "visual"]
 
-[badges.tags.tui]
+[board.badges.tags.tui]
 label = "TUI"
 tone = "accent"
 
-[badges.tags.docs]
+[board.badges.tags.docs]
 # label defaults to "DOCS"
 tone = "success"
 ```
 
-`label` and `tone` are optional for configured tags. `label` defaults to the uppercase tag, and `tone` defaults to `accent`; supported tones are `accent`, `success`, `warning`, `error`, and `muted`. `disabled` is a simple list of built-in badge IDs or configured tag names to suppress, not a regex/rule engine.
+`label` and `tone` are optional for configured tags. `label` defaults to the uppercase tag, and `tone` defaults to `accent`; supported tones are `accent`, `success`, `warning`, `error`, and `muted`. `disabled` is a simple list of built-in badge IDs or configured tag names to suppress, not a regex/rule engine. Legacy `[badges]` / `[badges.tags.*]` sections in theme files are still read during migration, but new project badge config should live in `.tandem/config.toml`.

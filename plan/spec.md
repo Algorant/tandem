@@ -99,7 +99,7 @@ CLI/TUI:
 - The TUI launches as `tandem tui` only in v0.
 - First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue. The current Board layout uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI uses canonical command names and long flags only; no short aliases.
-- Theme config loads in this order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`.
+- Theme config loads in this order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display semantics such as project tag badge opt-ins load from user config and workspace `.tandem/config.toml`.
 - Defer templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, and fixtures.
 - Markdown planning docs stay canonical for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `td` is reserved for future/internal tool prefixes; `tandem` remains the user-facing CLI.

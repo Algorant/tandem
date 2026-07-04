@@ -3727,10 +3727,11 @@ fn collect_reload_fingerprint(workspace: &Workspace) -> ReloadFingerprint {
     let mut files = BTreeMap::new();
     insert_optional_fingerprint(&mut files, workspace.config_path.clone());
     insert_optional_fingerprint(&mut files, workspace.events_path.clone());
-    insert_optional_fingerprint(
-        &mut files,
-        workspace.config_path.with_file_name("theme.toml"),
-    );
+    insert_optional_fingerprint(&mut files, theme::workspace_theme_path(workspace));
+    insert_optional_fingerprint(&mut files, theme::workspace_config_path(workspace));
+    if let Some(user_config_path) = theme::user_config_path_from_env() {
+        insert_optional_fingerprint(&mut files, user_config_path);
+    }
     insert_directory_fingerprints(&mut files, &workspace.board_dir, "md");
     insert_directory_fingerprints(&mut files, &workspace.logs_dir, "md");
     if let Some(user_theme_dir) = theme::user_theme_dir_from_env() {
@@ -6292,12 +6293,12 @@ mod tests {
     #[test]
     fn board_row_uses_configured_tag_badges_and_disabled_badges() {
         let mut theme = TuiTheme::default_dark();
-        let warnings = theme.apply_theme_content(
+        let warnings = theme.apply_display_content(
             r#"
-[badges]
+[board.badges]
 disabled = ["priority:high", "visual", "accord:accepted", "subtasks"]
 
-[badges.tags.tui]
+[board.badges.tags.tui]
 label = "TUI"
 tone = "success"
 "#,

@@ -97,6 +97,8 @@ The protocol is a project-local directory containing:
 └── events.jsonl       # legacy global event log; readable during transition
 ```
 
+Tool-specific sidecars may exist under `.tandem/`. The current TUI reads optional `.tandem/config.toml` for display preferences such as Board tag badge opt-ins; this is not the protocol workspace config and must not replace `.tandem/tandem.md`.
+
 Tandem examples use the project-local directory and config file:
 
 ```text

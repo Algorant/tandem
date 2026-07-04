@@ -67,12 +67,13 @@ tandem --version
 
 ## Implemented TUI themes and keys
 
-`tandem tui` starts from the built-in `default-dark` palette, discovers user theme files, applies the user's XDG config, and finally applies any workspace override:
+`tandem tui` starts from the built-in `default-dark` palette, discovers user theme files, applies the user's XDG config, applies any workspace theme override, then applies workspace display config:
 
 1. built-in presets: `default-dark` and `verdigris`
 2. user theme files: `$XDG_CONFIG_HOME/tandem/themes/*.toml`, or `~/.config/tandem/themes/*.toml` when `XDG_CONFIG_HOME` is unset
 3. user config: `$XDG_CONFIG_HOME/tandem/config.toml`, or `~/.config/tandem/config.toml` when `XDG_CONFIG_HOME` is unset
-4. workspace selector/override: `.tandem/theme.toml`
+4. workspace theme selector/override: `.tandem/theme.toml`
+5. workspace TUI display config: `.tandem/config.toml`
 
 Use the user config for your normal machine-wide preference:
 
@@ -82,7 +83,7 @@ transparent_background = true
 badge_style = "muted"
 ```
 
-Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user/workspace config may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names) and supported root settings:
+Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user config and workspace `.tandem/theme.toml` may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names) and supported root settings:
 
 ```toml
 theme = "my-custom-dark"
@@ -114,33 +115,34 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`), `badge_style` (optional; default `muted`) or `[badges] style`
 - `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
-- `[badges]`: `style`, `disabled` (list of built-in badge IDs or configured tag names to suppress)
-- `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, or `muted`) for project/user opt-in tag badges
+- `[badges]`: `style` for visual badge styling; legacy `disabled` remains accepted during migration
+- `[board.badges]` or legacy `[badges]`: `disabled` (list of built-in badge IDs or configured tag names to suppress)
+- `[board.badges.tags.<tag>]` or legacy `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, or `muted`) for project/user opt-in tag badges
 - `[badges.accord]`: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
-In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme files are non-fatal and appear as theme warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
+In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
 
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
 
 `badge_style` controls Board priority/status/tag chips: `muted` (default softened fill), `accent` (small colored rail), `text` (colored label), `ghost` (transparent chip outline), or `solid` (legacy saturated fill). Rounded-edge badge rendering remains deferred.
 
-Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in, not global defaults:
+Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in, not global defaults. Configure extra tag badges or suppress badges in user config or workspace `.tandem/config.toml`:
 
 ```toml
-[badges]
+[board.badges]
 disabled = ["deliverable", "visual"]
 
-[badges.tags.tui]
+[board.badges.tags.tui]
 label = "TUI"
 tone = "accent"
 
-[badges.tags.docs]
+[board.badges.tags.docs]
 # label defaults to "DOCS"
 tone = "success"
 ```
 
-User config applies before workspace `.tandem/theme.toml`; workspace badge config is therefore the final override. `disabled` is a simple suppression list for built-ins or configured tag names, not a regex/rule engine.
+User config applies before workspace `.tandem/config.toml`; workspace badge config is therefore the final override. Legacy `[badges]` / `[badges.tags.*]` sections in theme files are still read during migration, but `.tandem/theme.toml` should remain for theme selection/color/style behavior. `disabled` is a simple suppression list for built-ins or configured tag names, not a regex/rule engine.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 
@@ -186,5 +188,5 @@ User config applies before workspace `.tandem/theme.toml`; workspace badge confi
 - Validation queue: Board state/subview for delivered work awaiting accept/rework/complete in v0.
 - Keymaps: fixed defaults in v0; custom keymap config later.
 - Markdown rendering: styled basics in v0.
-- Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`.
+- Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badges load from user config and workspace `.tandem/config.toml`.
 - Deferred from v0: non-core command families and integrations listed in `plan/spec.md`, plus schemas, fixtures, and root Rust workspace layout.

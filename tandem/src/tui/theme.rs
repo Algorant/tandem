@@ -295,7 +295,8 @@ impl TuiTheme {
         };
         warnings.extend(user_themes.warnings.clone());
 
-        if let Some(user_config_path) = user_config_path.as_deref() {
+        let user_config_path = user_config_path.as_deref();
+        if let Some(user_config_path) = user_config_path {
             apply_theme_config_file(
                 &mut theme,
                 &mut source,
@@ -307,7 +308,7 @@ impl TuiTheme {
             );
         }
 
-        let workspace_theme = workspace.config_path.with_file_name("theme.toml");
+        let workspace_theme = workspace_theme_path(workspace);
         apply_theme_config_file(
             &mut theme,
             &mut source,
@@ -317,6 +318,16 @@ impl TuiTheme {
             user_theme_dir.as_deref(),
             no_color,
         );
+        if let Some(user_config_path) = user_config_path {
+            apply_display_config_file(&mut theme, &mut warnings, user_config_path);
+        }
+        // Compatibility: older workspaces used .tandem/theme.toml for Board badge
+        // display semantics. Keep reading those sections during migration, but let
+        // the dedicated workspace config sidecar win when both files exist.
+        apply_display_config_file(&mut theme, &mut warnings, &workspace_theme);
+
+        let workspace_config = workspace_config_path(workspace);
+        apply_display_config_file(&mut theme, &mut warnings, &workspace_config);
 
         ThemeLoad {
             theme,
@@ -775,16 +786,13 @@ impl TuiTheme {
                             "Theme warning line {line_number}: invalid badge style for `{section}.{key}`: use muted, accent, text, ghost, or solid"
                         )),
                     }
-                    continue;
                 }
-                if matches!(key.as_str(), "disabled" | "disable") {
-                    self.badge_config.disabled = parse_badge_disabled_list(&value);
-                    continue;
-                }
+                // Other [badges] keys are Board display semantics and are handled by
+                // apply_display_content so theme files stay focused on style.
+                continue;
             }
 
-            if let Some(tag) = section.strip_prefix("badges.tags.") {
-                self.apply_tag_badge_config(tag, &key, &value, line_number, &mut warnings);
+            if is_display_badge_section(&section) {
                 continue;
             }
 
@@ -805,8 +813,74 @@ impl TuiTheme {
         warnings
     }
 
+    pub(super) fn apply_display_content(&mut self, content: &str) -> Vec<String> {
+        let mut section = String::new();
+        let mut warnings = Vec::new();
+
+        for (index, raw_line) in content.lines().enumerate() {
+            let line_number = index + 1;
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+
+            if line.starts_with('[') {
+                if line.ends_with(']') {
+                    section = line[1..line.len() - 1].trim().to_ascii_lowercase();
+                } else {
+                    warnings.push(format!(
+                        "Config warning line {line_number}: malformed section header"
+                    ));
+                }
+                continue;
+            }
+
+            let Some((raw_key, raw_value)) = line.split_once('=') else {
+                if is_display_badge_section(&section) {
+                    warnings.push(format!(
+                        "Config warning line {line_number}: expected key = value"
+                    ));
+                }
+                continue;
+            };
+            let key = raw_key.trim().to_ascii_lowercase();
+            if key.is_empty() {
+                if is_display_badge_section(&section) {
+                    warnings.push(format!("Config warning line {line_number}: empty key"));
+                }
+                continue;
+            }
+            let value = parse_value(raw_value);
+
+            if is_display_badge_list_section(&section) {
+                if matches!(key.as_str(), "disabled" | "disable") {
+                    self.badge_config.disabled = parse_badge_disabled_list(&value);
+                } else if !matches!(key.as_str(), "style" | "badge_style" | "badge-style") {
+                    warnings.push(format!(
+                        "Config warning line {line_number}: unknown badge key `{section}.{key}`"
+                    ));
+                }
+                continue;
+            }
+
+            if let Some(tag) = display_badge_tag_name(&section) {
+                self.apply_tag_badge_config(
+                    &section,
+                    tag,
+                    &key,
+                    &value,
+                    line_number,
+                    &mut warnings,
+                );
+            }
+        }
+
+        warnings
+    }
+
     fn apply_tag_badge_config(
         &mut self,
+        section: &str,
         tag: &str,
         key: &str,
         value: &str,
@@ -816,7 +890,7 @@ impl TuiTheme {
         let tag_id = normalized_badge_id(tag);
         if tag_id.is_empty() {
             warnings.push(format!(
-                "Theme warning line {line_number}: empty badge tag name"
+                "Config warning line {line_number}: empty badge tag name"
             ));
             return;
         }
@@ -833,11 +907,11 @@ impl TuiTheme {
             "tone" => match parse_status_tone(value) {
                 Some(tone) => config.tone = tone,
                 None => warnings.push(format!(
-                    "Theme warning line {line_number}: invalid badge tone for `badges.tags.{tag}.{key}`: use accent, success, warning, error, or muted"
+                    "Config warning line {line_number}: invalid badge tone for `{section}.{key}`: use accent, success, warning, error, or muted"
                 )),
             },
             _ => warnings.push(format!(
-                "Theme warning line {line_number}: unknown badge tag key `badges.tags.{tag}.{key}`"
+                "Config warning line {line_number}: unknown badge tag key `{section}.{key}`"
             )),
         }
     }
@@ -895,6 +969,14 @@ pub(super) fn user_theme_dir_from_env() -> Option<PathBuf> {
 
 pub(super) fn user_config_path_from_env() -> Option<PathBuf> {
     user_config_dir_from_env().map(|dir| dir.join("config.toml"))
+}
+
+pub(super) fn workspace_theme_path(workspace: &Workspace) -> PathBuf {
+    workspace.config_path.with_file_name("theme.toml")
+}
+
+pub(super) fn workspace_config_path(workspace: &Workspace) -> PathBuf {
+    workspace.config_path.with_file_name("config.toml")
 }
 
 fn user_config_dir_from_env() -> Option<PathBuf> {
@@ -1000,6 +1082,10 @@ fn load_user_themes(dir: &Path) -> UserThemeRegistry {
             &path,
             theme.apply_theme_content(&content),
         ));
+        registry.warnings.extend(prefix_config_warnings(
+            &path,
+            theme.apply_display_content(&content),
+        ));
         if explicit_name.is_none() {
             theme.name = theme_name.clone();
         }
@@ -1067,6 +1153,28 @@ fn apply_theme_config_file(
     *source = format!("{selected_source} + {}", display_path(path));
 }
 
+fn apply_display_config_file(theme: &mut TuiTheme, warnings: &mut Vec<String>, path: &Path) {
+    if !path.exists() {
+        return;
+    }
+
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            warnings.push(format!(
+                "Config warning: could not read {}: {error}",
+                display_path(path)
+            ));
+            return;
+        }
+    };
+
+    warnings.extend(prefix_config_warnings(
+        path,
+        theme.apply_display_content(&content),
+    ));
+}
+
 fn resolve_theme_reference(name: &str, user_themes: &UserThemeRegistry) -> Option<ResolvedTheme> {
     let key = normalized(name);
     if let Some(user_theme) = user_themes.themes.get(&key) {
@@ -1092,6 +1200,16 @@ fn prefix_theme_warnings(path: &Path, warnings: Vec<String>) -> Vec<String> {
         .map(|warning| match warning.strip_prefix("Theme warning ") {
             Some(rest) => format!("Theme warning {}: {rest}", display_path(path)),
             None => format!("Theme warning {}: {warning}", display_path(path)),
+        })
+        .collect()
+}
+
+fn prefix_config_warnings(path: &Path, warnings: Vec<String>) -> Vec<String> {
+    warnings
+        .into_iter()
+        .map(|warning| match warning.strip_prefix("Config warning ") {
+            Some(rest) => format!("Config warning {}: {rest}", display_path(path)),
+            None => format!("Config warning {}: {warning}", display_path(path)),
         })
         .collect()
 }
@@ -1187,6 +1305,21 @@ fn parse_status_tone(value: &str) -> Option<StatusTone> {
         "muted" | "none" => Some(StatusTone::Muted),
         _ => None,
     }
+}
+
+fn is_display_badge_section(section: &str) -> bool {
+    is_display_badge_list_section(section) || display_badge_tag_name(section).is_some()
+}
+
+fn is_display_badge_list_section(section: &str) -> bool {
+    matches!(section, "badges" | "board.badges" | "display.badges")
+}
+
+fn display_badge_tag_name(section: &str) -> Option<&str> {
+    section
+        .strip_prefix("badges.tags.")
+        .or_else(|| section.strip_prefix("board.badges.tags."))
+        .or_else(|| section.strip_prefix("display.badges.tags."))
 }
 
 fn parse_badge_disabled_list(value: &str) -> BTreeSet<String> {
@@ -1443,16 +1576,16 @@ changes-requested = "#eb6f92"
     #[test]
     fn badge_config_supports_disabled_ids_and_tag_labels() {
         let mut theme = TuiTheme::default_dark();
-        let warnings = theme.apply_theme_content(
+        let warnings = theme.apply_display_content(
             r#"
-[badges]
+[board.badges]
 disabled = ["deliverable", "visual", "accord:failed"]
 
-[badges.tags.tui]
+[board.badges.tags.tui]
 label = "TUI"
 tone = "success"
 
-[badges.tags.docs]
+[board.badges.tags.docs]
 tone = "warning"
 "#,
         );
@@ -1473,9 +1606,9 @@ tone = "warning"
     #[test]
     fn invalid_badge_tone_warns_and_keeps_default_tone() {
         let mut theme = TuiTheme::default_dark();
-        let warnings = theme.apply_theme_content(
+        let warnings = theme.apply_display_content(
             r#"
-[badges.tags.spec]
+[board.badges.tags.spec]
 label = "SPEC"
 tone = "neon"
 "#,
@@ -1598,7 +1731,16 @@ transparent_background = true
         let workspace = workspace_at(&root);
         let user_config_path = root.join("xdg").join("tandem").join("config.toml");
         std::fs::create_dir_all(user_config_path.parent().unwrap()).unwrap();
-        std::fs::write(&user_config_path, "theme = \"verdigris\"\n").unwrap();
+        std::fs::write(
+            &user_config_path,
+            r#"
+theme = "verdigris"
+
+[board.badges.tags.docs]
+tone = "success"
+"#,
+        )
+        .unwrap();
         std::fs::write(
             workspace.config_path.with_file_name("theme.toml"),
             r##"
@@ -1624,12 +1766,14 @@ accent = "#010203"
         );
         assert_eq!(load.theme.name(), "default-dark");
         assert_eq!(load.theme.colors.accent, Color::Rgb(1, 2, 3));
+        let docs = load.theme.tag_badge("docs").expect("global display badge");
+        assert_eq!(docs.tone(), StatusTone::Success);
         assert!(load.source.contains(".tandem/theme.toml") || load.source.contains("theme.toml"));
         let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
-    fn workspace_badge_config_overrides_global_disabled_list() {
+    fn workspace_display_config_overrides_global_disabled_list() {
         let root = temp_theme_dir("badge-precedence");
         let workspace = workspace_at(&root);
         let user_config_path = root.join("xdg").join("tandem").join("config.toml");
@@ -1646,12 +1790,12 @@ tone = "success"
         )
         .unwrap();
         std::fs::write(
-            workspace.config_path.with_file_name("theme.toml"),
+            workspace.config_path.with_file_name("config.toml"),
             r#"
-[badges]
+[board.badges]
 disabled = ["deliverable"]
 
-[badges.tags.tui]
+[board.badges.tags.tui]
 label = "TUI"
 "#,
         )
@@ -1674,6 +1818,48 @@ label = "TUI"
         let tui = load.theme.tag_badge("tui").expect("merged tui badge");
         assert_eq!(tui.label_for("tui"), "TUI");
         assert_eq!(tui.tone(), StatusTone::Success);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn legacy_workspace_theme_badge_config_still_loads_before_workspace_config() {
+        let root = temp_theme_dir("legacy-badge-config");
+        let workspace = workspace_at(&root);
+        std::fs::write(
+            workspace.config_path.with_file_name("theme.toml"),
+            r#"
+[badges]
+disabled = ["visual"]
+
+[badges.tags.tui]
+tone = "warning"
+"#,
+        )
+        .unwrap();
+        std::fs::write(
+            workspace.config_path.with_file_name("config.toml"),
+            r#"
+[board.badges]
+disabled = ["deliverable"]
+
+[board.badges.tags.tui]
+label = "TUI"
+"#,
+        )
+        .unwrap();
+
+        let load = TuiTheme::load_for_workspace_with_options(&workspace, None, None, false);
+
+        assert!(
+            load.warnings.is_empty(),
+            "unexpected warnings: {:?}",
+            load.warnings
+        );
+        assert!(load.theme.badge_disabled("deliverable"));
+        assert!(!load.theme.badge_disabled("visual"));
+        let tui = load.theme.tag_badge("tui").expect("merged tui badge");
+        assert_eq!(tui.label_for("tui"), "TUI");
+        assert_eq!(tui.tone(), StatusTone::Warning);
         let _ = std::fs::remove_dir_all(root);
     }
 
