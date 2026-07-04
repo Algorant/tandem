@@ -12,8 +12,8 @@ const verdigrisDark = ExpressiveCodeTheme.fromJSONString(
 );
 
 export default defineConfig({
-  site: 'https://algorant.github.io',
-  base: '/tandem',
+  site: 'https://trytandem.dev',
+  base: '/',
   integrations: [
     starlight({
       title: 'Tandem',

@@ -92,10 +92,56 @@ Use this when you want to inspect the generated Starlight content before preview
 
 The workflow `.github/workflows/docs.yml` builds the Starlight site with Node from `site/.node-version`, installs Bun with `oven-sh/setup-bun`, runs `bun install --frozen-lockfile`, and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
 
+Production docs URL: <https://trytandem.dev/>. The Astro config uses `site: 'https://trytandem.dev'` and `base: '/'` so generated links and assets target the custom-domain root. The GitHub project Pages URL remains <https://algorant.github.io/tandem/> and should redirect to the custom domain once GitHub Pages accepts the domain.
+
 Repository setup required in GitHub:
 
 1. Open **Settings → Pages**.
 2. Set **Build and deployment → Source** to **GitHub Actions**.
-3. Ensure Actions are enabled for the private repository and the `github-pages` environment can deploy.
+3. Set **Custom domain** to `trytandem.dev`.
+4. After DNS resolves and GitHub provisions the certificate, enable **Enforce HTTPS**.
+5. Ensure Actions are enabled for the repository and the `github-pages` environment can deploy.
 
-The site config currently uses `site: 'https://algorant.github.io'` and `base: '/tandem'`, matching the expected GitHub Pages project URL.
+Useful `gh` checks:
+
+```sh
+gh api repos/Algorant/tandem/pages \
+  --jq '{html_url, cname, https_enforced, build_type, source, https_certificate}'
+
+gh api repos/Algorant/tandem/pages/health
+```
+
+If the custom domain needs to be set from the CLI:
+
+```sh
+gh api --method PUT repos/Algorant/tandem/pages -f cname=trytandem.dev
+# Retry after DNS/certificate provisioning if GitHub reports that no certificate exists yet.
+gh api --method PUT repos/Algorant/tandem/pages -F https_enforced=true
+```
+
+DNS records for Namecheap **Advanced DNS**:
+
+| Type | Host | Value |
+| --- | --- | --- |
+| A | `@` | `185.199.108.153` |
+| A | `@` | `185.199.109.153` |
+| A | `@` | `185.199.110.153` |
+| A | `@` | `185.199.111.153` |
+| AAAA | `@` | `2606:50c0:8000::153` |
+| AAAA | `@` | `2606:50c0:8001::153` |
+| AAAA | `@` | `2606:50c0:8002::153` |
+| AAAA | `@` | `2606:50c0:8003::153` |
+| CNAME | `www` | `algorant.github.io` |
+
+Remove Namecheap parking/default `@` and `www` records before adding the GitHub Pages records, do not add wildcard records, and allow up to 24 hours for DNS and certificate propagation. `site/public/CNAME` records the intended custom domain in the built artifact; for GitHub Actions Pages, the repository Pages setting is still the authority.
+
+Launch verification:
+
+```sh
+dig trytandem.dev +noall +answer -t A
+dig trytandem.dev +noall +answer -t AAAA
+dig www.trytandem.dev +noall +answer -t CNAME
+curl -I https://trytandem.dev/
+curl -I https://www.trytandem.dev/
+curl -I https://algorant.github.io/tandem/
+```
