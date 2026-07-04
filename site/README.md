@@ -10,11 +10,20 @@ Use Node.js 24 (see `.node-version`) and Bun for local dependency management and
 
 ```sh
 bun install
-bun run dev
-bun run build
+bun run dev       # sync docs and start Astro locally
+bun run build     # sync docs and build site/dist/
+bun run preview   # preview an existing site/dist/ build
 ```
 
 The docs-site package state is locked in `bun.lock`; use `bun install --frozen-lockfile` for reproducible validation. If a workflow needs an npm fallback, document it as a Bun exception with the attempts made, the incompatibility encountered, and the condition for revisiting the fallback.
+
+For local docs quality checks, run the build and internal link checker:
+
+```sh
+bun run check:docs
+```
+
+`check:docs` runs `bun run build` and then validates local links, assets, and fragments in the built HTML. External URLs are intentionally skipped so local and CI checks are deterministic.
 
 ## Theme assets
 
@@ -27,16 +36,26 @@ The site uses a standalone vendored Verdigris theme instead of a Starlight theme
 
 Useful scripts:
 
-- `bun run sync:docs` — clear Starlight's generated content cache, then copy canonical Markdown from `../docs/` into Starlight's content collection.
+- `bun run sync:docs` — clear Starlight's generated content cache, remove generated Markdown copies, then copy canonical Markdown from `../docs/` into Starlight's content collection while preserving `src/content/docs/.gitignore` and `README.txt`.
 - `bun run dev` — sync docs, then start Astro's local dev server with `--force` so rendered code blocks pick up theme changes.
 - `bun run build` — sync docs, then write static output to `dist/` with `--force`.
+- `bun run check:links` — validate internal links, assets, and fragments in an existing `dist/` build.
+- `bun run check:docs` — run the full local docs quality gate: build, then link-check.
 - `bun run preview` — preview the built `dist/` output locally.
 
-Do not commit `node_modules/`, `.astro/`, `dist/`, or generated Markdown copies under `src/content/docs/`.
+## Docs update checklist
+
+1. Edit canonical source under `../docs/`; do not edit generated Markdown copies under `src/content/docs/`.
+2. If you add, remove, or rename top-level pages, update the Starlight sidebar in `astro.config.mjs`.
+3. Run `bun run dev` for live preview, or `bun run sync:docs` when you only need to inspect generated Starlight content.
+4. Before opening a PR, run `bun install --frozen-lockfile` when dependencies changed, then `bun run check:docs`.
+5. Confirm `git status --short --ignored src/content/docs` shows generated Markdown as ignored, not staged.
+
+Do not commit `node_modules/`, `.astro/`, `dist/`, or generated Markdown copies under `src/content/docs/`. The nested `.gitignore` in `src/content/docs/` keeps copied docs ignored while allowing the tracked `.gitignore` and `README.txt` notice.
 
 ## GitHub Pages deployment
 
-The workflow `.github/workflows/docs.yml` builds the Starlight site and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
+The workflow `.github/workflows/docs.yml` builds the Starlight site, runs the internal link checker against `site/dist/`, and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build, link check, and upload step but skip deployment.
 
 Production docs URL: <https://trytandem.dev/>. The Astro config uses `site: 'https://trytandem.dev'` and `base: '/'` so generated links and assets target the custom-domain root. The GitHub project Pages URL remains <https://algorant.github.io/tandem/> and should redirect to the custom domain once GitHub Pages accepts the domain.
 

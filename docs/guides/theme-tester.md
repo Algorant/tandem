@@ -17,7 +17,7 @@ The canonical docs sync currently copies plain `.md` files from `docs/` into Sta
 
 # H1 verdigris headline
 
-A page-level heading should read green and confident without washing out the body copy. This paragraph includes an [internal docs-site workflow link](./docs-site.md), an [external Astro link](https://astro.build/), and inline code such as `tandem accord deliver`.
+A page-level heading should read green and confident without washing out the body copy. This paragraph includes an [internal docs-site workflow link](/guides/docs-site/), an [external Astro link](https://astro.build/), and inline code such as `tandem accord deliver`.
 
 ## H2 aqua section
 
@@ -43,7 +43,7 @@ H6 headings should stay quiet and muted.
 
 Tandem docs should remain readable before they become decorative. Body copy uses a warm neutral foreground, while links and inline code carry enough Verdigris identity to be discoverable during scanning.
 
-- Internal link: [Guides overview](./index.md)
+- Internal link: [Guides overview](/guides/)
 - External link: [Starlight authoring content](https://starlight.astro.build/guides/authoring-content/)
 - Inline code: `state: validation`, `accord.status: delivered`, and `bun run build`
 

@@ -18,7 +18,7 @@ The docs site should use a supported even-numbered Node.js LTS runtime, not an a
 
 The GitHub Pages workflow and local shortcuts read `site/.node-version`, currently `24`. Node 24 is the current LTS line and satisfies Astro's `>=22.12.0` requirement without pinning to an obsolete or odd-numbered release. Node 22 would also satisfy the minimum, but it is already a Maintenance LTS line; prefer Node 24 for the deployment workflow unless a compatibility issue appears.
 
-Use Bun for docs-site dependency management and script execution. The site has `site/bun.lock`; use `bun install --frozen-lockfile` when validating the committed lockfile. Keep `site/package.json` package-manager metadata aligned with the Bun version used to generate the lockfile. Bun is the default package manager per decision-2. Preserve an npm fallback only as a documented exception that records what Bun avenues were tried, why they failed, and what condition would allow revisiting the exception. The GitHub Pages workflow and `just` shortcuts install from `bun.lock` and run docs scripts with Bun.
+Use Bun for docs-site dependency management and script execution. The site has `site/bun.lock`; use `bun install --frozen-lockfile` when validating the committed lockfile. Keep `site/package.json` package-manager metadata aligned with the Bun version used to generate the lockfile. Bun is the default package manager per decision-2. Preserve an npm fallback only as a documented exception that records what Bun avenues were tried, why they failed, and what condition would allow revisiting the exception. The GitHub Pages workflow and `just` shortcuts install from `bun.lock`, run docs scripts with Bun, and keep the build entrypoint in CI before link validation.
 
 Upstream references:
 
@@ -72,7 +72,25 @@ The `predev` hook syncs `../docs/` into Starlight before the dev server starts. 
 just site-build
 ```
 
-The shortcut mirrors the GitHub Pages workflow with `bun install --frozen-lockfile`, then `bun run build`; the `prebuild` hook runs `bun run sync:docs`, and Astro writes static output to `site/dist/`.
+The shortcut mirrors the GitHub Pages workflow's install and build phase with `bun install --frozen-lockfile`, then `bun run build`; the `prebuild` hook runs `bun run sync:docs`, and Astro writes static output to `site/dist/`.
+
+For the full local quality gate from inside `site/`, run:
+
+```sh
+bun run check:docs
+```
+
+`check:docs` builds the site and then runs the internal link checker against `site/dist/`.
+
+## Link check built output
+
+```sh
+cd site
+bun run build
+bun run check:links
+```
+
+`check:links` validates local links, assets, and fragments in built HTML. It intentionally skips external URLs so docs CI does not fail because of transient remote outages or bot-blocking. Use manual browser checks or an external URL checker when changing outbound links that need extra scrutiny.
 
 ## Manual sync
 
@@ -83,14 +101,24 @@ bun run sync:docs
 
 Use this when you want to inspect the generated Starlight content before previewing or building.
 
+## Docs update checklist
+
+1. Edit canonical Markdown under `docs/`; never edit generated copies in `site/src/content/docs/`.
+2. Update `site/astro.config.mjs` navigation when pages are added, removed, renamed, or moved.
+3. Use `cd site && bun run dev` for local preview. The `predev` hook syncs source docs first.
+4. Use `cd site && bun run sync:docs` only when you need to inspect the generated Starlight content collection without starting Astro.
+5. Before review, run `cd site && bun run check:docs`. If dependencies changed, run `bun install --frozen-lockfile` first.
+6. Check `git status --short --ignored site/src/content/docs`: copied Markdown should be ignored, and only `.gitignore` plus `README.txt` should be tracked in that generated tree.
+
 ## Maintenance notes
 
 - Commit source changes under `docs/` and site tooling changes under `site/`.
 - Do not commit `site/dist/`, `site/.astro/`, or `site/node_modules/`.
-- Keep generated `site/src/content/docs/**/*.md` out of version control; it exists only to bridge canonical docs into Starlight.
+- Keep generated `site/src/content/docs/**/*.md` out of version control; it exists only to bridge canonical docs into Starlight. The nested `.gitignore` ignores copied Markdown while allowing the tracked `.gitignore` and `README.txt` notice.
+
 ## GitHub Pages deployment
 
-The workflow `.github/workflows/docs.yml` builds the Starlight site with Node from `site/.node-version`, installs Bun with `oven-sh/setup-bun`, runs `bun install --frozen-lockfile`, and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build and upload step but skip deployment.
+The workflow `.github/workflows/docs.yml` builds the Starlight site with Node from `site/.node-version`, installs Bun with `oven-sh/setup-bun`, runs `bun install --frozen-lockfile`, runs `bun run build`, checks built internal links with `bun run check:links`, and deploys `site/dist/` to GitHub Pages on pushes to `main` or manual dispatch. Pull requests run the build, link check, and upload step but skip deployment.
 
 Production docs URL: <https://trytandem.dev/>. The Astro config uses `site: 'https://trytandem.dev'` and `base: '/'` so generated links and assets target the custom-domain root. The GitHub project Pages URL remains <https://algorant.github.io/tandem/> and should redirect to the custom domain once GitHub Pages accepts the domain.
 

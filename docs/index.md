@@ -11,12 +11,12 @@ This docs tree is the canonical Markdown source for Tandem documentation. The `s
 
 ## Start here
 
-- [Concepts](./concepts/index.md) explains Tandem's core vocabulary.
-- [Protocol](./protocol/index.md) describes the `.tandem/` file model.
-- [CLI](./cli/index.md) covers the `tandem` command.
-- [TUI](./tui/index.md) covers the terminal interface.
-- [Extensions](./extensions/index.md) covers integration adapters.
-- [Guides](./guides/index.md) collects task-oriented workflows.
+- [Concepts](/concepts/) explains Tandem's core vocabulary.
+- [Protocol](/protocol/) describes the `.tandem/` file model.
+- [CLI](/cli/) covers the `tandem` command.
+- [TUI](/tui/) covers the terminal interface.
+- [Extensions](/extensions/) covers integration adapters.
+- [Guides](/guides/) collects task-oriented workflows.
 
 ## Current status
 

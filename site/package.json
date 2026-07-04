@@ -14,6 +14,8 @@
     "start": "astro dev --force",
     "prebuild": "bun run sync:docs",
     "build": "astro build --force",
+    "check:links": "node scripts/check-links.mjs dist",
+    "check:docs": "bun run build && bun run check:links",
     "preview": "astro preview",
     "sync:docs": "node scripts/sync-docs.mjs"
   },

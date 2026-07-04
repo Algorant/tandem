@@ -45,6 +45,9 @@ jobs:
       - name: Build docs
         working-directory: site
         run: bun run build
+      - name: Check built docs links
+        working-directory: site
+        run: bun run check:links
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5
         with:
