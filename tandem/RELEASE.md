@@ -1,6 +1,6 @@
 # Tandem CLI/TUI release checklist
 
-## v0.4.0 (recommended tag: `tandem-v0.4.0`)
+## v0.4.1 (recommended tag: `tandem-v0.4.1`)
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
@@ -63,7 +63,7 @@ Release flow:
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.0 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.1 --path tandem --locked
 tandem --version
 ```
 
@@ -104,7 +104,7 @@ git diff --check
 ### Release commands
 
 ```text
-git tag -a tandem-v0.4.0 -m "Release tandem v0.2.2"
+git tag -a tandem-v0.4.1 -m "Release tandem v0.4.1"
 git push origin main
-git push origin tandem-v0.4.0
+git push origin tandem-v0.4.1
 ```
