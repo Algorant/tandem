@@ -314,6 +314,8 @@ tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|me
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
+  - no body/creation fields such as `--description` or `--subtask`; set them during `tandem add` in v0.
+  - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata.
   - no `parentId` update and no clear/remove flags in v0.
   - completed logs are not updated.
 - Validation:

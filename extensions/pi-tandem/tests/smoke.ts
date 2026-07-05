@@ -97,6 +97,21 @@ assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init build
 const updateArgs = buildTaskArgs({ action: "update", id: "task-1", priority: "high", tags: ["cli"] });
 assert(updateArgs.join(" ") === "update task-1 --priority high --tag cli", "tandem_task update builder should map metadata flags");
 
+for (const [field, params] of [
+	["description", { description: "new body" }],
+	["subtasks", { subtasks: ["new checklist item"] }],
+	["accord", { accord: "ready" }],
+	["review", { review: "pending" }],
+] as const) {
+	let rejected = false;
+	try {
+		buildTaskArgs({ action: "update", id: "task-1", ...params });
+	} catch (err) {
+		rejected = err instanceof Error && err.message.includes(`does not support ${field}`);
+	}
+	assert(rejected, `tandem_task update builder should reject unsupported ${field}`);
+}
+
 const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
 assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");
 assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
@@ -125,6 +140,14 @@ try {
 
 	const shown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
 	assert(shown.data.document.title === "Smoke task", "show should return created task");
+
+	let unsupportedUpdateRejected = false;
+	try {
+		buildTaskArgs({ action: "update", id: taskId, description: "Not supported by tandem update" });
+	} catch (err) {
+		unsupportedUpdateRejected = err instanceof Error && err.message.includes("description") && err.message.includes("Supported update fields");
+	}
+	assert(unsupportedUpdateRejected, "unsupported update fields should fail before invoking tandem update");
 
 	const updateOutput = await runTandem(tandem, buildTaskArgs({
 		action: "update",

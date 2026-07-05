@@ -173,6 +173,27 @@ function addRepeatedFlag(args: string[], flag: string, values: unknown): void {
 	}
 }
 
+function hasStringValue(value: unknown): boolean {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasStringArrayValue(value: unknown): boolean {
+	return Array.isArray(value) && value.some((item) => hasStringValue(item));
+}
+
+function rejectUnsupportedUpdateFields(params: TaskToolParams): void {
+	const unsupported: string[] = [];
+	if (hasStringValue(params.description)) unsupported.push("description");
+	if (hasStringArrayValue(params.subtasks)) unsupported.push("subtasks");
+	if (hasStringValue(params.accord)) unsupported.push("accord");
+	if (hasStringValue(params.review)) unsupported.push("review");
+	if (!unsupported.length) return;
+	throw new Error(
+		`tandem_task update does not support ${unsupported.join(", ")}. ` +
+			"Use tandem_task action=add for description/subtasks when creating tasks; use tandem_accord for accord lifecycle changes; review metadata is managed by review/validation flows, not tandem update. Supported update fields are title, priority, assignee, dueDate, tags, blockers, references, and relatedFiles.",
+	);
+}
+
 function wantsJson(params: ReadJsonFlag): boolean {
 	return params.json !== false;
 }
@@ -219,6 +240,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		return ["move", requireString(params.id, "tandem_task move requires id"), "--state", requireString(params.state, "tandem_task move requires state")];
 	}
 	if (action === "update") {
+		rejectUnsupportedUpdateFields(params);
 		const args = ["update", requireString(params.id, "tandem_task update requires id")];
 		addOptionalFlag(args, "--title", params.title);
 		addOptionalFlag(args, "--priority", params.priority);
@@ -527,7 +549,7 @@ export const tandemTaskParameters = Type.Object({
 	title: Type.Optional(Type.String()),
 	state: Type.Optional(Type.String()),
 	type: Type.Optional(Type.String({ description: "Filter document type for list, usually task or decision." })),
-	description: Type.Optional(Type.String()),
+	description: Type.Optional(Type.String({ description: "Task body/description for action=add only; action=update intentionally rejects this field because `tandem update` does not edit document bodies in v0." })),
 	priority: Type.Optional(Type.String()),
 	tags: Type.Optional(Type.Array(Type.String())),
 	assignee: Type.Optional(Type.String()),
@@ -536,9 +558,9 @@ export const tandemTaskParameters = Type.Object({
 	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tandem add fail." })),
 	references: Type.Optional(Type.Array(Type.String(), { description: "Related Tandem document IDs such as decisions, sibling tasks, or logs. Prefer existing IDs; missing IDs are warnings, not hard blockers." })),
 	relatedFiles: Type.Optional(Type.Array(Type.String(), { description: "Project-relative file paths relevant to the task for implementation or review context." })),
-	subtasks: Type.Optional(Type.Array(Type.String(), { description: "Lightweight checklist item titles. Use child tasks with parent when work needs its own owner, accord, review, or blockers." })),
-	accord: Type.Optional(Type.String()),
-	review: Type.Optional(Type.String()),
+	subtasks: Type.Optional(Type.Array(Type.String(), { description: "Lightweight checklist item titles for action=add only. Use child tasks with parent when work needs its own owner, accord, review, or blockers; action=update intentionally rejects this field." })),
+	accord: Type.Optional(Type.String({ description: "Filter value for action=list only. Use tandem_accord for accord lifecycle changes; action=update intentionally rejects this field." })),
+	review: Type.Optional(Type.String({ description: "Filter value for action=list only. Review metadata is managed by review/validation flows; action=update intentionally rejects this field." })),
 	filesChanged: Type.Optional(Type.Array(Type.String())),
 	summary: Type.Optional(Type.String({ description: "Required for action=complete; maps to `tandem complete --summary`." })),
 	validation: Type.Optional(Type.String()),
@@ -547,7 +569,7 @@ export const tandemTaskParameters = Type.Object({
 
 function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists. Use action=update for task metadata edits; state remains action=move, and parentId is not updatable.\n- Epics are ordinary tasks with \`type: task\` plus \`kind: epic\`; use parent/parentId for epic children and references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- When creating related work, use tandem_task relationship fields: parent for hierarchy, blockers for strict dependencies, references for related Tandem docs, relatedFiles for project paths, and subtasks for lightweight in-task checklists. Use action=update only for supported metadata edits (title, priority, assignee, dueDate, tags, blockers, references, relatedFiles); state remains action=move, parentId is not updatable, description/subtasks are creation-time fields, and accord changes go through tandem_accord.\n- Epics are ordinary tasks with \`type: task\` plus \`kind: epic\`; use parent/parentId for epic children and references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -599,14 +621,14 @@ export default function piTandem(pi: ExtensionAPI) {
 		name: "tandem_task",
 		label: "Tandem Task",
 		...createTandemToolRenderer("tandem_task", "Tandem Task"),
-		description: "Run task-oriented `tandem` commands: list, show, add, move, update, or complete. Read actions default to `--json`; mutations preserve human-readable CLI output.",
+		description: "Run task-oriented `tandem` commands: list, show, add, move, update, or complete. Update supports metadata fields only; use add for description/subtasks and tandem_accord for accord lifecycle. Read actions default to `--json`; mutations preserve human-readable CLI output.",
 		promptSnippet: "Use tandem_task for Tandem task list/show/add/move/update/complete operations instead of editing .tandem files directly.",
 		promptGuidelines: [
 			"Use tandem_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
 			"Prefer tandem_task read actions with the default JSON output for reliable task inspection.",
 			"When decomposing work, set relationship fields explicitly: parent for hierarchy, blockers for hard dependencies, references for related tasks/decisions/logs, relatedFiles for repo paths, and subtasks for lightweight checklists.",
 			"Model epics as ordinary tasks with type: task plus kind: epic; use parent/parentId for epic children, references for loose related context, and do not invent type: epic or ADR-style epic records.",
-			"Use tandem_task action=update for active task metadata edits. State remains action=move, and parentId is not updatable.",
+			"Use tandem_task action=update only for supported active task metadata edits: title, priority, assignee, dueDate, tags, blockers, references, and relatedFiles. State remains action=move, parentId is not updatable, description/subtasks are creation-time fields, and accord changes go through tandem_accord.",
 			"Create or inspect parent and blocker documents before referencing them; tandem validates parent/blockers strictly, while references are related context and only warn if unresolved.",
 			"Prefer state=validation for delivered work awaiting human/product judgment; existing state=review is a legacy alias only.",
 			"Do not use tandem_task complete unless the user or orchestrator explicitly asks to archive completed work.",
