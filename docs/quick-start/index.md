@@ -13,9 +13,31 @@ The workflow below is CLI/TUI-only. Agent and editor integrations are optional; 
 
 Choose the lane that matches your environment.
 
-### Curl installer: coming soon
+### Branded curl installer
 
-A curl/`install.sh` style installer is planned, but this repository does not currently document a shipped installer URL. Do not run a guessed install script. Use the Cargo lane for now.
+Install the latest released Tandem binary with the branded installer URL:
+
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
+
+`https://trytandem.dev/install.sh` is a small redirect shim for the cargo-dist generated installer published on the latest GitHub Release. cargo-dist remains the source of truth for OS/architecture detection, release asset selection, and installation behavior.
+
+The installer is user-local and does not require `sudo`. It installs into cargo-dist's user bin directory for this platform, typically a directory such as `~/.local/bin` or `~/.cargo/bin`. If `tandem --version` is not found after installation, add the reported install directory to your shell `PATH`. For example:
+
+```sh
+mkdir -p ~/.local/bin
+printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> ~/.profile
+. ~/.profile
+```
+
+If your install reported `~/.cargo/bin` instead, add that directory instead:
+
+```sh
+printf '\nexport PATH="$HOME/.cargo/bin:$PATH"\n' >> ~/.profile
+. ~/.profile
+```
 
 ### Cargo / Rust: available now
 

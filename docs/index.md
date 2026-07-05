@@ -79,6 +79,9 @@ The goal is shared context that survives beyond chat: project state that can be 
 ## Run one explicit loop
 
 ```sh
+# Install the latest release.
+curl -fsSL https://trytandem.dev/install.sh | sh
+
 # Initialize a local coordination workspace.
 tandem init --title "My Project"
 

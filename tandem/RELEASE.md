@@ -45,6 +45,7 @@ Release flow:
 ### Known limitations
 
 - Binary artifact automation is configured through cargo-dist for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon.
+- The branded docs-site install command is `curl -fsSL https://trytandem.dev/install.sh | sh`; `site/public/install.sh` is only a redirect shim to the cargo-dist generated `tandem-installer.sh` on the latest GitHub Release.
 - No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
 - TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
@@ -52,6 +53,23 @@ Release flow:
 - Markdown rendering is styled basics only.
 - Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope for v0.
 - Docs-site build currently succeeds but may emit a Starlight warning about `Entry docs → 404 was not found`; this is non-blocking for the generated static output and should be tracked as docs-site polish.
+
+### Branded install target
+
+The primary user-facing install command is:
+
+```text
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
+
+The branded endpoint is published from `site/public/install.sh`. It must stay a minimal redirect shim to:
+
+```text
+https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh
+```
+
+Do not fork installer logic into the docs site. Keep OS/architecture detection, release asset selection, checksums, and install behavior in cargo-dist's generated installer. The install should remain user-local/no-sudo. If users cannot run `tandem` after install, direct them to add the reported cargo-dist bin directory, commonly `~/.local/bin` or `~/.cargo/bin`, to `PATH`.
 
 ### Install target for `pi-tandem`
 
@@ -92,6 +110,9 @@ cargo run -- version
 cd ../site
 bun install --frozen-lockfile
 bun run build
+bun run check:links
+test -f dist/install.sh
+rg 'github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh' dist/install.sh
 bun audit --audit-level=high
 cd ..
 bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
