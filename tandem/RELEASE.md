@@ -24,7 +24,7 @@ Release flow:
 3. Keep reusable validation commands, `pi-tandem` install notes, and operational checks in this checklist.
 4. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
 5. Do not include a `Not included` section in public release notes. Readers do not have context for rejected, shelved, or never-shipped work; mention only shipped behavior and current user-facing limitations when useful.
-6. Run `just release <version>`, which publishes the GitHub Release from `GITHUB_RELEASE_NOTES.md`.
+6. Run `just release <version>`, which pushes the release commit and `tandem-v<version>` tag; the cargo-dist GitHub Actions workflow creates the GitHub Release and uploads binary artifacts/checksums.
 
 ### Current capabilities
 
@@ -44,8 +44,8 @@ Release flow:
 
 ### Known limitations
 
-- No binary artifacts are published; install from the git tag with Cargo.
-- No root Rust workspace or split crates; install commands must target `--path tandem`.
+- Binary artifact automation is configured through cargo-dist for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon.
+- No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
 - TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
 - Keybindings are fixed defaults; custom keymap config is deferred.
@@ -104,7 +104,7 @@ git diff --check
 ### Release commands
 
 ```text
-git tag -a tandem-v0.4.1 -m "Release tandem v0.4.1"
-git push origin main
-git push origin tandem-v0.4.1
+just release 0.4.1
 ```
+
+The pushed `tandem-v0.4.1` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives, per-artifact SHA-256 files, and `sha256.sum`.

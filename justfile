@@ -41,9 +41,9 @@ site-build: _check-docs-node
 	bun install --frozen-lockfile
 	bun run build
 
-# Bump tandem to VERSION, validate, commit, tag, push main + tag, and create a concise GitHub Release.
+# Bump tandem to VERSION, validate, commit, tag, and push main + tag.
 # Usage: just release 0.2.1
-# Before running, curate tandem/GITHUB_RELEASE_NOTES.md; tandem/RELEASE.md is the reusable checklist.
+# Pushing the tandem-v* tag triggers cargo-dist release automation; curate tandem/GITHUB_RELEASE_NOTES.md for human-facing notes before tagging.
 release VERSION:
 	#!/usr/bin/env bash
 	set -euo pipefail
@@ -116,4 +116,3 @@ release VERSION:
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main
 	git push origin "$tag"
-	gh release create "$tag" --repo Algorant/tandem --title "Tandem v${version}" --notes-file tandem/GITHUB_RELEASE_NOTES.md
