@@ -1,0 +1,163 @@
+name: Update tandem-bin AUR package
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish to AUR, for example tandem-v0.4.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aur-tandem-bin
+  cancel-in-progress: false
+
+jobs:
+  update-aur:
+    name: Generate PKGBUILD and push to AUR
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+      }}
+    runs-on: ubuntu-22.04
+    container: archlinux:base-devel
+    env:
+      GH_TOKEN: ${{ github.token }}
+      AUR_PACKAGE: tandem-bin
+      AUR_REMOTE: ssh://aur@aur.archlinux.org/tandem-bin.git
+      GIT_AUTHOR_NAME: tandem release automation
+      GIT_AUTHOR_EMAIL: actions@github.com
+      GIT_COMMITTER_NAME: tandem release automation
+      GIT_COMMITTER_EMAIL: actions@github.com
+    steps:
+      - name: Install packaging dependencies
+        run: |
+          pacman -Sy --noconfirm --needed git github-cli openssh jq sudo
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${{ github.event.workflow_run.head_branch }}"
+          fi
+          if [[ ! "$tag" =~ ^tandem-v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release workflow did not provide a Tandem release tag: '$tag'" >&2
+            exit 1
+          fi
+          version="${tag#tandem-v}"
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+      - name: Download release artifact and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh release download "${{ steps.release.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --dir release \
+            --pattern 'tandem-x86_64-unknown-linux-gnu.tar.xz' \
+            --pattern 'sha256.sum'
+          test -s release/tandem-x86_64-unknown-linux-gnu.tar.xz
+          test -s release/sha256.sum
+          checksum="$(awk '$2 == "tandem-x86_64-unknown-linux-gnu.tar.xz" { print $1 }' release/sha256.sum)"
+          if [[ -z "$checksum" ]]; then
+            echo "Could not find tandem-x86_64-unknown-linux-gnu.tar.xz in sha256.sum" >&2
+            cat release/sha256.sum >&2
+            exit 1
+          fi
+          echo "TANDEM_X86_64_SHA256=$checksum" >>"$GITHUB_ENV"
+
+      - name: Configure AUR SSH key
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_KNOWN_HOSTS: ${{ secrets.AUR_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${AUR_SSH_PRIVATE_KEY:-}" ]]; then
+            echo "Missing required GitHub secret AUR_SSH_PRIVATE_KEY" >&2
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          if [[ -n "${AUR_KNOWN_HOSTS:-}" ]]; then
+            printf '%s\n' "$AUR_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -t ed25519 aur.archlinux.org > ~/.ssh/known_hosts
+          fi
+          cat > ~/.ssh/config <<'SSH_CONFIG'
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            IdentitiesOnly yes
+            User aur
+            StrictHostKeyChecking yes
+          SSH_CONFIG
+          chmod 600 ~/.ssh/config
+
+      - name: Generate PKGBUILD and .SRCINFO
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "$AUR_REMOTE" aur-package
+          cd aur-package
+          cat > PKGBUILD <<'PKGBUILD'
+          # Maintainer: Tandem maintainers <actions@github.com>
+          pkgname=tandem-bin
+          pkgver=__PKGVER__
+          pkgrel=1
+          pkgdesc='Local-first CLI/TUI for human and agent project coordination'
+          arch=('x86_64')
+          url='https://github.com/Algorant/tandem'
+          license=('MIT')
+          depends=('gcc-libs')
+          provides=('tandem')
+          conflicts=('tandem')
+          source_x86_64=("tandem-${pkgver}-x86_64-unknown-linux-gnu.tar.xz::https://github.com/Algorant/tandem/releases/download/tandem-v${pkgver}/tandem-x86_64-unknown-linux-gnu.tar.xz")
+          sha256sums_x86_64=('__SHA256__')
+
+          package() {
+            local tandem_bin
+            tandem_bin="$(find "${srcdir}" -type f -name tandem -perm -u+x | head -n 1)"
+            if [[ -z "${tandem_bin}" ]]; then
+              echo 'tandem binary not found in release archive' >&2
+              return 1
+            fi
+            install -Dm755 "${tandem_bin}" "${pkgdir}/usr/bin/tandem"
+          }
+          PKGBUILD
+          sed -i \
+            -e "s/__PKGVER__/${{ steps.release.outputs.version }}/g" \
+            -e "s/__SHA256__/$TANDEM_X86_64_SHA256/g" \
+            PKGBUILD
+          chown -R builder:builder .
+          sudo -u builder makepkg --printsrcinfo > .SRCINFO
+
+      - name: Commit and push AUR update
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd aur-package
+          git config user.name "$GIT_AUTHOR_NAME"
+          git config user.email "$GIT_AUTHOR_EMAIL"
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then
+            echo "AUR package is already up to date for ${{ steps.release.outputs.tag }}."
+            exit 0
+          fi
+          git commit -m "Update tandem-bin to ${{ steps.release.outputs.version }}"
+          git push origin master

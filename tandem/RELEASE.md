@@ -25,6 +25,7 @@ Release flow:
 4. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
 5. Do not include a `Not included` section in public release notes. Readers do not have context for rejected, shelved, or never-shipped work; mention only shipped behavior and current user-facing limitations when useful.
 6. Run `just release <version>`, which pushes the release commit and `tandem-v<version>` tag; the cargo-dist GitHub Actions workflow creates the GitHub Release and uploads binary artifacts/checksums.
+7. After the Release workflow succeeds, the `Update tandem-bin AUR package` workflow updates the `tandem-bin` AUR package from the published Linux x86_64 archive and `sha256.sum`. See `../docs/packaging/aur-tandem-bin.md` for secret setup, AUR remote setup, and recovery steps.
 
 ### Current capabilities
 
@@ -45,6 +46,7 @@ Release flow:
 ### Known limitations
 
 - Binary artifact automation is configured through cargo-dist for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon.
+- AUR binary package automation updates `tandem-bin` for x86_64 after release artifacts/checksums exist; it uses `AUR_SSH_PRIVATE_KEY` to push to AUR and never builds Tandem from source in the AUR package.
 - The available release install command uses the cargo-dist generated installer at `https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh`. The branded docs-site command `curl -fsSL https://trytandem.dev/install.sh | sh` is pending provider-level HTTP redirect configuration and must not be documented as live until that redirect exists.
 - No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
 - Mutation commands are human-readable only; structured JSON mutation output is deferred.
@@ -127,3 +129,5 @@ just release 0.4.1
 ```
 
 The pushed `tandem-v0.4.1` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives, per-artifact SHA-256 files, and `sha256.sum`.
+
+After that workflow completes successfully, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for `tandem-bin`, and pushes the AUR Git remote with the configured SSH key. If the AUR update needs to be retried, run the workflow manually with the same `tandem-v0.4.1` tag.
