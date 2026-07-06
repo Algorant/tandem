@@ -13,16 +13,26 @@ The workflow below is CLI/TUI-only. Agent and editor integrations are optional; 
 
 Choose the lane that matches your environment.
 
-### Branded curl installer
+### Direct cargo-dist installer
 
-Install the latest released Tandem binary with the branded installer URL:
+Install the latest released Tandem binary with the cargo-dist generated installer from GitHub Releases:
 
 ```sh
-curl -fsSL https://trytandem.dev/install.sh | sh
+curl -fsSL https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh | sh
 tandem --version
 ```
 
-`https://trytandem.dev/install.sh` is a small redirect shim for the cargo-dist generated installer published on the latest GitHub Release. cargo-dist remains the source of truth for OS/architecture detection, release asset selection, and installation behavior.
+The GitHub Release asset is the source of truth for OS/architecture detection, release asset selection, and installation behavior.
+
+### Branded installer URL: pending hosting redirect
+
+The intended branded command is:
+
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+```
+
+Do not rely on this command until `https://trytandem.dev/install.sh` is configured as a provider-level HTTP redirect to the cargo-dist generated installer above. GitHub Pages does not provide arbitrary per-path HTTP redirects for static files, and this repository no longer ships a checked-in shell wrapper at that path. See [Docs site hosting](/guides/docs-site/#branded-installer-redirect) for the required hosting settings.
 
 The installer is user-local and does not require `sudo`. It installs into cargo-dist's user bin directory for this platform, typically a directory such as `~/.local/bin` or `~/.cargo/bin`. If `tandem --version` is not found after installation, add the reported install directory to your shell `PATH`. For example:
 

@@ -100,6 +100,41 @@ DNS records for Namecheap **Advanced DNS**:
 
 Remove Namecheap parking/default `@` and `www` records before adding the GitHub Pages records, do not add wildcard records, and allow up to 24 hours for DNS and certificate propagation. `site/public/CNAME` records the intended custom domain in the built artifact; for GitHub Actions Pages, the repository Pages setting is still the authority.
 
+### Branded installer redirect
+
+The intended branded installer command is:
+
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+```
+
+`/install.sh` must be a real HTTP redirect to the cargo-dist generated installer:
+
+```text
+https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh
+```
+
+GitHub Pages can serve static files and custom 404 pages, but it does not support arbitrary path-level `301`/`302` redirects from repository configuration. Do not restore `site/public/install.sh` as a shell wrapper; that duplicates installer forwarding logic in the docs site. Until external hosting is configured, document the direct GitHub Release installer URL as the available install command.
+
+Preferred provider setup with Cloudflare:
+
+1. Move `trytandem.dev` DNS to Cloudflare or otherwise put Cloudflare in front of the hostname.
+2. Keep the apex site proxied to GitHub Pages with the same `A`/`AAAA` records listed above, and keep `www` as a proxied `CNAME` to `algorant.github.io`.
+3. Add a **Redirect Rule** matching `Hostname equals trytandem.dev` and `URI Path equals /install.sh`.
+4. Set **Static redirect** target URL to `https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh` with status code `302` (or `307`). Preserve query string can be enabled, but the installer command does not require one.
+5. Ensure the rule runs before any broader site forwarding rules.
+
+Equivalent hosting options are acceptable if they create the same HTTP redirect without a Tandem-maintained shell shim, for example a Netlify `_redirects` entry or Vercel `redirects` rule if the docs site is moved to that provider.
+
+Redirect verification after provider configuration:
+
+```sh
+curl -I https://trytandem.dev/install.sh
+curl -fsSL https://trytandem.dev/install.sh | head
+```
+
+The first command should report a `30x` response with `location: https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh`.
+
 Launch verification:
 
 ```sh
