@@ -143,8 +143,8 @@ jobs:
             -e "s/__SHA256__/$TANDEM_X86_64_SHA256/g" \
             PKGBUILD
           chown builder:builder PKGBUILD
-          install -d -o builder -g builder /tmp/makepkg
-          sudo -u builder env BUILDDIR=/tmp/makepkg makepkg --printsrcinfo > .SRCINFO
+          install -d -o builder -g builder /tmp/makepkg /tmp/makepkg/src /tmp/makepkg/pkg
+          sudo -u builder env BUILDDIR=/tmp/makepkg SRCDEST=/tmp/makepkg/src PKGDEST=/tmp/makepkg/pkg makepkg --printsrcinfo > .SRCINFO
 
       - name: Commit and push AUR update
         shell: bash
