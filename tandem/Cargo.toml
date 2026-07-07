@@ -11,6 +11,13 @@ readme = "README.md"
 name = "tandem"
 path = "src/main.rs"
 
+# cargo-dist builds release artifacts with `cargo build --profile dist`.
+# In this monorepo the Cargo package lives under tandem/ rather than at the
+# repository root, so the profile must be defined in this package manifest.
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 [dependencies]
 crossterm = "0.28"
 ratatui = "0.29"

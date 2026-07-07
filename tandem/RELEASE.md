@@ -125,9 +125,19 @@ git diff --check
 ### Release commands
 
 ```text
-just release 0.4.1
+just release 0.4.2
 ```
 
 The pushed `tandem-v0.4.2` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives, per-artifact SHA-256 files, and `sha256.sum`.
+
+If a release workflow fails before creating a GitHub Release, fix the release configuration, delete the failed remote tag, and rerun `just release 0.4.2` from the corrected commit. For example:
+
+```text
+git push origin :refs/tags/tandem-v0.4.2
+git tag -d tandem-v0.4.2
+just release 0.4.2
+```
+
+Do not delete or reuse the tag if a GitHub Release or published artifacts were created; publish a follow-up patch version instead.
 
 After that workflow completes successfully, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for `tandem-bin`, and pushes the AUR Git remote with the configured SSH key. If the AUR update needs to be retried, run the workflow manually with the same `tandem-v0.4.2` tag.
