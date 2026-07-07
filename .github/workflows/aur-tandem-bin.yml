@@ -142,7 +142,7 @@ jobs:
             -e "s/__PKGVER__/${{ steps.release.outputs.version }}/g" \
             -e "s/__SHA256__/$TANDEM_X86_64_SHA256/g" \
             PKGBUILD
-          chown -R builder:builder .
+          chown builder:builder PKGBUILD
           sudo -u builder makepkg --printsrcinfo > .SRCINFO
 
       - name: Commit and push AUR update
@@ -152,7 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           cd aur-package
-          chown -R root:root .git PKGBUILD .SRCINFO
+          git status --short
           git config user.name "$GIT_AUTHOR_NAME"
           git config user.email "$GIT_AUTHOR_EMAIL"
           git add PKGBUILD .SRCINFO
