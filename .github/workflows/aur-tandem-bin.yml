@@ -107,6 +107,8 @@ jobs:
 
       - name: Generate PKGBUILD and .SRCINFO
         shell: bash
+        env:
+          GIT_SSH_COMMAND: ssh -i ~/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
         run: |
           set -euo pipefail
           git clone "$AUR_REMOTE" aur-package
@@ -145,6 +147,8 @@ jobs:
 
       - name: Commit and push AUR update
         shell: bash
+        env:
+          GIT_SSH_COMMAND: ssh -i ~/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
         run: |
           set -euo pipefail
           cd aur-package
