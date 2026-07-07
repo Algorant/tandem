@@ -1,3 +1,8 @@
+---
+title: tandem-bin AUR release automation
+description: How Tandem updates the x86_64 tandem-bin AUR package from GitHub Release artifacts.
+---
+
 # tandem-bin AUR release automation
 
 The `Update tandem-bin AUR package` workflow updates the Arch User Repository binary package after Tandem GitHub Release artifacts exist.

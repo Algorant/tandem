@@ -1,6 +1,6 @@
 # Tandem CLI/TUI release checklist
 
-## v0.4.1 (recommended tag: `tandem-v0.4.1`)
+## v0.4.2 (recommended tag: `tandem-v0.4.2`)
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
@@ -83,7 +83,7 @@ Do not document the branded command as live until `https://trytandem.dev/install
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.1 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.2 --path tandem --locked
 tandem --version
 ```
 
@@ -128,6 +128,6 @@ git diff --check
 just release 0.4.1
 ```
 
-The pushed `tandem-v0.4.1` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives, per-artifact SHA-256 files, and `sha256.sum`.
+The pushed `tandem-v0.4.2` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives, per-artifact SHA-256 files, and `sha256.sum`.
 
-After that workflow completes successfully, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for `tandem-bin`, and pushes the AUR Git remote with the configured SSH key. If the AUR update needs to be retried, run the workflow manually with the same `tandem-v0.4.1` tag.
+After that workflow completes successfully, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for `tandem-bin`, and pushes the AUR Git remote with the configured SSH key. If the AUR update needs to be retried, run the workflow manually with the same `tandem-v0.4.2` tag.

@@ -1,6 +1,6 @@
-# Tandem v0.4.1
+# Tandem v0.4.2
 
-Concise public notes for the `tandem-v0.4.1` GitHub Release. Keep reusable release validation and install checklist details in `tandem/RELEASE.md`.
+Concise public notes for the `tandem-v0.4.2` GitHub Release. Keep reusable release validation and install checklist details in `tandem/RELEASE.md`.
 
 ## Highlights
 
@@ -39,7 +39,7 @@ Concise public notes for the `tandem-v0.4.1` GitHub Release. Keep reusable relea
 ## Install
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.1 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.2 --path tandem --locked
 tandem --version
 ```
 
