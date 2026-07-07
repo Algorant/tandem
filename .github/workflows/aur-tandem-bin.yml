@@ -95,11 +95,7 @@ jobs:
           install -d -m 700 ~/.ssh
           printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          if [[ -n "${AUR_KNOWN_HOSTS:-}" ]]; then
-            printf '%s\n' "$AUR_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            ssh-keyscan -t rsa,ecdsa,ed25519 aur.archlinux.org > ~/.ssh/known_hosts
-          fi
+          ssh-keyscan -t rsa,ecdsa,ed25519 aur.archlinux.org > ~/.ssh/known_hosts
           cat > ~/.ssh/config <<'SSH_CONFIG'
           Host aur.archlinux.org
             IdentityFile ~/.ssh/aur
