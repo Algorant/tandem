@@ -152,6 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           cd aur-package
+          chown -R root:root .git PKGBUILD .SRCINFO
           git config user.name "$GIT_AUTHOR_NAME"
           git config user.email "$GIT_AUTHOR_EMAIL"
           git add PKGBUILD .SRCINFO
