@@ -73,7 +73,7 @@ jobs:
             --pattern 'sha256.sum'
           test -s release/tandem-x86_64-unknown-linux-gnu.tar.xz
           test -s release/sha256.sum
-          checksum="$(awk '$2 == "tandem-x86_64-unknown-linux-gnu.tar.xz" { print $1 }' release/sha256.sum)"
+          checksum="$(awk '{ name=$2; sub(/^\\*/, "", name); if (name == "tandem-x86_64-unknown-linux-gnu.tar.xz") print $1 }' release/sha256.sum)"
           if [[ -z "$checksum" ]]; then
             echo "Could not find tandem-x86_64-unknown-linux-gnu.tar.xz in sha256.sum" >&2
             cat release/sha256.sum >&2
