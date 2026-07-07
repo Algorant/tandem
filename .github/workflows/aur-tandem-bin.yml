@@ -93,7 +93,7 @@ jobs:
             exit 1
           fi
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          printf '%s\n' "$AUR_SSH_PRIVATE_KEY" | sed 's/\\n/\n/g; s/\r$//' > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
           ssh-keyscan -t rsa,ecdsa,ed25519 aur.archlinux.org > ~/.ssh/known_hosts
           cat > ~/.ssh/config <<'SSH_CONFIG'
