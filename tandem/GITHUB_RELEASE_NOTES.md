@@ -39,12 +39,20 @@ Concise public notes for the `tandem-v0.4.2` GitHub Release. Keep reusable relea
 ## Install
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.4.2 --path tandem --locked
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
+
+Release binaries are published by cargo-dist through GitHub Actions for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon. Windows binaries are not published initially. GitHub Release assets include the installer, platform archives, per-artifact SHA-256 files, and `sha256.sum`.
+
+Arch Linux x86_64 users can install the binary package after AUR automation completes:
+
+```text
+yay -S tandem-bin
 tandem --version
 ```
 
 ## Notes
 
-- No binary artifacts are published yet; install from the git tag with Cargo.
 - Mutation commands remain human-readable only; structured JSON mutation output is deferred.
 - TUI visual polish remains active work.
