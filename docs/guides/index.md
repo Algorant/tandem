@@ -2,9 +2,6 @@
 title: Guides
 description: Task-oriented Tandem workflows.
 ---
-
-# Guides
-
 Guides collect practical maintenance workflows for this Tandem repository and docs site.
 
 For first-time usage, start with the [Quickstart](/quick-start/). It walks through install, workspace initialization, task delivery, validation, completion, logs, and the TUI.

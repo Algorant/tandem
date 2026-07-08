@@ -2,9 +2,6 @@
 title: Protocol
 description: The Tandem local-first file format.
 ---
-
-# Protocol
-
 The Tandem protocol defines the local `.tandem/` data model used by the CLI, TUI, and integration adapters.
 
 ## Layout

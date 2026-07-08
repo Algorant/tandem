@@ -2,9 +2,6 @@
 title: Extensions
 description: Tandem integration adapters.
 ---
-
-# Extensions
-
 Tandem integrations should be thin adapters over the installed `tandem` CLI.
 
 ## Adapter principle

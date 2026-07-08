@@ -2,9 +2,6 @@
 title: Decisions and ADRs
 description: Record durable Tandem decisions as ADR-compatible decision documents.
 ---
-
-# Decisions and ADRs
-
 Use Tandem `decision` documents for durable project, product, and architecture choices. A Tandem decision is ADR-compatible; do not create a separate `adr` type, task state, or completed-task log just to record an architecture decision.
 
 ## Frontmatter pattern

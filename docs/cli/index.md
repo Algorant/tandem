@@ -2,9 +2,6 @@
 title: CLI
 description: Using the tandem command-line interface.
 ---
-
-# CLI
-
 The `tandem` binary is the command-line interface for Tandem workspaces. Use it to initialize a workspace, manage Board tasks, record accord delivery evidence, validate work, complete logs, and provide JSON read output for adapters.
 
 For a full end-to-end workflow, see the [Quickstart](/quick-start/).

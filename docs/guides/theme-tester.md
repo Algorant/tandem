@@ -2,9 +2,6 @@
 title: Theme tester
 description: A low-noise page for validating the Verdigris docs theme.
 ---
-
-# Theme tester
-
 This page intentionally exercises the Verdigris docs theme. Use it when changing `site/src/styles/verdigris.css`, the Expressive Code themes, or Starlight navigation styling.
 
 It is not product documentation. It is a visual maintenance page for checking headings, links, inline code, code blocks, callouts, card-like surfaces, badges/tags, lists, and tables in one predictable place.

@@ -2,9 +2,6 @@
 title: TUI
 description: Using the Tandem terminal user interface.
 ---
-
-# TUI
-
 `tandem tui` opens the Ratatui-based terminal interface for a Tandem workspace.
 
 ## Views

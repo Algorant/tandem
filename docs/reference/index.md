@@ -2,9 +2,6 @@
 title: Reference
 description: Compact reference material for Tandem.
 ---
-
-# Reference
-
 Reference pages will hold stable command, field, and configuration details as Tandem matures.
 
 Initial references to expand:

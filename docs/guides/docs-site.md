@@ -2,9 +2,6 @@
 title: Docs site workflow
 description: Previewing and building the Tandem documentation site locally.
 ---
-
-# Docs site workflow
-
 Tandem documentation uses two directories:
 
 - `docs/` is the canonical Markdown source.

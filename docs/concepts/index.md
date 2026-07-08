@@ -2,9 +2,6 @@
 title: Concepts
 description: Core Tandem vocabulary and workflow model.
 ---
-
-# Concepts
-
 Tandem is easiest to understand from the Board. A task starts in `todo`, moves to `in-progress` when someone starts or claims it, moves to `validation` when work is delivered, and is archived into logs when accepted work is completed.
 
 The CLI, TUI, and integrations all operate on the same local Markdown files under `.tandem/`.

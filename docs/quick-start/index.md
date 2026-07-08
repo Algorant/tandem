@@ -2,9 +2,6 @@
 title: Quickstart
 description: Install Tandem and run one task from idea to completed log.
 ---
-
-# Quickstart
-
 This guide takes one task through the Tandem loop: install, initialize, add work, start and claim it, deliver it for validation, accept it, complete it into logs, and open the TUI.
 
 The workflow below is CLI/TUI-only. Agent and editor integrations are optional; see [Extensions](/extensions/) when you are ready to connect them.
