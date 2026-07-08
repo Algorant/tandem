@@ -80,41 +80,30 @@ export default defineConfig({
         emitExternalStylesheet: false,
       },
       sidebar: [
+        { label: 'Home', link: '/' },
+        { label: 'Quickstart', link: '/quick-start/' },
         {
-          label: 'Start here',
+          label: 'Overview',
           items: [
-            { label: 'Overview', link: '/' },
-            { label: 'Quickstart', link: '/quick-start/' },
-          ],
-        },
-        {
-          label: 'Core model',
-          items: [
-            { label: 'Concepts', link: '/concepts/' },
-            { label: 'Protocol', link: '/protocol/' },
-          ],
-        },
-        {
-          label: 'Interfaces',
-          items: [
+            { label: 'Spec', link: '/protocol/' },
             { label: 'CLI', link: '/cli/' },
             { label: 'TUI', link: '/tui/' },
-            { label: 'Extensions', link: '/extensions/' },
+            { label: 'Concepts', link: '/concepts/' },
           ],
         },
         {
-          label: 'Guides',
-          collapsed: false,
+          label: 'Workflows',
           items: [
-            { label: 'Guides overview', link: '/guides/' },
             { label: 'Decisions and ADRs', link: '/guides/decisions/' },
             { label: 'Docs site workflow', link: '/guides/docs-site/' },
-            { label: 'Theme tester', link: '/guides/theme-tester/' },
           ],
         },
         {
-          label: 'Reference',
-          items: [{ label: 'Reference overview', link: '/reference/' }],
+          label: 'Integrations',
+          items: [
+            { label: 'Extensions', link: '/extensions/' },
+            { label: 'Skills', link: '/skills/' },
+          ],
         },
       ],
     }),
