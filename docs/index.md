@@ -1,9 +1,9 @@
 ---
-title: Tandem documentation
-description: Local-first coordination for humans and agents working in the same repository.
+title: Home
+description: Human and agent coordination for local-first project work.
 hero:
-  title: Coordinate humans and agents in the repo
-  tagline: "Tandem keeps task state, work agreements, decisions, validation, and completed history in local Markdown so every actor works from the same durable context."
+  title: Tandem
+  tagline: "Human and Agent Coordination"
   image:
     html: |
       <svg class="td-hero-mark" viewBox="0 0 260 260" role="img" aria-labelledby="td-hero-mark-title">
@@ -31,91 +31,6 @@ hero:
           <path d="M112 130h36" stroke="#fbf1c7" stroke-width="11" opacity="0.9"/>
         </g>
       </svg>
-  actions:
-    - text: Start the quickstart
-      link: /quick-start/
-      icon: right-arrow
-    - text: Browse concepts
-      link: /concepts/
-      icon: open-book
-      variant: secondary
-    - text: View GitHub
-      link: https://github.com/Algorant/tandem
-      icon: github
-      variant: minimal
-      attrs:
-        rel: noreferrer
 ---
 
-Tandem is a local-first coordination system for people and agents working in the same repository. It stores active tasks, explicit accords, durable decisions, validation notes, and completed-work logs in plain Markdown under `.tandem/`, then layers a CLI, TUI, and lightweight integrations on top.
-
-The goal is shared context that survives beyond chat: project state that can be read in any editor, reviewed in Git, searched later, and trusted by both humans and automation.
-
-## Why teams reach for Tandem
-
-<div class="td-home-card-grid">
-  <a class="td-home-card" href="/concepts/#board-task-states">
-    <span class="td-home-card__eyebrow">Board state</span>
-    <strong>Keep active work honest</strong>
-    <span>Tasks move through <code>todo</code>, <code>in-progress</code>, and <code>validation</code>; accepted work leaves the board as a log.</span>
-  </a>
-  <a class="td-home-card" href="/concepts/#accords">
-    <span class="td-home-card__eyebrow">Accords</span>
-    <strong>Separate delivery from approval</strong>
-    <span>Workers can claim and deliver evidence without self-approving; reviewers decide acceptance, rework, blocking, or failure.</span>
-  </a>
-  <a class="td-home-card" href="/concepts/#decisions">
-    <span class="td-home-card__eyebrow">Decisions</span>
-    <strong>Record durable context</strong>
-    <span>ADR-compatible decision documents live beside tasks instead of disappearing into chat or issue comments.</span>
-  </a>
-  <a class="td-home-card" href="/concepts/#logs">
-    <span class="td-home-card__eyebrow">Logs</span>
-    <strong>Search completed history</strong>
-    <span>Completion archives the task body, validation, changed files, and accord metadata into first-class history.</span>
-  </a>
-</div>
-
-## Run one explicit loop
-
-```sh
-# Install the latest release from the cargo-dist generated installer.
-curl -fsSL https://trytandem.dev/install.sh | sh
-
-# Initialize a local coordination workspace.
-tandem init --title "My Project"
-
-# Add work, claim it, deliver evidence, accept, and archive.
-tandem add --title "Write project brief" --description "Draft and validate the first docs slice."
-tandem accord claim task-1 --assignee alice
-tandem accord deliver task-1 --summary "Drafted and checked" --validation "Ran docs check"
-tandem accord accept task-1 --reviewer bob --summary "Looks good"
-tandem complete task-1 --summary "Published the brief" --validation "Reviewed by Bob"
-```
-
-The [Quickstart](/quick-start/) walks through the same lifecycle with install notes, validation steps, logs, and `tandem tui`.
-
-## Explore by role
-
-<div class="td-home-card-grid td-home-card-grid--compact">
-  <a class="td-home-card td-home-card--compact" href="/quick-start/">
-    <span class="td-home-card__eyebrow">New users</span>
-    <strong>Install and run the first task</strong>
-  </a>
-  <a class="td-home-card td-home-card--compact" href="/cli/">
-    <span class="td-home-card__eyebrow">CLI users</span>
-    <strong>Use the command families</strong>
-  </a>
-  <a class="td-home-card td-home-card--compact" href="/tui/">
-    <span class="td-home-card__eyebrow">Terminal users</span>
-    <strong>Navigate the Ratatui interface</strong>
-  </a>
-  <a class="td-home-card td-home-card--compact" href="/protocol/">
-    <span class="td-home-card__eyebrow">Builders</span>
-    <strong>Understand the file protocol</strong>
-  </a>
-</div>
-
-## Current status
-
-Tandem is in early v0 implementation. The core CLI surface is implemented, the Ratatui TUI is growing around Board/Validation/Logs/Rules/Decisions workflows, and the docs site keeps canonical content in `docs/` so the public site can evolve with the protocol.
+Tandem is a local-first coordination system for people and agents working in the same repository.
