@@ -2689,7 +2689,10 @@ impl TuiApp {
 
         let entries = self.epic_board_entries();
         let count = entries.len();
-        let content_width = area.width.saturating_sub(4) as usize;
+        let content_width = area
+            .width
+            .saturating_sub(4)
+            .saturating_sub(BOARD_LIST_HIGHLIGHT_SYMBOL_WIDTH) as usize;
         let preview_line_limit = inline_preview_line_limit_for_area(area);
         let items = if entries.is_empty() {
             let empty_text = if self.board_filters.is_active() {
@@ -4710,10 +4713,22 @@ fn board_row_line(
         .map(|badge| text_width(badge) + 1)
         .unwrap_or(0);
     let meta_width = text_width(&right_meta);
-    let fixed_width = indent_width + doc_type_width + chip_width + 1 + meta_width;
-    let title_width = content_width.saturating_sub(fixed_width).max(12);
+    let title_separator_width = if chip_width > 0 || doc_type_width > 0 || indent_width > 0 {
+        1
+    } else {
+        0
+    };
+    let spacer_min_width = if right_meta.is_empty() { 0 } else { 1 };
+    let fixed_width = indent_width
+        + doc_type_width
+        + chip_width
+        + title_separator_width
+        + spacer_min_width
+        + meta_width;
+    let title_width = content_width.saturating_sub(fixed_width);
     let title = truncate(doc.title(), title_width);
-    let used_before_meta = indent_width + doc_type_width + chip_width + text_width(&title);
+    let used_before_meta =
+        indent_width + doc_type_width + chip_width + title_separator_width + text_width(&title);
     let spacer_width = content_width
         .saturating_sub(used_before_meta + meta_width)
         .max(1);
@@ -5000,6 +5015,7 @@ fn chip_text(label: &str, theme: &TuiTheme) -> String {
 }
 
 const INLINE_PREVIEW_MAX_LINES: usize = 25;
+const BOARD_LIST_HIGHLIGHT_SYMBOL_WIDTH: u16 = 2;
 
 fn inline_preview_line_limit_for_area(area: Rect) -> usize {
     area.height.saturating_sub(2).saturating_sub(1) as usize
@@ -6250,6 +6266,40 @@ mod tests {
             .iter()
             .map(|span| span.content.as_ref())
             .collect()
+    }
+
+    #[test]
+    fn board_row_preserves_right_metadata_when_title_space_is_tight() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = doc_with_state("task-102", Some("todo"));
+        doc.fields.insert(
+            "title".to_string(),
+            "Very long nested child task title that must yield to metadata".to_string(),
+        );
+
+        let line = board_row_line(
+            &doc,
+            &theme,
+            23,
+            false,
+            vec![(
+                chip_text("TODO", &theme),
+                theme.progress_chip_style(StatusTone::Muted),
+            )],
+            "task-102".to_string(),
+            1,
+            true,
+        );
+        let text = line_text(&line);
+
+        assert!(
+            text.ends_with("task-102"),
+            "right metadata should not lose its trailing digit: {text:?}"
+        );
+        assert!(
+            text_width(&text) <= 23,
+            "row should fit its content width instead of clipping metadata: {text:?}"
+        );
     }
 
     #[test]
