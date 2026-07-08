@@ -162,19 +162,19 @@ Remove Namecheap parking/default `@` and `www` records before adding the GitHub 
 
 ### Branded installer redirect
 
-The intended branded installer command is:
+The primary branded installer command is:
 
 ```sh
 curl -fsSL https://trytandem.dev/install.sh | sh
 ```
 
-`/install.sh` must be a real HTTP redirect to the cargo-dist generated installer:
+`/install.sh` must be maintained as a real HTTP redirect to the cargo-dist generated installer:
 
 ```text
 https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh
 ```
 
-GitHub Pages can serve static files and custom 404 pages, but it does not support arbitrary path-level `301`/`302` redirects from repository configuration. Do not restore `site/public/install.sh` as a shell wrapper; that duplicates installer forwarding logic in the docs site. Until external hosting is configured, document the direct GitHub Release installer URL as the available install command.
+GitHub Pages can serve static files and custom 404 pages, but it does not support arbitrary path-level `301`/`302` redirects from repository configuration. Do not restore `site/public/install.sh` as a shell wrapper; that duplicates installer forwarding logic in the docs site and bypasses cargo-dist's release asset selection and checksum behavior.
 
 Preferred provider setup with Cloudflare:
 

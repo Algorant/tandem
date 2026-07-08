@@ -2,7 +2,7 @@
 title: tandem-bin AUR release automation
 description: How Tandem updates the x86_64 tandem-bin AUR package from GitHub Release artifacts.
 ---
-The `Update tandem-bin AUR package` workflow updates the Arch User Repository binary package after Tandem GitHub Release artifacts exist.
+The `Update tandem-bin AUR package` workflow updates the Arch User Repository binary package after Tandem GitHub Release artifacts and checksums exist. The official binary artifact path is cargo-dist through the `Release` GitHub Actions workflow; AUR automation consumes those published release assets rather than building Tandem itself.
 
 ## Package scope
 
@@ -11,6 +11,7 @@ The `Update tandem-bin AUR package` workflow updates the Arch User Repository bi
 - Source artifact: `tandem-x86_64-unknown-linux-gnu.tar.xz` from the GitHub Release
 - Checksum source: the release `sha256.sum` entry for that artifact
 - The AUR package installs the published binary; it does not build Tandem from source.
+- Initial upstream release targets are Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon; Windows artifacts are not published initially. AUR packaging consumes only the Linux x86_64 artifact.
 
 ## Required GitHub secrets
 
@@ -42,7 +43,7 @@ The workflow downloads release assets with `gh release download`, so it fails ea
 
 If automation fails after a release:
 
-1. Verify the GitHub Release contains `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`.
+1. Verify the GitHub Release contains `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, and that `sha256.sum` includes an entry for the archive.
 2. Re-run the workflow manually with the same `tandem-vX.Y.Z` tag.
 3. If SSH fails, verify `AUR_SSH_PRIVATE_KEY`, the AUR account public key, and the known-hosts value.
 4. If package generation fails, clone `ssh://aur@aur.archlinux.org/tandem-bin.git`, update `PKGBUILD`, run `makepkg --printsrcinfo > .SRCINFO` on Arch, commit both files, and push `master`.

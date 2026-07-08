@@ -10,26 +10,18 @@ The workflow below is CLI/TUI-only. Agent and editor integrations are optional; 
 
 Choose the lane that matches your environment.
 
-### Direct cargo-dist installer
+### Recommended installer
 
-Install the latest released Tandem binary with the cargo-dist generated installer from GitHub Releases:
-
-```sh
-curl -fsSL https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh | sh
-tandem --version
-```
-
-The GitHub Release asset is the source of truth for OS/architecture detection, release asset selection, and installation behavior.
-
-### Branded installer URL: pending hosting redirect
-
-The intended branded command is:
+Install the latest released Tandem binary with the branded installer command:
 
 ```sh
 curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
 ```
 
-Do not rely on this command until `https://trytandem.dev/install.sh` is configured as a provider-level HTTP redirect to the cargo-dist generated installer above. GitHub Pages does not provide arbitrary per-path HTTP redirects for static files, and this repository no longer ships a checked-in shell wrapper at that path. See [Docs site hosting](/guides/docs-site/#branded-installer-redirect) for the required hosting settings.
+The branded URL redirects to the cargo-dist generated installer on the latest GitHub Release. The GitHub Release assets are the source of truth for OS/architecture detection, release asset selection, checksums, and installation behavior.
+
+The initial binary target set is Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon. Windows binaries are not published initially.
 
 The installer is user-local and does not require `sudo`. It installs into cargo-dist's user bin directory for this platform, typically a directory such as `~/.local/bin` or `~/.cargo/bin`. If `tandem --version` is not found after installation, add the reported install directory to your shell `PATH`. For example:
 
@@ -62,9 +54,16 @@ cargo install --path tandem --locked
 tandem --version
 ```
 
-### AUR binary: coming soon
+### AUR binary
 
-An Arch/AUR binary lane is planned, but no AUR package name is currently documented in this repository. Do not install a guessed package name. Use the Cargo lane until the package is published and named.
+Arch Linux users can install the x86_64 binary package from AUR once the release automation has published it:
+
+```sh
+yay -S tandem-bin
+tandem --version
+```
+
+The initial AUR package is `tandem-bin` for x86_64 only. It installs the published GitHub Release binary and uses the release `sha256.sum`; it does not build Tandem from source.
 
 ## 2. Initialize a workspace
 

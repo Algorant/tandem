@@ -50,6 +50,17 @@ extensions/    Agent/editor integrations such as the pi-tandem adapter
 - Planning docs remain Markdown for now; migrate/dogfood Tandem documents after the TUI can manage them safely.
 - `extensions/pi-tandem` is a lightweight Pi adapter over an installed `tandem` CLI. It uses safe argument arrays, prefers `tandem --json` read paths, and does not duplicate Tandem protocol parsing/mutation logic.
 
+## Install and releases
+
+The official binary release path is cargo-dist through GitHub Actions. Tagged releases create GitHub Release artifacts for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon; Windows binaries are not published initially. Releases include platform archives, checksums, and the generated installer.
+
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
+
+The installer is user-local/no-sudo and may ask you to add its bin directory, commonly `~/.local/bin` or `~/.cargo/bin`, to `PATH`. Arch Linux x86_64 users can use the automated `tandem-bin` AUR package after release automation publishes it.
+
 ## Current docs
 
 - `AGENTS.md` — guidance for AI agents working in this repo

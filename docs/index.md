@@ -80,7 +80,7 @@ The goal is shared context that survives beyond chat: project state that can be 
 
 ```sh
 # Install the latest release from the cargo-dist generated installer.
-curl -fsSL https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh | sh
+curl -fsSL https://trytandem.dev/install.sh | sh
 
 # Initialize a local coordination workspace.
 tandem init --title "My Project"
