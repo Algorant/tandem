@@ -17,21 +17,22 @@ Avoid editing `.tandem/board/*.md`, `.tandem/logs/*.md`, or `.tandem/tandem.md` 
 
 When decomposing or linking work, set Tandem relationship fields explicitly instead of burying relationships in prose:
 
-- `parent` writes `parentId` and is for supertask/child hierarchy. Create or inspect the parent document first.
+- `parent` writes `parentId` for add/update and filters exact parent matches for list. A task linked to another task this way is a first-class tracked subtask with its own workflow, owner, accord, review, blockers, and completion lifecycle. Create or inspect the parent document first.
 - `blockers` writes strict dependency IDs. Blockers must already exist; unresolved blockers are validation errors.
 - `references` writes related Tandem document IDs such as decisions, sibling tasks, or completed logs. Prefer existing IDs even though unresolved references are only warnings.
 - `relatedFiles` records project paths that help implementers/reviewers find relevant code or docs.
-- `subtasks` creates lightweight checklist items inside one task. Use child tasks with `parent` when work needs its own owner, accord, review, or blockers.
+- Inline checklist `subtasks` metadata is legacy/deprecated. The adapter does not author it; create each independently tracked work unit as a normal task with `parent`.
 
 Example tool pattern:
 
 ```text
-tandem_task action=add title="Ship relationship UI" relatedFiles=["tandem/src/tui.rs"] subtasks=["Define display", "Review copy"]
+tandem_task action=add title="Ship relationship UI" relatedFiles=["tandem/src/tui.rs"]
 tandem_decision action=add title="Relationship display policy" status="accepted" deciders=["Algorant"] references=["task-1"]
-tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"] subtasks=["Show parent", "Show blockers", "Show references"]
+tandem_task action=add title="Define relationship display" parent="task-1" references=["decision-1"] relatedFiles=["tandem/src/tui.rs"]
+tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"]
 ```
 
-After creating linked work, inspect with `tandem_task show` and `tandem_search`. If relationship fields are present in the document but hard to see in CLI/TUI output, report that as a display UX gap; do not invent replacement fields.
+After creating linked work, inspect with `tandem_task show`, `tandem_task list`, and `tandem_search`. Read responses pass through Tandem's relationship output: child list/search entries include `parentId` and computed `parentRelationship` where applicable, while showing a task parent includes computed `subtasks` summaries. The adapter does not duplicate that classification in TypeScript.
 
 ## Epic convention
 

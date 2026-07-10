@@ -29,15 +29,19 @@ Maps to:
 ```text
 tandem list [filters] --json
 tandem show <id> --json
-tandem add --title <title> [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--subtask <title>] ...
+tandem add --title <title> [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] ...
 tandem move <id> --state <state>
-tandem update <id> [--title <title>] [--priority <priority>] [--tag <tag>] ...
+tandem update <id> [--title <title>] [--parent <id>] [--priority <priority>] [--tag <tag>] ...
 tandem complete <id> --summary <text> ...
 ```
 
 Read actions default to JSON. Mutation actions keep the CLI's human-readable output.
 
-Relationship parameters map directly to Tandem protocol fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, `relatedFiles` → project paths, and `subtasks` → lightweight checklist items. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings. Use `action: "update"` for active task metadata edits; state remains `move`, and parentId is intentionally not updatable.
+Relationship parameters map directly to Tandem CLI fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, and `relatedFiles` → project paths. A normal task whose `parentId` resolves to another task is a first-class tracked subtask with its own workflow, ownership, accord, review, blockers, and completion lifecycle. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings. `parent` also filters list results and can attach/reparent an active task with `action: "update"`.
+
+Inline checklist `subtasks` metadata is legacy/deprecated and read-only through this adapter. `pi-tandem` does not expose it in the tool schema or forward `--subtask`; create each independently tracked work unit with a separate `action: "add"` call and `parent: "task-N"`.
+
+The adapter returns Tandem's read output without reclassifying relationships in TypeScript. Consequently, list/search JSON naturally includes CLI-computed `parentId` and `parentRelationship` fields where applicable, and show JSON naturally includes those fields plus computed `subtasks` summaries for task parents.
 
 For epics, use ordinary task hierarchy: the epic is `type: task` with the lightweight `kind: epic` classifier, children use `parent`/`parentId`, and loose decisions/sibling/log context uses `references`. The adapter does not create `type: epic`, ADR-style epic documents, custom folders, or special lifecycle states.
 
@@ -89,7 +93,7 @@ Use this tool for ADR-compatible durable decisions. The document remains `type: 
 Maps to:
 
 ```text
-tandem search <query> [--state <state>] [--type <type>] --json
+tandem search <query> [--state <state>] [--type <type>] [--parent <id>] --json
 ```
 
 ## Slash command
@@ -123,7 +127,7 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repo's `.tandem` board, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts`, starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes the loader. `relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tandem`, then verifies persisted relationship fields and search visibility.
+`smoke.ts` performs read-only checks against this repo's `.tandem` board when the checkout has one, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts` and, when needed, a temporary ignored repository `.tandem` workspace; it starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes all temporary state. `relationship-smoke.ts` builds the current repository CLI, creates a temporary parent/child/blocker/reference scenario, rejects legacy inline authoring, and verifies parent-linked child behavior plus CLI-computed show/list/search relationship output.
 
 Manual project-local Pi smoke:
 
@@ -145,4 +149,4 @@ Do not promote this extension into `~/.pi/agent/extensions` until a separate rev
 
 ## Prompt guidance
 
-The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to use `validation` for delivered work awaiting acceptance, to tolerate legacy `state: review` reads, to keep workflow state distinct from `review:` metadata and accord status, to model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior, and to use `tandem_decision` for ADR-compatible decisions instead of inventing task lifecycle state. See `pi-tandem.md` for the human-readable agent guidance.
+The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to create independently tracked work as parent-linked child tasks rather than deprecated inline checklist entries, use `validation` for delivered work awaiting acceptance, tolerate legacy `state: review` reads, keep workflow state distinct from `review:` metadata and accord status, model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior, and use `tandem_decision` for ADR-compatible decisions instead of inventing task lifecycle state. See `pi-tandem.md` for the human-readable agent guidance.

@@ -1,7 +1,7 @@
 # pi-tandem Adapter Spec
 
 Status: MVP implementation
-Date: 2026-06-28
+Date: 2026-07-10
 
 `pi-tandem` is a Pi extension that adapts an installed `tandem` CLI into Pi tools. It follows the local `pi-web-tools` convention: a small TypeScript adapter over a CLI, not a duplicated implementation of the underlying system.
 
@@ -35,14 +35,14 @@ It runs commands with `execFile(command, args, { cwd })` and never shell-interpo
 Current MVP tools:
 
 - `tandem_status` — `tandem --help`, workspace discovery, and optional `tandem list --json` health check.
-- `tandem_task` — `list`, `show`, `add`, `move`, `complete`.
+- `tandem_task` — `list`, `show`, `add`, `move`, `update`, `complete`; independently tracked subtasks are normal child task calls using `parent`, while deprecated inline checklist authoring is not exposed or forwarded.
 - `tandem_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - `tandem_log` — `list`, `show`, `search`.
 - `tandem_rules` — `list`, `add`, `edit`, `delete`.
 - `tandem_decision` — `list`, `show`, `add` for first-class decisions, including ADR-compatible durable records that stay `type: decision`.
 - `tandem_search` — active/log search.
 
-Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details.
+Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details. The adapter also does not classify relationships: Tandem's JSON naturally supplies `parentId`/`parentRelationship` on list/search/show results and computed `subtasks` summaries when showing task parents.
 
 ## Slash command
 
@@ -66,7 +66,7 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
-Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, modeling epics as ordinary `type: task` + `kind: epic` parents instead of separate ADR/epic protocol behavior, recording ADR-compatible choices with `tandem_decision` rather than task lifecycle state, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
+Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits, creating independently tracked work as ordinary parent-linked child tasks rather than deprecated inline checklist entries, modeling epics as ordinary `type: task` + `kind: epic` parents instead of separate ADR/epic protocol behavior, recording ADR-compatible choices with `tandem_decision` rather than task lifecycle state, delivering finished work into the `validation` workflow state, preserving `review:` metadata as distinct reviewer decision state, and not accepting/completing accord work unless explicitly instructed.
 
 ## Testing
 
@@ -79,11 +79,11 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repository's `.tandem` board, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, search, complete, and log coverage. If no `TANDEM_BIN` is set and the local debug binary is missing, it builds `tandem` first.
+`smoke.ts` performs read-only checks against this repository's `.tandem` board when the checkout has one, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, search, complete, and log coverage. Without `TANDEM_BIN`, it first builds the current repository CLI so a stale debug binary cannot mask source changes.
 
-`pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing `.pi` state: it creates `.pi/extensions/pi-tandem/index.ts`, starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status` against the repo workspace, and cleans up.
+`pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing runtime state: it creates `.pi/extensions/pi-tandem/index.ts` and, when the checkout lacks one, a temporary ignored `.tandem` workspace; it starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status`, and cleans up all temporary state.
 
-`relationship-smoke.ts` creates a temporary parent/child/blocker/reference scenario through pi-tandem argument builders and `tandem`, then verifies persisted `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks` plus search visibility.
+`relationship-smoke.ts` builds the current repository Tandem CLI, rejects legacy inline authoring, creates independently tracked parent-linked children through pi-tandem argument builders, and verifies persisted relationships plus the CLI's computed show/list/search `parentId`, `parentRelationship`, parent filters, and subtask summaries.
 
 Manual Pi smoke after review:
 

@@ -36,10 +36,8 @@ async function runProcess(command: string, args: string[], cwd: string): Promise
 async function ensureTandem(): Promise<string> {
 	const envBin = process.env.TANDEM_BIN;
 	if (envBin) return envBin;
-	if (!existsSync(localTandem)) {
-		console.log("Building local tandem for smoke test...");
-		await runProcess("cargo", ["build", "--manifest-path", join(repoRoot, "tandem", "Cargo.toml")], repoRoot);
-	}
+	console.log("Building current repository tandem for smoke test...");
+	await runProcess("cargo", ["build", "--manifest-path", join(repoRoot, "tandem", "Cargo.toml")], repoRoot);
 	return existsSync(localTandem) ? localTandem : "tandem";
 }
 
@@ -58,10 +56,18 @@ function parseId(output: string): string {
 }
 
 async function runRepoReadSmoke(tandem: string): Promise<void> {
+	if (!existsSync(join(repoRoot, ".tandem", "tandem.md"))) {
+		console.log("pi-tandem repo read smoke skipped: this checkout has no local .tandem workspace");
+		return;
+	}
 	const list = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), repoRoot));
 	assert(list.ok === true, "repo task list JSON should be ok");
 	const items = list.data?.items ?? [];
-	assert(Array.isArray(items) && items.length > 0, "repo board should have active Tandem items");
+	assert(Array.isArray(items), "repo task list should expose an items array");
+	if (items.length === 0) {
+		console.log("pi-tandem repo read smoke skipped: checkout Tandem workspace has no active items");
+		return;
+	}
 	const taskId = items.find((item: any) => item.id === "task-14")?.id ?? items[0]?.id;
 	assert(typeof taskId === "string", "repo task list should expose an item id");
 
@@ -90,16 +96,17 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 
 const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
+assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for tracked child tasks");
+assert(!taskSchemaProperties.subtasks, "tandem_task schema should not expose deprecated inline subtask authoring");
 
 const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
 assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");
 
-const updateArgs = buildTaskArgs({ action: "update", id: "task-1", priority: "high", tags: ["cli"] });
-assert(updateArgs.join(" ") === "update task-1 --priority high --tag cli", "tandem_task update builder should map metadata flags");
+const updateArgs = buildTaskArgs({ action: "update", id: "task-1", priority: "high", parent: "task-2", tags: ["cli"] });
+assert(updateArgs.join(" ") === "update task-1 --priority high --parent task-2 --tag cli", "tandem_task update builder should map metadata and parent flags");
 
 for (const [field, params] of [
 	["description", { description: "new body" }],
-	["subtasks", { subtasks: ["new checklist item"] }],
 	["accord", { accord: "ready" }],
 	["review", { review: "pending" }],
 ] as const) {
@@ -111,6 +118,14 @@ for (const [field, params] of [
 	}
 	assert(rejected, `tandem_task update builder should reject unsupported ${field}`);
 }
+
+let legacySubtasksRejected = false;
+try {
+	buildTaskArgs({ action: "add", title: "Legacy inline checklist", subtasks: ["new checklist item"] } as any);
+} catch (err) {
+	legacySubtasksRejected = err instanceof Error && err.message.includes("deprecated inline subtasks") && err.message.includes("parent=<task-id>");
+}
+assert(legacySubtasksRejected, "tandem_task builder should reject deprecated inline subtask authoring");
 
 const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
 assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");

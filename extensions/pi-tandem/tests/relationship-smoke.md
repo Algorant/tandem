@@ -1,27 +1,28 @@
 # pi-tandem Relationship Smoke Notes
 
-Purpose: validate that pi-tandem guidance/tool schemas make Tandem relationship fields easy enough for agents to use without direct `.tandem` edits.
+Purpose: validate that pi-tandem exposes Tandem's first-class parent-linked task behavior without authoring deprecated inline checklist subtasks or reimplementing relationship logic in TypeScript.
 
 ## Controlled scenario
 
-`relationship-smoke.ts` creates a temporary Tandem workspace and uses pi-tandem argument builders plus `tandem` to create:
+`relationship-smoke.ts` builds the current repository Tandem CLI, creates a temporary workspace, and uses pi-tandem argument builders plus `tandem` to create:
 
-- a parent/supertask with `relatedFiles` and `subtasks`;
+- a normal parent task with related files;
 - a decision referenced by the parent/children;
-- a fixture-prep child task with `parentId`, `references`, `relatedFiles`, and `subtasks`;
-- an implementation child task with `parentId`, `blockers`, `references`, `relatedFiles`, and `subtasks`;
-- a validation follow-up task blocked by the implementation child.
+- a fixture-prep child task linked through `parentId`;
+- an implementation child with its own `parentId`, blocker, references, related files, and workflow state;
+- a validation follow-up created as an ordinary task and then attached to the parent through `tandem update --parent`.
 
-It then verifies the generated Markdown contains `parentId`, `blockers`, `references`, `relatedFiles`, and parent-based subtask IDs, and verifies `tandem search` can find tasks by relationship metadata.
+The smoke also verifies that the adapter schema omits deprecated inline `subtasks` authoring and that a legacy builder input is rejected instead of forwarding `--subtask`.
 
-## Findings
+## Assertions
 
-- pi-tandem already passed relationship flags through to `tandem`, but the tool schema descriptions and prompt guidance were too terse for agent planning.
-- Protocol docs already define the fields clearly; no new protocol fields are needed.
-- CLI/TUI visibility remains the main UX caveat: `tandem show --json` currently returns identity/state/body details but not relationship fields. The smoke test therefore verifies raw persisted documents and search visibility, and docs now tell agents to report display gaps rather than invent replacement fields.
+- Persisted children have `parentId`, blockers, references, and related files, with no newly-authored inline `subtasks` block.
+- Child `show --json` returns `document.parentId` and CLI-computed `parentRelationship: "subtask"`.
+- Parent `show --json` returns computed summaries for all parent-linked task children.
+- `list --json` and `search --json` naturally retain the CLI's `parentId` and `parentRelationship` fields.
+- Parent filters pass through for list/search and select the tracked children.
+- Strict unresolved parents fail while unresolved loose references remain warnings.
 
-## Ownership of missing UX
+## Adapter boundary
 
-- **pi-tandem prompts/tool schemas:** improved here with concrete field guidance and examples.
-- **Tandem CLI/TUI display:** recommended follow-up: show relationship fields in `tandem show`/JSON and TUI task details.
-- **Protocol docs:** no change needed for this smoke; field semantics are already documented.
+The adapter only builds argument arrays and returns Tandem output. Parent classification and computed subtask discovery remain in the Rust CLI/protocol implementation; pi-tandem does not parse Markdown, infer relationships from IDs, or synthesize response fields.

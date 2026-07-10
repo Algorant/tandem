@@ -33,10 +33,8 @@ async function runProcess(command: string, args: string[], cwd: string): Promise
 async function ensureTandem(): Promise<string> {
 	const envBin = process.env.TANDEM_BIN;
 	if (envBin) return envBin;
-	if (!existsSync(localTandem)) {
-		console.log("Building local tandem for Pi runtime smoke test...");
-		await runProcess("cargo", ["build", "--manifest-path", join(repoRoot, "tandem", "Cargo.toml")], repoRoot);
-	}
+	console.log("Building current repository tandem for Pi runtime smoke test...");
+	await runProcess("cargo", ["build", "--manifest-path", join(repoRoot, "tandem", "Cargo.toml")], repoRoot);
 	return existsSync(localTandem) ? localTandem : "tandem";
 }
 
@@ -146,6 +144,14 @@ async function withProjectLocalLoader<T>(fn: () => Promise<T>): Promise<T> {
 	}
 }
 
+async function ensureRepoWorkspace(tandem: string): Promise<boolean> {
+	const tandemDir = join(repoRoot, ".tandem");
+	if (existsSync(join(tandemDir, "tandem.md"))) return false;
+	assert(!existsSync(tandemDir), `refusing to replace incomplete repository Tandem directory: ${tandemDir}`);
+	await runProcess(tandem, ["init", "--title", "Pi Tandem Runtime Smoke"], repoRoot);
+	return true;
+}
+
 async function stopProcess(proc: ChildProcessWithoutNullStreams): Promise<void> {
 	if (proc.exitCode !== null) return;
 	proc.kill("SIGTERM");
@@ -163,8 +169,10 @@ async function stopProcess(proc: ChildProcessWithoutNullStreams): Promise<void> 
 
 const tandem = await ensureTandem();
 const agentDir = await mkdtemp(join(tmpdir(), "pi-tandem-agent-"));
+let createdRepoWorkspace = false;
 
 try {
+	createdRepoWorkspace = await ensureRepoWorkspace(tandem);
 	await withProjectLocalLoader(async () => {
 		const proc = spawn("pi", [
 			"--mode", "rpc",
@@ -215,5 +223,6 @@ try {
 
 	console.log(`pi-tandem project-local Pi runtime smoke passed with loader ${loaderPath}`);
 } finally {
+	if (createdRepoWorkspace) await rm(join(repoRoot, ".tandem"), { recursive: true, force: true });
 	await rm(agentDir, { recursive: true, force: true });
 }
