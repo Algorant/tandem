@@ -79,11 +79,14 @@ Protocol:
 
 - Protocol version for the first v0 draft is `0.1.0`.
 - Canonical workflow field is `state`; default states are `todo`, `in-progress`, `review`.
-- New work items use `type: task` and sequential IDs such as `task-1`.
+- New work items use `type: task`; default allocation uses flat sequential IDs such as `task-1`.
 - First-class document types are `task` and `decision`; decision documents are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only in v0.
-- Epics are convention-only task documents using `type: task` plus `kind: epic`; child work links through `parentId`, loose context uses `references`, and v0 has no separate epic type or lifecycle.
+- A first-class subtask is a normal `type: task` document linked to another task with `parentId`, retaining ordinary task workflow, ownership, accord, review, and completion behavior without a new type or relationship field.
+- Parent-derived hierarchical IDs such as `task-100-1` are allowed and recommended when useful, but are not required; `parentId` remains the canonical hierarchy.
+- Inline `subtasks:` checklist items are legacy and deprecated for new work; existing entries remain readable and preservable, while new trackable work should use child task documents.
+- Epics are convention-only task documents using `type: task` plus `kind: epic` for broad outcome grouping; they use the same general `parentId` hierarchy, ordinary tasks may also parent children, loose context uses `references`, and v0 has no separate epic type or lifecycle.
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
-- Rules are structured objects. References may point to any Tandem document by ID. Subtasks use parent-based sequential IDs.
+- Rules are structured objects. References may point to any Tandem document by ID.
 - Completion warns but does not block on review/accord acceptance in v0.
 - Archived markdown docs in `.tandem/logs/` are the completed-log source of truth; per-actor `.tandem/events/<actor_id>.jsonl` logs record minimal audit-only lifecycle events, with legacy `.tandem/events.jsonl` read during transition.
 - Validation is built-in structural validation only for v0, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
