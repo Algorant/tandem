@@ -94,7 +94,7 @@ Command behavior rules:
 - `tandem decision` supports `list`, `show`, and `add` in v0.
 - The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
 - `tandem complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
-- `tandem update <id>` edits active task metadata only. It never updates completed logs, workflow `state`, or `parentId`; state changes remain `tandem move`.
+- `tandem update <id>` edits active task metadata only. It never updates completed logs or workflow `state`; state changes remain `tandem move`. `--parent <id>` may attach or reparent an active task; the relationship is a tracked subtask only when the resolved parent is another task.
 - The first implementation language is Rust, implemented inside `tandem/`.
 - The current implementation package is a Rust binary crate in `tandem/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
@@ -166,19 +166,21 @@ tandem init [--title <title>] [--force]
 - Syntax:
 
 ```text
-tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--accord <status>] [--review <status>] [--json]
+tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--parent <id>] [--accord <status>] [--review <status>] [--json]
 ```
 
 - Required inputs: none.
 - Optional inputs:
-  - filters: `--state`, `--type`, `--priority`, `--tag`, `--assignee`, `--accord`, `--review`.
+  - filters: `--state`, `--type`, `--priority`, `--tag`, `--assignee`, `--parent`, `--accord`, `--review`.
+  - `--parent <id>` selects documents whose `parentId` matches exactly, whether the parent is a task or another Tandem document type.
   - `--json`: emit structured output.
-- Human output shape: compact table grouped or sorted by state.
+- Human output shape: compact table grouped or sorted by state. `RELATION` is `subtask` only for a task whose resolved parent is another task; otherwise a valid non-task target is shown generically as `parent`.
 
 ```text
-ID      STATE        TYPE  KIND  TITLE                         ASSIGNEE
-task-7  in-progress  task  epic  Launch docs epic              pi
-task-8  validation   task  -     Add decision view             pi
+ID      STATE        TYPE  KIND  RELATION  PARENT      TITLE                ASSIGNEE
+task-7  in-progress  task  epic  -         -           Launch docs epic     pi
+task-8  validation   task  -     subtask   task-7      Add decision view    pi
+task-9  todo         task  -     parent    decision-2  Apply chosen policy  pi
 ```
 
 - `--json` data shape:
@@ -189,21 +191,22 @@ task-8  validation   task  -     Add decision view             pi
   "data": {
     "items": [
       {
-        "id": "task-7",
+        "id": "task-8",
         "type": "task",
-        "kind": "epic",
-        "title": "Launch docs epic",
-        "state": "in-progress",
+        "title": "Add decision view",
+        "state": "validation",
         "priority": "high",
         "assignee": "pi",
+        "parentId": "task-7",
+        "parentRelationship": "subtask",
         "tags": ["tui"],
-        "accord": { "status": "claimed" },
-        "review": { "status": "not-ready" }
+        "accord": { "status": "delivered" },
+        "review": { "status": "pending" }
       }
     ],
     "counts": {
       "total": 1,
-      "byState": { "in-progress": 1 }
+      "byState": { "validation": 1 }
     }
   },
   "warnings": []
@@ -227,8 +230,8 @@ tandem show <id> [--json]
   - `<id>`: task or decision ID.
 - Optional inputs:
   - `--json`: emit structured output.
-- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path.
-- `--json` data shape:
+- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path. A task whose resolved parent is another task uses `Subtask of`; other valid parent targets use `Parent`. Task documents include `Subtasks` summaries discovered from task children whose `parentId` points to them. Non-task documents do not expose those links as subtasks.
+- `--json` data shape includes `document.parentId` plus computed `data.parentRelationship: "subtask" | "parent"` when the document has a resolved parent. A computed top-level `data.subtasks` array is emitted only when the shown document is a task; it is omitted for decisions and other non-task documents:
 
 ```json
 {
@@ -245,6 +248,14 @@ tandem show <id> [--json]
       "accord": { "status": "claimed" },
       "review": { "status": "not-ready" }
     },
+    "subtasks": [
+      {
+        "id": "task-8",
+        "title": "Add decision view",
+        "state": "validation",
+        "location": "board"
+      }
+    ],
     "body": "## Description\nCoordinate docs launch.",
     "path": ".tandem/board/task-7.md",
     "location": "board"
@@ -263,7 +274,7 @@ tandem show <id> [--json]
 - Syntax:
 
 ```text
-tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--subtask <title>]
+tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>]
 ```
 
 - Required inputs:
@@ -271,8 +282,10 @@ tandem add --title <title> [--state <state>] [--kind epic] [--description <text>
 - Optional inputs:
   - `--state <state>` defaults to `todo`.
   - `--kind epic`: mark the new task as a lightweight epic while preserving `type: task` and `task-N` IDs.
-  - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, `--parent`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`, repeated `--subtask`.
-- Human output shape: labeled created-task summary with ID, state, title, and file path.
+  - `--parent <id>`: create a task linked through `parentId`. It is a tracked subtask when the resolved parent is another task; decision/custom-document parents remain valid generic parent relationships. The child still receives the next ordinary flat sequential ID such as `task-8`; this CLI path does not automatically generate IDs such as `task-7-1`.
+  - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`.
+  - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
+- Human output shape: labeled created-task summary with ID, state, title, and file path. Task-parent creation says `Created subtask` and `Subtask of`; non-task parents retain `Created task` and use the generic `Parent` label.
 - Exit/error notes:
   - fails on invalid state, unsupported kind, invalid referenced parent/blocker, structure errors, or failed write.
 
@@ -304,24 +317,25 @@ tandem move <id> --state <state>
 - Syntax:
 
 ```text
-tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
+tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
 ```
 
 - Required inputs:
   - `<id>`: active board task ID.
 - Optional inputs:
   - scalar replacements: `--title`, `--kind`, `--priority`, `--assignee`, `--due-date`.
+  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the parent exists; a task cannot parent itself. A task target produces a subtask relationship, while a decision/custom-document target remains a generic parent relationship.
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
-  - no body/creation fields such as `--description` or `--subtask`; set them during `tandem add` in v0.
+  - no body authoring such as `--description`; inline `--subtask` authoring is deprecated in favor of a separate task with `--parent`.
   - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata.
-  - no `parentId` update and no clear/remove flags in v0.
+  - no clear/remove flags in v0, including no way to clear an existing `parentId`.
   - completed logs are not updated.
 - Validation:
   - kind, when set, must be `epic`; omit `kind` for normal tasks.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
-  - blockers must resolve to existing documents; references warn when unresolved; related files remain path metadata.
+  - parent and blockers must resolve to existing documents; references warn when unresolved; related files remain path metadata.
 - Human output shape: warnings first, then changed fields with old/new values and the path. If every requested value already exists, the command prints a clear no-op and does not update `updatedAt` or append an event.
 - Mutation notes: raw-source frontmatter patches preserve unknown fields and the Markdown body, update `updatedAt` only on real changes, and append `task.updated` on real changes.
 
@@ -491,7 +505,7 @@ tandem log search <query> [--json]
 - Syntax:
 
 ```text
-tandem search <query> [--state <state>] [--type <type>] [--json]
+tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
 ```
 
 - Required inputs:
@@ -499,8 +513,9 @@ tandem search <query> [--state <state>] [--type <type>] [--json]
 - Optional inputs:
   - `--state <state>` filters active board results.
   - `--type <type>` filters by document type.
+  - `--parent <id>` filters active and completed results to documents with that parent, including generic non-task parent targets.
   - `--json`: emit structured output.
-- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, and match snippet.
+- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, `RELATION` (`subtask` or generic `parent`), parent ID, and match snippet.
 - `--json` data shape:
 
 ```json
@@ -510,13 +525,14 @@ tandem search <query> [--state <state>] [--type <type>] [--json]
     "query": "theme",
     "results": [
       {
-        "id": "task-7",
+        "id": "task-8",
         "type": "task",
-        "kind": "epic",
-        "title": "Launch docs epic",
+        "title": "Add theme preview",
         "location": "board",
         "state": "in-progress",
-        "snippet": "Coordinate docs launch."
+        "parentId": "task-7",
+        "parentRelationship": "subtask",
+        "snippet": "Add theme preview to the docs launch."
       },
       {
         "id": "task-2",

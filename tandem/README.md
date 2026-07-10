@@ -46,6 +46,21 @@ cargo run -- tui
 
 Use `cargo run -- <command>` during early development. The package binary name is `tandem`.
 
+## Task hierarchy
+
+A task becomes a tracked subtask when its `parentId` resolves to another task. Create it with the same `add` command as any other task:
+
+```text
+tandem add --title "Coordinate the release"
+tandem add --title "Write release notes" --parent task-1
+```
+
+The child receives the next normal sequential task ID (for example, `task-2`), not an automatically generated hierarchical ID such as `task-1-1`. `tandem list --parent task-1` and `tandem search <query> --parent task-1` select documents with that parent, while `tandem show task-1` includes linked task children as subtask summaries. Use `tandem update task-2 --parent task-1` to attach or reparent an existing active task.
+
+`parentId` may also resolve to a decision or another Tandem document type. Those valid relationships remain generic parents: human output uses `Parent` rather than `Subtask of`, JSON uses `parentRelationship: "parent"`, and showing the non-task parent does not fabricate a `subtasks` collection. Task-to-task links use `Subtask of` and `parentRelationship: "subtask"`.
+
+The earlier `add --subtask <title>` inline-checklist authoring path is deprecated and rejected with guidance to create a parent-linked task. Existing inline `subtasks` metadata remains readable for compatibility, but the CLI does not create new inline entries.
+
 ## Release and install target
 
 Current release recommendation: `tandem` package version `0.2.0`, `tandem` binary, annotated git tag `tandem-v0.2.0`.

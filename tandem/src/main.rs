@@ -105,6 +105,28 @@ impl DocumentLocation {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParentRelationship {
+    Subtask,
+    Parent,
+}
+
+impl ParentRelationship {
+    fn as_str(self) -> &'static str {
+        match self {
+            ParentRelationship::Subtask => "subtask",
+            ParentRelationship::Parent => "parent",
+        }
+    }
+
+    fn human_label(self) -> &'static str {
+        match self {
+            ParentRelationship::Subtask => "Subtask of",
+            ParentRelationship::Parent => "Parent",
+        }
+    }
+}
+
 impl Document {
     fn field(&self, key: &str) -> Option<&str> {
         self.fields.get(key).map(String::as_str)
@@ -142,6 +164,7 @@ struct ListOptions {
     priority: Option<String>,
     tag: Option<String>,
     assignee: Option<String>,
+    parent: Option<String>,
     accord: Option<String>,
     review: Option<String>,
     json: bool,
@@ -167,7 +190,6 @@ struct AddOptions {
     blockers: Vec<String>,
     references: Vec<String>,
     related_files: Vec<String>,
-    subtasks: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -176,6 +198,8 @@ struct AddOutcome {
     state: String,
     title: String,
     kind: Option<String>,
+    parent: Option<String>,
+    parent_relationship: Option<ParentRelationship>,
     path: PathBuf,
     warnings: Vec<String>,
 }
@@ -194,6 +218,7 @@ struct UpdateOptions {
     priority: Option<String>,
     assignee: Option<String>,
     due_date: Option<String>,
+    parent: Option<String>,
     tags: Vec<String>,
     blockers: Vec<String>,
     references: Vec<String>,
@@ -213,6 +238,7 @@ struct UpdateOutcome {
     path: PathBuf,
     changes: Vec<UpdateChange>,
     warnings: Vec<String>,
+    parent_relationship: Option<ParentRelationship>,
 }
 
 #[derive(Debug, Default)]
@@ -229,6 +255,7 @@ struct SearchOptions {
     query: String,
     state: Option<String>,
     doc_type: Option<String>,
+    parent: Option<String>,
     json: bool,
 }
 
@@ -344,13 +371,13 @@ fn print_help() {
     println!();
     println!("Usage:");
     println!("  tandem init [--title <title>]");
-    println!("  tandem list [--state <state>] [--type <type>] [--json]");
+    println!("  tandem list [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem show <id> [--json]");
-    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--description <text>]");
+    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>]");
     println!("  tandem move <id> --state <state>");
-    println!("  tandem update <id> [--title <title>] [--kind epic] [--priority <priority>] [--tag <tag>] ...");
+    println!("  tandem update <id> [--title <title>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
     println!("  tandem complete <id> --summary <text>");
-    println!("  tandem search <query> [--state <state>] [--type <type>] [--json]");
+    println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem log list|show|search ...");
     println!("  tandem accord ready|claim|deliver|accept|rework|block|fail ...");
     println!("  tandem rules list|add|edit|delete ...");
@@ -416,6 +443,10 @@ fn parse_list_args(args: &[String]) -> Result<ListOptions, CliError> {
             "--assignee" => {
                 index += 1;
                 options.assignee = Some(required_value(args, index, "--assignee")?.to_string());
+            }
+            "--parent" => {
+                index += 1;
+                options.parent = Some(required_value(args, index, "--parent")?.to_string());
             }
             "--accord" => {
                 index += 1;
@@ -524,10 +555,7 @@ fn parse_add_args(args: &[String]) -> Result<AddOptions, CliError> {
                     .push(required_value(args, index, "--related-file")?.to_string());
             }
             "--subtask" => {
-                index += 1;
-                options
-                    .subtasks
-                    .push(required_value(args, index, "--subtask")?.to_string());
+                return Err(inline_subtask_authoring_error("add"));
             }
             flag if flag.starts_with('-') => {
                 return Err(CliError::usage(format!("unknown add flag `{flag}`")))
@@ -590,6 +618,10 @@ fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
                 index += 1;
                 options.due_date = Some(required_value(args, index, "--due-date")?.to_string());
             }
+            "--parent" => {
+                index += 1;
+                options.parent = Some(required_value(args, index, "--parent")?.to_string());
+            }
             "--tag" => {
                 index += 1;
                 options
@@ -619,9 +651,12 @@ fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
                     "update does not support --state; use `tandem move <id> --state <state>`",
                 ))
             }
-            "--parent" | "--parent-id" | "--parentId" => {
-                return Err(CliError::usage("update does not support updating parentId"))
+            "--parent-id" | "--parentId" => {
+                return Err(CliError::usage(
+                    "update uses the canonical --parent <id> flag",
+                ))
             }
+            "--subtask" => return Err(inline_subtask_authoring_error("update")),
             flag if flag.starts_with('-') => {
                 return Err(CliError::usage(format!("unknown update flag `{flag}`")))
             }
@@ -683,6 +718,10 @@ fn parse_search_args(args: &[String]) -> Result<SearchOptions, CliError> {
             "--type" => {
                 index += 1;
                 options.doc_type = Some(required_value(args, index, "--type")?.to_string());
+            }
+            "--parent" => {
+                index += 1;
+                options.parent = Some(required_value(args, index, "--parent")?.to_string());
             }
             "--json" => options.json = true,
             flag if flag.starts_with('-') => {
@@ -973,6 +1012,12 @@ fn required_value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'
         .ok_or_else(|| CliError::usage(format!("{flag} requires a value")))
 }
 
+fn inline_subtask_authoring_error(command: &str) -> CliError {
+    CliError::usage(format!(
+        "{command} --subtask is deprecated; create a tracked subtask with `tandem add --title <title> --parent <task-id>`"
+    ))
+}
+
 fn set_single_positional(target: &mut String, value: &str, command: &str) -> Result<(), CliError> {
     if target.is_empty() {
         *target = value.to_string();
@@ -1047,11 +1092,12 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     let docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
     let mut filtered = filter_documents(docs, &options);
     sort_documents(&mut filtered);
+    let document_types = read_document_types(&workspace)?;
 
     if options.json {
-        println!("{}", list_json(&filtered));
+        println!("{}", list_json(&filtered, &document_types));
     } else {
-        print_list_table(&filtered);
+        print_list_table(&filtered, &document_types);
         print_document_warnings(&filtered);
     }
 
@@ -1062,11 +1108,14 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let doc = find_document(&workspace, &options.id)?
         .ok_or_else(|| CliError::user(format!("document not found: {}", options.id)))?;
+    let document_types = read_document_types(&workspace)?;
+    let relationship = parent_relationship(&doc, &document_types);
+    let subtasks = find_subtasks(&workspace, &doc)?;
 
     if options.json {
-        println!("{}", show_json(&doc));
+        println!("{}", show_json(&doc, &subtasks, relationship));
     } else {
-        print_show(&doc);
+        print_show(&doc, &subtasks, relationship);
     }
 
     Ok(())
@@ -1079,11 +1128,22 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     for warning in outcome.warnings {
         println!("Warning: {warning}");
     }
-    println!("Created task");
+    if outcome.parent_relationship == Some(ParentRelationship::Subtask) {
+        println!("Created subtask");
+    } else {
+        println!("Created task");
+    }
     println!("ID:    {}", outcome.id);
     println!("State: {}", outcome.state);
     if let Some(kind) = outcome.kind.as_deref() {
         println!("Kind:  {kind}");
+    }
+    if let Some(parent) = outcome.parent.as_deref() {
+        let label = outcome
+            .parent_relationship
+            .unwrap_or(ParentRelationship::Parent)
+            .human_label();
+        println!("{label}: {parent}");
     }
     println!("Title: {}", outcome.title);
     println!("Path:  {}", display_path(&outcome.path));
@@ -1103,9 +1163,11 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         .filter(|value| !value.is_empty())
         .map(str::to_string);
 
-    if let Some(parent) = options.parent.as_deref() {
-        require_existing_document(workspace, parent, "parent")?;
-    }
+    let parent_relationship = options
+        .parent
+        .as_deref()
+        .map(|parent| resolve_parent_relationship(workspace, "task", parent))
+        .transpose()?;
     for blocker in &options.blockers {
         require_existing_document(workspace, blocker, "blocker")?;
     }
@@ -1137,15 +1199,6 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         push_array_line(&mut lines, "tags", &options.tags);
         lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
         lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-        if !options.subtasks.is_empty() {
-            lines.push("subtasks:".to_string());
-            for (index, subtask) in options.subtasks.iter().enumerate() {
-                let subtask_id = format!("{task_id}-{}", index + 1);
-                lines.push(format!("  - id: {subtask_id}"));
-                lines.push(format!("    title: {}", yaml_double_quote(subtask)));
-                lines.push("    completed: false".to_string());
-            }
-        }
         lines.push("---".to_string());
         lines.push(String::new());
         if let Some(description) = options.description.as_deref() {
@@ -1163,6 +1216,8 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         state,
         title,
         kind,
+        parent: options.parent,
+        parent_relationship,
         path: created.path,
         warnings,
     })
@@ -1208,7 +1263,7 @@ fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
     for change in outcome.changes {
         println!(
             "{}: {} -> {}",
-            change.field,
+            display_change_field(&change.field, outcome.parent_relationship),
             display_change_value(&change.old),
             display_change_value(&change.new)
         );
@@ -1313,31 +1368,13 @@ fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
     docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
-    let mut results = docs
-        .into_iter()
-        .filter(|doc| {
-            options
-                .doc_type
-                .as_deref()
-                .map_or(true, |doc_type| doc.doc_type() == doc_type)
-        })
-        .filter(|doc| {
-            if doc.location == DocumentLocation::Logs {
-                options.state.is_none()
-            } else {
-                options.state.as_deref().map_or(true, |state| {
-                    state_matches_filter(doc.field("state"), state)
-                })
-            }
-        })
-        .filter_map(|doc| search_match(doc, &options.query))
-        .collect::<Vec<_>>();
-    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    let document_types = document_types_by_id(&docs);
+    let results = search_documents(docs, &options);
 
     if options.json {
-        println!("{}", search_json(&options.query, &results));
+        println!("{}", search_json(&options.query, &results, &document_types));
     } else {
-        print_search_table(&results);
+        print_search_table(&results, &document_types);
     }
     Ok(())
 }
@@ -1384,7 +1421,8 @@ fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", log_show_json(&doc));
     } else {
-        print_log_show(&doc);
+        let document_types = read_document_types(&workspace)?;
+        print_log_show(&doc, parent_relationship(&doc, &document_types));
     }
     Ok(())
 }
@@ -1396,10 +1434,11 @@ fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
         .filter_map(|doc| search_match(doc, &options.query))
         .collect::<Vec<_>>();
     results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    let document_types = read_document_types(&workspace)?;
     if options.json {
-        println!("{}", search_json(&options.query, &results));
+        println!("{}", search_json(&options.query, &results, &document_types));
     } else {
-        print_search_table(&results);
+        print_search_table(&results, &document_types);
     }
     Ok(())
 }
@@ -1760,7 +1799,8 @@ fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", decision_show_json(&doc));
     } else {
-        print_show(&doc);
+        let document_types = read_document_types(&workspace)?;
+        print_show(&doc, &[], parent_relationship(&doc, &document_types));
     }
     Ok(())
 }
@@ -1993,6 +2033,27 @@ fn find_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, Cl
     Ok(None)
 }
 
+fn find_subtasks(workspace: &Workspace, parent: &Document) -> Result<Vec<Document>, CliError> {
+    if parent.doc_type() != "task" {
+        return Ok(Vec::new());
+    }
+    let mut subtasks = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    subtasks.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    subtasks.retain(|doc| doc.doc_type() == "task" && doc.field("parentId") == Some(parent.id()));
+    subtasks.sort_by(|a, b| {
+        a.location
+            .as_str()
+            .cmp(b.location.as_str())
+            .then_with(|| {
+                a.field("state")
+                    .unwrap_or("")
+                    .cmp(b.field("state").unwrap_or(""))
+            })
+            .then_with(|| a.id().cmp(b.id()))
+    });
+    Ok(subtasks)
+}
+
 fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
     Ok(
         read_documents(&workspace.board_dir, DocumentLocation::Board)?
@@ -2019,6 +2080,48 @@ fn require_existing_document(workspace: &Workspace, id: &str, kind: &str) -> Res
             "Validation failed: {kind} document not found: {id}"
         )))
     }
+}
+
+fn resolve_parent_relationship(
+    workspace: &Workspace,
+    child_type: &str,
+    parent_id: &str,
+) -> Result<ParentRelationship, CliError> {
+    let parent = find_document(workspace, parent_id)?.ok_or_else(|| {
+        CliError::user(format!(
+            "Validation failed: parent document not found: {parent_id}"
+        ))
+    })?;
+    Ok(if child_type == "task" && parent.doc_type() == "task" {
+        ParentRelationship::Subtask
+    } else {
+        ParentRelationship::Parent
+    })
+}
+
+fn document_types_by_id(docs: &[Document]) -> HashMap<String, String> {
+    docs.iter()
+        .map(|doc| (doc.id().to_string(), doc.doc_type().to_string()))
+        .collect()
+}
+
+fn read_document_types(workspace: &Workspace) -> Result<HashMap<String, String>, CliError> {
+    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    Ok(document_types_by_id(&docs))
+}
+
+fn parent_relationship(
+    doc: &Document,
+    document_types: &HashMap<String, String>,
+) -> Option<ParentRelationship> {
+    let parent_id = doc.field("parentId")?;
+    let parent_type = document_types.get(parent_id)?;
+    Some(if doc.doc_type() == "task" && parent_type == "task" {
+        ParentRelationship::Subtask
+    } else {
+        ParentRelationship::Parent
+    })
 }
 
 fn unresolved_blockers(
@@ -2271,6 +2374,12 @@ fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document>
         })
         .filter(|doc| {
             options
+                .parent
+                .as_deref()
+                .is_none_or(|parent| doc.field("parentId") == Some(parent))
+        })
+        .filter(|doc| {
+            options
                 .tag
                 .as_deref()
                 .map_or(true, |tag| field_values_contain(doc.field("tags"), tag))
@@ -2390,7 +2499,7 @@ fn update_task_metadata(
         )));
     }
     validate_task_document_for_mutation(workspace, &doc)?;
-    validate_update_options(workspace, &options)?;
+    let parent_relationship = validate_update_options(workspace, &options)?;
 
     let mut warnings = Vec::new();
     for reference in &options.references {
@@ -2436,6 +2545,13 @@ fn update_task_metadata(
         "dueDate",
         options.due_date.as_deref(),
     )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
+        "parentId",
+        options.parent.as_deref(),
+    )?;
     apply_list_append_update(&mut updates, &mut changes, &doc, "tags", &options.tags);
     apply_list_append_update(
         &mut updates,
@@ -2467,6 +2583,7 @@ fn update_task_metadata(
             path,
             changes,
             warnings,
+            parent_relationship,
         });
     }
 
@@ -2495,10 +2612,14 @@ fn update_task_metadata(
         path,
         changes,
         warnings,
+        parent_relationship,
     })
 }
 
-fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Result<(), CliError> {
+fn validate_update_options(
+    workspace: &Workspace,
+    options: &UpdateOptions,
+) -> Result<Option<ParentRelationship>, CliError> {
     if let Some(title) = options.title.as_deref() {
         require_nonempty(Some(title), "update --title must not be empty")?;
     }
@@ -2518,6 +2639,18 @@ fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Re
     if let Some(due_date) = options.due_date.as_deref() {
         require_nonempty(Some(due_date), "update --due-date must not be empty")?;
     }
+    let parent_relationship = if let Some(parent) = options.parent.as_deref() {
+        let parent = require_nonempty(Some(parent), "update --parent must not be empty")?;
+        if parent == options.id {
+            return Err(CliError::user(format!(
+                "Validation failed: task {} cannot be its own parent",
+                options.id
+            )));
+        }
+        Some(resolve_parent_relationship(workspace, "task", parent)?)
+    } else {
+        None
+    };
     for (field, values) in [
         ("--tag", &options.tags),
         ("--blocker", &options.blockers),
@@ -2531,7 +2664,7 @@ fn validate_update_options(workspace: &Workspace, options: &UpdateOptions) -> Re
     for blocker in &options.blockers {
         require_existing_document(workspace, blocker, "blocker")?;
     }
-    Ok(())
+    Ok(parent_relationship)
 }
 
 fn validate_task_kind_option(kind: Option<&str>, flag: &str) -> Result<(), CliError> {
@@ -2612,6 +2745,15 @@ fn display_list_value(values: &[String]) -> String {
         "[]".to_string()
     } else {
         format!("[{}]", values.join(", "))
+    }
+}
+
+fn display_change_field(field: &str, relationship: Option<ParentRelationship>) -> &str {
+    match field {
+        "parentId" => relationship
+            .unwrap_or(ParentRelationship::Parent)
+            .human_label(),
+        _ => field,
     }
 }
 
@@ -3065,24 +3207,40 @@ fn sort_documents(docs: &mut [Document]) {
     });
 }
 
-fn print_list_table(docs: &[Document]) {
+fn parent_table_values<'a>(
+    doc: &'a Document,
+    document_types: &HashMap<String, String>,
+) -> (&'static str, &'a str) {
+    let Some(parent_id) = doc.field("parentId") else {
+        return ("-", "-");
+    };
+    let relationship = parent_relationship(doc, document_types)
+        .unwrap_or(ParentRelationship::Parent)
+        .as_str();
+    (relationship, parent_id)
+}
+
+fn print_list_table(docs: &[Document], document_types: &HashMap<String, String>) {
     if docs.is_empty() {
         println!("No active Tandem documents found.");
         return;
     }
 
     println!(
-        "{:<12} {:<12} {:<8} {:<8} {:<42} {:<12}",
-        "ID", "STATE", "TYPE", "KIND", "TITLE", "ASSIGNEE"
+        "{:<12} {:<12} {:<8} {:<8} {:<9} {:<12} {:<32} {:<12}",
+        "ID", "STATE", "TYPE", "KIND", "RELATION", "PARENT", "TITLE", "ASSIGNEE"
     );
     for doc in docs {
+        let (relationship, parent_id) = parent_table_values(doc, document_types);
         println!(
-            "{:<12} {:<12} {:<8} {:<8} {:<42} {:<12}",
+            "{:<12} {:<12} {:<8} {:<8} {:<9} {:<12} {:<32} {:<12}",
             truncate(doc.id(), 12),
             truncate(doc.field("state").unwrap_or("-"), 12),
             truncate(doc.doc_type(), 8),
             truncate(doc.kind().unwrap_or("-"), 8),
-            truncate(doc.title(), 42),
+            relationship,
+            truncate(parent_id, 12),
+            truncate(doc.title(), 32),
             truncate(doc.field("assignee").unwrap_or("-"), 12)
         );
     }
@@ -3129,7 +3287,7 @@ fn print_metadata_values(label: &str, values: Vec<String>) {
     }
 }
 
-fn print_show(doc: &Document) {
+fn print_show(doc: &Document, subtasks: &[Document], relationship: Option<ParentRelationship>) {
     println!("ID:        {}", doc.id());
     println!("Type:      {}", doc.doc_type());
     if let Some(kind) = doc.kind() {
@@ -3152,7 +3310,20 @@ fn print_show(doc: &Document) {
         println!("Due:       {due_date}");
     }
     if let Some(parent_id) = doc.field("parentId") {
-        println!("Parent:    {parent_id}");
+        let label = relationship
+            .unwrap_or(ParentRelationship::Parent)
+            .human_label();
+        println!("{label}: {parent_id}");
+    }
+    if !subtasks.is_empty() {
+        println!("Subtasks:   {}", subtasks.len());
+        for subtask in subtasks {
+            let status = subtask
+                .field("state")
+                .or_else(|| (subtask.location == DocumentLocation::Logs).then_some("completed"))
+                .unwrap_or(subtask.location.as_str());
+            println!("  {} [{}] {}", subtask.id(), status, subtask.title());
+        }
     }
     if let Some(created_at) = doc.field("createdAt") {
         println!("Created:   {created_at}");
@@ -3193,6 +3364,36 @@ fn print_show(doc: &Document) {
 struct SearchResult {
     doc: Document,
     snippet: String,
+}
+
+fn search_documents(docs: Vec<Document>, options: &SearchOptions) -> Vec<SearchResult> {
+    let mut results = docs
+        .into_iter()
+        .filter(|doc| {
+            options
+                .doc_type
+                .as_deref()
+                .map_or(true, |doc_type| doc.doc_type() == doc_type)
+        })
+        .filter(|doc| {
+            if doc.location == DocumentLocation::Logs {
+                options.state.is_none()
+            } else {
+                options.state.as_deref().map_or(true, |state| {
+                    state_matches_filter(doc.field("state"), state)
+                })
+            }
+        })
+        .filter(|doc| {
+            options
+                .parent
+                .as_deref()
+                .is_none_or(|parent| doc.field("parentId") == Some(parent))
+        })
+        .filter_map(|doc| search_match(doc, &options.query))
+        .collect::<Vec<_>>();
+    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    results
 }
 
 fn search_match(doc: Document, query: &str) -> Option<SearchResult> {
@@ -3237,25 +3438,28 @@ fn snippet_for_match(value: &str, query: &str) -> String {
     snippet
 }
 
-fn print_search_table(results: &[SearchResult]) {
+fn print_search_table(results: &[SearchResult], document_types: &HashMap<String, String>) {
     if results.is_empty() {
         println!("No matching Tandem documents found.");
         return;
     }
     println!(
-        "{:<12} {:<8} {:<12} {:<8} {:<8} {:<32} MATCH",
-        "ID", "WHERE", "STATE", "TYPE", "KIND", "TITLE"
+        "{:<12} {:<8} {:<12} {:<8} {:<8} {:<9} {:<12} {:<24} MATCH",
+        "ID", "WHERE", "STATE", "TYPE", "KIND", "RELATION", "PARENT", "TITLE"
     );
     for result in results {
         let doc = &result.doc;
+        let (relationship, parent_id) = parent_table_values(doc, document_types);
         println!(
-            "{:<12} {:<8} {:<12} {:<8} {:<8} {:<32} {}",
+            "{:<12} {:<8} {:<12} {:<8} {:<8} {:<9} {:<12} {:<24} {}",
             truncate(doc.id(), 12),
             doc.location.as_str(),
             truncate(doc.field("state").unwrap_or("-"), 12),
             truncate(doc.doc_type(), 8),
             truncate(doc.kind().unwrap_or("-"), 8),
-            truncate(doc.title(), 32),
+            relationship,
+            truncate(parent_id, 12),
+            truncate(doc.title(), 24),
             truncate(&result.snippet, 80)
         );
     }
@@ -3278,9 +3482,9 @@ fn print_log_table(docs: &[Document]) {
     }
 }
 
-fn print_log_show(doc: &Document) {
+fn print_log_show(doc: &Document, relationship: Option<ParentRelationship>) {
     println!("Log document");
-    print_show(doc);
+    print_show(doc, &[], relationship);
     if let Some(validation) = completion_validation(doc) {
         println!();
         println!("Validation: {validation}");
@@ -3774,14 +3978,17 @@ fn print_rules(rules: &RulesByCategory, category_filter: Option<&str>) {
     }
 }
 
-fn list_json(docs: &[Document]) -> String {
+fn list_json(docs: &[Document], document_types: &HashMap<String, String>) -> String {
     let mut by_state = BTreeMap::<String, usize>::new();
     for doc in docs {
         let state = doc.field("state").unwrap_or("unknown").to_string();
         *by_state.entry(state).or_insert(0) += 1;
     }
 
-    let items = docs.iter().map(document_summary_json).collect::<Vec<_>>();
+    let items = docs
+        .iter()
+        .map(|doc| document_summary_json(doc, parent_relationship(doc, document_types)))
+        .collect::<Vec<_>>();
     let states = by_state
         .iter()
         .map(|(state, count)| format!("{}:{count}", json_string(state)))
@@ -3798,14 +4005,39 @@ fn list_json(docs: &[Document]) -> String {
     )
 }
 
-fn show_json(doc: &Document) -> String {
+fn show_json(
+    doc: &Document,
+    subtasks: &[Document],
+    relationship: Option<ParentRelationship>,
+) -> String {
     let warnings = document_warnings(doc);
+    let mut data_fields = vec![format!("\"document\":{}", document_detail_json(doc))];
+    if let Some(relationship) = relationship {
+        data_fields.push(format!(
+            "\"parentRelationship\":{}",
+            json_string(relationship.as_str())
+        ));
+    }
+    if doc.doc_type() == "task" {
+        let subtasks = subtasks
+            .iter()
+            .map(subtask_summary_json)
+            .collect::<Vec<_>>()
+            .join(",");
+        data_fields.push(format!("\"subtasks\":[{subtasks}]"));
+    }
+    data_fields.push(format!("\"body\":{}", json_string(&doc.body)));
+    data_fields.push(format!(
+        "\"path\":{}",
+        json_string(&display_path(&doc.path))
+    ));
+    data_fields.push(format!(
+        "\"location\":{}",
+        json_string(doc.location.as_str())
+    ));
     format!(
-        "{{\"ok\":true,\"data\":{{\"document\":{},\"body\":{},\"path\":{},\"location\":{}}},\"warnings\":{}}}",
-        document_detail_json(doc),
-        json_string(&doc.body),
-        json_string(&display_path(&doc.path)),
-        json_string(doc.location.as_str()),
+        "{{\"ok\":true,\"data\":{{{}}},\"warnings\":{}}}",
+        data_fields.join(","),
         json_array_strings(&warnings)
     )
 }
@@ -3833,7 +4065,11 @@ fn log_show_json(doc: &Document) -> String {
     )
 }
 
-fn search_json(query: &str, results: &[SearchResult]) -> String {
+fn search_json(
+    query: &str,
+    results: &[SearchResult],
+    document_types: &HashMap<String, String>,
+) -> String {
     let items = results
         .iter()
         .map(|result| {
@@ -3846,6 +4082,11 @@ fn search_json(query: &str, results: &[SearchResult]) -> String {
             push_json_field(&mut fields, "location", doc.location.as_str());
             push_optional_json_field(&mut fields, "state", doc.field("state"));
             push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+            push_optional_json_field(&mut fields, "parentId", doc.field("parentId"));
+            push_parent_relationship_json_field(
+                &mut fields,
+                parent_relationship(doc, document_types),
+            );
             push_json_field(&mut fields, "snippet", &result.snippet);
             format!("{{{}}}", fields.join(","))
         })
@@ -3970,7 +4211,7 @@ fn first_body_line(doc: &Document) -> String {
         .to_string()
 }
 
-fn document_summary_json(doc: &Document) -> String {
+fn document_summary_json(doc: &Document, relationship: Option<ParentRelationship>) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "type", doc.doc_type());
@@ -3979,6 +4220,8 @@ fn document_summary_json(doc: &Document) -> String {
     push_optional_json_field(&mut fields, "state", doc.field("state"));
     push_optional_json_field(&mut fields, "priority", doc.field("priority"));
     push_optional_json_field(&mut fields, "assignee", doc.field("assignee"));
+    push_optional_json_field(&mut fields, "parentId", doc.field("parentId"));
+    push_parent_relationship_json_field(&mut fields, relationship);
     if let Some(tags) = doc.field("tags") {
         fields.push(format!(
             "\"tags\":{}",
@@ -4029,6 +4272,16 @@ fn document_detail_json(doc: &Document) -> String {
     format!("{{{}}}", fields.join(","))
 }
 
+fn subtask_summary_json(doc: &Document) -> String {
+    let mut fields = Vec::new();
+    push_json_field(&mut fields, "id", doc.id());
+    push_json_field(&mut fields, "title", doc.title());
+    push_optional_json_field(&mut fields, "state", doc.field("state"));
+    push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+    push_json_field(&mut fields, "location", doc.location.as_str());
+    format!("{{{}}}", fields.join(","))
+}
+
 fn log_summary_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
@@ -4043,6 +4296,15 @@ fn log_summary_json(doc: &Document) -> String {
 
 fn push_json_field(fields: &mut Vec<String>, key: &str, value: &str) {
     fields.push(format!("{}:{}", json_string(key), json_string(value)));
+}
+
+fn push_parent_relationship_json_field(
+    fields: &mut Vec<String>,
+    relationship: Option<ParentRelationship>,
+) {
+    if let Some(relationship) = relationship {
+        push_json_field(fields, "parentRelationship", relationship.as_str());
+    }
 }
 
 fn push_status_object_json(fields: &mut Vec<String>, key: &str, status: Option<&str>) {
@@ -4695,6 +4957,195 @@ mod tests {
     }
 
     #[test]
+    fn parent_relationships_distinguish_subtasks_from_generic_children() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-parent-relationships-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Parent decision\nstatus: accepted\n---\n",
+        )
+        .unwrap();
+
+        let parent = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Parent task".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        let subtask = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Tracked subtask".to_string()),
+                parent: Some(parent.id.clone()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        let generic_child = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Decision-linked task".to_string()),
+                parent: Some("decision-1".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(parent.id, "task-1");
+        assert_eq!(subtask.id, "task-2");
+        assert_eq!(generic_child.id, "task-3");
+        assert_eq!(
+            subtask.parent_relationship,
+            Some(ParentRelationship::Subtask)
+        );
+        assert_eq!(
+            generic_child.parent_relationship,
+            Some(ParentRelationship::Parent)
+        );
+        for outcome in [&subtask, &generic_child] {
+            let content = fs::read_to_string(&outcome.path).unwrap();
+            assert!(content.contains(&format!(
+                "parentId: {}\n",
+                yaml_double_quote(outcome.parent.as_deref().unwrap())
+            )));
+            assert!(!content.contains("subtasks:"));
+            assert!(!content.contains("task-1-1"));
+        }
+
+        let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
+        let document_types = document_types_by_id(&docs);
+        let task_parent = docs.iter().find(|doc| doc.id() == "task-1").unwrap();
+        let decision_parent = docs.iter().find(|doc| doc.id() == "decision-1").unwrap();
+        let task_child = docs.iter().find(|doc| doc.id() == "task-2").unwrap();
+        let decision_child = docs.iter().find(|doc| doc.id() == "task-3").unwrap();
+
+        assert_eq!(
+            parent_relationship(task_child, &document_types),
+            Some(ParentRelationship::Subtask)
+        );
+        assert_eq!(
+            parent_relationship(decision_child, &document_types),
+            Some(ParentRelationship::Parent)
+        );
+        assert_eq!(
+            parent_table_values(task_child, &document_types),
+            ("subtask", "task-1")
+        );
+        assert_eq!(
+            parent_table_values(decision_child, &document_types),
+            ("parent", "decision-1")
+        );
+
+        let linked = find_subtasks(&workspace, task_parent).unwrap();
+        assert_eq!(linked.len(), 1);
+        assert_eq!(linked[0].id(), "task-2");
+        assert!(find_subtasks(&workspace, decision_parent)
+            .unwrap()
+            .is_empty());
+
+        let parent_json = show_json(task_parent, &linked, None);
+        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-2\""));
+        let decision_json = show_json(decision_parent, &[], None);
+        assert!(!decision_json.contains("\"subtasks\""));
+        let subtask_json = show_json(task_child, &[], Some(ParentRelationship::Subtask));
+        assert!(subtask_json.contains("\"parentRelationship\":\"subtask\""));
+        let generic_json = show_json(decision_child, &[], Some(ParentRelationship::Parent));
+        assert!(generic_json.contains("\"parentRelationship\":\"parent\""));
+        assert!(!generic_json.contains("\"parentRelationship\":\"subtask\""));
+
+        let list_output = list_json(&docs, &document_types);
+        assert!(list_output.contains("\"parentRelationship\":\"subtask\""));
+        assert!(list_output.contains("\"parentRelationship\":\"parent\""));
+        for (parent_id, expected_id, expected_relationship) in [
+            ("task-1", "task-2", "subtask"),
+            ("decision-1", "task-3", "parent"),
+        ] {
+            let filtered = filter_documents(
+                docs.clone(),
+                &ListOptions {
+                    parent: Some(parent_id.to_string()),
+                    ..ListOptions::default()
+                },
+            );
+            assert_eq!(filtered.len(), 1);
+            assert_eq!(filtered[0].id(), expected_id);
+
+            let search_options = SearchOptions {
+                query: "task".to_string(),
+                parent: Some(parent_id.to_string()),
+                ..SearchOptions::default()
+            };
+            let results = search_documents(docs.clone(), &search_options);
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].doc.id(), expected_id);
+            assert!(
+                search_json("task", &results, &document_types).contains(&format!(
+                    "\"parentRelationship\":\"{expected_relationship}\""
+                ))
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn hierarchy_change_labels_follow_resolved_parent_type() {
+        assert_eq!(
+            display_change_field("parentId", Some(ParentRelationship::Subtask)),
+            "Subtask of"
+        );
+        assert_eq!(
+            display_change_field("parentId", Some(ParentRelationship::Parent)),
+            "Parent"
+        );
+        assert_eq!(display_change_field("priority", None), "priority");
+    }
+
+    #[test]
+    fn inline_subtask_authoring_flags_point_to_parent_linked_tasks() {
+        let add_error = parse_add_args(&[
+            "--title".to_string(),
+            "Parent".to_string(),
+            "--subtask".to_string(),
+            "Checklist".to_string(),
+        ])
+        .unwrap_err();
+        assert!(add_error.message.contains("add --subtask is deprecated"));
+        assert!(add_error.message.contains("--parent <task-id>"));
+
+        let update_error = parse_update_args(&[
+            "task-1".to_string(),
+            "--subtask".to_string(),
+            "Checklist".to_string(),
+        ])
+        .unwrap_err();
+        assert!(update_error
+            .message
+            .contains("update --subtask is deprecated"));
+    }
+
+    #[test]
     fn parses_yaml_frontmatter_and_preserves_body() {
         let input = "---\nid: task-1\ntitle: \"Hello\"\nstate: todo\n---\n\nBody\n";
         let (frontmatter, body) = split_frontmatter(input).unwrap();
@@ -4856,8 +5307,11 @@ rules:
             body: String::new(),
         };
 
-        assert!(show_json(&doc).contains("accord.status `claimed` suggests `in-progress`"));
-        assert!(list_json(&[doc]).contains("accord.status `claimed` suggests `in-progress`"));
+        assert!(
+            show_json(&doc, &[], None).contains("accord.status `claimed` suggests `in-progress`")
+        );
+        assert!(list_json(&[doc], &HashMap::new())
+            .contains("accord.status `claimed` suggests `in-progress`"));
     }
 
     #[test]
@@ -5021,6 +5475,11 @@ rules:
             "---\nid: task-2\ntype: task\ntitle: Blocker\nstate: todo\n---\n",
         )
         .unwrap();
+        fs::write(
+            workspace.board_dir.join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Parent decision\nstatus: accepted\n---\n",
+        )
+        .unwrap();
         let task_path = workspace.board_dir.join("task-1.md");
         fs::write(
             &task_path,
@@ -5035,6 +5494,7 @@ rules:
                 title: Some("New".to_string()),
                 kind: Some("epic".to_string()),
                 priority: Some("high".to_string()),
+                parent: Some("task-2".to_string()),
                 tags: vec!["cli".to_string(), "metadata".to_string()],
                 blockers: vec!["task-2".to_string()],
                 references: vec!["missing-decision".to_string()],
@@ -5045,7 +5505,11 @@ rules:
         .unwrap();
 
         let output = fs::read_to_string(&task_path).unwrap();
-        assert_eq!(outcome.changes.len(), 7);
+        assert_eq!(outcome.changes.len(), 8);
+        assert_eq!(
+            outcome.parent_relationship,
+            Some(ParentRelationship::Subtask)
+        );
         assert_eq!(
             outcome.warnings,
             vec!["reference not found: missing-decision"]
@@ -5053,6 +5517,7 @@ rules:
         assert!(output.contains("title: \"New\"\n"));
         assert!(output.contains("kind: \"epic\"\n"));
         assert!(output.contains("priority: \"high\"\n"));
+        assert!(output.contains("parentId: \"task-2\"\n"));
         assert!(output.contains("tags: [\"cli\", \"metadata\"]\n"));
         assert!(output.contains("blockers: [\"task-2\"]\n"));
         assert!(output.contains("references: [\"missing-decision\"]\n"));
@@ -5062,6 +5527,24 @@ rules:
         assert!(fs::read_to_string(&workspace.events_path)
             .unwrap()
             .contains("task.updated"));
+
+        let generic_parent_outcome = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                parent: Some("decision-1".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(generic_parent_outcome.changes.len(), 1);
+        assert_eq!(
+            generic_parent_outcome.parent_relationship,
+            Some(ParentRelationship::Parent)
+        );
+        assert!(fs::read_to_string(&task_path)
+            .unwrap()
+            .contains("parentId: \"decision-1\"\n"));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -5125,8 +5608,11 @@ rules:
             body: String::new(),
         };
 
-        assert!(show_json(&child).contains("\"parentId\":\"task-1\""));
-        assert!(!show_json(&parent).contains("\"parentId\""));
+        let parent_json = show_json(&parent, std::slice::from_ref(&child), None);
+        assert!(show_json(&child, &[], Some(ParentRelationship::Subtask))
+            .contains("\"parentId\":\"task-1\""));
+        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-2\""));
+        assert!(!document_detail_json(&parent).contains("\"parentId\""));
     }
 
     #[test]
@@ -5140,7 +5626,7 @@ rules:
             .unwrap(),
             body: String::new(),
         };
-        assert!(document_summary_json(&doc).contains("\"kind\":\"epic\""));
+        assert!(document_summary_json(&doc, None).contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"kind\":\"epic\""));
         let search = search_json(
             "epic",
@@ -5148,6 +5634,7 @@ rules:
                 doc: doc.clone(),
                 snippet: "epic".to_string(),
             }],
+            &HashMap::new(),
         );
         assert!(search.contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"blockers\":[\"task-2\"]"));
@@ -5181,6 +5668,17 @@ rules:
         )
         .unwrap_err();
         assert!(error.message.contains("invalid kind `feature`"));
+
+        let error = validate_update_options(
+            &workspace,
+            &UpdateOptions {
+                id: "task-1".to_string(),
+                parent: Some("task-1".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("cannot be its own parent"));
     }
 
     #[test]
