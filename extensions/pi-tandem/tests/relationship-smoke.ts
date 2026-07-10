@@ -160,9 +160,8 @@ try {
 	assert(shown.ok === true, "tandem_task show JSON should be ok for relationship child");
 	assert(shown.data.document.id === childId, "tandem_task show should return child id");
 	assert(shown.data.document.title === "Implement relationship display", "tandem_task show should return child title");
-	if (!("parentId" in shown.data.document) || !("blockers" in shown.data.document)) {
-		console.log("Note: tandem show --json currently omits relationship fields; smoke validates raw Tandem documents and search visibility.");
-	}
+	assert(shown.data.document.parentId === parentId, "tandem_task show should return child parentId");
+	assert(Array.isArray(shown.data.document.blockers) && shown.data.document.blockers.includes(blockerId), "tandem_task show should return child blockers");
 
 	const parentFile = await readFile(join(workspace, ".tandem", "board", `${parentId}.md`), "utf8");
 	assertIncludes(parentFile, "relatedFiles: [\"docs/architecture.md\"]", "parent task");

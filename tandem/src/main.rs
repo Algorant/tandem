@@ -3151,6 +3151,9 @@ fn print_show(doc: &Document) {
     if let Some(due_date) = doc.field("dueDate") {
         println!("Due:       {due_date}");
     }
+    if let Some(parent_id) = doc.field("parentId") {
+        println!("Parent:    {parent_id}");
+    }
     if let Some(created_at) = doc.field("createdAt") {
         println!("Created:   {created_at}");
     }
@@ -4001,6 +4004,7 @@ fn document_detail_json(doc: &Document) -> String {
         "priority",
         "assignee",
         "dueDate",
+        "parentId",
         "createdAt",
         "updatedAt",
         "completedAt",
@@ -5098,6 +5102,31 @@ rules:
         assert_eq!(fs::read_to_string(&task_path).unwrap(), before);
         assert_eq!(fs::read_to_string(&workspace.events_path).unwrap(), "");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn show_json_includes_parent_id_only_when_present() {
+        let child = Document {
+            path: PathBuf::from("task-2.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: task-2\ntype: task\ntitle: Child\nstate: todo\nparentId: task-1\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        let parent = Document {
+            path: PathBuf::from("task-1.md"),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(
+                "id: task-1\ntype: task\ntitle: Parent\nstate: todo\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+
+        assert!(show_json(&child).contains("\"parentId\":\"task-1\""));
+        assert!(!show_json(&parent).contains("\"parentId\""));
     }
 
     #[test]
