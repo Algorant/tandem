@@ -2,9 +2,51 @@
 
 set positional-arguments
 
-# Run the development TUI against this repository's .tandem workspace.
+# Run the development TUI. A delegated visual task may temporarily route this
+# command through Git-local state to its worktree code and a safe fixture.
 dev:
-	cargo run --manifest-path tandem/Cargo.toml -- tui
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+	route_file="$git_common_dir/tandem-dev-preview"
+	manifest="$repo_root/tandem/Cargo.toml"
+	workspace="$repo_root"
+	if [[ -f "$route_file" ]]; then
+		mapfile -t route < "$route_file"
+		if [[ "${#route[@]}" -ne 2 ]]; then
+			echo "Invalid dev preview route: $route_file" >&2
+			exit 2
+		fi
+		manifest="${route[0]}"
+		workspace="${route[1]}"
+	fi
+	test -f "$manifest"
+	test -f "$workspace/.tandem/tandem.md"
+	echo "Tandem code:      $manifest"
+	echo "Tandem workspace: $workspace"
+	cd "$workspace"
+	exec cargo run --manifest-path "$manifest" -- tui
+
+# Agent/orchestrator helper: configure the one-command delegated preview slot.
+[private]
+dev-route manifest workspace:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	manifest="$(realpath "{{manifest}}")"
+	workspace="$(realpath "{{workspace}}")"
+	test -f "$manifest"
+	test -f "$workspace/.tandem/tandem.md"
+	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+	printf '%s\n%s\n' "$manifest" "$workspace" > "$git_common_dir/tandem-dev-preview"
+
+# Agent/orchestrator helper: restore `just dev` to the normal checkout.
+[private]
+dev-reset:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+	rm -f "$git_common_dir/tandem-dev-preview"
 
 # Verify the local docs runtime satisfies Astro's Node floor.
 _check-docs-node:
