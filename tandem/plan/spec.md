@@ -274,18 +274,19 @@ tandem show <id> [--json]
 - Syntax:
 
 ```text
-tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>]
+tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--json]
 ```
 
 - Required inputs:
   - `--title <title>`.
 - Optional inputs:
   - `--state <state>` defaults to `todo`.
-  - `--kind epic`: mark the new task as a lightweight epic while preserving `type: task` and `task-N` IDs.
-  - `--parent <id>`: create a task linked through `parentId`. It is a tracked subtask when the resolved parent is another task; decision/custom-document parents remain valid generic parent relationships. The child still receives the next ordinary flat sequential ID such as `task-8`; this CLI path does not automatically generate IDs such as `task-7-1`.
+  - `--kind epic`: mark the new task as a lightweight epic while preserving `type: task` and the task ID namespace.
+  - `--parent <id>`: create a task linked through canonical `parentId`. When the resolved parent is another task, allocate the next parent-derived ID such as `task-7-1`, then `task-7-2`; nested children extend the full parent ID. Allocation scans active board documents and completed logs and reserves the destination without overwriting. Decision/custom-document parents remain valid generic relationships and use the next ordinary flat ID such as `task-8`.
   - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`.
   - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
 - Human output shape: labeled created-task summary with ID, state, title, and file path. Task-parent creation says `Created subtask` and `Subtask of`; non-task parents retain `Created task` and use the generic `Parent` label.
+- JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
 - Exit/error notes:
   - fails on invalid state, unsupported kind, invalid referenced parent/blocker, structure errors, or failed write.
 
@@ -324,7 +325,7 @@ tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|me
   - `<id>`: active board task ID.
 - Optional inputs:
   - scalar replacements: `--title`, `--kind`, `--priority`, `--assignee`, `--due-date`.
-  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the parent exists; a task cannot parent itself. A task target produces a subtask relationship, while a decision/custom-document target remains a generic parent relationship.
+  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the parent exists; a task cannot parent itself. A task target produces a subtask relationship, while a decision/custom-document target remains a generic parent relationship. The task ID is immutable; update preserves it and warns when it does not match the new parent's default hierarchical or flat designation.
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.

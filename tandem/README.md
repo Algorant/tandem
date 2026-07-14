@@ -55,7 +55,9 @@ tandem add --title "Coordinate the release"
 tandem add --title "Write release notes" --parent task-1
 ```
 
-The child receives the next normal sequential task ID (for example, `task-2`), not an automatically generated hierarchical ID such as `task-1-1`. `tandem list --parent task-1` and `tandem search <query> --parent task-1` select documents with that parent, while `tandem show task-1` includes linked task children as subtask summaries. Use `tandem update task-2 --parent task-1` to attach or reparent an existing active task.
+The child receives the next parent-derived task ID, such as `task-1-1`, then `task-1-2`; nested children extend the full parent ID, such as `task-1-1-1`. Allocation scans active board documents and completed logs, so completed IDs are never reused. `tandem list --parent task-1` and `tandem search <query> --parent task-1` select documents with that parent, while `tandem show task-1` includes linked task children as subtask summaries.
+
+Existing flat-ID children remain valid. `tandem update task-2 --parent task-1` attaches or reparents an active task without changing its immutable ID and warns when the preserved ID no longer matches the target parent's default designation.
 
 `parentId` may also resolve to a decision or another Tandem document type. Those valid relationships remain generic parents: human output uses `Parent` rather than `Subtask of`, JSON uses `parentRelationship: "parent"`, and showing the non-task parent does not fabricate a `subtasks` collection. Task-to-task links use `Subtask of` and `parentRelationship: "subtask"`.
 

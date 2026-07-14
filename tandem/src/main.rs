@@ -180,6 +180,7 @@ struct ShowOptions {
 struct AddOptions {
     title: Option<String>,
     state: Option<String>,
+    json: bool,
     description: Option<String>,
     kind: Option<String>,
     priority: Option<String>,
@@ -373,7 +374,7 @@ fn print_help() {
     println!("  tandem init [--title <title>]");
     println!("  tandem list [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem show <id> [--json]");
-    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>]");
+    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>] [--json]");
     println!("  tandem move <id> --state <state>");
     println!("  tandem update <id> [--title <title>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
     println!("  tandem complete <id> --summary <text>");
@@ -505,6 +506,7 @@ fn parse_add_args(args: &[String]) -> Result<AddOptions, CliError> {
                 index += 1;
                 options.state = Some(required_value(args, index, "--state")?.to_string());
             }
+            "--json" => options.json = true,
             "--description" => {
                 index += 1;
                 options.description =
@@ -1123,9 +1125,15 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
 
 fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
+    let json = options.json;
     let outcome = add_task(&workspace, options)?;
 
-    for warning in outcome.warnings {
+    if json {
+        println!("{}", add_outcome_json(&outcome));
+        return Ok(());
+    }
+
+    for warning in &outcome.warnings {
         println!("Warning: {warning}");
     }
     if outcome.parent_relationship == Some(ParentRelationship::Subtask) {
@@ -1179,8 +1187,12 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         }
     }
 
+    let allocation_prefix = match (parent_relationship, options.parent.as_deref()) {
+        (Some(ParentRelationship::Subtask), Some(parent)) => parent,
+        _ => "task",
+    };
     let now = current_timestamp();
-    let created = create_new_sequential_document(workspace, "task", |task_id| {
+    let created = create_new_sequential_document(workspace, allocation_prefix, |task_id| {
         let mut lines = vec![
             "---".to_string(),
             format!("id: {task_id}"),
@@ -2099,6 +2111,35 @@ fn resolve_parent_relationship(
     })
 }
 
+fn task_id_matches_parent_designation(
+    task_id: &str,
+    parent_id: &str,
+    relationship: ParentRelationship,
+) -> bool {
+    let prefix = match relationship {
+        ParentRelationship::Subtask => format!("{parent_id}-"),
+        ParentRelationship::Parent => "task-".to_string(),
+    };
+    task_id
+        .strip_prefix(&prefix)
+        .and_then(|suffix| suffix.parse::<usize>().ok())
+        .is_some_and(|number| number > 0)
+}
+
+fn parent_designation_warning(
+    task_id: &str,
+    parent_id: &str,
+    relationship: ParentRelationship,
+) -> String {
+    let expected = match relationship {
+        ParentRelationship::Subtask => format!("{parent_id}-N"),
+        ParentRelationship::Parent => "task-N".to_string(),
+    };
+    format!(
+        "{task_id} keeps its immutable ID while parentId changes to {parent_id}; the ID does not match the {expected} designation (legacy and reparented IDs remain valid)"
+    )
+}
+
 fn document_types_by_id(docs: &[Document]) -> HashMap<String, String> {
     docs.iter()
         .map(|doc| (doc.id().to_string(), doc.doc_type().to_string()))
@@ -2502,6 +2543,13 @@ fn update_task_metadata(
     let parent_relationship = validate_update_options(workspace, &options)?;
 
     let mut warnings = Vec::new();
+    if let (Some(parent), Some(relationship)) = (options.parent.as_deref(), parent_relationship) {
+        if doc.field("parentId") != Some(parent)
+            && !task_id_matches_parent_designation(doc.id(), parent, relationship)
+        {
+            warnings.push(parent_designation_warning(doc.id(), parent, relationship));
+        }
+    }
     for reference in &options.references {
         if !document_exists(workspace, reference)? {
             warnings.push(format!("reference not found: {reference}"));
@@ -3978,6 +4026,36 @@ fn print_rules(rules: &RulesByCategory, category_filter: Option<&str>) {
     }
 }
 
+fn add_outcome_json(outcome: &AddOutcome) -> String {
+    let mut fields = vec![
+        format!("\"id\":{}", json_string(&outcome.id)),
+        "\"type\":\"task\"".to_string(),
+        format!("\"state\":{}", json_string(&outcome.state)),
+        format!("\"title\":{}", json_string(&outcome.title)),
+    ];
+    if let Some(kind) = outcome.kind.as_deref() {
+        fields.push(format!("\"kind\":{}", json_string(kind)));
+    }
+    if let Some(parent) = outcome.parent.as_deref() {
+        fields.push(format!("\"parentId\":{}", json_string(parent)));
+    }
+    if let Some(relationship) = outcome.parent_relationship {
+        fields.push(format!(
+            "\"parentRelationship\":{}",
+            json_string(relationship.as_str())
+        ));
+    }
+    fields.push(format!(
+        "\"path\":{}",
+        json_string(&display_path(&outcome.path))
+    ));
+    format!(
+        "{{\"ok\":true,\"data\":{{\"document\":{{{}}}}},\"warnings\":{}}}",
+        fields.join(","),
+        json_array_strings(&outcome.warnings)
+    )
+}
+
 fn list_json(docs: &[Document], document_types: &HashMap<String, String>) -> String {
     let mut by_state = BTreeMap::<String, usize>::new();
     for doc in docs {
@@ -5014,8 +5092,8 @@ mod tests {
         .unwrap();
 
         assert_eq!(parent.id, "task-1");
-        assert_eq!(subtask.id, "task-2");
-        assert_eq!(generic_child.id, "task-3");
+        assert_eq!(subtask.id, "task-1-1");
+        assert_eq!(generic_child.id, "task-2");
         assert_eq!(
             subtask.parent_relationship,
             Some(ParentRelationship::Subtask)
@@ -5031,15 +5109,14 @@ mod tests {
                 yaml_double_quote(outcome.parent.as_deref().unwrap())
             )));
             assert!(!content.contains("subtasks:"));
-            assert!(!content.contains("task-1-1"));
         }
 
         let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
         let document_types = document_types_by_id(&docs);
         let task_parent = docs.iter().find(|doc| doc.id() == "task-1").unwrap();
         let decision_parent = docs.iter().find(|doc| doc.id() == "decision-1").unwrap();
-        let task_child = docs.iter().find(|doc| doc.id() == "task-2").unwrap();
-        let decision_child = docs.iter().find(|doc| doc.id() == "task-3").unwrap();
+        let task_child = docs.iter().find(|doc| doc.id() == "task-1-1").unwrap();
+        let decision_child = docs.iter().find(|doc| doc.id() == "task-2").unwrap();
 
         assert_eq!(
             parent_relationship(task_child, &document_types),
@@ -5060,13 +5137,13 @@ mod tests {
 
         let linked = find_subtasks(&workspace, task_parent).unwrap();
         assert_eq!(linked.len(), 1);
-        assert_eq!(linked[0].id(), "task-2");
+        assert_eq!(linked[0].id(), "task-1-1");
         assert!(find_subtasks(&workspace, decision_parent)
             .unwrap()
             .is_empty());
 
         let parent_json = show_json(task_parent, &linked, None);
-        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-2\""));
+        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-1-1\""));
         let decision_json = show_json(decision_parent, &[], None);
         assert!(!decision_json.contains("\"subtasks\""));
         let subtask_json = show_json(task_child, &[], Some(ParentRelationship::Subtask));
@@ -5079,8 +5156,8 @@ mod tests {
         assert!(list_output.contains("\"parentRelationship\":\"subtask\""));
         assert!(list_output.contains("\"parentRelationship\":\"parent\""));
         for (parent_id, expected_id, expected_relationship) in [
-            ("task-1", "task-2", "subtask"),
-            ("decision-1", "task-3", "parent"),
+            ("task-1", "task-1-1", "subtask"),
+            ("decision-1", "task-2", "parent"),
         ] {
             let filtered = filter_documents(
                 docs.clone(),
@@ -5106,6 +5183,213 @@ mod tests {
                 ))
             );
         }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn hierarchical_allocation_scans_logs_nests_and_preserves_ids_on_reparent() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-hierarchical-ids-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("task-103.md"),
+            "---\nid: task-103\ntype: task\ntitle: Parent\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Decision\nstatus: accepted\n---\n",
+        )
+        .unwrap();
+
+        let first = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("First child".to_string()),
+                parent: Some("task-103".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(first.id, "task-103-1");
+        fs::rename(&first.path, workspace.logs_dir.join("task-103-1.md")).unwrap();
+
+        let second = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Second child".to_string()),
+                parent: Some("task-103".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(second.id, "task-103-2");
+        let nested = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Nested child".to_string()),
+                parent: Some("task-103-1".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(nested.id, "task-103-1-1");
+
+        let generic = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Generic parent".to_string()),
+                parent: Some("decision-1".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(generic.id, "task-104");
+
+        let legacy_path = workspace.board_dir.join("task-200.md");
+        fs::write(
+            &legacy_path,
+            "---\nid: task-200\ntype: task\ntitle: Legacy flat child\nstate: todo\nparentId: task-103\n---\n",
+        )
+        .unwrap();
+        let legacy = read_document(&legacy_path, DocumentLocation::Board).unwrap();
+        validate_task_document_for_mutation(&workspace, &legacy).unwrap();
+        let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
+        let filtered = filter_documents(
+            docs.clone(),
+            &ListOptions {
+                parent: Some("task-103".to_string()),
+                ..ListOptions::default()
+            },
+        );
+        assert!(filtered.iter().any(|doc| doc.id() == "task-200"));
+        let results = search_documents(
+            docs,
+            &SearchOptions {
+                query: "Legacy".to_string(),
+                parent: Some("task-103".to_string()),
+                ..SearchOptions::default()
+            },
+        );
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].doc.id(), "task-200");
+
+        let outcome = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: second.id.clone(),
+                parent: Some("task-200".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome.id, "task-103-2");
+        assert!(outcome
+            .warnings
+            .iter()
+            .any(|warning| { warning.contains("immutable ID") && warning.contains("task-200-N") }));
+        let reparented = read_document(&second.path, DocumentLocation::Board).unwrap();
+        assert_eq!(reparented.id(), "task-103-2");
+        assert_eq!(reparented.field("parentId"), Some("task-200"));
+
+        let json = add_outcome_json(&nested);
+        assert!(json.contains("\"id\":\"task-103-1-1\""));
+        assert!(json.contains("\"parentId\":\"task-103-1\""));
+        assert!(json.contains("\"parentRelationship\":\"subtask\""));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn concurrent_subtask_adds_allocate_unique_parent_derived_ids() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-concurrent-subtask-add-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("task-103.md"),
+            "---\nid: task-103\ntype: task\ntitle: Parent\nstate: todo\n---\n",
+        )
+        .unwrap();
+
+        let thread_count = 8;
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(thread_count));
+        let handles = (0..thread_count)
+            .map(|index| {
+                let workspace = workspace.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    add_task(
+                        &workspace,
+                        AddOptions {
+                            title: Some(format!("Concurrent child {index}")),
+                            parent: Some("task-103".to_string()),
+                            ..AddOptions::default()
+                        },
+                    )
+                    .unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut ids = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap().id)
+            .collect::<Vec<_>>();
+        ids.sort_by_key(|id| {
+            id.strip_prefix("task-103-")
+                .unwrap()
+                .parse::<usize>()
+                .unwrap()
+        });
+        assert_eq!(
+            ids,
+            (1..=thread_count)
+                .map(|number| format!("task-103-{number}"))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            read_documents(&workspace.board_dir, DocumentLocation::Board)
+                .unwrap()
+                .len(),
+            thread_count + 1
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -5510,10 +5794,10 @@ rules:
             outcome.parent_relationship,
             Some(ParentRelationship::Subtask)
         );
-        assert_eq!(
-            outcome.warnings,
-            vec!["reference not found: missing-decision"]
-        );
+        assert_eq!(outcome.warnings.len(), 2);
+        assert!(outcome.warnings[0].contains("immutable ID"));
+        assert!(outcome.warnings[0].contains("task-2-N"));
+        assert_eq!(outcome.warnings[1], "reference not found: missing-decision");
         assert!(output.contains("title: \"New\"\n"));
         assert!(output.contains("kind: \"epic\"\n"));
         assert!(output.contains("priority: \"high\"\n"));
