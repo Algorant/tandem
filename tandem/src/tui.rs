@@ -2033,7 +2033,7 @@ impl TuiApp {
     }
 
     fn epic_board_entries(&self) -> Vec<EpicBoardEntry<'_>> {
-        epic_board_entries(&self.docs, &self.board_filters)
+        epic_board_entries(&self.docs, &self.logs, &self.board_filters)
     }
 
     fn detail_line_count(&self) -> usize {
@@ -2101,12 +2101,12 @@ impl TuiApp {
 
     #[allow(dead_code)]
     fn review_items(&self) -> Vec<review::ReviewQueueItem> {
-        review::queue_items(&self.docs)
+        review::queue_items(&self.docs, &self.logs)
     }
 
     #[allow(dead_code)]
     fn selected_review_item(&self) -> Option<review::ReviewQueueItem> {
-        review::selected_item(&self.docs, self.selected_review_item)
+        review::selected_item(&self.docs, &self.logs, self.selected_review_item)
     }
 
     #[allow(dead_code)]
@@ -4366,6 +4366,7 @@ struct BoardRelatedChild {
 struct BoardRelationshipContext {
     parent_id: Option<String>,
     parent_title: Option<String>,
+    parent_is_task: bool,
     parent_missing: bool,
     active_children: Vec<BoardRelatedChild>,
     completed_children: Vec<BoardRelatedChild>,
@@ -4399,10 +4400,13 @@ struct EpicBoardEntry<'a> {
     doc: &'a Document,
     role: EpicBoardEntryRole,
     depth: usize,
+    active_descendants: usize,
+    completed_descendants: usize,
 }
 
 fn epic_board_entries<'a>(
     active_docs: &'a [Document],
+    completed_logs: &[Document],
     filters: &BoardFilters,
 ) -> Vec<EpicBoardEntry<'a>> {
     let mut entries = Vec::new();
@@ -4411,30 +4415,141 @@ fn epic_board_entries<'a>(
         .iter()
         .filter(|doc| is_board_visible_doc(doc) && is_epic_task(doc))
     {
-        let visible_children = active_docs
-            .iter()
-            .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
-            .filter(|doc| normalized_parent_id(doc).as_deref() == Some(epic.id()))
-            .filter(|doc| doc.id() != epic.id())
-            .filter(|doc| board_filters_match(doc, filters))
-            .collect::<Vec<_>>();
-        if !board_filters_match(epic, filters) && visible_children.is_empty() {
+        let mut visited = BTreeSet::from([epic.id().to_string()]);
+        let mut descendants = Vec::new();
+        collect_visible_epic_descendants(
+            epic.id(),
+            1,
+            active_docs,
+            completed_logs,
+            filters,
+            &mut visited,
+            &mut descendants,
+        );
+        if !board_filters_match(epic, filters) && descendants.is_empty() {
             continue;
         }
+        let (active_descendants, completed_descendants) = count_task_descendants(
+            epic.id(),
+            active_docs,
+            completed_logs,
+            &mut BTreeSet::from([epic.id().to_string()]),
+        );
         entries.push(EpicBoardEntry {
             doc: epic,
             role: EpicBoardEntryRole::Epic,
             depth: 0,
+            active_descendants,
+            completed_descendants,
         });
-        for child in visible_children {
-            entries.push(EpicBoardEntry {
-                doc: child,
-                role: EpicBoardEntryRole::Child,
-                depth: 1,
-            });
-        }
+        entries.extend(descendants.into_iter().map(|(doc, depth)| EpicBoardEntry {
+            doc,
+            role: EpicBoardEntryRole::Child,
+            depth,
+            active_descendants: 0,
+            completed_descendants: 0,
+        }));
     }
     entries
+}
+
+fn collect_visible_epic_descendants<'a>(
+    parent_id: &str,
+    depth: usize,
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    filters: &BoardFilters,
+    visited: &mut BTreeSet<String>,
+    entries: &mut Vec<(&'a Document, usize)>,
+) -> bool {
+    let mut any_visible = false;
+
+    for child in active_docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if !visited.insert(child.id().to_string()) {
+            continue;
+        }
+        let insert_at = entries.len();
+        entries.push((child, depth));
+        let descendant_visible = collect_visible_epic_descendants(
+            child.id(),
+            depth + 1,
+            active_docs,
+            completed_logs,
+            filters,
+            visited,
+            entries,
+        );
+        if board_filters_match(child, filters) || descendant_visible {
+            any_visible = true;
+        } else {
+            entries.remove(insert_at);
+        }
+    }
+
+    for completed in completed_logs
+        .iter()
+        .filter(|doc| is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if !visited.insert(completed.id().to_string()) {
+            continue;
+        }
+        if collect_visible_epic_descendants(
+            completed.id(),
+            depth + 1,
+            active_docs,
+            completed_logs,
+            filters,
+            visited,
+            entries,
+        ) {
+            any_visible = true;
+        }
+    }
+
+    any_visible
+}
+
+fn count_task_descendants(
+    parent_id: &str,
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    visited: &mut BTreeSet<String>,
+) -> (usize, usize) {
+    let mut active = 0;
+    let mut completed = 0;
+
+    for doc in active_docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if visited.insert(doc.id().to_string()) {
+            active += 1;
+            let nested = count_task_descendants(doc.id(), active_docs, completed_logs, visited);
+            active += nested.0;
+            completed += nested.1;
+        }
+    }
+
+    for doc in completed_logs
+        .iter()
+        .filter(|doc| is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if visited.insert(doc.id().to_string()) {
+            completed += 1;
+            let nested = count_task_descendants(doc.id(), active_docs, completed_logs, visited);
+            active += nested.0;
+            completed += nested.1;
+        }
+    }
+
+    (active, completed)
 }
 
 fn relationship_context_for_doc(
@@ -4443,41 +4558,45 @@ fn relationship_context_for_doc(
     completed_logs: &[Document],
 ) -> BoardRelationshipContext {
     let parent_id = normalized_parent_id(doc).filter(|parent_id| parent_id.as_str() != doc.id());
-    let parent_title = parent_id
-        .as_deref()
-        .and_then(|parent_id| document_title_by_id(active_docs, completed_logs, parent_id));
-    let parent_missing = parent_id.is_some() && parent_title.is_none();
-    let active_children = active_docs
-        .iter()
-        .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
-        .filter(|child| child.id() != doc.id())
-        .map(|child| related_child_summary(child, false))
-        .collect::<Vec<_>>();
-    let completed_children = completed_logs
-        .iter()
-        .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
-        .filter(|child| child.id() != doc.id())
-        .map(|child| related_child_summary(child, true))
-        .collect::<Vec<_>>();
+    let parent_doc = parent_id.as_deref().and_then(|parent_id| {
+        active_docs
+            .iter()
+            .chain(completed_logs.iter())
+            .find(|candidate| candidate.id() == parent_id)
+    });
+    let parent_title = parent_doc.map(|parent| parent.title().to_string());
+    let parent_is_task = parent_doc.is_some_and(is_task_doc);
+    let parent_missing = parent_id.is_some() && parent_doc.is_none();
+    let active_children = if is_task_doc(doc) {
+        active_docs
+            .iter()
+            .filter(|child| is_task_doc(child))
+            .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
+            .filter(|child| child.id() != doc.id())
+            .map(|child| related_child_summary(child, false))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let completed_children = if is_task_doc(doc) {
+        completed_logs
+            .iter()
+            .filter(|child| is_task_doc(child))
+            .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
+            .filter(|child| child.id() != doc.id())
+            .map(|child| related_child_summary(child, true))
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     BoardRelationshipContext {
         parent_id,
         parent_title,
+        parent_is_task,
         parent_missing,
         active_children,
         completed_children,
     }
-}
-
-fn document_title_by_id(
-    active_docs: &[Document],
-    completed_logs: &[Document],
-    id: &str,
-) -> Option<String> {
-    active_docs
-        .iter()
-        .chain(completed_logs.iter())
-        .find(|doc| doc.id() == id)
-        .map(|doc| doc.title().to_string())
 }
 
 fn related_child_summary(doc: &Document, completed: bool) -> BoardRelatedChild {
@@ -4542,6 +4661,7 @@ fn board_item_lines_for_doc(
     )
 }
 
+#[cfg(test)]
 fn board_item_lines_for_doc_with_context(
     doc: &Document,
     theme: &TuiTheme,
@@ -4653,30 +4773,32 @@ fn epic_list_item_for_entry(
     expanded: bool,
     selected: bool,
 ) -> ListItem<'static> {
-    let doc = entry.doc;
-    let left_label = match entry.role {
-        EpicBoardEntryRole::Epic => "EPIC".to_string(),
-        EpicBoardEntryRole::Child => display_state_label(&document_state_label(doc)),
-    };
-    let left_tone = match entry.role {
-        EpicBoardEntryRole::Epic => StatusTone::Accent,
-        EpicBoardEntryRole::Child => StatusTone::Muted,
-    };
-    let meta = match entry.role {
-        EpicBoardEntryRole::Epic => relationship_rollup(relationship_context),
-        EpicBoardEntryRole::Child => doc.id().to_string(),
-    };
-    let mut lines = vec![board_row_line(
-        doc,
+    ListItem::new(epic_lines_for_entry(
+        entry,
+        relationship_context,
         theme,
         content_width,
-        false,
-        vec![(
-            chip_text(&left_label, theme),
-            theme.progress_chip_style(left_tone),
-        )],
-        meta,
-        entry.depth,
+        preview_line_limit,
+        expanded,
+        selected,
+    ))
+}
+
+fn epic_lines_for_entry(
+    entry: &EpicBoardEntry<'_>,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+    content_width: usize,
+    preview_line_limit: usize,
+    expanded: bool,
+    selected: bool,
+) -> Vec<Line<'static>> {
+    let doc = entry.doc;
+    let mut lines = vec![epic_row_line(
+        entry,
+        relationship_context,
+        theme,
+        content_width,
         selected,
     )];
     if expanded {
@@ -4688,7 +4810,122 @@ fn epic_list_item_for_entry(
             preview_line_limit,
         ));
     }
-    ListItem::new(lines)
+    lines
+}
+
+const EPIC_META_COLUMN_WIDTH: usize = 32;
+const EPIC_MIN_TITLE_WIDTH: usize = 8;
+
+fn epic_row_line(
+    entry: &EpicBoardEntry<'_>,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+    content_width: usize,
+    selected: bool,
+) -> Line<'static> {
+    let doc = entry.doc;
+    let indent = "  ".repeat(entry.depth);
+    let title_style = if selected {
+        theme.board_selected_title_style()
+    } else {
+        theme.text_style().add_modifier(Modifier::BOLD)
+    };
+    let mut prefix = vec![Span::styled(indent.clone(), theme.muted_style())];
+    let prefix_width = match entry.role {
+        EpicBoardEntryRole::Epic => {
+            prefix.push(Span::styled(
+                chip_text("EPIC", theme),
+                theme.progress_chip_style(StatusTone::Accent),
+            ));
+            prefix.push(Span::raw(" "));
+            text_width(&indent) + text_width(&chip_text("EPIC", theme)) + 1
+        }
+        EpicBoardEntryRole::Child => {
+            let state = compact_epic_state(&document_state_label(doc));
+            prefix.push(Span::styled(
+                chip_text("SUB", theme),
+                theme.progress_chip_style(StatusTone::Accent),
+            ));
+            prefix.push(Span::raw(" "));
+            prefix.push(Span::styled(
+                chip_text(&format!("{state:<4}"), theme),
+                theme.progress_chip_style(StatusTone::Muted),
+            ));
+            prefix.push(Span::raw(" "));
+            text_width(&indent)
+                + text_width(&chip_text("SUB", theme))
+                + text_width(&chip_text(&format!("{state:<4}"), theme))
+                + 2
+        }
+    };
+
+    let meta_column_width = EPIC_META_COLUMN_WIDTH
+        .min(content_width.saturating_sub(prefix_width + EPIC_MIN_TITLE_WIDTH + 1));
+    let show_meta = meta_column_width >= 7;
+    let meta_column_width = if show_meta { meta_column_width } else { 0 };
+    let raw_meta = match entry.role {
+        EpicBoardEntryRole::Epic => {
+            descendant_rollup(entry.active_descendants, entry.completed_descendants)
+        }
+        EpicBoardEntryRole::Child => compact_relationship_meta(
+            relationship_context.parent_id.as_deref().unwrap_or("?"),
+            doc.id(),
+            meta_column_width,
+        ),
+    };
+    let meta = if show_meta {
+        truncate(&raw_meta, meta_column_width)
+    } else {
+        String::new()
+    };
+    let title_width =
+        content_width.saturating_sub(prefix_width + meta_column_width + usize::from(show_meta));
+    let title = truncate(doc.title(), title_width);
+    let spacer_width = content_width
+        .saturating_sub(prefix_width + text_width(&title) + meta_column_width)
+        .max(usize::from(show_meta));
+
+    prefix.push(Span::styled(title, title_style));
+    prefix.push(Span::raw(" ".repeat(spacer_width)));
+    if show_meta {
+        prefix.push(Span::styled(
+            format!("{meta:<meta_column_width$}"),
+            theme.muted_style(),
+        ));
+    }
+    Line::from(prefix)
+}
+
+fn compact_epic_state(state: &str) -> String {
+    match normalize_filter_value(state).as_str() {
+        "todo" => "TODO".to_string(),
+        "in-progress" | "inprogress" | "doing" => "WIP".to_string(),
+        "validation" | "review" => "VAL".to_string(),
+        "blocked" => "BLK".to_string(),
+        "ready" => "RDY".to_string(),
+        "backlog" => "BACK".to_string(),
+        "unfiled" => "UNFD".to_string(),
+        "" => "UNFD".to_string(),
+        other => truncate(&other.to_ascii_uppercase().replace('_', "-"), 4),
+    }
+}
+
+fn compact_relationship_meta(parent_id: &str, child_id: &str, width: usize) -> String {
+    let full = format!("{parent_id} → {child_id}");
+    if text_width(&full) <= width {
+        return full;
+    }
+    if width < 7 {
+        return String::new();
+    }
+    let id_width = width.saturating_sub(3);
+    let parent_width = id_width / 2;
+    let child_width = id_width.saturating_sub(parent_width);
+    format!(
+        "{} → {}",
+        truncate(parent_id, parent_width),
+        truncate(child_id, child_width)
+    )
 }
 
 fn board_row_line(
@@ -4764,19 +5001,13 @@ fn board_row_line(
     Line::from(spans)
 }
 
-fn relationship_rollup(context: &BoardRelationshipContext) -> String {
-    let hints = context.hints();
-    if !hints.has_children() {
-        return "0 children".to_string();
+fn descendant_rollup(active: usize, completed: usize) -> String {
+    match (active, completed) {
+        (0, 0) => "no descendants".to_string(),
+        (active, 0) => format!("{active} active"),
+        (0, completed) => format!("{completed} logged"),
+        (active, completed) => format!("{active} active · {completed} logged"),
     }
-    let mut parts = Vec::new();
-    if hints.active_children > 0 {
-        parts.push(format!("{} active", hints.active_children));
-    }
-    if hints.completed_children > 0 {
-        parts.push(format!("{} done", hints.completed_children));
-    }
-    parts.join(" · ")
 }
 
 fn relationship_detail_summary(context: &BoardRelationshipContext) -> String {
@@ -4784,16 +5015,24 @@ fn relationship_detail_summary(context: &BoardRelationshipContext) -> String {
     let mut parts = Vec::new();
     if hints.active_children > 0 {
         parts.push(format!(
-            "{} active child{}",
+            "{} active {}",
             hints.active_children,
-            plural_suffix(hints.active_children)
+            if hints.active_children == 1 {
+                "child"
+            } else {
+                "children"
+            }
         ));
     }
     if hints.completed_children > 0 {
         parts.push(format!(
-            "{} completed child{}",
+            "{} completed {} in Logs",
             hints.completed_children,
-            plural_suffix(hints.completed_children)
+            if hints.completed_children == 1 {
+                "child"
+            } else {
+                "children"
+            }
         ));
     }
     if parts.len() > 1 {
@@ -5239,8 +5478,13 @@ fn inline_relationship_preview_lines(
                 .parent_title
                 .as_deref()
                 .unwrap_or("untitled parent");
+            let label = if relationship_context.parent_is_task {
+                "   Subtask of: "
+            } else {
+                "   Parent: "
+            };
             lines.push(Line::from(vec![
-                Span::styled("   Parent epic: ", theme.label_style()),
+                Span::styled(label, theme.label_style()),
                 Span::styled(parent_title.to_string(), theme.text_style()),
                 Span::styled(format!(" ({parent_id})"), theme.muted_style()),
             ]));
@@ -5682,7 +5926,12 @@ fn detail_lines_for_doc_with_context(
             .as_deref()
             .map(|title| format!("{title} ({parent_id})"))
             .unwrap_or_else(|| format!("missing parent {parent_id}"));
-        lines.push(detail_field_line("Parent", &parent, theme));
+        let label = if relationship_context.parent_is_task {
+            "Subtask of"
+        } else {
+            "Parent"
+        };
+        lines.push(detail_field_line(label, &parent, theme));
     }
     if relationship_context.has_children() {
         lines.push(detail_field_line(
@@ -6461,7 +6710,9 @@ mod tests {
         .collect::<Vec<_>>()
         .join("\n");
         assert!(expanded_text.contains("Epic"));
-        assert!(expanded_text.contains("Children: 1 active child, 1 completed child (2 total)"));
+        assert!(
+            expanded_text.contains("Children: 1 active child, 1 completed child in Logs (2 total)")
+        );
         assert!(expanded_text.contains("Task task-81"));
         assert!(expanded_text.contains("Task task-82"));
 
@@ -6470,14 +6721,15 @@ mod tests {
             .map(line_text)
             .collect::<Vec<_>>();
         assert!(parent_detail.contains(&"Kind: epic".to_string()));
-        assert!(parent_detail
-            .contains(&"Children: 1 active child, 1 completed child (2 total)".to_string()));
+        assert!(parent_detail.contains(
+            &"Children: 1 active child, 1 completed child in Logs (2 total)".to_string()
+        ));
 
         let child_detail = detail_lines_for_doc_with_context(&active_child, &theme, &child_context)
             .iter()
             .map(line_text)
             .collect::<Vec<_>>();
-        assert!(child_detail.contains(&"Parent: Launch docs epic (task-80)".to_string()));
+        assert!(child_detail.contains(&"Subtask of: Launch docs epic (task-80)".to_string()));
     }
 
     #[test]
@@ -6507,7 +6759,7 @@ mod tests {
             non_epic_parent,
             non_epic_child,
         ];
-        let entries = epic_board_entries(&docs, &BoardFilters::default());
+        let entries = epic_board_entries(&docs, &[], &BoardFilters::default());
         let ids = entries
             .iter()
             .map(|entry| entry.doc.id())
@@ -6524,29 +6776,337 @@ mod tests {
     }
 
     #[test]
+    fn epic_board_nests_deep_and_legacy_flat_children_and_preserves_filter_context() {
+        let mut epic = doc_with_state("task-103", Some("in-progress"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut child = doc_with_state("task-103-1", Some("todo"));
+        child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let mut grandchild = doc_with_state("task-103-1-1", Some("validation"));
+        grandchild
+            .fields
+            .insert("parentId".to_string(), "task-103-1".to_string());
+        grandchild
+            .fields
+            .insert("tags".to_string(), "[\"ux\"]".to_string());
+        let mut flat_child = doc_with_state("task-9", Some("todo"));
+        flat_child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let docs = vec![epic, child, grandchild, flat_child];
+
+        let entries = epic_board_entries(&docs, &[], &BoardFilters::default());
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| (entry.doc.id(), entry.depth))
+                .collect::<Vec<_>>(),
+            vec![
+                ("task-103", 0),
+                ("task-103-1", 1),
+                ("task-103-1-1", 2),
+                ("task-9", 1)
+            ]
+        );
+
+        let filtered = epic_board_entries(
+            &docs,
+            &[],
+            &BoardFilters {
+                tag: Some("ux".to_string()),
+                priority: None,
+            },
+        );
+        assert_eq!(
+            filtered
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-103", "task-103-1", "task-103-1-1"]
+        );
+    }
+
+    #[test]
+    fn epic_board_rollup_counts_completed_nested_descendants_without_active_rows() {
+        let mut epic = doc_with_state("task-103", Some("in-progress"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut active_child = doc_with_state("task-103-1", Some("todo"));
+        active_child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let mut completed_grandchild = doc_with_state("task-103-1-1", Some("validation"));
+        completed_grandchild.location = DocumentLocation::Logs;
+        completed_grandchild
+            .fields
+            .insert("parentId".to_string(), "task-103-1".to_string());
+        let docs = vec![epic, active_child];
+        let logs = vec![completed_grandchild];
+
+        let entries = epic_board_entries(&docs, &logs, &BoardFilters::default());
+        assert_eq!(entries.len(), 2, "completed descendants are rollup-only");
+        assert_eq!(entries[0].active_descendants, 1);
+        assert_eq!(entries[0].completed_descendants, 1);
+        assert_eq!(descendant_rollup(1, 1), "1 active · 1 logged");
+    }
+
+    #[test]
+    fn epic_board_traverses_logged_ancestors_to_active_filtered_descendants_cycle_safely() {
+        let mut epic = doc_with_state("task-1", Some("in-progress"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        epic.fields
+            .insert("parentId".to_string(), "task-1-1-1".to_string());
+        let mut completed_child = doc_with_state("task-1-1", Some("validation"));
+        completed_child.location = DocumentLocation::Logs;
+        completed_child
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut active_grandchild = doc_with_state("task-1-1-1", Some("todo"));
+        active_grandchild
+            .fields
+            .insert("parentId".to_string(), "task-1-1".to_string());
+        active_grandchild
+            .fields
+            .insert("tags".to_string(), "[\"ux\"]".to_string());
+        let docs = vec![epic, active_grandchild];
+        let logs = vec![completed_child];
+        let entries = epic_board_entries(
+            &docs,
+            &logs,
+            &BoardFilters {
+                tag: Some("ux".to_string()),
+                priority: None,
+            },
+        );
+
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| (entry.doc.id(), entry.depth))
+                .collect::<Vec<_>>(),
+            vec![("task-1", 0), ("task-1-1-1", 2)]
+        );
+        assert_eq!(entries[0].active_descendants, 1);
+        assert_eq!(entries[0].completed_descendants, 1);
+        let context = relationship_context_for_doc(&docs[1], &docs, &logs);
+        assert!(context.parent_is_task);
+        assert_eq!(context.parent_id.as_deref(), Some("task-1-1"));
+        let rendered = epic_lines_for_entry(
+            &entries[1],
+            &context,
+            &TuiTheme::default_dark(),
+            140,
+            10,
+            false,
+            false,
+        )
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+        assert!(rendered.contains("task-1-1-1"));
+        assert!(rendered.contains("task-1-1 → task-1-1-1"));
+    }
+
+    #[test]
+    fn parent_context_labels_only_task_parents_as_subtasks() {
+        let task_parent = doc_with_state("task-103", Some("todo"));
+        let decision_parent = decision_doc("decision-4");
+        let mut task_child = doc_with_state("task-103-1", Some("validation"));
+        task_child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let mut generic_child = doc_with_state("task-7", Some("validation"));
+        generic_child
+            .fields
+            .insert("parentId".to_string(), "decision-4".to_string());
+        let docs = vec![
+            task_parent,
+            decision_parent,
+            task_child.clone(),
+            generic_child.clone(),
+        ];
+        let theme = TuiTheme::default_dark();
+
+        let task_lines = detail_lines_for_doc_with_context(
+            &task_child,
+            &theme,
+            &relationship_context_for_doc(&task_child, &docs, &[]),
+        );
+        let generic_lines = detail_lines_for_doc_with_context(
+            &generic_child,
+            &theme,
+            &relationship_context_for_doc(&generic_child, &docs, &[]),
+        );
+        assert!(task_lines
+            .iter()
+            .map(line_text)
+            .any(|line| line.starts_with("Subtask of:")));
+        assert!(generic_lines
+            .iter()
+            .map(line_text)
+            .any(|line| line.starts_with("Parent:")));
+        assert!(!generic_lines
+            .iter()
+            .map(line_text)
+            .any(|line| line.contains("Subtask")));
+    }
+
+    #[test]
+    fn epic_board_navigation_selects_deep_descendants() {
+        let root = unique_test_dir("tandem-epic-navigation");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.board_dir.join("task-103.md"),
+            "---\nid: task-103\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-103-1.md"),
+            "---\nid: task-103-1\ntype: task\ntitle: Child\nstate: todo\nparentId: task-103\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-103-1-1.md"),
+            "---\nid: task-103-1-1\ntype: task\ntitle: Grandchild\nstate: validation\nparentId: task-103-1\n---\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.board_arrangement = BoardArrangement::Epic;
+        app.next_item();
+        app.next_item();
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-103-1-1"));
+        app.previous_item();
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-103-1"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn epic_child_row_names_subtask_and_immediate_parent() {
+        let theme = TuiTheme::default_dark();
+        let parent = doc_with_state("task-103-1", Some("todo"));
+        let mut child = doc_with_state("task-103-1-1", Some("validation"));
+        child
+            .fields
+            .insert("parentId".to_string(), "task-103-1".to_string());
+        let docs = vec![parent, child.clone()];
+        let context = relationship_context_for_doc(&child, &docs, &[]);
+        let lines = epic_lines_for_entry(
+            &EpicBoardEntry {
+                doc: &child,
+                role: EpicBoardEntryRole::Child,
+                depth: 2,
+                active_descendants: 0,
+                completed_descendants: 0,
+            },
+            &context,
+            &theme,
+            140,
+            10,
+            false,
+            false,
+        );
+        let text = lines.iter().map(line_text).collect::<Vec<_>>().join("\n");
+        assert!(text.contains("SUB"));
+        assert!(!text.contains("SUBTASK"));
+        assert!(text.contains("VAL"));
+        assert!(text.contains("task-103-1 → task-103-1-1"));
+        assert!(!text.contains("subtask of"));
+    }
+
+    #[test]
+    fn epic_rows_use_compact_aligned_state_and_relationship_columns() {
+        let theme = TuiTheme::default_dark();
+        let parent = doc_with_state("task-1", Some("in-progress"));
+        let mut todo = doc_with_state("task-1-1", Some("todo"));
+        todo.fields
+            .insert("title".to_string(), "Todo title".to_string());
+        todo.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut wip = doc_with_state("task-1-2", Some("in-progress"));
+        wip.fields
+            .insert("title".to_string(), "Wip title".to_string());
+        wip.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut validation = doc_with_state("task-1-3", Some("validation"));
+        validation
+            .fields
+            .insert("title".to_string(), "Val title".to_string());
+        validation
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let docs = vec![parent, todo, wip, validation];
+
+        let render = |doc: &Document, width| {
+            let context = relationship_context_for_doc(doc, &docs, &[]);
+            line_text(&epic_row_line(
+                &EpicBoardEntry {
+                    doc,
+                    role: EpicBoardEntryRole::Child,
+                    depth: 1,
+                    active_descendants: 0,
+                    completed_descendants: 0,
+                },
+                &context,
+                &theme,
+                width,
+                false,
+            ))
+        };
+        let todo_line = render(&docs[1], 100);
+        let wip_line = render(&docs[2], 100);
+        let val_line = render(&docs[3], 100);
+
+        assert!(todo_line.contains("SUB"));
+        assert!(todo_line.contains("TODO"));
+        assert!(wip_line.contains("WIP"));
+        assert!(val_line.contains("VAL"));
+        assert_eq!(todo_line.find("Todo title"), wip_line.find("Wip title"));
+        assert_eq!(todo_line.find("Todo title"), val_line.find("Val title"));
+        assert_eq!(todo_line.find("task-1 →"), wip_line.find("task-1 →"));
+        assert_eq!(todo_line.find("task-1 →"), val_line.find("task-1 →"));
+        assert!(todo_line.contains("task-1 → task-1-1"));
+
+        let narrow = render(&docs[3], 42);
+        assert!(
+            narrow.chars().count() <= 42,
+            "narrow row overflowed: {narrow}"
+        );
+        assert!(narrow.contains('→'), "narrow row lost direction: {narrow}");
+        assert!(!narrow.contains("subtask of"));
+        assert_eq!(compact_epic_state("review"), "VAL");
+        assert_eq!(compact_epic_state("blocked"), "BLK");
+    }
+
+    #[test]
     fn actual_board_render_surfaces_epic_grouping_and_expanded_relationships() {
         let root = unique_test_dir("tandem-epic-render");
         let workspace = temp_workspace(&root);
         fs::write(
-            workspace.board_dir.join("task-100.md"),
-            "---\nid: task-100\ntype: task\nkind: epic\ntitle: \"Epic: Ship docs refresh\"\nstate: todo\npriority: high\n---\n\nParent epic body.\n",
+            workspace.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\nkind: epic\ntitle: \"Ship hierarchical subtasks\"\nstate: todo\npriority: high\n---\n\nParent epic body.\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-101.md"),
-            "---\nid: task-101\ntype: task\ntitle: Write refreshed docs\nstate: todo\npriority: medium\nparentId: task-100\n---\n\nChild task body.\n",
+            workspace.board_dir.join("task-1-1.md"),
+            "---\nid: task-1-1\ntype: task\ntitle: Hierarchical child\nstate: in-progress\npriority: medium\nparentId: task-1\n---\n\nNormal allocated child.\n",
         )
         .unwrap();
         fs::write(
-            workspace.logs_dir.join("task-102.md"),
-            "---\nid: task-102\ntype: task\ntitle: Completed docs child\nstate: validation\nparentId: task-100\ncompletedAt: \"2026-07-01T00:00:00Z\"\ncompletion:\n  summary: \"Completed docs child\"\n---\n\nCompleted child body.\n",
+            workspace.board_dir.join("task-2.md"),
+            "---\nid: task-2\ntype: task\ntitle: Legacy flat child\nstate: todo\nparentId: task-1\n---\n\nCreated as a root, then reparented; ID remains immutable.\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.logs_dir.join("task-1-2.md"),
+            "---\nid: task-1-2\ntype: task\ntitle: Completed child\nstate: validation\nparentId: task-1\ncompletedAt: \"2026-07-01T00:00:00Z\"\ncompletion:\n  summary: \"Completed child\"\n---\n\nCompleted child body.\n",
         )
         .unwrap();
 
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         app.board_arrangement = BoardArrangement::Epic;
-        assert!(app.select_document_by_id("task-100"));
-        app.expanded_board_doc_id = Some("task-100".to_string());
+        assert!(app.select_document_by_id("task-1"));
+        app.expanded_board_doc_id = Some("task-1".to_string());
         app.show_board_detail = true;
         let mut terminal = Terminal::new(TestBackend::new(150, 40)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
@@ -6563,15 +7123,18 @@ mod tests {
             "rendered Board should include EPIC badge: {rendered}"
         );
         assert!(
-            rendered.contains("1 active") && rendered.contains("1 done"),
-            "Epic Board row should include title-based child rollup text: {rendered}"
+            rendered.contains("2 active") && rendered.contains("1 logged"),
+            "Epic Board row should include concise active/logged rollup text: {rendered}"
         );
         assert!(
-            rendered.contains("Write refreshed docs"),
-            "Epic Board should nest active child rows under the epic: {rendered}"
+            rendered.contains("Hierarchical child")
+                && rendered.contains("task-1 → task-1-1")
+                && rendered.contains("Legacy flat child")
+                && rendered.contains("task-1 → task-2"),
+            "Epic Board should show normal hierarchical and immutable legacy-flat children: {rendered}"
         );
         assert!(
-            !rendered.contains("P:task-100"),
+            !rendered.contains("P:task-1"),
             "Epic Board should avoid noisy parent-id chips: {rendered}"
         );
         assert!(
@@ -6579,7 +7142,7 @@ mod tests {
             "detail pane should include task kind: {rendered}"
         );
         assert!(
-            rendered.contains("Children: 1 active child, 1 completed child (2 total)"),
+            rendered.contains("Children: 2 active children, 1 completed child in Logs (3 total)"),
             "detail pane should include derived child summary: {rendered}"
         );
         fs::remove_dir_all(root).unwrap();

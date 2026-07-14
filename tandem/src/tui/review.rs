@@ -42,6 +42,8 @@ pub(super) struct ReviewQueueItem {
     review_decided_at: Option<String>,
     review_note: Option<String>,
     validation_status: Option<String>,
+    parent_label: Option<String>,
+    parent_value: Option<String>,
     reasons: Vec<ReviewReason>,
 }
 
@@ -58,11 +60,37 @@ impl ReviewQueueItem {
             .join(", ")
     }
 
-    fn from_document(doc: &Document) -> Option<Self> {
+    fn from_document(
+        doc: &Document,
+        active_docs: &[Document],
+        completed_logs: &[Document],
+    ) -> Option<Self> {
         let reasons = typed_attention_reasons(doc);
         if reasons.is_empty() {
             return None;
         }
+        let parent_id = doc
+            .field("parentId")
+            .map(str::trim)
+            .filter(|id| !id.is_empty());
+        let parent_doc = parent_id.and_then(|id| {
+            active_docs
+                .iter()
+                .chain(completed_logs.iter())
+                .find(|candidate| candidate.id() == id)
+        });
+        let parent_label = parent_id.map(|_| {
+            if parent_doc.is_some_and(|parent| parent.doc_type() == "task") {
+                "Subtask of".to_string()
+            } else {
+                "Parent".to_string()
+            }
+        });
+        let parent_value = parent_id.map(|id| {
+            parent_doc
+                .map(|parent| format!("{} ({id})", parent.title()))
+                .unwrap_or_else(|| format!("missing parent {id}"))
+        });
 
         Some(Self {
             id: doc.id().to_string(),
@@ -112,6 +140,8 @@ impl ReviewQueueItem {
                 .or_else(|| doc.field("review.notes"))
                 .map(str::to_string),
             validation_status: validation_status(doc),
+            parent_label,
+            parent_value,
             reasons,
         })
     }
@@ -180,10 +210,13 @@ impl ReviewReasonKind {
     }
 }
 
-pub(super) fn queue_items(docs: &[Document]) -> Vec<ReviewQueueItem> {
-    let mut items = docs
+pub(super) fn queue_items(
+    active_docs: &[Document],
+    completed_logs: &[Document],
+) -> Vec<ReviewQueueItem> {
+    let mut items = active_docs
         .iter()
-        .filter_map(ReviewQueueItem::from_document)
+        .filter_map(|doc| ReviewQueueItem::from_document(doc, active_docs, completed_logs))
         .collect::<Vec<_>>();
 
     items.sort_by(|a, b| {
@@ -202,8 +235,14 @@ pub(super) fn queue_len(docs: &[Document]) -> usize {
         .count()
 }
 
-pub(super) fn selected_item(docs: &[Document], selected: usize) -> Option<ReviewQueueItem> {
-    queue_items(docs).into_iter().nth(selected)
+pub(super) fn selected_item(
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    selected: usize,
+) -> Option<ReviewQueueItem> {
+    queue_items(active_docs, completed_logs)
+        .into_iter()
+        .nth(selected)
 }
 
 pub(super) fn detail_line_count(item: Option<&ReviewQueueItem>, theme: &TuiTheme) -> usize {
@@ -432,6 +471,9 @@ fn detail_lines(item: &ReviewQueueItem, theme: &TuiTheme) -> Vec<Line<'static>> 
     lines.push(field_line("State", &item.state, theme));
     lines.push(field_line("Priority", &item.priority, theme));
     lines.push(field_line("Assignee", &item.assignee, theme));
+    if let (Some(label), Some(value)) = (&item.parent_label, &item.parent_value) {
+        lines.push(field_line(label, value, theme));
+    }
     optional_field_line(&mut lines, "Tags", non_empty(&item.tags), theme);
     optional_field_line(&mut lines, "Updated", non_empty(&item.updated_at), theme);
     if !item.blockers.is_empty() {
@@ -841,6 +883,52 @@ mod tests {
     }
 
     #[test]
+    fn review_detail_preserves_task_subtask_and_generic_parent_context() {
+        let mut task_parent = doc_with_fields("task-103", &[]);
+        task_parent.location = DocumentLocation::Logs;
+        let mut decision_parent = doc_with_fields("decision-4", &[]);
+        decision_parent.location = DocumentLocation::Logs;
+        decision_parent
+            .fields
+            .insert("type".to_string(), "decision".to_string());
+        let task_child = doc_with_fields(
+            "task-103-1",
+            &[("parentId", "task-103"), ("accord.status", "delivered")],
+        );
+        let generic_child = doc_with_fields(
+            "task-7",
+            &[("parentId", "decision-4"), ("accord.status", "delivered")],
+        );
+        let docs = vec![task_child, generic_child];
+        let logs = vec![task_parent, decision_parent];
+        let items = queue_items(&docs, &logs);
+        let theme = TuiTheme::default_dark();
+        let task_item = items.iter().find(|item| item.id() == "task-103-1").unwrap();
+        let generic_item = items.iter().find(|item| item.id() == "task-7").unwrap();
+        let task_text = detail_lines(task_item, &theme)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
+        let generic_text = detail_lines(generic_item, &theme)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
+        assert!(task_text.contains(&"Subtask of: Task task-103 (task-103)".to_string()));
+        assert!(generic_text.contains(&"Parent: Task decision-4 (decision-4)".to_string()));
+        assert!(!generic_text.iter().any(|line| line.contains("Subtask")));
+    }
+
+    #[test]
     fn queue_sorts_priority_before_timestamp() {
         let low_recent = doc_with_fields(
             "task-1",
@@ -858,7 +946,7 @@ mod tests {
                 ("updatedAt", "2026-06-26T12:00:00Z"),
             ],
         );
-        let items = queue_items(&[low_recent, high_older]);
+        let items = queue_items(&[low_recent, high_older], &[]);
         assert_eq!(items[0].id(), "task-2");
         assert_eq!(items[1].id(), "task-1");
     }

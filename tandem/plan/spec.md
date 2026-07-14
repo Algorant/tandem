@@ -882,6 +882,15 @@ Board view should support:
 - selection and multi-select later
 - click actions when mouse mode is enabled
 
+The Board has exactly two arrangements in this slice:
+
+- **State Board** keeps the configured workflow-state tabs and active-row behavior above.
+- **Epic Board** groups each active `kind: epic` task with all active task descendants reached through `parentId`. It renders the complete ancestor path for a matching deep descendant and uses nesting depth for hierarchy. Descendant rows use compact, fixed-width `SUB` plus state labels (`TODO`, `WIP`, `VAL`, and concise equivalents), with a stable right-side `<parentId> → <childId>` column. Existing flat-ID task children remain valid and visible in the same hierarchy.
+- Epic Board filtering applies to matching rows while retaining their epic/ancestor context. Keyboard and mouse row navigation traverse the resulting flattened depth-first hierarchy.
+- Completed task descendants contribute concise Board rollups such as `2 active · 3 logged`; expanded/detail context uses explicit `completed ... in Logs` wording. The UI never calls them `done`, and completed documents remain in Logs rather than reappearing as active Epic Board rows. Traversal continues through completed task ancestors, so an active descendant below a logged intermediary remains visible at its actual depth with its immediate parent context.
+- A task relationship is called a subtask only when its resolved parent is another task. Decision/custom-document parents remain generic `Parent` relationships in Board detail and Validation/Review inspection.
+- Do not add a third general Subtask Board arrangement without a separate product decision.
+
 Card example:
 
 ```text
