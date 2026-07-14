@@ -51,10 +51,11 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 
 - Protocol version: `0.1.0` for the first v0 draft.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
-- New work items use `type: task`; default allocation uses flat sequential IDs such as `task-1`.
+- New work items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
 - First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only.
 - A first-class subtask is a normal `type: task` document linked to another task with `parentId`; it keeps normal task workflow, ownership, accord, review, and completion behavior, with no new type or relationship field.
-- Parent-derived hierarchical IDs such as `task-100-1` are allowed and recommended when useful, but optional; `parentId`, not the ID, defines hierarchy.
+- `parentId`, not ID shape, defines hierarchy. Existing flat-ID children remain valid without migration.
+- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
 - Inline `subtasks:` checklist items are legacy and deprecated for new work. Existing entries remain readable, validatable, and preservable; new trackable work should use child task documents.
 - Epics are ordinary `type: task` documents with `kind: epic` for broad outcome grouping; they use the same general `parentId` hierarchy, ordinary tasks may also parent children, loose related context uses `references`, and v0 has no separate epic type, ID namespace, command family, or lifecycle.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.

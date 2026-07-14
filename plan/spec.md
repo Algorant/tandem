@@ -79,10 +79,11 @@ Protocol:
 
 - Protocol version for the first v0 draft is `0.1.0`.
 - Canonical workflow field is `state`; default states are `todo`, `in-progress`, `review`.
-- New work items use `type: task`; default allocation uses flat sequential IDs such as `task-1`.
+- New work items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
 - First-class document types are `task` and `decision`; decision documents are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only in v0.
 - A first-class subtask is a normal `type: task` document linked to another task with `parentId`, retaining ordinary task workflow, ownership, accord, review, and completion behavior without a new type or relationship field.
-- Parent-derived hierarchical IDs such as `task-100-1` are allowed and recommended when useful, but are not required; `parentId` remains the canonical hierarchy.
+- `parentId` remains the canonical hierarchy; ID shape alone never establishes parentage. Existing flat-ID children remain valid without migration.
+- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
 - Inline `subtasks:` checklist items are legacy and deprecated for new work; existing entries remain readable and preservable, while new trackable work should use child task documents.
 - Epics are convention-only task documents using `type: task` plus `kind: epic` for broad outcome grouping; they use the same general `parentId` hierarchy, ordinary tasks may also parent children, loose context uses `references`, and v0 has no separate epic type or lifecycle.
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.

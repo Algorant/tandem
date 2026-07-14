@@ -26,11 +26,12 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - No Brainfile importer or migration command is required in v0.
 - Canonical workflow field names are `state` on documents and `states` in workspace config.
 - Default active states are `todo`, `in-progress`, and `validation`; existing `state: review` documents are tolerated as a legacy alias during the transition.
-- New task items use `type: task`; default allocation uses flat sequential IDs such as `task-1`.
+- New task items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
 - First-class document types are `task` and `decision`.
 - Custom document types are allowed in config only; v0 has no type-management CLI.
 - A first-class subtask is a normal `type: task` document whose `parentId` points to another task. It keeps its own workflow, accord, review, ownership, and completion behavior; no subtask document type or separate relationship field is needed.
-- Parent-derived hierarchical IDs such as `task-100-1` are allowed and recommended when they improve local readability, but they are optional. `parentId`, not ID shape, defines the hierarchy.
+- `parentId`, not ID shape, defines hierarchy. Existing flat-ID children remain valid without migration.
+- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
 - Inline `subtasks:` checklist objects are legacy and deprecated for new work. Tools must continue to read, validate, preserve, and operate on existing entries, but new independently trackable work should be a child task document.
 - Epics are a convention on task documents: use `type: task` plus `kind: epic` for broad outcome grouping, link children through the same general `parentId` hierarchy, and use `references` for loose related documents. A parent need not be an epic, and no separate epic document type, command family, or lifecycle is part of v0.
 - The work-agreement object is `accord`.
@@ -172,30 +173,38 @@ A completed task should expose:
 - related events
 - original Markdown body
 
-### 5. Task IDs support flat and optional hierarchical sequences
+### 5. Task IDs use flat root and parent-derived child sequences
 
-New v0 tasks default to flat sequential IDs:
+New root tasks default to flat sequential IDs:
 
 ```yaml
 id: task-1
 type: task
 ```
 
-First-class child tasks may instead use a parent-derived hierarchical ID when that makes the relationship easier to scan:
+A new first-class child task defaults to a parent-derived hierarchical ID:
 
 ```yaml
-id: task-100-1
+id: task-103-1
 type: task
-parentId: task-100
+parentId: task-103
 ```
 
-Hierarchical IDs are optional and may add further positive-integer segments for deeper nesting. `parentId` is always the canonical relationship; tools must not infer or require hierarchy from an ID alone. Default automatic allocation remains the flat global `task-N` sequence unless the caller explicitly supplies a hierarchical ID through capable tooling or manual authoring.
+Further nesting extends the sequence:
+
+```yaml
+id: task-103-1-1
+type: task
+parentId: task-103-1
+```
+
+`parentId` is always the canonical relationship; tools must not infer or require hierarchy from an ID alone. Existing children with flat IDs remain valid without migration. To allocate a new child, scan task IDs in both the active board and completed logs and choose the next parent-derived sequence without reusing an earlier ID. IDs are immutable after creation: normal reparenting updates `parentId` but must not silently rename the task ID or rewrite references.
 
 Suggested filenames:
 
 ```text
 task-1-implement-theme-system.md
-task-100-1-add-child-validation.md
+task-103-1-add-child-validation.md
 ```
 
 The ID is canonical. A readable filename suffix may change without changing the document identity.
@@ -264,7 +273,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
-| `id` | yes | error | Canonical ID. Task IDs use one or more positive-integer segments, e.g. flat `task-1` or optional hierarchical `task-100-1`. IDs must be unique across board and logs; ID shape does not establish hierarchy. |
+| `id` | yes | error | Immutable canonical ID. Root tasks default to flat IDs such as `task-1`; new children default to parent-derived IDs such as `task-103-1`, with nested forms such as `task-103-1-1`. IDs must be unique across board and logs; ID shape does not establish hierarchy, and existing flat-ID children remain valid. |
 | `type` | yes | error | Must be `task` for v0 task documents. |
 | `kind` | no | error if unsupported | Optional task sub-kind/convention classifier. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks without changing task identity, ID allocation, workflow, accord, review, or completion behavior. |
 | `title` | yes | error | Display title. |
@@ -498,7 +507,7 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `id` | yes | Stable canonical identifier such as flat `task-1` or optional hierarchical `task-100-1`; the ID does not define parentage. |
+| `id` | yes | Immutable canonical identifier. Root tasks default to flat IDs such as `task-1`; new children default to parent-derived IDs such as `task-103-1`. The ID does not define parentage. |
 | `type` | no | Defaults to `task` for new task documents. |
 | `kind` | no | Optional task sub-kind/convention classifier. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task` and normal task semantics. |
 | `title` | yes | Display title. |
@@ -533,7 +542,7 @@ state: in-progress
 ---
 ```
 
-Example first-class child task using an optional hierarchical ID:
+Example newly allocated first-class child task:
 
 ```markdown
 ---
@@ -545,7 +554,7 @@ parentId: task-100
 ---
 ```
 
-The same child could use a flat ID such as `task-137`; `parentId: task-100` alone establishes the relationship. Parent-derived IDs are allowed and recommended when useful for local readability, but are never required, and tools must not infer parentage from them. An ordinary task may parent children without `kind: epic`, and nesting may continue by linking a child task to another child task.
+`parentId: task-100` alone establishes the relationship; tools must not infer parentage from the ID. A newly allocated child defaults to the parent-derived sequence, while an existing child with a flat ID such as `task-137` remains valid without migration. Nested children extend the ID, for example `task-100-1-1` with `parentId: task-100-1`. Child allocation scans task IDs in the active board and completed logs so an earlier sequence is never reused. IDs are immutable after creation, so normal reparenting changes `parentId` without silently renaming the ID or rewriting references. An ordinary task may parent children without `kind: epic`.
 
 Inline `subtasks:` objects remain a legacy checklist representation, not first-class task documents. Compliant tools should continue to read, validate, preserve, and toggle existing entries without silently converting them. New work that needs tracking should be authored as a child task document; migration of an old inline item should be explicit so identity and history are not fabricated.
 
@@ -578,7 +587,7 @@ Example child task:
 
 ```markdown
 ---
-id: task-11
+id: task-10-1
 type: task
 title: Rewrite Concepts page
 state: todo
@@ -597,7 +606,7 @@ Update the public concepts page as one deliverable under the docs IA epic.
 
 Guidance:
 
-- Keep epic IDs in the normal task namespace (usually flat `task-N`, with optional hierarchical task IDs still allowed), not a separate `epic-N` namespace.
+- Keep epic IDs in the normal task namespace (a root epic normally uses flat `task-N`; an epic created as a child uses its parent-derived task sequence), not a separate `epic-N` namespace.
 - Use `parentId` for the strict parent/child hierarchy. The target may be an active board document or a completed log document, and unresolved `parentId` remains a validation error.
 - Use `references` for loose related context such as decisions, sibling tasks, or completed logs. References are intentionally not hierarchy and unresolved references remain warnings.
 - Use normal child task documents when work needs its own owner, accord, review, blockers, validation, or completion history. Existing inline `subtasks` remain legacy checklist data and are deprecated for new work.
@@ -1014,14 +1023,14 @@ Event records use the v0 audit envelope: `ts`, `event`, `id`, `summary`, `actor`
 
 | Aspect | Semantics |
 | --- | --- |
-| Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, deprecated inline subtasks for compatibility, accord, review. New callers should create child task documents instead of inline entries. |
+| Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, accord, and review. New inline checklist `subtasks:` are not accepted; independently trackable work uses child task documents. |
 | Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and reference validation. |
-| Files written | New `.tandem/board/task-N*.md`; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, or nested accord/review/subtasks are malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
+| Files written | New `.tandem/board/<task-id>*.md`; the allocated ID may be flat or contain any depth of parent-derived positive-integer segments. Append the current actor event log under `.tandem/events/<actor_id>.jsonl`. ID shape alone does not establish hierarchy. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, new inline `subtasks:` are requested, or nested accord/review data is malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
 | Event | `task.created`. |
-| Resulting state | New task document in `.tandem/board/` with `id: task-N`, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, `createdAt`, and `updatedAt`. |
+| Resulting state | New task document in `.tandem/board/` with a flat root or parent-derived child `id`, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, optional `parentId`, `createdAt`, and `updatedAt`. |
 
-Default task ID allocation chooses the next available flat `task-N` value after scanning existing task IDs in both board and logs. Parent-derived hierarchical IDs may be supplied explicitly through capable tooling or manual authoring, but `parentId` remains the canonical relationship. Human-readable filename suffixes are optional and non-canonical.
+Default root-task ID allocation chooses the next flat `task-N` value after scanning existing task IDs in both board and logs. When `parentId` identifies a task, default child allocation chooses the next parent-derived positive-integer suffix after scanning active board and completed-log task IDs, including nested forms such as `task-103-1-1`; completed IDs are never reused. `parentId` remains the canonical relationship, existing flat-ID children remain valid, and IDs remain immutable during normal reparenting. Human-readable filename suffixes are optional and non-canonical.
 
 ### Add decision
 
@@ -1136,7 +1145,7 @@ tandem list
 tandem show <id>
 tandem add --title ... --state todo --kind epic
 tandem move <id> --state validation
-tandem update <id> --kind epic --priority high --tag cli
+tandem update <id> --kind epic --priority high --tag cli --parent task-1
 tandem complete <id> --summary ...
 tandem log list|show|search
 tandem search <query>
@@ -1146,7 +1155,7 @@ tandem decision list|show|add
 tandem tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks; it does not update completed logs, workflow `state`, or `parentId`.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks, including `parentId` changes through `--parent`; it does not update completed logs or workflow `state`. Normal reparenting preserves the task's immutable ID and does not silently rewrite references.
 
 ## Brainfile design mapping/reference only
 

@@ -1,7 +1,7 @@
 # Tandem Protocol Todo
 
 Status: v0 draft accepted for implementation
-Last updated: 2026-06-26
+Last updated: 2026-07-13
 
 This todo tracks protocol-specific tasks. The current protocol draft lives in `protocol/plan/spec.md`.
 
@@ -19,13 +19,15 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Chose default active states: `todo`, `in-progress`, and `review`.
 - [x] Chose completion lifecycle: `todo → in-progress → review → complete/archive → logs`.
 - [x] Captured separation between human workflow state, accord state, and review state.
-- [x] Chose new task identity shape: `type: task` with sequential IDs such as `task-1`.
+- [x] Chose task identity shape: `type: task`; root tasks default to flat IDs such as `task-1`, while new first-class children default to parent-derived IDs such as `task-103-1` and nested `task-103-1-1`.
 - [x] Chose first-class document types: `task` and `decision`.
 - [x] Decided custom document types are config-only in v0, with no type-management CLI.
 - [x] Chose accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`.
 - [x] Chose structured rule objects with `id`, `rule`, and optional `source`.
 - [x] Decided `parentId`, `blockers`, and `references` may point to any Tandem document by ID.
-- [x] Chose parent-based sequential subtask IDs such as `task-1-1`.
+- [x] Chose first-class child tasks as normal task documents linked by canonical `parentId`, distinct from legacy inline checklist `subtasks:`.
+- [x] Chose parent-derived sequential IDs for new first-class children, allocated across the active board and completed logs without reuse; existing flat-ID children remain valid.
+- [x] Chose immutable task IDs; normal reparenting must not silently rename IDs or rewrite references.
 - [x] Decided completion warns about missing accepted review or accord but allows completion in v0.
 - [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed history.
 - [x] Decided per-actor event logs under `.tandem/events/<actor_id>.jsonl` enrich timeline/audit history while avoiding a shared Git append hotspot; legacy `.tandem/events.jsonl` remains readable during transition.

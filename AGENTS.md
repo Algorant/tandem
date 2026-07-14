@@ -39,7 +39,7 @@ Protocol:
 - Canonical workflow field: `state` / `states`.
 - Default active states: `todo`, `in-progress`, `review`.
 - Protocol version for the first v0 draft: `0.1.0`.
-- Default task identity: `type: task` with sequential IDs such as `task-1`.
+- Default task identity: `type: task`; root tasks use flat sequential IDs such as `task-1`, while new first-class children use parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
 - First-class document types: `task` and `decision`; decision documents are ADR-compatible durable records and do not need a lifecycle field in v0.
 - Custom document types: allowed in config only; no v0 type-management CLI.
 - Epics: convention-only task documents using `type: task` plus `kind: epic`; children link through `parentId`, related context uses `references`, and there is no separate epic type, command family, ID namespace, or lifecycle in v0.
@@ -47,7 +47,7 @@ Protocol:
 - Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
 - References: `parentId`, blockers, and related references may point to any Tandem document by ID.
-- Subtask IDs: parent-based sequential IDs such as `task-1-1`.
+- Subtask IDs: new first-class child tasks default to parent-derived sequential IDs such as `task-103-1`; allocate each child sequence across active board documents and completed logs without reuse. `parentId` alone defines hierarchy, existing flat-ID children remain valid, and IDs remain immutable during normal reparenting.
 - Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0.
 - Events: per-actor `.tandem/events/<actor_id>.jsonl` logs store minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`; legacy `.tandem/events.jsonl` remains readable during transition.
 - Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
