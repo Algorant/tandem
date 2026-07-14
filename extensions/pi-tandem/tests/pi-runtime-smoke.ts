@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { buildTaskArgs } from "../index";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -17,6 +18,12 @@ type JsonObject = Record<string, any>;
 
 function assert(condition: unknown, message: string): asserts condition {
 	if (!condition) throw new Error(message);
+}
+
+function parseId(output: string): string {
+	const match = /^ID:\s+(\S+)/m.exec(output);
+	assert(match, `could not parse ID from output:\n${output}`);
+	return match[1];
 }
 
 async function runProcess(command: string, args: string[], cwd: string): Promise<string> {
@@ -152,6 +159,17 @@ async function ensureRepoWorkspace(tandem: string): Promise<boolean> {
 	return true;
 }
 
+async function prepareHierarchicalRuntimeFixture(tandem: string): Promise<void> {
+	const parentId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime hierarchy parent" }), repoRoot));
+	const completedChildId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime completed child", parent: parentId }), repoRoot));
+	assert(completedChildId === `${parentId}-1`, `Pi runtime fixture expected first hierarchical child ${parentId}-1, got ${completedChildId}`);
+	await runProcess(tandem, buildTaskArgs({ action: "complete", id: completedChildId, summary: "Exercise runtime completed-log continuity" }), repoRoot);
+	const activeChildId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime active child", parent: parentId }), repoRoot));
+	assert(activeChildId === `${parentId}-2`, `Pi runtime fixture should continue after logged child with ${parentId}-2, got ${activeChildId}`);
+	const nestedId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime nested child", parent: activeChildId }), repoRoot));
+	assert(nestedId === `${activeChildId}-1`, `Pi runtime fixture expected nested ID ${activeChildId}-1, got ${nestedId}`);
+}
+
 async function stopProcess(proc: ChildProcessWithoutNullStreams): Promise<void> {
 	if (proc.exitCode !== null) return;
 	proc.kill("SIGTERM");
@@ -173,6 +191,7 @@ let createdRepoWorkspace = false;
 
 try {
 	createdRepoWorkspace = await ensureRepoWorkspace(tandem);
+	if (createdRepoWorkspace) await prepareHierarchicalRuntimeFixture(tandem);
 	await withProjectLocalLoader(async () => {
 		const proc = spawn("pi", [
 			"--mode", "rpc",
@@ -213,6 +232,9 @@ try {
 			assert(widgetLines.some((line: string) => line.includes(`workspace: ${repoRoot}`)), `/tandem status did not locate repo workspace: ${widgetLines.join("\n")}`);
 			assert(widgetLines.some((line: string) => line.includes("tandem: available")), `/tandem status did not report tandem availability: ${widgetLines.join("\n")}`);
 			assert(widgetLines.some((line: string) => line.includes("tandem list --json: ok")), `/tandem status did not smoke list --json: ${widgetLines.join("\n")}`);
+			if (createdRepoWorkspace) {
+				assert(widgetLines.some((line: string) => line.includes('counts: {"total":3')), `/tandem status should observe parent, active child, and nested child after completed-log continuity setup: ${widgetLines.join("\n")}`);
+			}
 
 			const statusResponse = await rpc.waitFor("/tandem status response", (event) => event.type === "response" && event.id === "status");
 			assert(statusResponse.success === true, `/tandem status prompt failed: ${JSON.stringify(statusResponse)}`);

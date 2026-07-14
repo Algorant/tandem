@@ -13,7 +13,7 @@ Last updated: 2026-07-10
 - [x] Added smoke test coverage for CLI-backed wrapper mappings.
 - [x] Added repo read smoke coverage for this workspace's `.tandem` board.
 - [x] Added a project-local Pi runtime smoke that creates an ignored `.pi/extensions/pi-tandem/index.ts` loader, verifies fresh RPC startup discovers `/tandem`, runs `/tandem status`, and cleans up.
-- [x] Added relationship guidance and smoke coverage for first-class parent-linked child tasks, CLI-computed `parentRelationship`/subtask summaries, blockers, references, and related files; deprecated inline checklist authoring is no longer exposed.
+- [x] Added relationship guidance and smoke coverage for first-class parent-linked child tasks, CLI-owned hierarchical/nested allocation, completed-log sequence continuity, generic non-task parents, existing flat-ID child compatibility, allocation collision errors, CLI-computed `parentRelationship`/subtask summaries, blockers, references, and related files; deprecated inline checklist authoring is no longer exposed.
 
 ## Current tasks
 

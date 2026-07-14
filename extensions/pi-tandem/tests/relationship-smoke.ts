@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	buildDecisionArgs,
+	buildLogArgs,
 	buildSearchArgs,
 	buildTaskArgs,
 	tandemTaskParameters,
@@ -85,7 +86,7 @@ function assertSchemaDescribesRelationshipFields(): void {
 		assert(typeof properties[field].description === "string" && properties[field].description.length > 20, `tandem_task schema should describe relationship field ${field}`);
 	}
 	assert(!properties.subtasks, "tandem_task schema should not offer deprecated inline subtask authoring");
-	assert(properties.parent.description.includes("first-class tracked subtask"), "parent schema guidance should describe tracked child tasks");
+	assert(properties.parent.description.includes("CLI allocates parent-derived IDs"), "parent schema guidance should describe CLI-owned hierarchical allocation");
 }
 
 assertSchemaDescribesRelationshipFields();
@@ -137,6 +138,7 @@ try {
 		tags: ["relationship-smoke"],
 	}), workspace);
 	const blockerId = parseId(blockerOutput);
+	assert(blockerId === `${parentId}-1`, `first task child should use CLI-allocated hierarchical ID ${parentId}-1, got ${blockerId}`);
 
 	const childParams = {
 		action: "add" as const,
@@ -156,6 +158,18 @@ try {
 	assert(!childArgs.includes("--subtask"), "buildTaskArgs should never forward deprecated --subtask authoring");
 	const childOutput = await runTandem(tandem, childArgs, workspace);
 	const childId = parseId(childOutput);
+	assert(childId === `${parentId}-2`, `second task child should use CLI-allocated hierarchical ID ${parentId}-2, got ${childId}`);
+
+	const nestedOutput = await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Implement nested relationship detail",
+		parent: childId,
+		references: [decisionId],
+		relatedFiles: ["src/relationships.ts"],
+		tags: ["relationship-smoke"],
+	}), workspace);
+	const nestedId = parseId(nestedOutput);
+	assert(nestedId === `${childId}-1`, `nested task child should extend its CLI-allocated parent ID, got ${nestedId}`);
 
 	const followUpOutput = await runTandem(tandem, buildTaskArgs({
 		action: "add",
@@ -167,6 +181,7 @@ try {
 		tags: ["relationship-smoke"],
 	}), workspace);
 	const followUpId = parseId(followUpOutput);
+	assert(/^task-\d+$/.test(followUpId), `root task should retain a flat CLI-allocated ID, got ${followUpId}`);
 	const attachArgs = buildTaskArgs({ action: "update", id: followUpId, parent: parentId });
 	assert(attachArgs.includes("--parent") && attachArgs.includes(parentId), "buildTaskArgs update should pass --parent for attach/reparent");
 	await runTandem(tandem, attachArgs, workspace);
@@ -176,7 +191,7 @@ try {
 	assert(shown.data.document.id === childId, "tandem_task show should return child id");
 	assert(shown.data.document.parentId === parentId, "tandem_task show should return child parentId");
 	assert(shown.data.parentRelationship === "subtask", "tandem_task show should classify task-parent links as subtasks");
-	assert(Array.isArray(shown.data.subtasks) && shown.data.subtasks.length === 0, "child show should naturally include an empty computed subtask summary");
+	assert(Array.isArray(shown.data.subtasks) && shown.data.subtasks.some((subtask: any) => subtask.id === nestedId), "child show should naturally include its nested child summary");
 	assert(Array.isArray(shown.data.document.blockers) && shown.data.document.blockers.includes(blockerId), "tandem_task show should return child blockers");
 
 	const parentShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: parentId }), workspace));
@@ -215,6 +230,10 @@ try {
 	assertIncludes(childFile, "relatedFiles: [\"src/relationships.ts\", \"docs/architecture.md\"]", "child task");
 	assert(!childFile.includes("\nsubtasks:"), "implementation child should not contain legacy inline subtasks metadata");
 
+	const nestedFile = await readFile(join(workspace, ".tandem", "board", `${nestedId}.md`), "utf8");
+	assertIncludes(nestedFile, `parentId: "${childId}"`, "nested child task");
+	assert(!nestedFile.includes("\nsubtasks:"), "nested child should not contain legacy inline subtasks metadata");
+
 	const followUpFile = await readFile(join(workspace, ".tandem", "board", `${followUpId}.md`), "utf8");
 	assertIncludes(followUpFile, `parentId: \"${parentId}\"`, "follow-up task");
 	assertIncludes(followUpFile, `blockers: [\"${childId}\"]`, "follow-up task");
@@ -238,6 +257,38 @@ try {
 	assert(resultIds(decisionSearch).has(childId), "tandem_search should find child by decision reference");
 	assert(resultIds(decisionSearch).has(followUpId), "tandem_search should find follow-up by decision reference");
 
+	await runTandem(tandem, buildTaskArgs({
+		action: "complete",
+		id: blockerId,
+		summary: "Archive first allocated child for sequence continuity smoke",
+	}), workspace);
+	const loggedChild = parseJson(await runTandem(tandem, buildLogArgs({ action: "show", id: blockerId }), workspace));
+	assert(loggedChild.data.document.id === blockerId, "completed first child should be readable from logs");
+	const successorOutput = await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Continue relationship sequence after completed log",
+		parent: parentId,
+	}), workspace);
+	const successorId = parseId(successorOutput);
+	assert(successorId === `${parentId}-3`, `completed-log child sequence should not be reused; expected ${parentId}-3, got ${successorId}`);
+
+	const genericOutput = await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Generic decision-parent relationship",
+		parent: decisionId,
+	}), workspace);
+	const genericId = parseId(genericOutput);
+	assert(/^task-\d+$/.test(genericId), `generic non-task parent should retain flat task allocation, got ${genericId}`);
+	const genericShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: genericId }), workspace));
+	assert(genericShown.data.document.parentId === decisionId, "generic parent task should preserve parentId");
+	assert(genericShown.data.parentRelationship === "parent", "decision-parent link should remain a generic parent relationship");
+
+	const legacyFlatId = "task-200";
+	await writeFile(join(workspace, ".tandem", "board", `${legacyFlatId}.md`), `---\nid: ${legacyFlatId}\ntype: task\ntitle: "Legacy flat-ID child"\nstate: todo\nparentId: "${parentId}"\n---\n`, "utf8");
+	const legacyShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: legacyFlatId }), workspace));
+	assert(legacyShown.data.document.parentId === parentId, "existing flat-ID child should preserve canonical parentId");
+	assert(legacyShown.data.parentRelationship === "subtask", "existing flat-ID child should still classify from parentId");
+
 	const missingParent = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Bad missing parent", parent: "task-999" }), workspace);
 	assert(missingParent.code !== 0, "tandem_task add should reject unresolved parent core reference");
 	assertIncludes(`${missingParent.stdout}\n${missingParent.stderr}`, "Validation failed: parent document not found: task-999", "missing parent failure");
@@ -245,8 +296,22 @@ try {
 	const looseReferenceOutput = await runTandem(tandem, buildTaskArgs({ action: "add", title: "Loose related reference", references: ["task-999"] }), workspace);
 	assertIncludes(looseReferenceOutput, "Warning: reference not found: task-999", "loose reference warning");
 
+	// Occupy every destination in one allocator retry window without matching the
+	// parent-derived IDs in frontmatter. The adapter must surface the CLI's
+	// collision failure rather than constructing or retrying IDs itself.
+	for (let suffix = 4; suffix < 1004; suffix += 1) {
+		await writeFile(
+			join(workspace, ".tandem", "board", `${parentId}-${suffix}.md`),
+			`---\nid: collision-${suffix}\ntype: decision\ntitle: "Collision fixture ${suffix}"\n---\n`,
+			"utf8",
+		);
+	}
+	const collision = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Exhaust occupied child destinations", parent: parentId }), workspace);
+	assert(collision.code !== 0, "tandem_task add should expose CLI allocation failure when child destinations remain occupied");
+	assertIncludes(`${collision.stdout}\n${collision.stderr}`, `ID allocation failure: could not reserve a new ${parentId} document`, "child allocation collision failure");
+
 	console.log(`pi-tandem relationship smoke passed with ${tandem}`);
-	console.log(`Verified parent-linked children: ${parentId} -> ${blockerId}/${childId}/${followUpId}; blocker chain ${blockerId} -> ${childId} -> ${followUpId}; decision ${decisionId} referenced by all children.`);
+	console.log(`Verified CLI-owned IDs: ${parentId} -> ${blockerId}/${childId}/${successorId}, nested ${nestedId}, generic ${decisionId} -> ${genericId}, legacy flat ${legacyFlatId}.`);
 } finally {
 	await rm(workspace, { recursive: true, force: true });
 }

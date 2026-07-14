@@ -35,14 +35,14 @@ It runs commands with `execFile(command, args, { cwd })` and never shell-interpo
 Current MVP tools:
 
 - `tandem_status` — `tandem --help`, workspace discovery, and optional `tandem list --json` health check.
-- `tandem_task` — `list`, `show`, `add`, `move`, `update`, `complete`; independently tracked subtasks are normal child task calls using `parent`, while deprecated inline checklist authoring is not exposed or forwarded.
+- `tandem_task` — `list`, `show`, `add`, `move`, `update`, `complete`; independently tracked subtasks are normal child task calls using `parent`, which is passed directly to Tandem so the CLI owns parent-derived/nested ID allocation and relationship classification. Deprecated inline checklist authoring is not exposed or forwarded.
 - `tandem_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - `tandem_log` — `list`, `show`, `search`.
 - `tandem_rules` — `list`, `add`, `edit`, `delete`.
 - `tandem_decision` — `list`, `show`, `add` for first-class decisions, including ADR-compatible durable records that stay `type: decision`.
 - `tandem_search` — active/log search.
 
-Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details. The adapter also does not classify relationships: Tandem's JSON naturally supplies `parentId`/`parentRelationship` on list/search/show results and computed `subtasks` summaries when showing task parents.
+Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details. The adapter neither allocates IDs nor classifies relationships: Tandem assigns parent-derived IDs for task children (including nested children), scans active/log history for sequence continuity, retains flat IDs for generic parents, and returns allocation/collision errors. Tandem's JSON naturally supplies `parentId`/`parentRelationship` on list/search/show results and computed `subtasks` summaries when showing task parents. Existing flat-ID children remain compatible because the CLI classifies from `parentId`.
 
 ## Slash command
 
@@ -81,9 +81,9 @@ bun extensions/pi-tandem/tests/relationship-smoke.ts
 
 `smoke.ts` performs read-only checks against this repository's `.tandem` board when the checkout has one, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, search, complete, and log coverage. Without `TANDEM_BIN`, it first builds the current repository CLI so a stale debug binary cannot mask source changes.
 
-`pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing runtime state: it creates `.pi/extensions/pi-tandem/index.ts` and, when the checkout lacks one, a temporary ignored `.tandem` workspace; it starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status`, and cleans up all temporary state.
+`pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing runtime state: it creates `.pi/extensions/pi-tandem/index.ts` and, when the checkout lacks one, a temporary ignored `.tandem` workspace with a completed hierarchical child, a sequence-continuing sibling, and a nested child; it starts fresh `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies `/tandem` is registered from the project-local loader, runs `/tandem status`, confirms the active hierarchy count, and cleans up all temporary state.
 
-`relationship-smoke.ts` builds the current repository Tandem CLI, rejects legacy inline authoring, creates independently tracked parent-linked children through pi-tandem argument builders, and verifies persisted relationships plus the CLI's computed show/list/search `parentId`, `parentRelationship`, parent filters, and subtask summaries.
+`relationship-smoke.ts` builds the current repository Tandem CLI, rejects legacy inline authoring, passes parents through pi-tandem argument builders, and verifies hierarchical/nested IDs, completed-log sequence continuity, generic non-task parent allocation/classification, existing flat-ID child compatibility, occupied-destination collision errors, persisted relationships, and computed show/list/search fields.
 
 Manual Pi smoke after review:
 

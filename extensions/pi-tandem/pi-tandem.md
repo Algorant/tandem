@@ -17,7 +17,7 @@ Avoid editing `.tandem/board/*.md`, `.tandem/logs/*.md`, or `.tandem/tandem.md` 
 
 When decomposing or linking work, set Tandem relationship fields explicitly instead of burying relationships in prose:
 
-- `parent` writes `parentId` for add/update and filters exact parent matches for list. A task linked to another task this way is a first-class tracked subtask with its own workflow, owner, accord, review, blockers, and completion lifecycle. Create or inspect the parent document first.
+- `parent` passes `--parent` directly to Tandem for add/update and filters exact parent matches for list. On add, let the CLI allocate the ID: task parents produce parent-derived IDs such as `task-103-1` (and nested `task-103-1-1`), while decision/custom parents retain flat `task-N` allocation. Completed child IDs are not reused. Never construct child IDs in Pi. `parentId`, not ID shape, defines hierarchy, so existing flat-ID children remain valid. Create or inspect the parent document first.
 - `blockers` writes strict dependency IDs. Blockers must already exist; unresolved blockers are validation errors.
 - `references` writes related Tandem document IDs such as decisions, sibling tasks, or completed logs. Prefer existing IDs even though unresolved references are only warnings.
 - `relatedFiles` records project paths that help implementers/reviewers find relevant code or docs.
@@ -29,10 +29,11 @@ Example tool pattern:
 tandem_task action=add title="Ship relationship UI" relatedFiles=["tandem/src/tui.rs"]
 tandem_decision action=add title="Relationship display policy" status="accepted" deciders=["Algorant"] references=["task-1"]
 tandem_task action=add title="Define relationship display" parent="task-1" references=["decision-1"] relatedFiles=["tandem/src/tui.rs"]
-tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-2"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"]
+# Inspect the returned ID (for example task-1-1), then use that real ID:
+tandem_task action=add title="Render blockers and references" parent="task-1" blockers=["task-1-1"] references=["decision-1"] relatedFiles=["tandem/src/tui.rs", "protocol/plan/spec.md"]
 ```
 
-After creating linked work, inspect with `tandem_task show`, `tandem_task list`, and `tandem_search`. Read responses pass through Tandem's relationship output: child list/search entries include `parentId` and computed `parentRelationship` where applicable, while showing a task parent includes computed `subtasks` summaries. The adapter does not duplicate that classification in TypeScript.
+After creating linked work, use the ID returned by Tandem and inspect with `tandem_task show`, `tandem_task list`, and `tandem_search`. Read responses pass through Tandem's relationship output: child list/search entries include `parentId` and computed `parentRelationship` where applicable, while showing a task parent includes computed `subtasks` summaries. Allocation failures and destination collisions are CLI errors surfaced unchanged by the adapter. The adapter does not allocate IDs or duplicate classification in TypeScript.
 
 ## Epic convention
 
