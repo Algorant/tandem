@@ -378,6 +378,7 @@ struct TuiApp {
     focus: FocusPane,
     show_board_detail: bool,
     expanded_board_doc_id: Option<String>,
+    expanded_board_hierarchy_ids: BTreeSet<String>,
     detail_scroll: u16,
     review_detail_scroll: u16,
     log_detail_scroll: u16,
@@ -419,6 +420,7 @@ impl TuiApp {
             focus: FocusPane::Board,
             show_board_detail: false,
             expanded_board_doc_id: None,
+            expanded_board_hierarchy_ids: BTreeSet::new(),
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
@@ -491,6 +493,20 @@ impl TuiApp {
         self.configured_states = configured_states;
         self.docs = docs;
         self.logs = log_load.docs;
+        let active_ids = self
+            .docs
+            .iter()
+            .map(|doc| doc.id().to_string())
+            .collect::<BTreeSet<_>>();
+        // Keep hierarchy expansion IDs across tolerant parse gaps. Stale IDs are inert,
+        // while a task that reappears after an editor's partial write regains its state.
+        if self
+            .expanded_board_doc_id
+            .as_ref()
+            .is_some_and(|id| !active_ids.contains(id))
+        {
+            self.expanded_board_doc_id = None;
+        }
         self.log_events = log_events;
         self.rules = rules;
         self.load_errors = load_errors;
@@ -711,6 +727,7 @@ impl TuiApp {
             }
             KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
             KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
+            KeyCode::Char(' ') if self.view == TuiView::Board => self.toggle_board_preview(),
             KeyCode::Enter if self.view == TuiView::Logs => self.toggle_focus(),
             KeyCode::Esc => match self.view {
                 TuiView::Board if self.focus == FocusPane::Detail => {
@@ -1508,29 +1525,23 @@ impl TuiApp {
             }
         }
 
+        self.expand_active_task_ancestors(id);
         for state_index in 0..self.states.len() {
             let Some(state_name) = self.states.get(state_index) else {
                 continue;
             };
-            let mut item_index = 0;
-            for doc in &self.docs {
-                if !is_board_visible_doc(doc) {
-                    continue;
+            if let Some(item_index) = self
+                .state_board_entries(state_name)
+                .iter()
+                .position(|entry| entry.doc.id() == id)
+            {
+                self.selected_state = state_index;
+                self.selected_item = item_index;
+                if reset_scroll {
+                    self.detail_scroll = 0;
                 }
-                if document_state_label(doc) == state_name.as_str()
-                    && board_filters_match(doc, &self.board_filters)
-                {
-                    if doc.id() == id {
-                        self.selected_state = state_index;
-                        self.selected_item = item_index;
-                        if reset_scroll {
-                            self.detail_scroll = 0;
-                        }
-                        self.clamp_selection();
-                        return true;
-                    }
-                    item_index += 1;
-                }
+                self.clamp_selection();
+                return true;
             }
         }
         self.clamp_selection();
@@ -1748,7 +1759,7 @@ impl TuiApp {
         self.status = if self.show_board_detail {
             "Board detail pane shown; Tab or Esc returns to the list.".to_string()
         } else {
-            "Board detail pane hidden; Enter expands the selected row inline.".to_string()
+            "Board detail pane hidden; Space toggles the selected row preview.".to_string()
         };
     }
 
@@ -1773,12 +1784,61 @@ impl TuiApp {
             self.status = "No selected Board item to expand.".to_string();
             return;
         };
+        let has_active_descendants = self.selected_doc().is_some_and(is_task_doc)
+            && count_task_descendants(
+                &doc_id,
+                &self.docs,
+                &self.logs,
+                &mut BTreeSet::from([doc_id.clone()]),
+            )
+            .0 > 0;
+        if self.board_arrangement == BoardArrangement::State && has_active_descendants {
+            self.expanded_board_doc_id = None;
+            if self.expanded_board_hierarchy_ids.remove(&doc_id) {
+                self.status = format!("Collapsed subtasks under {doc_id}.");
+            } else {
+                self.expanded_board_hierarchy_ids.insert(doc_id.clone());
+                self.status = format!("Expanded subtasks under {doc_id}; press Enter to collapse.");
+            }
+            self.clamp_selection();
+        } else {
+            self.toggle_board_preview();
+        }
+    }
+
+    fn toggle_board_preview(&mut self) {
+        let Some(doc_id) = self.selected_doc().map(|doc| doc.id().to_string()) else {
+            self.status = "No selected Board item to preview.".to_string();
+            return;
+        };
         if self.expanded_board_doc_id.as_deref() == Some(doc_id.as_str()) {
             self.expanded_board_doc_id = None;
-            self.status = format!("Collapsed {doc_id}.");
+            self.status = format!("Closed preview for {doc_id}.");
         } else {
             self.expanded_board_doc_id = Some(doc_id.clone());
-            self.status = format!("Expanded {doc_id} inline; press Enter to collapse.");
+            self.status = format!("Previewing {doc_id} inline; press Space to close.");
+        }
+    }
+
+    fn expand_active_task_ancestors(&mut self, id: &str) {
+        let mut current = id.to_string();
+        let mut visited = BTreeSet::from([current.clone()]);
+        while let Some(parent_id) = self
+            .docs
+            .iter()
+            .find(|doc| doc.id() == current)
+            .and_then(normalized_parent_id)
+        {
+            if !visited.insert(parent_id.clone())
+                || !self
+                    .docs
+                    .iter()
+                    .any(|doc| doc.id() == parent_id && is_task_doc(doc))
+            {
+                break;
+            }
+            self.expanded_board_hierarchy_ids.insert(parent_id.clone());
+            current = parent_id;
         }
     }
 
@@ -1988,7 +2048,7 @@ impl TuiApp {
         }
         self.states
             .get(self.selected_state)
-            .map(|state| self.docs_for_state(state).len())
+            .map(|state| self.state_board_entries(state).len())
             .unwrap_or(0)
     }
 
@@ -2000,13 +2060,31 @@ impl TuiApp {
         let Some(state) = self.states.get(self.selected_state) else {
             return "No state · 0 items".to_string();
         };
-        let count = self.selected_state_count();
-        format!(
-            "{} · {} item{}",
-            display_state_label(state),
-            count,
-            if count == 1 { "" } else { "s" }
-        )
+        let visible_rows = self.selected_state_count();
+        let state_tasks = self
+            .docs
+            .iter()
+            .filter(|doc| is_board_visible_doc(doc))
+            .filter(|doc| document_state_label(doc) == state.as_str())
+            .filter(|doc| board_filters_match(doc, &self.board_filters))
+            .count();
+        if visible_rows == state_tasks {
+            format!(
+                "{} · {} row{}",
+                display_state_label(state),
+                visible_rows,
+                if visible_rows == 1 { "" } else { "s" }
+            )
+        } else {
+            format!(
+                "{} · {} task{} · {} row{}",
+                display_state_label(state),
+                state_tasks,
+                if state_tasks == 1 { "" } else { "s" },
+                visible_rows,
+                if visible_rows == 1 { "" } else { "s" }
+            )
+        }
     }
 
     fn selected_doc(&self) -> Option<&Document> {
@@ -2018,18 +2096,20 @@ impl TuiApp {
                 .map(|entry| entry.doc);
         }
         let state = self.states.get(self.selected_state)?;
-        self.docs_for_state(state)
+        self.state_board_entries(state)
             .into_iter()
             .nth(self.selected_item)
+            .map(|entry| entry.doc)
     }
 
-    fn docs_for_state(&self, state: &str) -> Vec<&Document> {
-        self.docs
-            .iter()
-            .filter(|doc| is_board_visible_doc(doc))
-            .filter(|doc| document_state_label(doc) == state)
-            .filter(|doc| board_filters_match(doc, &self.board_filters))
-            .collect()
+    fn state_board_entries(&self, state: &str) -> Vec<StateBoardEntry<'_>> {
+        state_board_entries(
+            &self.docs,
+            &self.logs,
+            state,
+            &self.board_filters,
+            &self.expanded_board_hierarchy_ids,
+        )
     }
 
     fn epic_board_entries(&self) -> Vec<EpicBoardEntry<'_>> {
@@ -2761,7 +2841,7 @@ impl TuiApp {
                     }
                 })
                 .collect::<Vec<_>>();
-            self.register_board_row_hits(area, self.selected_state, &row_heights);
+            self.register_board_row_hits(area, self.selected_state, state.offset(), &row_heights);
         } else {
             frame.render_widget(list, area);
         }
@@ -2823,13 +2903,22 @@ impl TuiApp {
         let Some(state_name) = self.states.get(state_index) else {
             return;
         };
-        let docs = self.docs_for_state(state_name);
-        let count = docs.len();
+        let entries = self.state_board_entries(state_name);
+        let row_count = entries.len();
+        let state_task_count = self
+            .docs
+            .iter()
+            .filter(|doc| is_board_visible_doc(doc))
+            .filter(|doc| document_state_label(doc) == state_name.as_str())
+            .filter(|doc| board_filters_match(doc, &self.board_filters))
+            .count();
         let content_width = area.width.saturating_sub(4) as usize;
         let preview_line_limit = inline_preview_line_limit_for_area(area);
-        let items = if docs.is_empty() {
+        let items = if entries.is_empty() {
             let empty_text = if self.board_filters.is_active() {
-                "No items match the active Board filters. Press F to clear filters."
+                "No hierarchy matches the active Board filters. Press F to clear filters."
+            } else if state_task_count > 0 {
+                "Tasks in this state are nested under parents in other state tabs."
             } else {
                 "No active items in this state. Press a to quick-add here."
             };
@@ -2838,31 +2927,43 @@ impl TuiApp {
                 self.theme.muted_style(),
             )))]
         } else {
-            let show_doc_type = docs.iter().any(|doc| doc.doc_type() != "task");
-            docs.iter()
+            let show_doc_type = entries.iter().any(|entry| entry.doc.doc_type() != "task");
+            entries
+                .iter()
                 .enumerate()
-                .map(|(index, doc)| {
-                    let context = relationship_context_for_doc(doc, &self.docs, &self.logs);
-                    list_item_for_doc(
-                        doc,
+                .map(|(index, entry)| {
+                    let context = relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                    state_list_item_for_entry(
+                        entry,
+                        &context,
                         &self.theme,
                         content_width,
                         show_doc_type,
-                        &context,
                         preview_line_limit,
-                        self.expanded_board_doc_id.as_deref() == Some(doc.id()),
+                        self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()),
                         index == self.selected_item,
                     )
                 })
                 .collect::<Vec<_>>()
         };
 
-        let title = format!(
-            " {} · {} item{} ",
-            display_state_label(state_name),
-            count,
-            if count == 1 { "" } else { "s" }
-        );
+        let title = if row_count == state_task_count {
+            format!(
+                " {} · {} row{} ",
+                display_state_label(state_name),
+                row_count,
+                if row_count == 1 { "" } else { "s" }
+            )
+        } else {
+            format!(
+                " {} · {} task{} · {} visible row{} ",
+                display_state_label(state_name),
+                state_task_count,
+                if state_task_count == 1 { "" } else { "s" },
+                row_count,
+                if row_count == 1 { "" } else { "s" }
+            )
+        };
         let list = List::new(items)
             .style(self.theme.panel_style())
             .block(
@@ -2873,19 +2974,20 @@ impl TuiApp {
                     .style(self.theme.panel_style()),
             )
             .highlight_style(self.theme.board_selected_style())
-            .highlight_symbol("▸ ");
+            .highlight_symbol("› ");
 
-        if count > 0 {
+        if row_count > 0 {
             let mut state = ListState::default();
-            state.select(Some(self.selected_item.min(count - 1)));
+            state.select(Some(self.selected_item.min(row_count - 1)));
             frame.render_stateful_widget(list, area, &mut state);
-            let row_heights = docs
+            let row_heights = entries
                 .iter()
-                .map(|doc| {
-                    if self.expanded_board_doc_id.as_deref() == Some(doc.id()) {
-                        let context = relationship_context_for_doc(doc, &self.docs, &self.logs);
+                .map(|entry| {
+                    if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
+                        let context =
+                            relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
                         1 + inline_preview_height_with_context(
-                            doc,
+                            entry.doc,
                             &context,
                             content_width,
                             preview_line_limit,
@@ -2895,13 +2997,19 @@ impl TuiApp {
                     }
                 })
                 .collect::<Vec<_>>();
-            self.register_board_row_hits(area, state_index, &row_heights);
+            self.register_board_row_hits(area, state_index, state.offset(), &row_heights);
         } else {
             frame.render_widget(list, area);
         }
     }
 
-    fn register_board_row_hits(&mut self, area: Rect, state_index: usize, row_heights: &[u16]) {
+    fn register_board_row_hits(
+        &mut self,
+        area: Rect,
+        state_index: usize,
+        first_visible_index: usize,
+        row_heights: &[u16],
+    ) {
         if area.width <= 2 || area.height <= 2 {
             return;
         }
@@ -2909,7 +3017,12 @@ impl TuiApp {
         let mut y = area.y.saturating_add(1);
         let width = area.width.saturating_sub(2);
         let bottom = area.y.saturating_add(area.height).saturating_sub(1);
-        for (index, height) in row_heights.iter().copied().enumerate() {
+        for (index, height) in row_heights
+            .iter()
+            .copied()
+            .enumerate()
+            .skip(first_visible_index)
+        {
             if y >= bottom {
                 break;
             }
@@ -2988,11 +3101,11 @@ impl TuiApp {
         let commands = if self.focus == FocusPane::Detail {
             format!("Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
         } else if selected_is_validation {
-            format!("Enter detail · A accept · R rework · C apply accepted · e edit · {arrangement_hint} · ? help")
+            format!("Enter expand · Space preview · A accept · R rework · C apply accepted · {arrangement_hint} · ? help")
         } else if self.board_filters.is_active() {
-            format!("Enter detail · F clear filter · H prev · L next · {arrangement_hint} · ? help")
+            format!("Enter expand · Space preview · F clear filter · H prev · L next · {arrangement_hint} · ? help")
         } else {
-            format!("Enter detail · a add · t tag · p priority · {arrangement_hint} · ? help")
+            format!("Enter expand · Space preview · a add · t tag · p priority · {arrangement_hint} · ? help")
         };
         self.with_status(format!(
             "{context} · {} · {commands}",
@@ -3086,7 +3199,7 @@ impl TuiApp {
                 self.register_footer_hit(
                     area,
                     text,
-                    "Enter detail",
+                    "Enter expand",
                     HitAction::ToggleBoardExpansion,
                 );
                 self.register_footer_hit(area, text, "Tab board", HitAction::ToggleBoardDetail);
@@ -3222,7 +3335,12 @@ impl TuiApp {
         );
 
         self.push_help_section(&mut lines, "Board");
-        self.push_help_command(&mut lines, "Enter", "expand/collapse row preview");
+        self.push_help_command(
+            &mut lines,
+            "Enter",
+            "expand/collapse task children; preview leaf rows",
+        );
+        self.push_help_command(&mut lines, "Space", "toggle inline row preview");
         self.push_help_command(&mut lines, "b", "toggle State/Epic Board arrangement");
         self.push_help_command(&mut lines, "a", "quick-add a task in the selected state");
         self.push_help_command(&mut lines, "e", "open the selected active task in $EDITOR");
@@ -4390,6 +4508,297 @@ impl BoardRelationshipContext {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StateBoardEntryRole {
+    Root,
+    Child,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StateBoardEntry<'a> {
+    doc: &'a Document,
+    role: StateBoardEntryRole,
+    depth: usize,
+    active_descendants: usize,
+    completed_descendants: usize,
+    has_active_children: bool,
+    expanded: bool,
+    cross_state: bool,
+    last_sibling: bool,
+}
+
+fn state_board_entries<'a>(
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    state: &str,
+    filters: &BoardFilters,
+    expanded_ids: &BTreeSet<String>,
+) -> Vec<StateBoardEntry<'a>> {
+    let mut entries = Vec::new();
+    for root in active_docs.iter().filter(|doc| {
+        is_board_visible_doc(doc) && is_state_board_root(doc, active_docs, completed_logs)
+    }) {
+        let mut visited = BTreeSet::from([root.id().to_string()]);
+        let root_matches_state = document_state_label(root) == state;
+        let subtree_matches = if filters.is_active() {
+            (root_matches_state && board_filters_match(root, filters))
+                || (is_task_doc(root)
+                    && task_subtree_matches_filters(
+                        root.id(),
+                        active_docs,
+                        completed_logs,
+                        state,
+                        filters,
+                        &mut visited,
+                    ))
+        } else {
+            root_matches_state
+        };
+        if !subtree_matches {
+            continue;
+        }
+        let (active_descendants, completed_descendants) = if is_task_doc(root) {
+            count_task_descendants(
+                root.id(),
+                active_docs,
+                completed_logs,
+                &mut BTreeSet::from([root.id().to_string()]),
+            )
+        } else {
+            (0, 0)
+        };
+        let has_active_children = active_descendants > 0;
+        let expanded = expanded_ids.contains(root.id());
+        let role = if normalized_parent_id(root).is_some_and(|parent_id| {
+            completed_logs
+                .iter()
+                .any(|parent| parent.id() == parent_id && is_task_doc(parent))
+        }) {
+            StateBoardEntryRole::Child
+        } else {
+            StateBoardEntryRole::Root
+        };
+        entries.push(StateBoardEntry {
+            doc: root,
+            role,
+            depth: 0,
+            active_descendants,
+            completed_descendants,
+            has_active_children,
+            expanded,
+            cross_state: document_state_label(root) != state,
+            last_sibling: false,
+        });
+        if is_task_doc(root) {
+            collect_visible_state_descendants(
+                root.id(),
+                1,
+                active_docs,
+                completed_logs,
+                state,
+                filters,
+                expanded_ids,
+                expanded || filters.is_active(),
+                &mut BTreeSet::from([root.id().to_string()]),
+                &mut entries,
+            );
+        }
+    }
+    mark_state_board_last_siblings(&mut entries);
+    entries
+}
+
+fn mark_state_board_last_siblings(entries: &mut [StateBoardEntry<'_>]) {
+    for index in 0..entries.len() {
+        let depth = entries[index].depth;
+        if depth == 0 {
+            continue;
+        }
+        entries[index].last_sibling = !entries[index + 1..]
+            .iter()
+            .take_while(|candidate| candidate.depth >= depth)
+            .any(|candidate| candidate.depth == depth);
+    }
+}
+
+fn collect_visible_state_descendants<'a>(
+    parent_id: &str,
+    depth: usize,
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    target_state: &str,
+    filters: &BoardFilters,
+    expanded_ids: &BTreeSet<String>,
+    parent_open: bool,
+    visited: &mut BTreeSet<String>,
+    entries: &mut Vec<StateBoardEntry<'a>>,
+) {
+    for child in active_docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if !visited.insert(child.id().to_string()) {
+            continue;
+        }
+        let mut match_visited = visited.clone();
+        let subtree_matches = !filters.is_active()
+            || (document_state_label(child) == target_state && board_filters_match(child, filters))
+            || task_subtree_matches_filters(
+                child.id(),
+                active_docs,
+                completed_logs,
+                target_state,
+                filters,
+                &mut match_visited,
+            );
+        if !parent_open || !subtree_matches {
+            continue;
+        }
+        let (active_descendants, completed_descendants) = count_task_descendants(
+            child.id(),
+            active_docs,
+            completed_logs,
+            &mut BTreeSet::from([child.id().to_string()]),
+        );
+        let has_active_children = active_descendants > 0;
+        let expanded = expanded_ids.contains(child.id());
+        entries.push(StateBoardEntry {
+            doc: child,
+            role: StateBoardEntryRole::Child,
+            depth,
+            active_descendants,
+            completed_descendants,
+            has_active_children,
+            expanded,
+            cross_state: document_state_label(child) != target_state,
+            last_sibling: false,
+        });
+        collect_visible_state_descendants(
+            child.id(),
+            depth + 1,
+            active_docs,
+            completed_logs,
+            target_state,
+            filters,
+            expanded_ids,
+            expanded || filters.is_active(),
+            visited,
+            entries,
+        );
+    }
+
+    for completed in completed_logs
+        .iter()
+        .filter(|doc| is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+    {
+        if visited.insert(completed.id().to_string()) && parent_open {
+            collect_visible_state_descendants(
+                completed.id(),
+                depth + 1,
+                active_docs,
+                completed_logs,
+                target_state,
+                filters,
+                expanded_ids,
+                true,
+                visited,
+                entries,
+            );
+        }
+    }
+}
+
+fn is_state_board_root(
+    doc: &Document,
+    active_docs: &[Document],
+    completed_logs: &[Document],
+) -> bool {
+    if !is_task_doc(doc) {
+        return true;
+    }
+    let mut current = doc;
+    let mut visited = vec![doc.id().to_string()];
+    let mut saw_active_ancestor = false;
+    loop {
+        let Some(parent_id) = normalized_parent_id(current) else {
+            return !saw_active_ancestor;
+        };
+        if let Some(cycle_start) = visited.iter().position(|id| id == &parent_id) {
+            let cycle_root = visited[cycle_start..]
+                .iter()
+                .filter(|id| {
+                    active_docs
+                        .iter()
+                        .any(|candidate| candidate.id() == id.as_str())
+                })
+                .min();
+            return cycle_root.is_some_and(|id| id == doc.id());
+        }
+        visited.push(parent_id.clone());
+        if let Some(parent) = active_docs
+            .iter()
+            .find(|candidate| candidate.id() == parent_id && is_task_doc(candidate))
+        {
+            saw_active_ancestor = true;
+            current = parent;
+            continue;
+        }
+        if let Some(parent) = completed_logs
+            .iter()
+            .find(|candidate| candidate.id() == parent_id && is_task_doc(candidate))
+        {
+            current = parent;
+            continue;
+        }
+        return !saw_active_ancestor;
+    }
+}
+
+fn task_subtree_matches_filters(
+    parent_id: &str,
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    target_state: &str,
+    filters: &BoardFilters,
+    visited: &mut BTreeSet<String>,
+) -> bool {
+    let active_match = active_docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
+        .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+        .any(|child| {
+            visited.insert(child.id().to_string())
+                && ((document_state_label(child) == target_state
+                    && board_filters_match(child, filters))
+                    || task_subtree_matches_filters(
+                        child.id(),
+                        active_docs,
+                        completed_logs,
+                        target_state,
+                        filters,
+                        visited,
+                    ))
+        });
+    active_match
+        || completed_logs
+            .iter()
+            .filter(|doc| is_task_doc(doc))
+            .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
+            .any(|completed| {
+                visited.insert(completed.id().to_string())
+                    && task_subtree_matches_filters(
+                        completed.id(),
+                        active_docs,
+                        completed_logs,
+                        target_state,
+                        filters,
+                        visited,
+                    )
+            })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EpicBoardEntryRole {
     Epic,
     Child,
@@ -4619,28 +5028,6 @@ fn normalized_parent_id(doc: &Document) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-fn list_item_for_doc(
-    doc: &Document,
-    theme: &TuiTheme,
-    content_width: usize,
-    show_doc_type: bool,
-    relationship_context: &BoardRelationshipContext,
-    preview_line_limit: usize,
-    expanded: bool,
-    selected: bool,
-) -> ListItem<'static> {
-    ListItem::new(board_item_lines_for_doc_with_context_and_limit(
-        doc,
-        theme,
-        content_width,
-        show_doc_type,
-        relationship_context,
-        preview_line_limit,
-        expanded,
-        selected,
-    ))
-}
-
 #[cfg(test)]
 fn board_item_lines_for_doc(
     doc: &Document,
@@ -4683,6 +5070,7 @@ fn board_item_lines_for_doc_with_context(
     )
 }
 
+#[cfg(test)]
 fn board_item_lines_for_doc_with_context_and_limit(
     doc: &Document,
     theme: &TuiTheme,
@@ -4696,8 +5084,33 @@ fn board_item_lines_for_doc_with_context_and_limit(
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in expanded rows and the detail pane. Relationship context is shown
     // as nesting/expanded-row content, not noisy parent-id chips.
+    let chips = board_scan_chips(doc, theme);
+
+    let mut lines = vec![board_row_line(
+        doc,
+        theme,
+        content_width,
+        show_doc_type,
+        chips,
+        doc.id().to_string(),
+        0,
+        selected,
+    )];
+    if expanded {
+        lines.extend(inline_preview_lines_for_doc_with_context(
+            doc,
+            theme,
+            relationship_context,
+            content_width,
+            preview_line_limit,
+        ));
+    }
+    lines
+}
+
+fn board_scan_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, Style)> {
     let priority = doc.field("priority").unwrap_or("-");
-    let mut chips: Vec<(String, Style)> = Vec::new();
+    let mut chips = Vec::new();
     if let Some(priority_chip) = priority_chip(priority, theme) {
         chips.push((priority_chip, theme.priority_chip_style(priority)));
     }
@@ -4741,18 +5154,80 @@ fn board_item_lines_for_doc_with_context_and_limit(
             theme.progress_chip_style(tone),
         ));
     }
+    chips
+}
 
+fn state_list_item_for_entry(
+    entry: &StateBoardEntry<'_>,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+    content_width: usize,
+    show_doc_type: bool,
+    preview_line_limit: usize,
+    preview_expanded: bool,
+    selected: bool,
+) -> ListItem<'static> {
+    ListItem::new(state_lines_for_entry(
+        entry,
+        relationship_context,
+        theme,
+        content_width,
+        show_doc_type,
+        preview_line_limit,
+        preview_expanded,
+        selected,
+    ))
+}
+
+fn state_lines_for_entry(
+    entry: &StateBoardEntry<'_>,
+    relationship_context: &BoardRelationshipContext,
+    theme: &TuiTheme,
+    content_width: usize,
+    show_doc_type: bool,
+    preview_line_limit: usize,
+    preview_expanded: bool,
+    selected: bool,
+) -> Vec<Line<'static>> {
+    let doc = entry.doc;
+    let meta_width = content_width.saturating_div(2).min(32);
+    let right_meta = if entry.active_descendants + entry.completed_descendants > 0 {
+        truncate(
+            &descendant_rollup(entry.active_descendants, entry.completed_descendants),
+            meta_width,
+        )
+    } else {
+        String::new()
+    };
+    let mut chips = vec![(state_hierarchy_prefix(entry), theme.muted_style())];
+    match entry.role {
+        StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, theme)),
+        StateBoardEntryRole::Child => {
+            let state = compact_epic_state(&document_state_label(doc));
+            if entry.cross_state {
+                chips.push((
+                    chip_text(&format!("{state:<4}"), theme),
+                    theme.progress_chip_style(StatusTone::Muted),
+                ));
+            } else {
+                chips.push((
+                    " ".repeat(text_width(&chip_text("TODO", theme))),
+                    theme.muted_style(),
+                ));
+            }
+        }
+    }
     let mut lines = vec![board_row_line(
         doc,
         theme,
         content_width,
-        show_doc_type,
+        show_doc_type && entry.role == StateBoardEntryRole::Root,
         chips,
-        doc.id().to_string(),
+        right_meta,
         0,
         selected,
     )];
-    if expanded {
+    if preview_expanded {
         lines.extend(inline_preview_lines_for_doc_with_context(
             doc,
             theme,
@@ -4762,6 +5237,37 @@ fn board_item_lines_for_doc_with_context_and_limit(
         ));
     }
     lines
+}
+
+fn state_hierarchy_prefix(entry: &StateBoardEntry<'_>) -> String {
+    if entry.depth == 0 {
+        return if entry.has_active_children {
+            if entry.expanded {
+                "▾"
+            } else {
+                "▸"
+            }
+        } else {
+            " "
+        }
+        .to_string();
+    }
+    let branch = if entry.last_sibling { "└" } else { "├" };
+    let disclosure = if entry.has_active_children {
+        if entry.expanded {
+            "▾"
+        } else {
+            "▸"
+        }
+    } else {
+        "─"
+    };
+    format!(
+        "{}{}{}",
+        "│  ".repeat(entry.depth.saturating_sub(1)),
+        branch,
+        disclosure
+    )
 }
 
 fn epic_list_item_for_entry(
@@ -4949,26 +5455,24 @@ fn board_row_line(
         .as_ref()
         .map(|badge| text_width(badge) + 1)
         .unwrap_or(0);
-    let meta_width = text_width(&right_meta);
     let title_separator_width = if chip_width > 0 || doc_type_width > 0 || indent_width > 0 {
         1
     } else {
         0
     };
+    let base_width = indent_width + doc_type_width + chip_width + title_separator_width;
+    let max_meta_width = content_width.saturating_sub(base_width).saturating_sub(1);
+    let right_meta = truncate(&right_meta, max_meta_width);
+    let meta_width = text_width(&right_meta);
     let spacer_min_width = if right_meta.is_empty() { 0 } else { 1 };
-    let fixed_width = indent_width
-        + doc_type_width
-        + chip_width
-        + title_separator_width
-        + spacer_min_width
-        + meta_width;
+    let fixed_width = base_width + spacer_min_width + meta_width;
     let title_width = content_width.saturating_sub(fixed_width);
     let title = truncate(doc.title(), title_width);
     let used_before_meta =
         indent_width + doc_type_width + chip_width + title_separator_width + text_width(&title);
     let spacer_width = content_width
         .saturating_sub(used_before_meta + meta_width)
-        .max(1);
+        .max(spacer_min_width);
 
     let mut spans = Vec::new();
     if indent_width > 0 {
@@ -5360,7 +5864,7 @@ fn inline_preview_lines_for_doc_with_context(
         lines.push(Line::from(""));
     }
     lines.push(Line::from(Span::styled(
-        "   Enter collapse · Tab detail pane · e edit",
+        "   Space close preview · Tab detail pane · e edit",
         theme.muted_style(),
     )));
     lines
@@ -6733,6 +7237,438 @@ mod tests {
     }
 
     #[test]
+    fn state_board_collapses_task_children_and_expands_nested_cross_state_rows() {
+        let parent = doc_with_state("task-103", Some("todo"));
+        let mut legacy_child = doc_with_state("task-9", Some("validation"));
+        legacy_child
+            .fields
+            .insert("title".to_string(), "Legacy child".to_string());
+        legacy_child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let mut grandchild = doc_with_state("task-103-1-1", Some("todo"));
+        grandchild
+            .fields
+            .insert("parentId".to_string(), "task-9".to_string());
+        let mut generic_parent_child = doc_with_state("task-7", Some("todo"));
+        generic_parent_child
+            .fields
+            .insert("parentId".to_string(), "decision-4".to_string());
+        let decision = decision_doc("decision-4");
+        let docs = vec![
+            parent,
+            legacy_child,
+            grandchild,
+            generic_parent_child,
+            decision,
+        ];
+        let mut completed = doc_with_state("task-103-2", Some("validation"));
+        completed.location = DocumentLocation::Logs;
+        completed
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        let logs = vec![completed];
+
+        let collapsed = state_board_entries(
+            &docs,
+            &logs,
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            collapsed
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-103", "task-7"]
+        );
+        assert_eq!(collapsed[0].active_descendants, 2);
+        assert_eq!(collapsed[0].completed_descendants, 1);
+        assert_eq!(collapsed[1].role, StateBoardEntryRole::Root);
+
+        let expanded = state_board_entries(
+            &docs,
+            &logs,
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::from(["task-103".to_string(), "task-9".to_string()]),
+        );
+        assert_eq!(
+            expanded
+                .iter()
+                .map(|entry| (entry.doc.id(), entry.depth))
+                .collect::<Vec<_>>(),
+            vec![
+                ("task-103", 0),
+                ("task-9", 1),
+                ("task-103-1-1", 2),
+                ("task-7", 0),
+            ]
+        );
+        let child = &expanded[1];
+        let context = relationship_context_for_doc(child.doc, &docs, &logs);
+        let rendered = state_lines_for_entry(
+            child,
+            &context,
+            &TuiTheme::default_dark(),
+            42,
+            false,
+            10,
+            false,
+            false,
+        )
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+        assert!(!rendered.contains("SUB"));
+        assert!(rendered.contains("VAL"));
+        assert!(!rendered.contains("task-9"));
+        assert!(!rendered.contains('→'));
+        assert!(rendered.contains("└▾"));
+        assert!(rendered.contains("Legacy child"));
+        assert!(rendered.find("1 active").is_some());
+        assert!(rendered.lines().all(|line| text_width(line) <= 42));
+    }
+
+    #[test]
+    fn state_board_promotes_one_stable_root_for_parent_cycles() {
+        let mut a = doc_with_state("task-1", Some("todo"));
+        a.fields
+            .insert("parentId".to_string(), "task-3".to_string());
+        let mut b = doc_with_state("task-2", Some("todo"));
+        b.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut c = doc_with_state("task-3", Some("todo"));
+        c.fields
+            .insert("parentId".to_string(), "task-2".to_string());
+        let docs = vec![a, b, c];
+
+        let collapsed = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            collapsed
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-1"]
+        );
+        let expanded = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::from([
+                "task-1".to_string(),
+                "task-2".to_string(),
+                "task-3".to_string(),
+            ]),
+        );
+        assert_eq!(
+            expanded
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-1", "task-2", "task-3"]
+        );
+    }
+
+    #[test]
+    fn state_board_keeps_generic_parent_tasks_normal_and_logged_parent_tasks_contextual() {
+        let mut custom_parent = doc_with_state("note-1", Some("todo"));
+        custom_parent
+            .fields
+            .insert("type".to_string(), "note".to_string());
+        let mut generic_child = doc_with_state("task-7", Some("todo"));
+        generic_child
+            .fields
+            .insert("parentId".to_string(), "note-1".to_string());
+        let mut logged_parent = doc_with_state("task-8", Some("validation"));
+        logged_parent.location = DocumentLocation::Logs;
+        let mut active_child = doc_with_state("task-8-1", Some("todo"));
+        active_child
+            .fields
+            .insert("parentId".to_string(), "task-8".to_string());
+        let active_root = doc_with_state("task-10", Some("todo"));
+        let mut logged_middle = doc_with_state("task-10-1", Some("validation"));
+        logged_middle.location = DocumentLocation::Logs;
+        logged_middle
+            .fields
+            .insert("parentId".to_string(), "task-10".to_string());
+        let mut deep_active = doc_with_state("task-10-1-1", Some("validation"));
+        deep_active
+            .fields
+            .insert("parentId".to_string(), "task-10-1".to_string());
+        let docs = vec![
+            custom_parent,
+            generic_child,
+            active_child,
+            active_root,
+            deep_active,
+        ];
+        let logs = vec![logged_parent, logged_middle];
+
+        let entries = state_board_entries(
+            &docs,
+            &logs,
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| (entry.doc.id(), entry.role))
+                .collect::<Vec<_>>(),
+            vec![
+                ("note-1", StateBoardEntryRole::Root),
+                ("task-7", StateBoardEntryRole::Root),
+                ("task-8-1", StateBoardEntryRole::Child),
+                ("task-10", StateBoardEntryRole::Root),
+            ]
+        );
+        assert!(!entries[0].has_active_children);
+        assert_eq!(entries[0].active_descendants, 0);
+        assert!(entries[3].has_active_children);
+        assert_eq!(entries[3].active_descendants, 1);
+        assert_eq!(entries[3].completed_descendants, 1);
+
+        let expanded = state_board_entries(
+            &docs,
+            &logs,
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::from(["task-10".to_string()]),
+        );
+        assert!(expanded
+            .iter()
+            .any(|entry| entry.doc.id() == "task-10-1-1" && entry.depth == 2));
+    }
+
+    #[test]
+    fn default_state_board_render_hides_then_reveals_subtask_rows() {
+        let mut app = keyboard_test_app();
+        app.docs[0]
+            .fields
+            .insert("title".to_string(), "Hierarchy parent".to_string());
+        let mut child = doc_with_state("task-9", Some("validation"));
+        child
+            .fields
+            .insert("title".to_string(), "Hidden legacy child".to_string());
+        child
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        app.docs.push(child);
+
+        let render = |app: &mut TuiApp| {
+            let mut terminal = Terminal::new(TestBackend::new(110, 24)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|cell| cell.symbol())
+                .collect::<String>()
+        };
+        let collapsed = render(&mut app);
+        assert!(collapsed.contains("Hierarchy parent"));
+        assert!(collapsed.contains("1 active"));
+        assert!(!collapsed.contains("Hidden legacy child"));
+
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let expanded = render(&mut app);
+        assert!(expanded.contains("Hidden legacy child"));
+        assert!(!expanded.contains("SUB"));
+        assert!(expanded.contains("VAL"));
+        assert!(!expanded.contains("task-1 → task-9"));
+        assert!(!expanded.contains("task-9"));
+        assert!(expanded.contains("Selected task-1"));
+    }
+
+    #[test]
+    fn state_board_rows_keep_identity_quiet_and_align_cross_state_children() {
+        let theme = TuiTheme::default_dark();
+        let mut parent = doc_with_state("task-20", Some("todo"));
+        parent
+            .fields
+            .insert("title".to_string(), "Quiet parent".to_string());
+        let mut same_state = doc_with_state("task-20-1", Some("todo"));
+        same_state
+            .fields
+            .insert("title".to_string(), "Same state child".to_string());
+        same_state
+            .fields
+            .insert("parentId".to_string(), "task-20".to_string());
+        let mut cross_state = doc_with_state("legacy-7", Some("in-progress"));
+        cross_state
+            .fields
+            .insert("title".to_string(), "Cross state child".to_string());
+        cross_state
+            .fields
+            .insert("parentId".to_string(), "task-20".to_string());
+        let docs = vec![parent, same_state, cross_state];
+        let entries = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::from(["task-20".to_string()]),
+        );
+        let render = |entry: &StateBoardEntry<'_>| {
+            line_text(
+                &state_lines_for_entry(
+                    entry,
+                    &relationship_context_for_doc(entry.doc, &docs, &[]),
+                    &theme,
+                    100,
+                    false,
+                    10,
+                    false,
+                    false,
+                )[0],
+            )
+        };
+        let parent_line = render(&entries[0]);
+        let same_line = render(&entries[1]);
+        let cross_line = render(&entries[2]);
+
+        assert!(!parent_line.contains("task-20"));
+        assert!(parent_line.contains("2 active"));
+        assert!(!same_line.contains("task-20-1"));
+        assert!(!cross_line.contains("legacy-7"));
+        assert!(!same_line.contains("SUB"));
+        assert!(!cross_line.contains("SUB"));
+        assert!(!same_line.contains("TODO"));
+        assert!(cross_line.contains("WIP"));
+        assert_eq!(
+            same_line.find("Same state child"),
+            cross_line.find("Cross state child")
+        );
+        assert!(same_line.contains("├─"));
+        assert!(!same_line.contains('→'));
+        assert!(!cross_line.contains('→'));
+    }
+
+    #[test]
+    fn state_board_filters_reveal_matching_descendant_ancestor_path() {
+        let mut parent = doc_with_state("task-1", Some("todo"));
+        parent
+            .fields
+            .insert("tags".to_string(), "[\"backend\"]".to_string());
+        let mut child = doc_with_state("task-1-1", Some("in-progress"));
+        child
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut grandchild = doc_with_state("task-1-1-1", Some("validation"));
+        grandchild
+            .fields
+            .insert("parentId".to_string(), "task-1-1".to_string());
+        grandchild
+            .fields
+            .insert("tags".to_string(), "[\"ux\"]".to_string());
+        let docs = vec![parent, child, grandchild];
+        let filters = BoardFilters {
+            tag: Some("ux".to_string()),
+            priority: None,
+        };
+
+        let todo_entries = state_board_entries(&docs, &[], "todo", &filters, &BTreeSet::new());
+        assert!(todo_entries.is_empty());
+        let validation_entries =
+            state_board_entries(&docs, &[], "validation", &filters, &BTreeSet::new());
+        assert_eq!(
+            validation_entries
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-1", "task-1-1", "task-1-1-1"]
+        );
+        let tabs = board_subview_tabs(
+            &[
+                "todo".to_string(),
+                "in-progress".to_string(),
+                "validation".to_string(),
+            ],
+            &docs,
+            &filters,
+        );
+        assert_eq!(
+            tabs.iter().map(|tab| tab.count).collect::<Vec<_>>(),
+            vec![0, 0, 1]
+        );
+    }
+
+    #[test]
+    fn state_board_enter_and_mouse_expand_children_while_space_controls_preview() {
+        let mut app = keyboard_test_app();
+        let mut child = doc_with_state("task-9", Some("validation"));
+        child
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        app.docs.push(child);
+
+        assert_eq!(app.selected_state_count(), 1);
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.expanded_board_hierarchy_ids.contains("task-1"));
+        assert_eq!(app.selected_state_count(), 2);
+        app.next_item();
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-9"));
+        app.handle_key(key(KeyCode::Char(' '))).unwrap();
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-9"));
+
+        app.selected_item = 0;
+        app.hits = vec![HitRegion {
+            rect: Rect {
+                x: 2,
+                y: 4,
+                width: 20,
+                height: 1,
+            },
+            action: HitAction::SelectBoardItem(0, 0),
+        }];
+        app.handle_mouse(left_click(3, 4));
+        assert!(!app.expanded_board_hierarchy_ids.contains("task-1"));
+        assert_eq!(app.selected_state_count(), 1);
+    }
+
+    #[test]
+    fn state_board_reload_preserves_expansion_and_selected_child() {
+        let root = unique_test_dir("tandem-state-hierarchy-reload");
+        let workspace = temp_workspace(&root);
+        write_task_doc(&workspace, "task-1", "Parent", "todo");
+        fs::write(
+            workspace.board_dir.join("task-9.md"),
+            "---\nid: task-9\ntype: task\ntitle: Legacy child\nstate: validation\nparentId: task-1\n---\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.expanded_board_hierarchy_ids
+            .insert("task-1".to_string());
+        assert!(app.select_document_by_id("task-9"));
+
+        fs::write(
+            workspace.board_dir.join("task-9.md"),
+            "---\nid: task-9\ntype: task\ntitle: Reloaded child\nstate: validation\nparentId: task-1\n---\n",
+        )
+        .unwrap();
+        app.reload();
+        assert!(app.expanded_board_hierarchy_ids.contains("task-1"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-9"));
+        assert_eq!(
+            app.selected_doc().map(Document::title),
+            Some("Reloaded child")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn epic_board_entries_only_include_epics_and_their_task_children() {
         let mut epic = doc_with_state("task-80", Some("in-progress"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
@@ -7300,7 +8236,7 @@ tone = "success"
         };
 
         let footer = app.board_footer_text();
-        assert!(footer.contains("F clear filter"));
+        assert!(footer.contains("F clear"));
         assert!(!footer.contains("#research"));
         assert!(!footer.contains("priority high"));
 
@@ -7681,6 +8617,7 @@ tone = "success"
             focus: FocusPane::Board,
             show_board_detail: false,
             expanded_board_doc_id: None,
+            expanded_board_hierarchy_ids: BTreeSet::new(),
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
@@ -7742,7 +8679,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 item · Enter detail · a add · t tag · p priority · b Epic Board · ? help"
+            "board · TODO · 1 row · Enter expand · Space preview · a add · t tag · p priority · b Epic Board · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -7750,7 +8687,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "detail · TODO · 1 item · Tab board · j/k scroll · e edit · b Epic Board · ? help"
+            "detail · TODO · 1 row · Tab board · j/k scroll · e edit · b Epic Board · ? help"
         );
 
         app.switch_view(TuiView::Logs);
@@ -7808,6 +8745,34 @@ tone = "success"
 
         assert_eq!(app.handle_mouse(left_click(3, 4)), KeyAction::Continue);
         assert!(app.expanded_board_doc_id.is_none());
+    }
+
+    #[test]
+    fn mouse_row_hits_follow_scrolled_list_viewport_offsets() {
+        let mut app = keyboard_test_app();
+        app.states = vec!["todo".to_string()];
+        app.configured_states = app.states.clone();
+        app.docs = (0..20)
+            .map(|index| doc_with_state(&format!("task-{index}"), Some("todo")))
+            .collect();
+        app.selected_state = 0;
+        app.selected_item = 19;
+
+        let mut terminal = Terminal::new(TestBackend::new(80, 12)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let first_visible_hit = app
+            .hits
+            .iter()
+            .filter_map(|hit| match hit.action {
+                HitAction::SelectBoardItem(0, index) => Some((hit.rect.y, index, hit.rect)),
+                _ => None,
+            })
+            .min_by_key(|(y, _, _)| *y)
+            .expect("scrolled Board should register visible row hits");
+        assert!(first_visible_hit.1 > 0);
+
+        app.handle_mouse(left_click(first_visible_hit.2.x, first_visible_hit.2.y));
+        assert_eq!(app.selected_item, first_visible_hit.1);
     }
 
     #[test]
