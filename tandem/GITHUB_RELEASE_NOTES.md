@@ -1,34 +1,78 @@
-# Tandem v0.4.3
+# Tandem v0.5.0
 
-Tandem v0.4.3 is a maintenance release focused on TUI rendering, documentation clarity, and reliable AUR publishing.
+Tandem v0.5.0 introduces first-class hierarchical subtasks across the protocol, CLI, TUI, public documentation, and repository-local Pi integration.
 
 ## Highlights
 
-- Fixed Epic Board child-row clipping so titles and metadata render correctly within the available width.
-- Simplified the documentation site into a smaller, more useful information architecture.
-- Rewrote the project README to reflect Tandem's current purpose, installation paths, repository layout, and workflow.
-- Stabilized the automated `tandem-bin` AUR publishing workflow.
+- Create full child tasks with `tandem add --parent <task-id>`.
+- Automatically allocate parent-derived IDs such as `task-103-1` and nested `task-103-1-1`.
+- Navigate recursive task hierarchies in Epic Board.
+- Preserve completed-child history without reusing IDs.
+- Expose parent and subtask relationships consistently in human and JSON output.
+
+## Bug fixes
+
+- Fixed `tandem show --json` omitting `parentId`.
+- Fixed new child tasks receiving unrelated flat IDs instead of parent-derived IDs.
+- Prevented concurrent task creation from overwriting occupied destinations.
+- Prevented completed child IDs from being reused.
+- Fixed non-task parents being presented as subtasks instead of generic parent relationships.
+- Fixed reparenting ambiguity by preserving immutable IDs and warning when their designation no longer matches the new parent.
+- Fixed Epic Board filters dropping the ancestor path of matching nested tasks.
+- Fixed active descendants disappearing when an intermediary parent had already moved to Logs.
+- Fixed Review details misclassifying children whose task parent was in Logs.
+- Fixed inconsistent and overly verbose Epic Board child-row alignment.
+
+## Protocol
+
+- Defined a first-class subtask as a normal task whose `parentId` resolves to another task.
+- Child tasks retain their own workflow, owner, accord, validation, blockers, references, and completion history.
+- New children receive parent-derived sequential IDs by default, with arbitrary nested depth.
+- Allocation scans active Board documents and completed Logs.
+- `parentId` remains canonical; ID shape alone does not establish hierarchy.
+- Existing flat-ID children remain valid, and task IDs remain immutable during reparenting.
+- Inline `subtasks` checklist data remains readable but is deprecated for new tracked work.
+- Decision and custom-document parents remain generic relationships rather than subtasks.
+
+## CLI
+
+- Added hierarchical and nested allocation to `tandem add --parent`.
+- Added collision-safe concurrent task creation and completed-log sequence continuity.
+- Added `--parent` filtering to list and search.
+- Added parent relationship information to show, list, and search output.
+- Added `tandem add --json`.
+- Added computed `parentRelationship` values for task and non-task parents.
+- Added immutable-ID warnings when reparenting changes a task's expected designation.
+- Deprecated inline `--subtask` authoring in favor of separate child tasks.
 
 ## TUI
 
-- Reserved space for the Board selection marker when calculating Epic Board row width.
-- Improved row-width accounting for indentation, badges, titles, spacing, and right-aligned metadata.
-- Prevented child titles and metadata from overflowing or clipping in narrower Epic Board layouts.
+- Epic Board now recursively displays active task descendants.
+- Child rows use compact `SUB` and state labels such as `TODO`, `WIP`, and `VAL`.
+- Relationships use a concise `<parent> → <child>` column.
+- Filters retain matching descendants and their ancestor context.
+- Existing flat-ID children remain visible in the hierarchy.
+- Epic rows summarize active and logged descendants without returning completed tasks to active rows.
+- Traversal continues through completed intermediary parents to active descendants.
+- Board and Review details distinguish subtasks from generic parent relationships.
+
+## Pi integration
+
+- Updated repository-local `pi-tandem` for hierarchical child tasks.
+- Pi passes `parent` to Tandem and does not construct IDs itself.
+- Added coverage for nested allocation, completed-log continuity, generic parents, legacy flat children, and allocation collisions.
+- Child tasks can be created through `tandem_task` and delegated using the returned ID.
 
 ## Documentation
 
-- Reduced the docs landing page to a minimal Home.
-- Simplified the sidebar around Home, Quickstart, Overview, Workflows, and Integrations.
-- Removed duplicate page headings already supplied by Starlight.
-- Added the Skills documentation placeholder.
-- Updated release, installer, and AUR maintenance guidance.
-- Replaced the planning-oriented root README with a current project overview.
+- Added guidance for epics, ordinary parent tasks, first-class subtasks, blockers, references, and legacy inline checklists.
+- Added CLI examples for creation, inspection, filtering, and reparenting.
+- Documented the updated Epic Board hierarchy and visual language.
+- Added an event-log storage options research note.
 
-## Packaging
+## Upgrade notes
 
-- Fixed parsing of cargo-dist checksum entries that use binary-file markers.
-- Normalized multiline AUR SSH private-key secrets.
-- Made AUR SSH identity and host-key handling more reliable.
-- Preserved Git metadata ownership while generating and committing package files.
-- Added writable `makepkg` build, source, and package output directories.
-- Improved generation and publication of `PKGBUILD` and `.SRCINFO`.
+- Existing flat-ID children do not require migration.
+- Existing inline `subtasks` data remains readable.
+- New tracked child work should use a separate task with `--parent`.
+- Reparenting does not rename tasks or rewrite references.
