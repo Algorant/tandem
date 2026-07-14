@@ -63,6 +63,8 @@ See the [agent-first quickstart](https://trytandem.dev/quick-start/) to take a s
 
 Human describes task to agent -> agent creates task and accord (contract with deliverables) -> human or agent orchestrator delegates the task to begin being worked on -> agent returns results when done to orchestrator -> work is either auto approved by meeting the requirements or, optionally a human gets final sign off -> task is completed, all work committed and cleaned up.
 
+Large outcomes can use an epic, while any task can have full child tasks linked with `parentId`. Child tasks keep their own owner, accord, validation, and completion history; see [Epics, subtasks, and related work](https://trytandem.dev/concepts/#epics-subtasks-and-related-work).
+
 ## TUI
 
 [placeholder tui image/gif]

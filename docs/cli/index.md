@@ -39,6 +39,34 @@ tandem update task-1 --priority medium --tag docs --related-file docs/index.md
 
 The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` state.
 
+### Create and inspect subtasks
+
+Create a child with the normal `add` command and the parent's returned ID:
+
+```sh
+tandem add --title "Coordinate the release" --kind epic
+# If Tandem returns task-103:
+tandem add --title "Write release notes" --parent task-103
+# Tandem returns the next child ID, such as task-103-1.
+tandem add --title "Check upgrade notes" --parent task-103-1
+```
+
+The CLI—not an integration adapter—validates the parent and allocates the next available ID across the Board and Logs. Nested children extend the parent's ID, such as `task-103-1-1`. Always use the ID returned by Tandem rather than assuming a suffix.
+
+```sh
+tandem show task-103
+tandem list --parent task-103
+tandem search "release" --parent task-103
+```
+
+To attach or reparent an active task, update its parent:
+
+```sh
+tandem update task-137 --parent task-103
+```
+
+The task keeps its original ID. Existing flat-ID children remain valid because `parentId`, not the ID shape, defines the relationship. The older `--subtask` inline-checklist option is deprecated; use a separate task with `--parent` for new tracked work.
+
 ## Accords and validation
 
 ```sh

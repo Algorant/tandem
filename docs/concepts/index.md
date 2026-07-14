@@ -38,18 +38,26 @@ Accord actions can synchronize Board state. Claiming a `todo` task moves it to `
 
 This keeps agent workflows honest: a child worker can deliver evidence, while a human or parent orchestrator decides whether to accept, request rework, block, fail, or complete the task.
 
-## Epics and task relationships
+## Epics, subtasks, and related work
 
-An epic is a normal task with `kind: epic`, not a separate document type. Use epics to group related work while keeping child tasks independently claimable and reviewable.
+A first-class subtask is a full task document whose `parentId` points to another task. It has its own state, owner, accord, validation, blockers, and completion history. The parent can be an epic or an ordinary task. If `parentId` instead resolves to a decision or custom document, it is a valid generic parent relationship—not a subtask.
 
-Relationship fields have different meanings:
+New children normally receive a parent-derived ID. For example, a child of `task-103` becomes `task-103-1`, and its child becomes `task-103-1-1`. Tandem allocates the next suffix across both the active Board and completed Logs, so completing a child does not make its ID available again.
 
-- `parentId` — strict hierarchy, usually epic to child task.
-- `blockers` — hard dependencies that must resolve before work can proceed.
-- `references` — loose related context such as decisions, sibling tasks, or completed logs.
-- `subtasks` — lightweight checklist items inside one task.
+`parentId` defines the hierarchy; the ID shape does not. Older children with flat IDs such as `task-137` remain valid. IDs are immutable, so reparenting changes `parentId` without renaming the task or rewriting links to it.
 
-Create a child task when work needs its own owner, accord, validation, or blockers. Use subtasks when a checklist inside one task is enough.
+Choose each relationship for its meaning:
+
+| Use | When |
+| --- | --- |
+| Epic (`kind: epic`) | A broad outcome groups several independently managed tasks. An epic is still a normal task. |
+| Ordinary parent task | One task naturally breaks into tracked child work but does not need to be called an epic. |
+| First-class child task | Work needs its own owner, state, accord, validation, blockers, or completion record. |
+| `blockers` | Another document must be resolved before this task can proceed. |
+| `references` | A decision, sibling task, log, or other document is useful context but not a dependency or parent. |
+| Inline `subtasks` checklist | Preserve an older checklist already in a task. Inline items are legacy data and should not be created for new tracked work. |
+
+Completed children move to Logs like any other task. They still count toward their parent's history and ID allocation, while active children remain on the Board.
 
 ## Rules
 

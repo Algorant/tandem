@@ -19,6 +19,12 @@ Use `1` through `4` to switch top-level views, `j`/`k` or arrow keys to move sel
 
 Board supports quick task creation, state movement, reloads, mouse selection/scrolling, inline preview expansion by clicking the selected row, and opening active task Markdown in `$EDITOR`. The Decisions view lists active decision records, displays metadata/body/path, and supports a basic title/body add prompt with `a`; include ADR sections such as Status, Context, Decision, Consequences, and Supersession in the body when recording architecture decisions. Mouse hit regions are intentionally bounded: top tabs switch views, Board state tabs switch states, Board/Logs/Decisions rows select items, visible footer actions reuse the matching keyboard behavior where safe, wheel events scroll the pane under the pointer, and non-action regions no-op. Drag/drop is out of v0.
 
+## Epic Board
+
+Press `b` from the Board to switch between State Board and Epic Board. Epic Board groups each active epic with its active task descendants, indents nested children, and keeps the ancestor path visible when filters match a deeper child. Child rows use compact `SUB` plus concise state labels such as `TODO`, `WIP`, and `VAL`, with stable `<parentId> → <childId>` context on the right. Children with older flat IDs appear in the same hierarchy because `parentId`, not the ID shape, defines nesting.
+
+Completed children stay in Logs rather than returning as active rows. Epic rows show concise active/logged rollups such as `2 active · 3 logged`, while expanded details explicitly say completed children are in Logs. If a completed task has an active child, Epic Board still follows that link so the active descendant appears at the correct depth with its immediate parent context.
+
 ## Themes
 
 The TUI includes built-in themes and can load user TOML themes from `~/.config/tandem/themes/` or `$XDG_CONFIG_HOME/tandem/themes/`. Set your normal theme in `~/.config/tandem/config.toml` or `$XDG_CONFIG_HOME/tandem/config.toml`:
