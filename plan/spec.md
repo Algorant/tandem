@@ -67,7 +67,7 @@ Keep protocol and CLI/TUI work together while the idea is still forming. Split l
 Current areas:
 
 - `protocol/` — the protocol/spec source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile.
-- `tandem/` — CLI + TUI design and implementation. The user-facing CLI is `tandem`; the current v0 CLI surface is implemented as a single Rust binary crate, and forward implementation focus is the interactive Rust + Ratatui/crossterm TUI.
+- `tandem/` — CLI + TUI design and implementation. The user-facing CLI is `tandem`; the prior v0 surface is implemented as a single Rust binary crate, but the accepted strict Epic → Task → Subtask correction remains active implementation work across CLI and TUI.
 - `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tandem` CLI.
 - `plan/` — parent project coordination and cross-cutting decisions.
 
@@ -79,18 +79,20 @@ Protocol:
 
 - Protocol version for the first v0 draft is `0.1.0`.
 - Canonical workflow field is `state`; default states are `todo`, `in-progress`, `review`.
-- New work items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
+- New work items use `type: task`; Epics and Tasks—including direct Epic Tasks—use the global `task-N` namespace. Only a Subtask directly beneath a Task uses `task-N-M`.
 - First-class document types are `task` and `decision`; decision documents are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only in v0.
-- A first-class subtask is a normal `type: task` document linked to another task with `parentId`, retaining ordinary task workflow, ownership, accord, review, and completion behavior without a new type or relationship field.
-- `parentId` remains the canonical hierarchy; ID shape alone never establishes parentage. Existing flat-ID children remain valid without migration.
-- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
-- Inline `subtasks:` checklist items are legacy and deprecated for new work; existing entries remain readable and preservable, while new trackable work should use child task documents.
-- Epics are convention-only task documents using `type: task` plus `kind: epic` for broad outcome grouping; they use the same general `parentId` hierarchy, ordinary tasks may also parent children, loose context uses `references`, and v0 has no separate epic type or lifecycle.
+- Epic, Task, and Subtask are derived roles over `type: task` documents. An Epic has `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Resolve documents to classify these roles—never infer them from ID shape.
+- Direct Epic children are Tasks with relationship `epic-task`; children of Tasks are Subtasks with relationship `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.
+- The hierarchy and ID grammar are strict: Epics cannot have `parentId`; Subtasks cannot have children; Epics/Tasks require global `task-N`; Subtasks require parent-derived `task-N-M`. Invalid role/ID forms and role-changing or ID-invalidating reparenting are errors.
+- `parentId` remains canonical for hierarchy, while each resolved role determines the only valid ID form. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid; decision-7 fully supersedes decision-4 with no compatibility exception.
+- Allocation scans active board documents and completed logs without reuse: Epics/Tasks take the next global `task-N`, while Subtasks take the next suffix beneath their Task.
+- Inline `subtasks:` checklist items are legacy and deprecated for new work; existing entries remain readable and preservable, while lifecycle-bearing checklist work uses first-class Subtask documents.
+- Epics remain convention-only `type: task` plus `kind: epic` documents with normal lifecycle and no separate type or ID namespace. Epics are not delegated; Tasks are delegated, and Worker A executes their Subtask documents as a `pi-todos` checklist without independent Subtask delegation or nested workers.
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References may point to any Tandem document by ID.
 - Completion warns but does not block on review/accord acceptance in v0.
 - Archived markdown docs in `.tandem/logs/` are the completed-log source of truth; per-actor `.tandem/events/<actor_id>.jsonl` logs record minimal audit-only lifecycle events, with legacy `.tandem/events.jsonl` read during transition.
-- Validation is built-in structural validation only for v0, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
+- Validation is built-in structural validation only for v0, with strict structure/core refs and role/ID checks: unresolved `parentId`/`blockers`, a parented Epic, a child beneath a Subtask, a role/ID mismatch, or role-changing reparenting are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.
 
 CLI/TUI:
@@ -123,7 +125,7 @@ Extensions:
 3. Stabilize protocol vocabulary and lifecycle.
 4. Draft the detailed `tandem` command reference from the locked CLI surface.
 5. Keep the existing `tandem/` Rust package layout stable unless implementation pressure proves a change is needed.
-6. Treat the existing CLI v0 surface as complete for the current known scope; future CLI work should be explicit new features or bug fixes.
+6. Complete the accepted strict Epic → Task → Subtask correction across protocol, CLI, TUI, and integrations before describing the CLI/TUI surface as complete.
 7. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
 8. Add TUI accord/review/completion flows.
 9. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.

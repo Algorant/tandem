@@ -26,18 +26,19 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - No Brainfile importer or migration command is required in v0.
 - Canonical workflow field names are `state` on documents and `states` in workspace config.
 - Default active states are `todo`, `in-progress`, and `validation`; existing `state: review` documents are tolerated as a legacy alias during the transition.
-- New task items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
+- New task items use `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 - First-class document types are `task` and `decision`.
 - Custom document types are allowed in config only; v0 has no type-management CLI.
-- A first-class subtask is a normal `type: task` document whose `parentId` points to another task. It keeps its own workflow, accord, review, ownership, and completion behavior; no subtask document type or separate relationship field is needed.
-- `parentId`, not ID shape, defines hierarchy. Existing flat-ID children remain valid without migration.
-- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
-- Inline `subtasks:` checklist objects are legacy and deprecated for new work. Tools must continue to read, validate, preserve, and operate on existing entries, but new independently trackable work should be a child task document.
-- Epics are a convention on task documents: use `type: task` plus `kind: epic` for broad outcome grouping, link children through the same general `parentId` hierarchy, and use `references` for loose related documents. A parent need not be an epic, and no separate epic document type, command family, or lifecycle is part of v0.
+- Epic, Task, and Subtask are derived roles over `type: task` documents; there is no separate task subtype or persisted role field. An Epic has `kind: epic`. A Task is normal and either root-level, parented by a non-task document, or directly parented by an Epic. A Subtask is normal and directly parented by a Task.
+- Resolve the referenced documents to classify hierarchy. Direct Epic children use relationship `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Never derive any role or relationship from ID shape.
+- The hierarchy and ID grammar are strict: Epics cannot have `parentId`; Subtasks cannot have children; Epics/Tasks require global `task-N`; Subtasks require `task-N-M`. Add/update/reparent operations reject invalid roles, IDs, and role-changing or ID-invalidating reparenting. Generic-parent Tasks may have Subtasks.
+- `parentId` is canonical for hierarchy, while resolved roles constrain ID shape. Direct Epic Tasks with hierarchical IDs, Subtasks with global IDs, nested Epics, and children beneath Subtasks are structurally invalid. Decision-7 fully supersedes decision-4 with no compatibility exception.
+- Allocation scans active board documents and completed logs without reuse. Epics/Tasks allocate the next global `task-N`; Subtasks allocate the next `task-N-M` suffix beneath their Task. IDs are immutable and tools never silently rename IDs or rewrite references.
+- Inline `subtasks:` checklist objects are legacy and deprecated for new work. Tools must continue to read, validate, preserve, and operate on existing entries, but new lifecycle-bearing checklist work uses first-class Subtask documents.
 - The work-agreement object is `accord`.
 - Accord statuses are `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`.
 - Rules are structured objects with stable IDs: `{ id, rule, source? }`.
-- `parentId`, `blockers`, and `references` may point to any Tandem document by ID. A task is a first-class subtask specifically when its `parentId` target is another task.
+- `parentId`, `blockers`, and `references` may point to any Tandem document by ID. A task-to-task `parentId` is `epic-task` when the resolved parent is an Epic and `subtask` only when the resolved parent has the Task role; a non-task target is generic `parent`.
 - Completion warns about missing accepted review or accepted accord, but allows completion in v0.
 - Protocol version for the first v0 draft is `0.1.0`.
 - Events live in per-actor append logs under `.tandem/events/<actor_id>.jsonl`; legacy `.tandem/events.jsonl` remains a readable transition source, but new writes should not append to it by default.
@@ -45,7 +46,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Completed logs are archived Markdown documents in `.tandem/logs/`; those documents are the source of truth for completed history. Events enrich timeline and audit views.
 - Validation/lint is built-in structural validation only in v0.
 - Schemas and fixtures are not part of v0.
-- Validation severity is strict for structure and core references: invalid/missing required structure and unresolved `parentId`/`blockers` are errors; unresolved related `references`/rule sources and completion-policy issues are warnings.
+- Validation severity is strict for structure, roles, IDs, and core references: invalid/missing required structure, unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, and role-changing or ID-invalidating reparenting are errors; unresolved related `references`/rule sources and completion-policy issues are warnings.
 - Decision documents do not need a workflow lifecycle `state` field in v0. They may carry an ADR-style `status` such as `proposed` or `accepted`; this status is decision metadata, not task workflow state.
 
 ## Naming model
@@ -173,38 +174,41 @@ A completed task should expose:
 - related events
 - original Markdown body
 
-### 5. Task IDs use flat root and parent-derived child sequences
+### 5. Task IDs encode the resolved role boundary
 
-New root tasks default to flat sequential IDs:
-
-```yaml
-id: task-1
-type: task
-```
-
-A new first-class child task defaults to a parent-derived hierarchical ID:
+Every Epic and Task uses a global flat ID:
 
 ```yaml
-id: task-103-1
+id: task-134
 type: task
-parentId: task-103
+kind: epic
 ```
 
-Further nesting extends the sequence:
+A direct Task of that Epic keeps the global namespace and adds canonical hierarchy through `parentId`:
 
 ```yaml
-id: task-103-1-1
+id: task-139
 type: task
-parentId: task-103-1
+parentId: task-134
 ```
 
-`parentId` is always the canonical relationship; tools must not infer or require hierarchy from an ID alone. Existing children with flat IDs remain valid without migration. To allocate a new child, scan task IDs in both the active board and completed logs and choose the next parent-derived sequence without reusing an earlier ID. IDs are immutable after creation: normal reparenting updates `parentId` but must not silently rename the task ID or rewrite references.
+Only a Subtask directly beneath a Task uses a parent-derived ID:
+
+```yaml
+id: task-139-1
+type: task
+parentId: task-139
+```
+
+Tools first resolve `parentId`, document type, and `kind` to derive Epic, Task, Subtask, `epic-task`, `subtask`, or generic `parent`, then enforce the corresponding ID grammar. ID shape never establishes role by itself, but a resolved role with the wrong shape is invalid. Epics and Tasks—including standalone, generic-parent, and direct Epic Tasks—must be global `task-N`; Subtasks must be `task-N-M` whose `task-N` prefix exactly matches their resolved Task parent. Direct Epic Tasks such as `task-134-1`, global-ID Subtasks, deeper IDs, and other role/ID mismatches are errors with no legacy compatibility path.
+
+Allocate global Epic/Task IDs by scanning all task IDs in the active board and completed logs for the next unused `task-N`. Allocate a Subtask suffix by scanning board and logs for the next unused `task-N-M` beneath that exact Task; completed IDs are never reused. IDs are immutable after creation. Reparenting is allowed only when the document retains its role and its existing ID remains valid for the new resolved relationship; tools must reject role-changing or ID-invalidating reparenting rather than rename the ID or rewrite references.
 
 Suggested filenames:
 
 ```text
-task-1-implement-theme-system.md
-task-103-1-add-child-validation.md
+task-139-rewrite-concepts.md
+task-139-1-validate-links.md
 ```
 
 The ID is canonical. A readable filename suffix may change without changing the document identity.
@@ -225,7 +229,7 @@ subtasks:
     completed: false
 ```
 
-These entries are not task documents and do not gain workflow, ownership, accord, review, blocker, or completion semantics. The field is deprecated for new work; tools must read and preserve existing entries, while new work should use normal child task documents linked with `parentId`.
+These entries are not task documents and do not gain workflow, ownership, accord, review, blocker, or completion semantics. The field is deprecated for new work; tools must read and preserve existing entries, while canonical Task-owned checklist work uses first-class `task-N-M` Subtask documents linked with `parentId`.
 
 Custom document types may define their own `idPrefix` in workspace config, but v0 does not include type-management commands.
 
@@ -273,7 +277,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
-| `id` | yes | error | Immutable canonical ID. Root tasks default to flat IDs such as `task-1`; new children default to parent-derived IDs such as `task-103-1`, with nested forms such as `task-103-1-1`. IDs must be unique across board and logs; ID shape does not establish hierarchy, and existing flat-ID children remain valid. |
+| `id` | yes | error | Immutable canonical ID. Every resolved Epic/Task requires global `task-N`; only a Subtask requires `task-N-M` matching its resolved Task parent. IDs are unique across board/logs; role comes from resolved documents, then ID shape is validated strictly with no compatibility exception. |
 | `type` | yes | error | Must be `task` for v0 task documents. |
 | `kind` | no | error if unsupported | Optional task sub-kind/convention classifier. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks without changing task identity, ID allocation, workflow, accord, review, or completion behavior. |
 | `title` | yes | error | Display title. |
@@ -282,7 +286,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | `effort` | no | warning if unrecognized | Suggested values: `trivial`, `small`, `medium`, `large`, `xlarge`; projects may extend. |
 | `tags` | no | error if malformed | Array of strings. |
 | `assignee` | no | none | Human or agent responsible. |
-| `parentId` | no | error if unresolved | Core reference to any Tandem document ID. When a task points to another task, this field makes it a first-class child/subtask; no other relationship field or task type is required. |
+| `parentId` | no | error if unresolved, role-invalid, or ID-invalid | Core reference to any Tandem document ID. Resolved Epic parents produce global-ID Tasks with `epic-task`, resolved Task parents produce matching `task-N-M` Subtasks with `subtask`, and non-task parents produce global-ID Tasks with generic `parent`. Epics cannot set it, and Subtasks cannot be parents. |
 | `blockers` | no | error if unresolved | Core references to Tandem document IDs blocking this task. |
 | `references` | no | warning if unresolved | Related Tandem document IDs. |
 | `relatedFiles` | no | warning if path malformed | Project paths relevant to the task; paths do not have to exist. |
@@ -294,7 +298,7 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | `completedAt` | logs only | error in logs if missing | Timestamp for completion/archive. Active tasks should not normally carry it. |
 | `completion` | logs only | error in logs if missing | Completion metadata; see below. |
 
-`kind` does not change task identity: epic tasks still use `type: task`, the normal task ID namespace and shapes, normal board states, and normal completion/archive behavior. Child work links to an epic through `parentId`; looser association remains `references`.
+`kind` does not change task identity: Epic documents still use `type: task`, the normal task ID namespace and shapes, normal board states, and normal completion/archive behavior. `kind: epic` does change the derived hierarchy role: the Epic must be root-level, and its direct children are Tasks with `epic-task` relationships. Looser association remains `references`.
 
 ### Decision document fields
 
@@ -507,7 +511,7 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 
 | Field | Required | Purpose |
 | --- | --- | --- |
-| `id` | yes | Immutable canonical identifier. Root tasks default to flat IDs such as `task-1`; new children default to parent-derived IDs such as `task-103-1`. The ID does not define parentage. |
+| `id` | yes | Immutable canonical identifier. Epics/Tasks require global `task-N`; Subtasks require `task-N-M` matching their resolved Task parent. The ID does not define parentage, but the resolved role strictly constrains its valid shape. |
 | `type` | no | Defaults to `task` for new task documents. |
 | `kind` | no | Optional task sub-kind/convention classifier. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task` and normal task semantics. |
 | `title` | yes | Display title. |
@@ -516,7 +520,7 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | `effort` | no | `trivial`, `small`, `medium`, `large`, `xlarge`, or project-defined. |
 | `tags` | no | Filtering/grouping. |
 | `assignee` | no | Human or agent currently responsible. |
-| `parentId` | no | Parent Tandem document ID. A task pointing to another task is a first-class child/subtask; the field may otherwise point to any document type. |
+| `parentId` | no | Canonical parent document ID. A resolved Epic target yields a global-ID Task with `epic-task`, a resolved Task target yields a matching `task-N-M` Subtask with `subtask`, and a non-task target yields a global-ID Task with generic `parent`. Epics cannot have this field, and a Subtask cannot be targeted as a parent. |
 | `references` | no | Related Tandem document IDs. May point to any document type. |
 | `relatedFiles` | no | Project paths relevant to the task. |
 | `blockers` | no | Tandem document IDs blocking this item. May point to any document type. |
@@ -527,11 +531,17 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | `updatedAt` | no | Last mutation timestamp. |
 | `completedAt` | logs only | Completion timestamp. |
 
-## Parent/child task and subtask convention
+## Epic, Task, Subtask, and generic-parent convention
 
-A first-class subtask is an ordinary task document linked to another task with `parentId`. It has the same schema and lifecycle as every other task, including its own `state`, assignee, blockers, accord, review, and completion record. Tandem does not need a `subtask` document type, a `subtaskOf` field, or another relationship mechanism.
+Tandem retains one task schema and lifecycle, then derives hierarchy roles from resolved documents:
 
-Example parent task:
+- **Epic**: `type: task` plus `kind: epic`; it is root-only and cannot have `parentId`.
+- **Task**: a normal global-ID `task-N` document with no parent, a resolved non-task parent, or a resolved Epic parent. A direct Epic child has relationship `epic-task`; a non-task link has generic relationship `parent`.
+- **Subtask**: a normal `task-N-M` document whose resolved parent is exactly `task-N` with the Task role. It has relationship `subtask`, keeps its own state, assignee, blockers, accord, review, and completion record, and cannot have children.
+
+A generic-parent Task may have Subtasks. Tandem does not persist a role field or add `subtask`/`epic` document types; classifiers resolve `parentId`, document type, and `kind`, then validate the role-specific ID shape. Decision-7 supersedes decision-4 completely: wrong role/ID combinations are errors, not legacy forms.
+
+Example standalone Task and Subtask:
 
 ```markdown
 ---
@@ -541,8 +551,6 @@ title: Improve relationship modeling
 state: in-progress
 ---
 ```
-
-Example newly allocated first-class child task:
 
 ```markdown
 ---
@@ -554,13 +562,17 @@ parentId: task-100
 ---
 ```
 
-`parentId: task-100` alone establishes the relationship; tools must not infer parentage from the ID. A newly allocated child defaults to the parent-derived sequence, while an existing child with a flat ID such as `task-137` remains valid without migration. Nested children extend the ID, for example `task-100-1-1` with `parentId: task-100-1`. Child allocation scans task IDs in the active board and completed logs so an earlier sequence is never reused. IDs are immutable after creation, so normal reparenting changes `parentId` without silently renaming the ID or rewriting references. An ordinary task may parent children without `kind: epic`.
+`parentId: task-100` is canonical, and the Subtask's required ID is `task-100-M`. Allocation scans task IDs in the active board and completed logs so an earlier suffix is never reused. A global-ID child of `task-100` is invalid rather than a legacy Subtask.
 
-Inline `subtasks:` objects remain a legacy checklist representation, not first-class task documents. Compliant tools should continue to read, validate, preserve, and toggle existing entries without silently converting them. New work that needs tracking should be authored as a child task document; migration of an old inline item should be explicit so identity and history are not fabricated.
+Validation computes prospective roles and ID validity before mutations. It rejects an Epic with any parent, a child attached beneath a Subtask, a direct Epic Task without a global `task-N` ID, a Subtask whose `task-N-M` prefix does not match its Task parent, and any other role/ID mismatch. Reparenting is rejected if it changes Epic/Task/Subtask role or makes the immutable ID invalid; tools never silently rename IDs or rewrite references.
+
+Delegation follows the accepted Task-tree worker model. Epics are not delegation roots. A global-ID Task is delegated to Worker A, who executes that Task's direct Subtask documents as one bounded checklist projected into `pi-todos`; Subtasks are not independently delegated, Worker A does not spawn Worker B, and parent review/settlement remains at the delegated Task boundary.
+
+Inline `subtasks:` objects remain a legacy checklist representation, not task documents and not the canonical Worker A checklist. Compliant tools continue to read, validate, preserve, and toggle existing entries without silently converting them. New lifecycle-bearing decomposition uses first-class Subtask documents.
 
 ## Epic convention
 
-Epics are normal tasks with `kind: epic`: they remain board-visible, use normal workflow states, allocate normal task IDs, and complete/archive into logs like any other task. Use an epic when a task mainly groups a larger outcome or milestone. `kind: epic` describes the parent's planning role; it does not create the parent/child relationship, and general task hierarchies do not require an epic.
+Epics are root-only normal tasks with `kind: epic`: they remain board-visible, use normal workflow states, allocate global `task-N` IDs, and complete/archive into logs like any other task. Use an Epic to group a larger outcome into independently managed global-ID Tasks. `kind: epic` establishes the derived Epic role but `parentId` remains the canonical link from each direct Task.
 
 Example epic task:
 
@@ -580,14 +592,14 @@ relatedFiles:
 
 ## Outcome
 
-Coordinate the docs information architecture refresh across smaller child tasks.
+Coordinate the docs information architecture refresh across independently managed Tasks.
 ```
 
-Example child task:
+Example direct Task of the Epic (`epic-task`):
 
 ```markdown
 ---
-id: task-10-1
+id: task-27
 type: task
 title: Rewrite Concepts page
 state: todo
@@ -606,11 +618,13 @@ Update the public concepts page as one deliverable under the docs IA epic.
 
 Guidance:
 
-- Keep epic IDs in the normal task namespace (a root epic normally uses flat `task-N`; an epic created as a child uses its parent-derived task sequence), not a separate `epic-N` namespace.
-- Use `parentId` for the strict parent/child hierarchy. The target may be an active board document or a completed log document, and unresolved `parentId` remains a validation error.
-- Use `references` for loose related context such as decisions, sibling tasks, or completed logs. References are intentionally not hierarchy and unresolved references remain warnings.
-- Use normal child task documents when work needs its own owner, accord, review, blockers, validation, or completion history. Existing inline `subtasks` remain legacy checklist data and are deprecated for new work.
-- Complete/archive an epic with the normal task completion flow only when its children are completed, intentionally canceled/superseded, or the human/project owner decides the epic is done. Completion moves the epic task to `.tandem/logs/`; it does not create a persistent `done` state or special epic archive.
+- Keep every Epic and Task in the global `task-N` namespace. An Epic must be root-level; its direct Tasks retain global IDs and link through `parentId`. Hierarchical IDs directly beneath Epics are invalid.
+- Use `parentId` for strict hierarchy. Direct Epic children are Tasks (`epic-task`), never Subtasks. Only children directly beneath Tasks are `task-N-M` Subtasks, and Subtasks are leaves.
+- Use `references` for loose related context such as decisions, sibling Tasks, or completed logs. References are intentionally not hierarchy and unresolved references remain warnings.
+- Reject children beneath Subtasks and reparenting that would make a Task with children into a Subtask. Generic-parent Tasks may have Subtasks.
+- Reject invalid deeper structures, nested/parented Epics, global-ID Subtasks, hierarchical-ID Epic Tasks, and role-changing or ID-invalidating reparenting; there is no compatibility migration exception.
+- Existing inline `subtasks` remain legacy data and are deprecated. Canonical Worker A checklists project first-class Subtask documents into `pi-todos`; they are not inline strings.
+- Complete/archive an Epic with the normal task completion flow only when its Tasks are completed, intentionally canceled/superseded, or the human/project owner decides the Epic is done. Completion moves the Epic task to `.tandem/logs/`; it does not create a persistent `done` state or special Epic archive.
 - Do not model epics as `type: decision`, ADRs, custom protocol folders, or separate lifecycle states. Decisions remain for durable choices; epics remain task coordination records.
 
 ## Decision document
@@ -968,7 +982,7 @@ Errors fail validation and should block normal mutations.
 | `E010` | document frontmatter unreadable | A Markdown file in `board/` or `logs/` has invalid frontmatter. |
 | `E011` | document required field missing | A task is missing `id`, `type`, `title`, or active `state`. |
 | `E012` | duplicate document ID | The same ID appears in more than one board/log document. |
-| `E013` | invalid document ID shape | A v0 task ID is not `task-` followed by one or more positive-integer segments, or a decision ID is not `decision-N`. |
+| `E013` | invalid document ID shape or role | An Epic/Task is not global `task-N`, a Subtask is not `task-N-M` matching its resolved Task parent, a deeper task ID is used, or a decision ID is not `decision-N`. |
 | `E020` | unknown document type | `type` is neither `task`, `decision`, nor a configured custom type. |
 | `E021` | unknown active state | A task has `state: blocked` but `blocked` is not in workspace `states`. |
 | `E030` | invalid accord object | `accord.status` is missing or not one of the canonical v0 values. |
@@ -977,6 +991,9 @@ Errors fail validation and should block normal mutations.
 | `E050` | invalid legacy inline subtask object | A retained inline checklist entry lacks `id`, `title`, or `completed`, or its ID does not match the parent-based sequential pattern. |
 | `E060` | unresolved core parent | `parentId` points to no Tandem document. |
 | `E061` | unresolved core blocker | A `blockers` entry points to no Tandem document. |
+| `E062` | parented Epic | A `kind: epic` task has `parentId`; Epics are root-only. |
+| `E063` | child beneath Subtask | A task targets a resolved Subtask. |
+| `E064` | invalid role transition | Reparenting changes Epic/Task/Subtask role or leaves the immutable ID invalid for the prospective relationship. |
 | `E070` | invalid completed log | A log task lacks `completedAt` or `completion.summary`. |
 
 ### Warning categories
@@ -998,6 +1015,9 @@ Warnings should be shown, but tools may proceed.
 Reference checks should build an ID index from both `.tandem/board/` and `.tandem/logs/`.
 
 - `parentId` and `blockers` are core references. Missing targets are errors.
+- Resolve `parentId` targets across board and logs before deriving roles. Epic parents yield `epic-task`, Task parents yield `subtask`, and non-task parents yield generic `parent`; role is not inferred from ID shape.
+- Validate the derived role against ID grammar: Epics/Tasks require global `task-N`; Subtasks require `task-N-M` whose prefix matches the resolved Task parent. Wrong forms are errors with no compatibility exception.
+- An Epic with `parentId` and a child beneath a Subtask are errors. Mutation validation uses the prospective graph and rejects role-changing or ID-invalidating reparenting.
 - `references` and rule `source` are related references. Missing targets are warnings.
 - References may point to any Tandem document type, including completed log documents.
 
@@ -1023,14 +1043,14 @@ Event records use the v0 audit envelope: `ts`, `event`, `id`, `summary`, `actor`
 
 | Aspect | Semantics |
 | --- | --- |
-| Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, accord, and review. New inline checklist `subtasks:` are not accepted; independently trackable work uses child task documents. |
+| Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, accord, and review. New inline checklist `subtasks:` are not accepted; Task-owned checklist work uses first-class Subtask documents. |
 | Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and reference validation. |
-| Files written | New `.tandem/board/<task-id>*.md`; the allocated ID may be flat or contain any depth of parent-derived positive-integer segments. Append the current actor event log under `.tandem/events/<actor_id>.jsonl`. ID shape alone does not establish hierarchy. |
-| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, new inline `subtasks:` are requested, or nested accord/review data is malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
+| Files written | New `.tandem/board/<task-id>*.md`; Epics/Tasks receive global `task-N`, while only a Subtask beneath a Task receives `task-N-M`. Append the current actor event log under `.tandem/events/<actor_id>.jsonl`. Resolved role determines the valid ID grammar. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, an Epic would have a parent, a child would be attached beneath a Subtask, role and ID shape disagree, new inline `subtasks:` are requested, or nested accord/review data is malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
 | Event | `task.created`. |
-| Resulting state | New task document in `.tandem/board/` with a flat root or parent-derived child `id`, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, optional `parentId`, `createdAt`, and `updatedAt`. |
+| Resulting state | New task document in `.tandem/board/` with a role-valid global or Subtask ID, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, optional `parentId`, `createdAt`, and `updatedAt`. |
 
-Default root-task ID allocation chooses the next flat `task-N` value after scanning existing task IDs in both board and logs. When `parentId` identifies a task, default child allocation chooses the next parent-derived positive-integer suffix after scanning active board and completed-log task IDs, including nested forms such as `task-103-1-1`; completed IDs are never reused. `parentId` remains the canonical relationship, existing flat-ID children remain valid, and IDs remain immutable during normal reparenting. Human-readable filename suffixes are optional and non-canonical.
+Epic and Task allocation chooses the next global `task-N` after scanning task IDs in both board and logs. This includes root Tasks, generic-parent Tasks, and direct Tasks of an Epic. Subtask allocation chooses the next `task-N-M` suffix beneath the resolved Task after scanning board/log IDs; completed suffixes are never reused. A Subtask prefix must exactly match its Task parent. Decision-7 provides no compatibility for global-ID Subtasks, hierarchical direct Epic Tasks, deeper IDs, or other role/ID mismatches. IDs remain immutable, and mutations reject role-changing or ID-invalidating reparenting. Human-readable filename suffixes are optional and non-canonical.
 
 ### Add decision
 
@@ -1155,7 +1175,7 @@ tandem decision list|show|add
 tandem tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks, including `parentId` changes through `--parent`; it does not update completed logs or workflow `state`. Normal reparenting preserves the task's immutable ID and does not silently rewrite references.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks, including `parentId` changes through `--parent`; it does not update completed logs or workflow `state`. Before writing, update resolves the prospective hierarchy and rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and any reparenting that changes role or invalidates the immutable ID. Valid reparenting never renames IDs or rewrites references.
 
 ## Brainfile design mapping/reference only
 
@@ -1172,7 +1192,7 @@ Brainfile column             → Tandem state
 Brainfile contract concept   → Tandem accord
 Brainfile archived task      → Tandem completed log document
 ADR-style record             → Tandem decision document
-Epic/theme/milestone         → Tandem task with `kind: epic` and child tasks linked by `parentId`
+Epic/theme/milestone         → Root global-ID Tandem task with `kind: epic`; direct `parentId` children are independently managed global-ID Tasks
 ```
 
 ## Open protocol questions

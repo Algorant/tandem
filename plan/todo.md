@@ -23,7 +23,7 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [x] Resolved CLI/TUI detail decisions: `tandem tui` only, `tandem decision list|show|add`, no short aliases, compact-table/detail-block human output, `--json` envelope objects for all read commands, TOML theme loading built-in/user/workspace, mouse on by default without drag/drop, fixed v0 keymaps, styled-basic Markdown rendering, and simple filtered Review queue.
 - [x] Resolved parent strategy decisions: keep implementation under `tandem/` for v0, no schemas/fixtures in v0, migrate/dogfood Tandem documents after the tooling can manage them safely, and reserve `td` while keeping `tandem` user-facing.
 - [x] Accepted protocol v0 draft for implementation.
-- [x] Implemented and hardened the current known v0 `tandem` CLI surface inside `tandem/`.
+- [x] Implemented and hardened the prior v0 `tandem` CLI surface inside `tandem/`; the accepted strict Epic → Task → Subtask correction is tracked as active follow-up work and must land before the surface is called complete.
 - [x] Started the first Ratatui/crossterm `tandem tui` implementation with a read-only Board shell under `tandem/src/tui.rs`.
 - [x] Expanded `tandem tui` to Board, Review, Logs, Rules, and Decisions views with initial Board, Rules, Decisions, and Logs interactions.
 - [x] Reworked the Board into count-labeled state subviews with a full-width selected-state list and richer rows while preserving quick-add and `H`/`L` task moves.
@@ -33,6 +33,8 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 
 ## Current tasks
 
+- [ ] Implement accepted decision-7 across protocol, CLI, TUI, and integrations: derive Epic/Task/Subtask roles from resolved documents, enforce global `task-N` IDs for Epics/Tasks and `task-N-M` only for Subtasks, emit `epic-task`/`subtask`/generic `parent`, and reject invalid roles, IDs, and reparenting.
+- [ ] Integrate delegated Task campaigns with the accepted worker direction: Epics are not delegated; Worker A executes a delegated Task's Subtask documents through one `pi-todos` checklist and one root settlement without independent Subtask delegation.
 - [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
 - [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.

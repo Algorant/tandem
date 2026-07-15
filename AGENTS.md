@@ -26,7 +26,7 @@ Current direction is intentionally simple:
 - `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
-- The v0 `tandem` CLI surface is implemented and considered complete for the current known scope; future CLI work should be explicit new features or bug fixes. Forward implementation focus is the Rust/Ratatui TUI, starting from the current Ratatui/crossterm Board shell. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
+- The prior v0 `tandem` CLI surface is implemented, but the accepted strict Epic → Task → Subtask correction is not complete until its delegated protocol, CLI, TUI, and integration tasks deliver. Do not describe the current CLI/TUI implementation as complete while that work remains open. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
 - `extensions/` is the scoped home for agent/editor integrations. The first integration is `extensions/pi-tandem/`, a lightweight Pi adapter over an installed `tandem` CLI; extension code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
@@ -39,19 +39,19 @@ Protocol:
 - Canonical workflow field: `state` / `states`.
 - Default active states: `todo`, `in-progress`, `review`.
 - Protocol version for the first v0 draft: `0.1.0`.
-- Default task identity: `type: task`; root tasks use flat sequential IDs such as `task-1`, while new first-class children use parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
+- Default task identity: `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 - First-class document types: `task` and `decision`; decision documents are ADR-compatible durable records and do not need a lifecycle field in v0.
 - Custom document types: allowed in config only; no v0 type-management CLI.
-- Epics: convention-only task documents using `type: task` plus `kind: epic`; children link through `parentId`, related context uses `references`, and there is no separate epic type, command family, ID namespace, or lifecycle in v0.
+- Hierarchy roles are derived from resolved documents, never ID shape: an Epic is `type: task` plus `kind: epic`; a Task is a normal task that is root-level, has a generic non-task parent, or is directly parented by an Epic; a Subtask is a normal task directly parented by a Task. Direct Epic children use relationship `epic-task`, Task children use `subtask`, and decision/custom-document parents use generic `parent`.
 - Work agreement object: `accord`.
 - Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
 - References: `parentId`, blockers, and related references may point to any Tandem document by ID.
-- Subtask IDs: new first-class child tasks default to parent-derived sequential IDs such as `task-103-1`; allocate each child sequence across active board documents and completed logs without reuse. `parentId` alone defines hierarchy, existing flat-ID children remain valid, and IDs remain immutable during normal reparenting.
+- Role-specific IDs are strict: Epics and Tasks allocate the next global `task-N` across active board documents and completed logs; Subtasks allocate the next `task-N-M` suffix beneath their Task across board and logs without reuse. Resolved documents define roles, while the role constrains valid ID shape. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid; there is no decision-4 compatibility exception.
 - Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0.
 - Events: per-actor `.tandem/events/<actor_id>.jsonl` logs store minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`; legacy `.tandem/events.jsonl` remains readable during transition.
 - Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
-- Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings.
+- Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings. Epics with `parentId`, children beneath Subtasks, and reparenting that would create either condition are structural errors; Subtasks cannot have children.
 - Brainfile migration/import: no v0 requirement and no required command.
 
 CLI/TUI:
@@ -144,13 +144,17 @@ Use these names consistently unless the user explicitly changes them:
 
 Avoid reintroducing `contract` except when discussing Brainfile design mapping from `contract` to Tandem `accord`.
 
-## Epic convention for agents
+## Epic, Task, and Subtask convention for agents
 
-- Model epics as ordinary tasks with `type: task` and `kind: epic`; do not invent `type: epic`, `epic-N` IDs, ADR-style epic records, custom folders, or special workflow states.
-- Use `parentId` for strict epic-to-child hierarchy. Create or inspect the epic task before adding children, because unresolved parents are validation errors.
+- Model epics as ordinary tasks with `type: task` and `kind: epic`; do not invent `type: epic`, `epic-N` IDs, ADR-style epic records, custom folders, or special workflow states. Epics are root-only and cannot have `parentId`.
+- Decompose an Epic into independently managed Tasks. Each direct Epic child links through `parentId`, remains a Task with a global `task-N` ID, and has relationship `epic-task`—never `subtask`.
+- Epics are planning/grouping roots and are not delegated. Delegate a Task to Worker A; its Subtask documents are Worker A's bounded execution checklist, projected into `pi-todos` and executed directly without independently delegating them or spawning Worker B. Parent review remains at the delegated Task boundary.
+- Create a Subtask only beneath a Task and only for smaller lifecycle-bearing checklist work. It uses `task-N-M`, cannot have children, and is not an independent delegation unit. A Task with a decision/custom-document parent remains a global-ID Task and may have Subtasks.
+- Derive Epic, Task, Subtask, `epic-task`, `subtask`, and generic `parent` classifications from resolved documents, then validate the required role-specific ID form. Never infer role from ID shape alone.
+- Create or inspect the parent before adding children because unresolved parents are errors. Reject a parented Epic, a child beneath a Subtask, every role/ID mismatch, and reparenting that changes a document's role or invalidates its ID.
 - Use `references` for loose related context such as decisions, sibling tasks, or completed logs. References are not hierarchy and unresolved references are warnings.
-- Use child tasks when work needs its own owner, accord, review, blockers, or validation; use inline `subtasks` only for checklist items inside one task.
-- Complete/archive epics with the normal task completion flow only after children are completed, intentionally canceled/superseded, or the project owner decides the epic is done. Do not create a persistent `done` state.
+- Inline `subtasks` are legacy checklist data, not the canonical Worker A checklist; do not author them for lifecycle-bearing work.
+- Complete/archive epics with the normal task completion flow only after their Tasks are completed, intentionally canceled/superseded, or the project owner decides the epic is done. Do not create a persistent `done` state.
 - Keep decisions/ADR-style documents for durable decisions only; do not use them as a substitute for epic tracking.
 
 ## Design direction

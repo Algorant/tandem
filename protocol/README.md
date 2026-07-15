@@ -51,16 +51,18 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 
 - Protocol version: `0.1.0` for the first v0 draft.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
-- New work items use `type: task`; root tasks default to flat sequential IDs such as `task-1`, while new first-class children default to parent-derived sequential IDs such as `task-103-1` and nested `task-103-1-1`.
+- New work items use `type: task`; Epics and Tasks—including direct Epic Tasks—use global `task-N` IDs. Only a Subtask directly beneath a Task uses `task-N-M`.
 - First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only.
-- A first-class subtask is a normal `type: task` document linked to another task with `parentId`; it keeps normal task workflow, ownership, accord, review, and completion behavior, with no new type or relationship field.
-- `parentId`, not ID shape, defines hierarchy. Existing flat-ID children remain valid without migration.
-- Child sequence allocation scans active board documents and completed logs and never reuses an ID. IDs are immutable; normal reparenting changes `parentId` without silently renaming IDs or rewriting references.
-- Inline `subtasks:` checklist items are legacy and deprecated for new work. Existing entries remain readable, validatable, and preservable; new trackable work should use child task documents.
-- Epics are ordinary `type: task` documents with `kind: epic` for broad outcome grouping; they use the same general `parentId` hierarchy, ordinary tasks may also parent children, loose related context uses `references`, and v0 has no separate epic type, ID namespace, command family, or lifecycle.
+- Epic, Task, and Subtask are derived roles over normal task documents. An Epic is `type: task` plus `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Classification resolves documents and never uses ID shape.
+- Direct Epic children use `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.
+- Strict validation rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and role-changing or ID-invalidating reparenting.
+- `parentId` remains canonical for hierarchy, while the resolved role constrains ID shape: Epics/Tasks require global `task-N`; Subtasks require `task-N-M`. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid.
+- Decision-7 fully supersedes decision-4 with no compatibility exception. Global and per-Task suffix allocation both scan active board documents and completed logs without reuse.
+- Inline `subtasks:` checklist items are legacy and deprecated for new work. Existing entries remain readable, validatable, and preservable; new lifecycle-bearing checklist work uses first-class Subtask documents.
+- Epics retain normal task lifecycle and have no separate type, ID namespace, command family, or lifecycle. Epics are not delegated; a delegated Task's Subtask documents are Worker A's `pi-todos` execution checklist and are not independently delegated.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID.
 - Completion warns but allows completion in v0.
 - Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition.
-- Validation is built-in structural validation only, with strict structure/core refs: unresolved `parentId`/`blockers` are errors; unresolved related `references` are warnings.
+- Validation is built-in structural validation only, with strict structure/core refs, hierarchy roles, and ID grammar: unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, and role-changing reparenting are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.

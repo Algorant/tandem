@@ -3,20 +3,20 @@
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: CLI v0 surface complete for current known scope; forward focus Rust + Ratatui/crossterm TUI inside `tandem/`
+Implementation target: prior CLI v0 surface implemented; strict Epic → Task → Subtask correction pending across CLI and TUI inside `tandem/`
 
 Naming:
 
 - Product/protocol: **Tandem**
 - CLI/TUI source directory: `tandem/`
 - CLI binary: `tandem`
-- CLI design and current known CLI v0 implementation precede TUI implementation; future CLI work should be explicit new features or bug fixes
+- CLI design and the prior v0 implementation precede TUI implementation; accepted decision-7 hierarchy correction is active required CLI/TUI work, not a completed surface
 - V0 TUI invocation: `tandem tui` only
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
 This document describes the user-facing `tandem` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
 
-The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The CLI v0 surface is now implemented for the current known scope; the active implementation focus is a more capable, responsive, themeable, mouse-aware TUI.
+The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The prior CLI v0 surface is implemented, but strict Epic → Task → Subtask classification and validation remain active implementation work alongside the responsive, themeable, mouse-aware TUI.
 
 ## Baseline inputs
 
@@ -48,10 +48,11 @@ It should feel closer to a local-first Linear/kanban/logbook hybrid than a simpl
 
 ## Design principles
 
-- **CLI first, TUI now:** the `tandem` command workflows are implemented for the current known v0 scope; focus new work on the interactive TUI unless fixing CLI bugs or adding requested CLI features.
+- **CLI first, TUI now:** the prior command workflows are implemented, but the accepted strict hierarchy correction must land in CLI and TUI before either surface is called complete.
 - **Feature parity baseline:** map live Brainfile features before deciding what Tandem keeps, renames, improves, or omits.
 - **Logs are real:** completed work is browsable, searchable, inspectable, and useful; restore/reopen behavior can come after the v0 log read scope.
 - **Validation is central:** delivered work should naturally flow to the Board Validation state for acceptance, rejection, redirection, reviewer metadata updates, rework, and completion.
+- **Task-root delegation:** Epics are not delegated. Shep delegates a valid global-ID Task to Worker A, who projects its direct Subtask documents into `pi-todos`, executes them without independent Subtask delegation or Worker B, and returns one Task-root settlement for parent review.
 - **Agent state is visible, not omnipresent:** accord/review/validation/blocker information must be available in the right place, but the Board list should surface only the signals that change scan priority or next action.
 - **Minimal first:** start each TUI surface from the smallest useful shape, then add only proven-needed details. Avoid kitchen-sink rows, decorative color, and metadata duplication between list rows and detail panes.
 - **Fast scanning:** compact rows, calm hierarchy, and clear badge/chip shapes. Important labels should read as small terminal stickers using foreground + background styling, not merely differently colored text.
@@ -94,7 +95,7 @@ Command behavior rules:
 - `tandem decision` supports `list`, `show`, and `add` in v0.
 - The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
 - `tandem complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
-- `tandem update <id>` edits active task metadata only. It never updates completed logs or workflow `state`; state changes remain `tandem move`. `--parent <id>` may attach or reparent an active task; the relationship is a tracked subtask only when the resolved parent is another task.
+- `tandem update <id>` edits active task metadata only. It never updates completed logs or workflow `state`; state changes remain `tandem move`. `--parent <id>` resolves the prospective hierarchy: an Epic parent yields a global-ID Task with `epic-task`, a Task parent yields a `task-N-M` Subtask with `subtask`, and a non-task parent yields a global-ID Task with generic `parent`. Role-changing or ID-invalidating reparenting is rejected.
 - The first implementation language is Rust, implemented inside `tandem/`.
 - The current implementation package is a Rust binary crate in `tandem/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
@@ -174,12 +175,12 @@ tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <ta
   - filters: `--state`, `--type`, `--priority`, `--tag`, `--assignee`, `--parent`, `--accord`, `--review`.
   - `--parent <id>` selects documents whose `parentId` matches exactly, whether the parent is a task or another Tandem document type.
   - `--json`: emit structured output.
-- Human output shape: compact table grouped or sorted by state. `RELATION` is `subtask` only for a task whose resolved parent is another task; otherwise a valid non-task target is shown generically as `parent`.
+- Human output shape: compact table grouped or sorted by state. Resolve hierarchy from documents: direct Epic children use `epic-task`, children of Tasks use `subtask`, and valid non-task targets use generic `parent`. Never classify from ID shape.
 
 ```text
 ID      STATE        TYPE  KIND  RELATION  PARENT      TITLE                ASSIGNEE
 task-7  in-progress  task  epic  -         -           Launch docs epic     pi
-task-8  validation   task  -     subtask   task-7      Add decision view    pi
+task-8  validation   task  -     epic-task task-7      Add decision view    pi
 task-9  todo         task  -     parent    decision-2  Apply chosen policy  pi
 ```
 
@@ -198,7 +199,7 @@ task-9  todo         task  -     parent    decision-2  Apply chosen policy  pi
         "priority": "high",
         "assignee": "pi",
         "parentId": "task-7",
-        "parentRelationship": "subtask",
+        "parentRelationship": "epic-task",
         "tags": ["tui"],
         "accord": { "status": "delivered" },
         "review": { "status": "pending" }
@@ -230,8 +231,8 @@ tandem show <id> [--json]
   - `<id>`: task or decision ID.
 - Optional inputs:
   - `--json`: emit structured output.
-- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path. A task whose resolved parent is another task uses `Subtask of`; other valid parent targets use `Parent`. Task documents include `Subtasks` summaries discovered from task children whose `parentId` points to them. Non-task documents do not expose those links as subtasks.
-- `--json` data shape includes `document.parentId` plus computed `data.parentRelationship: "subtask" | "parent"` when the document has a resolved parent. A computed top-level `data.subtasks` array is emitted only when the shown document is a task; it is omitted for decisions and other non-task documents:
+- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path. A direct child of an Epic uses Task-of-Epic language; a Subtask uses `Subtask of`; other valid parent targets use `Parent`. Showing an Epic exposes direct `Tasks`; showing a Task exposes direct `Subtasks`; Subtasks and non-task documents expose no child collection.
+- `--json` data shape includes `document.parentId` plus computed `data.parentRelationship: "epic-task" | "subtask" | "parent"` when the document has a resolved parent. A computed `data.tasks` array is emitted for an Epic, `data.subtasks` for a Task, and neither for a Subtask or non-task document:
 
 ```json
 {
@@ -248,7 +249,7 @@ tandem show <id> [--json]
       "accord": { "status": "claimed" },
       "review": { "status": "not-ready" }
     },
-    "subtasks": [
+    "tasks": [
       {
         "id": "task-8",
         "title": "Add decision view",
@@ -281,14 +282,14 @@ tandem add --title <title> [--state <state>] [--kind epic] [--description <text>
   - `--title <title>`.
 - Optional inputs:
   - `--state <state>` defaults to `todo`.
-  - `--kind epic`: mark the new task as a lightweight epic while preserving `type: task` and the task ID namespace.
-  - `--parent <id>`: create a task linked through canonical `parentId`. When the resolved parent is another task, allocate the next parent-derived ID such as `task-7-1`, then `task-7-2`; nested children extend the full parent ID. Allocation scans active board documents and completed logs and reserves the destination without overwriting. Decision/custom-document parents remain valid generic relationships and use the next ordinary flat ID such as `task-8`.
+  - `--kind epic`: mark the new root task as an Epic while preserving `type: task` and the task ID namespace. `--kind epic` and `--parent` cannot be combined because Epics cannot have parents.
+  - `--parent <id>`: create a normal task linked through canonical `parentId`. A resolved Epic parent creates a global-ID Task with `epic-task`; a resolved Task parent creates a leaf `task-N-M` Subtask with `subtask`; a decision/custom parent creates a global-ID Task with generic `parent`. Attaching beneath a Subtask is an error. Global Epic/Task allocation and per-Task Subtask suffix allocation both scan active board documents and completed logs and reserve without overwriting.
   - metadata: `--description`, `--priority`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`.
   - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
-- Human output shape: labeled created-task summary with ID, state, title, and file path. Task-parent creation says `Created subtask` and `Subtask of`; non-task parents retain `Created task` and use the generic `Parent` label.
+- Human output shape: labeled created-task summary with ID, state, title, and file path. Epic-parent creation uses Task-of-Epic language, Task-parent creation uses `Created subtask`/`Subtask of`, and non-task parents retain `Created task`/generic `Parent`.
 - JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
 - Exit/error notes:
-  - fails on invalid state, unsupported kind, invalid referenced parent/blocker, structure errors, or failed write.
+  - fails on invalid state, unsupported kind, invalid referenced parent/blocker, a parented Epic, attachment beneath a Subtask, a role/ID mismatch, or failed write. Direct Epic Tasks never receive hierarchical IDs.
 
 ### `tandem move`
 
@@ -325,7 +326,7 @@ tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|me
   - `<id>`: active board task ID.
 - Optional inputs:
   - scalar replacements: `--title`, `--kind`, `--priority`, `--assignee`, `--due-date`.
-  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the parent exists; a task cannot parent itself. A task target produces a subtask relationship, while a decision/custom-document target remains a generic parent relationship. The task ID is immutable; update preserves it and warns when it does not match the new parent's default hierarchical or flat designation.
+  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the prospective role graph. An Epic target requires the document to remain a global-ID Task with `epic-task`; a Task target would require a matching `task-N-M` Subtask with `subtask`; a decision/custom target requires a global-ID Task with generic `parent`. Reject a parented Epic, a Subtask target, every role/ID mismatch, and any role-changing or ID-invalidating reparenting. The immutable ID is never renamed.
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
@@ -334,9 +335,9 @@ tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|me
   - no clear/remove flags in v0, including no way to clear an existing `parentId`.
   - completed logs are not updated.
 - Validation:
-  - kind, when set, must be `epic`; omit `kind` for normal tasks.
+  - kind, when set, must be `epic`; an Epic must have no `parentId`.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
-  - parent and blockers must resolve to existing documents; references warn when unresolved; related files remain path metadata.
+  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; references warn when unresolved; related files remain path metadata.
 - Human output shape: warnings first, then changed fields with old/new values and the path. If every requested value already exists, the command prints a clear no-op and does not update `updatedAt` or append an event.
 - Mutation notes: raw-source frontmatter patches preserve unknown fields and the Markdown body, update `updatedAt` only on real changes, and append `task.updated` on real changes.
 
@@ -516,7 +517,7 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
   - `--type <type>` filters by document type.
   - `--parent <id>` filters active and completed results to documents with that parent, including generic non-task parent targets.
   - `--json`: emit structured output.
-- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, `RELATION` (`subtask` or generic `parent`), parent ID, and match snippet.
+- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, resolved `RELATION` (`epic-task`, `subtask`, or generic `parent`), parent ID, and match snippet.
 - `--json` data shape:
 
 ```json
@@ -532,7 +533,7 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
         "location": "board",
         "state": "in-progress",
         "parentId": "task-7",
-        "parentRelationship": "subtask",
+        "parentRelationship": "epic-task",
         "snippet": "Add theme preview to the docs launch."
       },
       {
@@ -811,7 +812,7 @@ tandem tui
 - Current implementation slice:
   - launches a Ratatui/crossterm alternate-screen app from the existing `tandem tui` command.
   - renders top-level Board, Logs, Rules, and Decisions tabs in the target Validation workflow; legacy Review-queue code may exist only as transitional implementation detail while task-25/task-30 remove it.
-  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns. The default State Board collapses task-to-task descendants beneath root rows, expands them inline with `Enter`/mouse, and keeps explicit `Space` preview access.
+  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns. The default State Board resolves the strict Epic → Task → Subtask graph, collapses valid descendants beneath roots, expands them inline with `Enter`/mouse, and keeps explicit `Space` preview access. The strict-role correction is pending implementation.
   - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, sparse one-line rows, reload, help, and safe quit.
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows minimal.
@@ -884,13 +885,13 @@ Board view should support:
 
 The Board has exactly two arrangements in this slice:
 
-- **State Board** is the default hierarchical task surface. Task-to-task children are omitted as flat roots and collapsed beneath their nearest active task ancestor by default. Root tasks, non-task documents, and tasks with decision/custom-document parents remain normal rows. An active task whose task parent is already logged remains reachable as a contextual hierarchy root rather than disappearing.
+- **State Board** is the default hierarchical task surface. It derives roles from resolved documents, then validates IDs: direct Epic children are global-ID Tasks, children of Tasks are matching `task-N-M` Subtasks, and decision/custom-parented tasks remain global-ID generic-parent Tasks. Valid descendants are omitted as flat roots and collapsed beneath their nearest active ancestor. An active Task whose Epic/Task parent is logged remains reachable as a contextual hierarchy root rather than disappearing. Parented Epics, children beneath Subtasks, hierarchical-ID Epic Tasks, global-ID Subtasks, deeper IDs, and other invalid forms surface validation errors rather than being silently rendered.
 - Parent rows show a concise disclosure affordance plus a right-side active/logged descendant rollup. `Enter` expands/collapses task children one level at a time; clicking an already-selected parent uses the same path. `Enter` previews leaf rows for compatibility, while `Space` explicitly toggles inline preview for every row and `Tab` retains the detail pane.
-- Expanded descendants use compact, aligned tree guides and disclosure markers. State Board task rows omit procedural IDs, `<parentId> → <childId>` strings, and redundant `SUB` chips; exact canonical identity remains in the Selected header and detail context. Cross-state descendants use compact state labels (`TODO`, `WIP`, `VAL`, and concise equivalents), while same-state descendants reserve the same column width so titles remain aligned. Existing flat-ID children work identically because canonical `parentId`, not ID shape, still defines hierarchy.
+- Expanded descendants use compact, aligned tree guides and disclosure markers. State Board task rows omit procedural IDs, `<parentId> → <childId>` strings, and redundant `SUB` chips; exact canonical identity remains in the Selected header and detail context. Cross-state descendants use compact state labels (`TODO`, `WIP`, `VAL`, and concise equivalents), while same-state descendants reserve the same column width so titles remain aligned. `parentId` defines hierarchy, but the resolved role's ID grammar is mandatory; invalid former decision-4 forms are diagnostics, not compatibility rows.
 - State-tab/filter counts count matching active documents by each document's own workflow state, including collapsed children. Expanded rows may therefore differ from the selected tab count; expanding/collapsing never changes counts. When a tag/priority filter matches a descendant, State Board retains and reveals its required ancestor path in that descendant's own-state tab even if those ancestors do not match.
-- **Epic Board** remains the optional epic-specific arrangement. It groups each active `kind: epic` task with all active task descendants reached through `parentId`, renders the complete ancestor path for a matching deep descendant, and retains its epic-specific compact `SUB`/state/identity language. Keyboard and mouse row navigation traverse its flattened depth-first hierarchy.
-- Completed task descendants contribute concise Board rollups such as `2 active · 3 logged`; expanded/detail context uses explicit `completed ... in Logs` wording. The UI never calls them `done`, and completed documents remain in Logs rather than reappearing as active rows. Traversal/context continues through completed task ancestors so active descendants remain reachable.
-- A task relationship is called a subtask only when its resolved parent is another task. Decision/custom-document parents remain generic `Parent` relationships in Board detail and Validation/Review inspection.
+- **Epic Board** remains the optional epic-specific arrangement. It groups each active global-ID Epic with its direct global-ID independently managed Tasks, then at most each Task's matching `task-N-M` Subtasks. Direct children use Task/Epic language and never a `SUB` label; only third-tier rows use Subtask language. Matching rows retain the valid ancestor path, and keyboard/mouse navigation traverses the flattened strict hierarchy.
+- Completed Tasks/Subtasks contribute concise Board rollups such as `2 active · 3 logged`; expanded/detail context uses explicit `completed ... in Logs` wording. The UI never calls them `done`, and completed documents remain in Logs rather than reappearing as active rows. Valid context may traverse logged Epic/Task ancestors so active work remains reachable.
+- Relationship labels come from the shared resolved-document classifier: `epic-task` for a direct Epic child, `subtask` for a Task child, and generic `Parent` for decision/custom-document parents. ID shape never controls rendering.
 - There is no separate Subtask Board arrangement.
 
 Card example:
@@ -914,7 +915,7 @@ Default Board badges are intentionally small and action-oriented:
 - Validation attention: `VISUAL` for items in `validation` tagged `visual`, `ui`, or `ux`.
 - Accord attention: `DELIVERED`, `ACCEPTED`, `REWORK`, `BLOCKED`, and `FAILED` when they affect scan/action priority. `DELIVERED` is suppressed in the `validation` state/subview because the state already carries that signal.
 - Review attention: `PENDING`, `CHANGES-REQUESTED`, `REJECTED`, and `FAILED`.
-- Subtask progress: `2/5`, `5/5`, and similar progress badges after at least one subtask is complete or all subtasks are complete; `0/N` stays in details.
+- Subtask progress on Tasks: `2/5`, `5/5`, and similar progress badges after at least one Subtask is complete or all Subtasks are complete; `0/N` stays in details. Epic progress counts direct Tasks separately from their Subtasks.
 
 Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are not global defaults. A user or workspace may opt specific tags into Board badges through TUI display config, not theme color files: global user config at `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace display config at `.tandem/config.toml`. Workspace display config is applied last. Legacy `[badges]` / `[badges.tags.*]` sections in user theme files or workspace `.tandem/theme.toml` are still read during migration, but new project badge semantics should live in `.tandem/config.toml`. Tag definitions merge by tag, while a later disabled list replaces the earlier disabled list.
 
@@ -947,7 +948,7 @@ Sections:
 
 - title and metadata
 - Markdown description preview
-- subtasks
+- direct Tasks for an Epic, or Subtasks for a Task
 - related files
 - accord/assignment
 - validation commands/results
