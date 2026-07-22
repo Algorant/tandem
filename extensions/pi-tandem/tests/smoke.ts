@@ -96,14 +96,18 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 
 const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
-assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for tracked child tasks");
+assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for canonical hierarchy creation");
+assert(taskSchemaProperties.kind, "tandem_task schema should expose kind for Epic creation");
 assert(!taskSchemaProperties.subtasks, "tandem_task schema should not expose deprecated inline subtask authoring");
 
 const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
 assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");
 
-const updateArgs = buildTaskArgs({ action: "update", id: "task-1", priority: "high", parent: "task-2", tags: ["cli"] });
-assert(updateArgs.join(" ") === "update task-1 --priority high --parent task-2 --tag cli", "tandem_task update builder should map metadata and parent flags");
+const epicArgs = buildTaskArgs({ action: "add", title: "Canonical Epic", kind: "epic" });
+assert(epicArgs.join(" ") === "add --title Canonical Epic --kind epic", "tandem_task add builder should map Epic kind directly");
+
+const updateArgs = buildTaskArgs({ action: "update", id: "task-1", kind: "epic", priority: "high", parent: "task-2", tags: ["cli"] });
+assert(updateArgs.join(" ") === "update task-1 --kind epic --priority high --parent task-2 --tag cli", "tandem_task update builder should map kind, metadata, and parent flags");
 
 for (const [field, params] of [
 	["description", { description: "new body" }],

@@ -48,6 +48,7 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	description?: string;
 	priority?: string;
 	type?: string;
+	kind?: "epic";
 	tags?: string[];
 	assignee?: string;
 	dueDate?: string;
@@ -193,7 +194,7 @@ function rejectUnsupportedUpdateFields(params: TaskToolParams): void {
 	if (!unsupported.length) return;
 	throw new Error(
 		`tandem_task update does not support ${unsupported.join(", ")}. ` +
-			"Use tandem_task action=add for descriptions when creating tasks; use tandem_accord for accord lifecycle changes; review metadata is managed by review/validation flows, not tandem update. Supported update fields are title, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles.",
+			"Use tandem_task action=add for descriptions when creating tasks; use tandem_accord for accord lifecycle changes; review metadata is managed by review/validation flows, not tandem update. Supported update fields are title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles.",
 	);
 }
 
@@ -231,6 +232,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		addOptionalFlag(args, "--state", params.state);
 		addOptionalFlag(args, "--description", params.description);
 		addOptionalFlag(args, "--priority", params.priority);
+		addOptionalFlag(args, "--kind", params.kind);
 		addRepeatedFlag(args, "--tag", params.tags);
 		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--due-date", params.dueDate);
@@ -247,6 +249,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		rejectUnsupportedUpdateFields(params);
 		const args = ["update", requireString(params.id, "tandem_task update requires id")];
 		addOptionalFlag(args, "--title", params.title);
+		addOptionalFlag(args, "--kind", params.kind);
 		addOptionalFlag(args, "--priority", params.priority);
 		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--due-date", params.dueDate);
@@ -557,10 +560,11 @@ export const tandemTaskParameters = Type.Object({
 	type: Type.Optional(Type.String({ description: "Filter document type for list, usually task or decision." })),
 	description: Type.Optional(Type.String({ description: "Task body/description for action=add only; action=update intentionally rejects this field because `tandem update` does not edit document bodies in v0." })),
 	priority: Type.Optional(Type.String()),
+	kind: Type.Optional(StringEnum(["epic"] as const, { description: "Optional task classifier for add/update. Use kind=epic only for a root global task; Epics cannot have parentId and are not delegation roots." })),
 	tags: Type.Optional(Type.Array(Type.String())),
 	assignee: Type.Optional(Type.String()),
 	dueDate: Type.Optional(Type.String()),
-	parent: Type.Optional(Type.String({ description: "Existing Tandem document ID passed directly to add/update as --parent, or used by list to filter exact parentId matches. On add, the CLI allocates parent-derived IDs for task children and flat IDs for generic non-task parents; pi-tandem never constructs IDs. Create or inspect the parent first." })),
+	parent: Type.Optional(Type.String({ description: "Existing Tandem document ID passed directly to add/update as --parent, or used by list to filter exact parentId matches. On add, the CLI resolves the parent role: an Epic gets a global-ID Task, a Task gets a parent-derived Subtask, and a decision/custom document gets a global-ID Task with a generic parent relationship. pi-tandem never allocates IDs or classifies roles. Create or inspect the parent first." })),
 	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tandem add fail." })),
 	references: Type.Optional(Type.Array(Type.String(), { description: "Related Tandem document IDs such as decisions, sibling tasks, or logs. Prefer existing IDs; missing IDs are warnings, not hard blockers." })),
 	relatedFiles: Type.Optional(Type.Array(Type.String(), { description: "Project-relative file paths relevant to the task for implementation or review context." })),
@@ -572,9 +576,9 @@ export const tandemTaskParameters = Type.Object({
 	reviewer: Type.Optional(Type.String()),
 });
 
-function tandemPromptGuidance(workspaceRoot?: string): string {
+export function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- When creating related work, create each independently tracked child with tandem_task action=add and parent=<task-id>; pass the parent to Tandem and let the CLI allocate the parent-derived child ID (including nested IDs) and classify the relationship. Never construct child IDs in the adapter. This writes parentId while preserving the child task's own workflow, accord, review, ownership, blockers, and completion lifecycle. Inline checklist subtasks are legacy read-only metadata and pi-tandem does not author them. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Use tandem_task action=update only for supported metadata edits (title, priority, assignee, dueDate, parent, tags, blockers, references, relatedFiles); state remains action=move, descriptions are creation-time fields, and accord changes go through tandem_accord.\n- Epics are ordinary tasks with \`type: task\` plus \`kind: epic\`; use parent/parentId for epic children and references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; do not mark accords accepted/completed unless the user or orchestrator asks.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update only for supported metadata edits (title, kind, priority, assignee, dueDate, parent, tags, blockers, references, relatedFiles); state remains action=move, descriptions are creation-time fields, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -626,14 +630,14 @@ export default function piTandem(pi: ExtensionAPI) {
 		name: "tandem_task",
 		label: "Tandem Task",
 		...createTandemToolRenderer("tandem_task", "Tandem Task"),
-		description: "Run task-oriented `tandem` commands: list, show, add, move, update, or complete. Add passes parent to the CLI so Tandem allocates/classifies tracked children; pi-tandem never constructs IDs. Deprecated inline checklist subtasks are not authored. Read actions default to `--json`; mutations preserve human-readable CLI output.",
+		description: "Run task-oriented `tandem` commands: list, show, add, move, update, or complete. Add/update pass kind and parent directly to the CLI: Epics contain global-ID Tasks, Tasks contain parent-derived leaf Subtasks, and generic parents retain global Task IDs. pi-tandem never allocates IDs or reclassifies CLI relationships. Deprecated inline checklist subtasks are not authored. Read actions default to `--json`; mutations preserve human-readable CLI output.",
 		promptSnippet: "Use tandem_task for Tandem task list/show/add/move/update/complete operations instead of editing .tandem files directly.",
 		promptGuidelines: [
 			"Use tandem_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
 			"Prefer tandem_task read actions with the default JSON output for reliable task inspection.",
-			"When decomposing work, create independently tracked child tasks with parent and rely on the Tandem CLI to allocate parent-derived and nested IDs; do not construct IDs in Pi. Use blockers for hard dependencies, references for related tasks/decisions/logs, and relatedFiles for repo paths. Inline checklist subtasks are legacy metadata and tandem_task does not author them.",
-			"Model epics as ordinary tasks with type: task plus kind: epic; use parent/parentId for epic children, references for loose related context, and do not invent type: epic or ADR-style epic records.",
-			"Use tandem_task action=update only for supported active task metadata edits: title, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles. State remains action=move, descriptions are creation-time fields, and accord changes go through tandem_accord.",
+			"Pass parent directly to Tandem and consume the CLI result without reclassification: an Epic gets global-ID Tasks with epic-task, a Task gets parent-derived leaf Subtasks with subtask, and a decision/custom parent gets global-ID Tasks with generic parent. Never construct IDs in Pi. Use blockers for hard dependencies, references for related tasks/decisions/logs, and relatedFiles for repo paths. Inline checklist subtasks are legacy metadata and tandem_task does not author them.",
+			"Model Epics as root tasks with type: task plus kind: epic. Only Tasks are delegation roots initially; one Task worker owns its Subtasks through the todo projection, while Epics and Subtasks are not independently delegated.",
+			"Use tandem_task action=update only for supported active task metadata edits: title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles. State remains action=move, descriptions are creation-time fields, and accord changes go through tandem_accord. Let Tandem reject role-changing or ID-invalidating reparenting.",
 			"Create or inspect parent and blocker documents before referencing them; tandem validates parent/blockers strictly, while references are related context and only warn if unresolved.",
 			"Prefer state=validation for delivered work awaiting human/product judgment; existing state=review is a legacy alias only.",
 			"Do not use tandem_task complete unless the user or orchestrator explicitly asks to archive completed work.",

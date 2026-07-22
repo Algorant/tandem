@@ -8,6 +8,7 @@ import {
 	buildLogArgs,
 	buildSearchArgs,
 	buildTaskArgs,
+	tandemPromptGuidance,
 	tandemTaskParameters,
 } from "../index";
 
@@ -67,8 +68,10 @@ function assertIncludes(haystack: string, needle: string, label: string): void {
 	assert(haystack.includes(needle), `${label} missing ${JSON.stringify(needle)} in:\n${haystack}`);
 }
 
-function resultIds(searchPayload: any): Set<string> {
-	return new Set((searchPayload.data?.results ?? []).map((result: any) => result.id));
+function assertFailure(result: ProcessResult, label: string, ...needles: string[]): void {
+	assert(result.code !== 0, `${label} should fail`);
+	const output = `${result.stdout}\n${result.stderr}`;
+	for (const needle of needles) assertIncludes(output, needle, label);
 }
 
 function itemById(payload: any, id: string): any {
@@ -79,17 +82,27 @@ function resultById(payload: any, id: string): any {
 	return (payload.data?.results ?? []).find((result: any) => result.id === id);
 }
 
-function assertSchemaDescribesRelationshipFields(): void {
+function assertSchemaDescribesCanonicalHierarchy(): void {
 	const properties = (tandemTaskParameters as any).properties ?? {};
-	for (const field of ["parent", "blockers", "references", "relatedFiles"]) {
+	for (const field of ["kind", "parent", "blockers", "references", "relatedFiles"]) {
 		assert(properties[field], `tandem_task schema should expose ${field}`);
-		assert(typeof properties[field].description === "string" && properties[field].description.length > 20, `tandem_task schema should describe relationship field ${field}`);
+		assert(typeof properties[field].description === "string" && properties[field].description.length > 20, `tandem_task schema should describe ${field}`);
 	}
 	assert(!properties.subtasks, "tandem_task schema should not offer deprecated inline subtask authoring");
-	assert(properties.parent.description.includes("CLI allocates parent-derived IDs"), "parent schema guidance should describe CLI-owned hierarchical allocation");
+	assert(properties.parent.description.includes("Epic gets a global-ID Task"), "parent schema should describe Epic -> global Task allocation");
+	assert(properties.parent.description.includes("Task gets a parent-derived Subtask"), "parent schema should describe Task -> parent-derived Subtask allocation");
 }
 
-assertSchemaDescribesRelationshipFields();
+assertSchemaDescribesCanonicalHierarchy();
+
+const generatedGuidance = tandemPromptGuidance("/tmp/canonical-tandem-workspace");
+assertIncludes(generatedGuidance, "their direct children are global-ID Tasks", "generated canonical hierarchy guidance");
+assertIncludes(generatedGuidance, "a Task's direct children are leaf, parent-derived", "generated canonical Subtask guidance");
+assertIncludes(generatedGuidance, "Only Task-role roots are delegated initially", "generated Task-only delegation guidance");
+assertIncludes(generatedGuidance, "Never allocate IDs or reclassify CLI output in Pi", "generated thin-adapter guidance");
+
+const epicArgs = buildTaskArgs({ action: "add", title: "Canonical Epic", kind: "epic" });
+assert(epicArgs.includes("--kind") && epicArgs.includes("epic"), "buildTaskArgs should pass kind=epic directly to Tandem");
 
 let legacySubtasksRejected = false;
 try {
@@ -107,211 +120,188 @@ try {
 	await mkdir(join(workspace, "docs"), { recursive: true });
 	await mkdir(join(workspace, "src"), { recursive: true });
 	await mkdir(join(workspace, "tests", "fixtures"), { recursive: true });
-	await writeFile(join(workspace, "docs", "architecture.md"), "# Relationship smoke architecture\n", "utf8");
+	await writeFile(join(workspace, "docs", "architecture.md"), "# Canonical hierarchy\n", "utf8");
 	await writeFile(join(workspace, "src", "relationships.ts"), "export const relationshipSmoke = true;\n", "utf8");
 	await writeFile(join(workspace, "tests", "fixtures", "relationship.json"), "{\"ok\":true}\n", "utf8");
 
-	const parentOutput = await runTandem(tandem, buildTaskArgs({
+	const epicOutput = await runTandem(tandem, buildTaskArgs({
 		action: "add",
-		title: "Relationship smoke parent",
-		description: "Parent task whose independently tracked children are linked through parentId.",
+		title: "Ship canonical relationship support",
+		kind: "epic",
 		relatedFiles: ["docs/architecture.md"],
 		tags: ["relationship-smoke"],
 	}), workspace);
-	const parentId = parseId(parentOutput);
+	const epicId = parseId(epicOutput);
+	assert(/^task-\d+$/.test(epicId), `Epic should have a global task-N ID, got ${epicId}`);
 
-	const decisionOutput = await runTandem(tandem, buildDecisionArgs({
+	const decisionId = parseId(await runTandem(tandem, buildDecisionArgs({
 		action: "add",
-		title: "Relationship smoke decision",
-		body: "## Decision\nUse explicit Tandem relationship fields in agent-created work.",
-		references: [parentId],
+		title: "Canonical relationship policy",
+		body: "## Decision\nUse strict Epic -> Task -> Subtask roles.",
+		references: [epicId],
 		tags: ["relationship-smoke"],
-	}), workspace);
-	const decisionId = parseId(decisionOutput);
+	}), workspace));
 
-	const blockerOutput = await runTandem(tandem, buildTaskArgs({
-		action: "add",
-		title: "Prepare relationship fixtures",
-		parent: parentId,
-		references: [decisionId],
-		relatedFiles: ["tests/fixtures/relationship.json"],
-		tags: ["relationship-smoke"],
-	}), workspace);
-	const blockerId = parseId(blockerOutput);
-	assert(blockerId === `${parentId}-1`, `first task child should use CLI-allocated hierarchical ID ${parentId}-1, got ${blockerId}`);
-
-	const childParams = {
+	const taskParams = {
 		action: "add" as const,
 		title: "Implement relationship display",
-		description: "First-class child task with its own blocker, references, files, and lifecycle.",
-		parent: parentId,
-		blockers: [blockerId],
-		references: [decisionId, parentId],
+		description: "Delegatable global-ID Task directly beneath an Epic.",
+		parent: epicId,
+		references: [decisionId],
 		relatedFiles: ["src/relationships.ts", "docs/architecture.md"],
 		tags: ["relationship-smoke"],
 	};
-	const childArgs = buildTaskArgs(childParams);
-	assert(childArgs.includes("--parent") && childArgs.includes(parentId), "buildTaskArgs should pass --parent");
-	assert(childArgs.filter((arg) => arg === "--blocker").length === 1, "buildTaskArgs should pass one --blocker");
-	assert(childArgs.filter((arg) => arg === "--reference").length === 2, "buildTaskArgs should pass repeated --reference flags");
-	assert(childArgs.filter((arg) => arg === "--related-file").length === 2, "buildTaskArgs should pass repeated --related-file flags");
-	assert(!childArgs.includes("--subtask"), "buildTaskArgs should never forward deprecated --subtask authoring");
-	const childOutput = await runTandem(tandem, childArgs, workspace);
-	const childId = parseId(childOutput);
-	assert(childId === `${parentId}-2`, `second task child should use CLI-allocated hierarchical ID ${parentId}-2, got ${childId}`);
+	const taskArgs = buildTaskArgs(taskParams);
+	assert(taskArgs.includes("--parent") && taskArgs.includes(epicId), "buildTaskArgs should pass the Epic parent directly");
+	const taskOutput = await runTandem(tandem, taskArgs, workspace);
+	const taskId = parseId(taskOutput);
+	assert(/^task-\d+$/.test(taskId), `direct Epic child should be a global-ID Task, got ${taskId}`);
+	assert(!taskId.startsWith(`${epicId}-`), `direct Epic child must not use an erroneous hierarchical ID, got ${taskId}`);
+	assertIncludes(taskOutput, `Task of Epic: ${epicId}`, "Epic Task creation output");
 
-	const nestedOutput = await runTandem(tandem, buildTaskArgs({
+	const blockerId = parseId(await runTandem(tandem, buildTaskArgs({
 		action: "add",
-		title: "Implement nested relationship detail",
-		parent: childId,
+		title: "Prepare relationship fixtures",
+		parent: taskId,
 		references: [decisionId],
+		relatedFiles: ["tests/fixtures/relationship.json"],
+		tags: ["relationship-smoke"],
+	}), workspace));
+	assert(blockerId === `${taskId}-1`, `first Task child should be parent-derived Subtask ${taskId}-1, got ${blockerId}`);
+
+	const subtaskArgs = buildTaskArgs({
+		action: "add",
+		title: "Render canonical relationships",
+		description: "Leaf Subtask owned by the delegated Task worker.",
+		parent: taskId,
+		blockers: [blockerId],
+		references: [decisionId, epicId],
 		relatedFiles: ["src/relationships.ts"],
 		tags: ["relationship-smoke"],
-	}), workspace);
-	const nestedId = parseId(nestedOutput);
-	assert(nestedId === `${childId}-1`, `nested task child should extend its CLI-allocated parent ID, got ${nestedId}`);
+	});
+	assert(subtaskArgs.filter((arg) => arg === "--blocker").length === 1, "buildTaskArgs should pass blockers");
+	assert(subtaskArgs.filter((arg) => arg === "--reference").length === 2, "buildTaskArgs should pass repeated references");
+	assert(!subtaskArgs.includes("--subtask"), "buildTaskArgs should never forward deprecated --subtask authoring");
+	const subtaskId = parseId(await runTandem(tandem, subtaskArgs, workspace));
+	assert(subtaskId === `${taskId}-2`, `second Task child should be parent-derived Subtask ${taskId}-2, got ${subtaskId}`);
 
-	const followUpOutput = await runTandem(tandem, buildTaskArgs({
+	const genericId = parseId(await runTandem(tandem, buildTaskArgs({
 		action: "add",
-		title: "Validate relationship guidance",
-		state: "validation",
-		blockers: [childId],
-		references: [decisionId, blockerId],
-		relatedFiles: ["extensions/pi-tandem/pi-tandem.md"],
+		title: "Decision-parented implementation Task",
+		parent: decisionId,
 		tags: ["relationship-smoke"],
-	}), workspace);
-	const followUpId = parseId(followUpOutput);
-	assert(/^task-\d+$/.test(followUpId), `root task should retain a flat CLI-allocated ID, got ${followUpId}`);
-	const attachArgs = buildTaskArgs({ action: "update", id: followUpId, parent: parentId });
-	assert(attachArgs.includes("--parent") && attachArgs.includes(parentId), "buildTaskArgs update should pass --parent for attach/reparent");
-	await runTandem(tandem, attachArgs, workspace);
+	}), workspace));
+	assert(/^task-\d+$/.test(genericId), `generic-parent Task should retain global task-N allocation, got ${genericId}`);
+	const genericSubtaskId = parseId(await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Generic Task checklist item",
+		parent: genericId,
+	}), workspace));
+	assert(genericSubtaskId === `${genericId}-1`, `a generic-parent Task should own parent-derived Subtasks, got ${genericSubtaskId}`);
 
-	const shown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: childId }), workspace));
-	assert(shown.ok === true, "tandem_task show JSON should be ok for relationship child");
-	assert(shown.data.document.id === childId, "tandem_task show should return child id");
-	assert(shown.data.document.parentId === parentId, "tandem_task show should return child parentId");
-	assert(shown.data.parentRelationship === "subtask", "tandem_task show should classify task-parent links as subtasks");
-	assert(Array.isArray(shown.data.subtasks) && shown.data.subtasks.some((subtask: any) => subtask.id === nestedId), "child show should naturally include its nested child summary");
-	assert(Array.isArray(shown.data.document.blockers) && shown.data.document.blockers.includes(blockerId), "tandem_task show should return child blockers");
+	const epicShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: epicId }), workspace));
+	assert(epicShown.data.document.kind === "epic", "Epic show should retain kind=epic");
+	assert(Array.isArray(epicShown.data.tasks) && epicShown.data.tasks.some((task: any) => task.id === taskId), "Epic show should expose direct global Tasks in data.tasks");
+	assert(epicShown.data.subtasks === undefined, "Epic show should not label direct Tasks as subtasks");
 
-	const parentShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: parentId }), workspace));
-	assert(parentShown.data.document.id === parentId, "parent show should return the parent task");
-	assert(Array.isArray(parentShown.data.subtasks), "parent show should naturally expose computed subtask summaries");
-	assert(parentShown.data.subtasks.length === 3, "parent show should include all three parent-linked children");
-	for (const id of [blockerId, childId, followUpId]) {
-		const summary = parentShown.data.subtasks.find((subtask: any) => subtask.id === id);
-		assert(summary, `parent show should include computed summary for ${id}`);
-		assert(typeof summary.title === "string" && typeof summary.location === "string", `computed summary for ${id} should include title/location`);
-	}
+	const taskShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	assert(taskShown.data.document.parentId === epicId, "Task show should preserve Epic parentId");
+	assert(taskShown.data.parentRelationship === "epic-task", "direct Epic child should consume CLI relationship epic-task");
+	assert(Array.isArray(taskShown.data.subtasks), "Task show should expose its Subtask worklist");
+	assert(taskShown.data.subtasks.length === 2, "Task show should expose both direct Subtasks");
+	assert(taskShown.data.subtasks.some((subtask: any) => subtask.id === subtaskId), "Task show should include implementation Subtask");
+
+	const subtaskShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: subtaskId }), workspace));
+	assert(subtaskShown.data.document.parentId === taskId, "Subtask show should preserve Task parentId");
+	assert(subtaskShown.data.parentRelationship === "subtask", "Task child should consume CLI relationship subtask");
+	assert(subtaskShown.data.subtasks === undefined && subtaskShown.data.tasks === undefined, "Subtasks are leaves and should expose no child collection");
+	assert(Array.isArray(subtaskShown.data.document.blockers) && subtaskShown.data.document.blockers.includes(blockerId), "Subtask show should retain blockers");
+
+	const genericShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: genericId }), workspace));
+	assert(genericShown.data.document.parentId === decisionId, "generic-parent Task should preserve parentId");
+	assert(genericShown.data.parentRelationship === "parent", "decision-parented Task should consume generic parent relationship");
+	assert(genericShown.data.subtasks.some((subtask: any) => subtask.id === genericSubtaskId), "generic-parent Task should expose its Subtasks");
 
 	const listed = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), workspace));
-	for (const id of [blockerId, childId, followUpId]) {
-		const item = itemById(listed, id);
-		assert(item?.parentId === parentId, `tandem_task list should return parentId for ${id}`);
-		assert(item?.parentRelationship === "subtask", `tandem_task list should return subtask relationship for ${id}`);
+	assert(itemById(listed, taskId)?.parentRelationship === "epic-task", "list should pass through epic-task");
+	for (const id of [blockerId, subtaskId, genericSubtaskId]) {
+		assert(itemById(listed, id)?.parentRelationship === "subtask", `list should pass through subtask for ${id}`);
 	}
-	const parentFilteredList = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list", parent: parentId }), workspace));
-	assert(parentFilteredList.data.counts.total === 3, "tandem_task list parent filter should return all tracked children");
+	assert(itemById(listed, genericId)?.parentRelationship === "parent", "list should pass through generic parent");
 
-	const parentFile = await readFile(join(workspace, ".tandem", "board", `${parentId}.md`), "utf8");
-	assertIncludes(parentFile, "relatedFiles: [\"docs/architecture.md\"]", "parent task");
-	assert(!parentFile.includes("\nsubtasks:"), "parent task should not contain legacy inline subtasks metadata");
+	const epicFiltered = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list", parent: epicId }), workspace));
+	assert(epicFiltered.data.counts.total === 1 && epicFiltered.data.items[0].id === taskId, "exact Epic parent filter should return its global Task");
+	assert(epicFiltered.data.items[0].parentRelationship === "epic-task", "filtered list should retain epic-task");
+	const taskFiltered = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list", parent: taskId }), workspace));
+	assert(taskFiltered.data.counts.total === 2, "exact Task parent filter should return its Subtask worklist");
+	assert(taskFiltered.data.items.every((item: any) => item.parentRelationship === "subtask"), "Task-filtered list should retain subtask relationships");
 
-	const blockerFile = await readFile(join(workspace, ".tandem", "board", `${blockerId}.md`), "utf8");
-	assertIncludes(blockerFile, `parentId: \"${parentId}\"`, "blocker task");
-	assertIncludes(blockerFile, `references: [\"${decisionId}\"]`, "blocker task");
-	assertIncludes(blockerFile, "relatedFiles: [\"tests/fixtures/relationship.json\"]", "blocker task");
-	assert(!blockerFile.includes("\nsubtasks:"), "blocker child should not contain legacy inline subtasks metadata");
+	const searched = parseJson(await runTandem(tandem, buildSearchArgs({ query: "relationship-smoke" }), workspace));
+	assert(resultById(searched, taskId)?.parentRelationship === "epic-task", "search should pass through epic-task");
+	assert(resultById(searched, subtaskId)?.parentRelationship === "subtask", "search should pass through subtask");
+	assert(resultById(searched, genericId)?.parentRelationship === "parent", "search should pass through generic parent");
 
-	const childFile = await readFile(join(workspace, ".tandem", "board", `${childId}.md`), "utf8");
-	assertIncludes(childFile, `parentId: \"${parentId}\"`, "child task");
-	assertIncludes(childFile, `blockers: [\"${blockerId}\"]`, "child task");
-	assertIncludes(childFile, `references: [\"${decisionId}\", \"${parentId}\"]`, "child task");
-	assertIncludes(childFile, "relatedFiles: [\"src/relationships.ts\", \"docs/architecture.md\"]", "child task");
-	assert(!childFile.includes("\nsubtasks:"), "implementation child should not contain legacy inline subtasks metadata");
-
-	const nestedFile = await readFile(join(workspace, ".tandem", "board", `${nestedId}.md`), "utf8");
-	assertIncludes(nestedFile, `parentId: "${childId}"`, "nested child task");
-	assert(!nestedFile.includes("\nsubtasks:"), "nested child should not contain legacy inline subtasks metadata");
-
-	const followUpFile = await readFile(join(workspace, ".tandem", "board", `${followUpId}.md`), "utf8");
-	assertIncludes(followUpFile, `parentId: \"${parentId}\"`, "follow-up task");
-	assertIncludes(followUpFile, `blockers: [\"${childId}\"]`, "follow-up task");
-	assertIncludes(followUpFile, `references: [\"${decisionId}\", \"${blockerId}\"]`, "follow-up task");
-	assertIncludes(followUpFile, "relatedFiles: [\"extensions/pi-tandem/pi-tandem.md\"]", "follow-up task");
-
-	const fileSearch = parseJson(await runTandem(tandem, buildSearchArgs({ query: "src/relationships.ts" }), workspace));
-	assert(resultIds(fileSearch).has(childId), "tandem_search should find child by relatedFiles path");
-	const childSearchResult = resultById(fileSearch, childId);
-	assert(childSearchResult?.parentId === parentId, "tandem_search should naturally return child parentId");
-	assert(childSearchResult?.parentRelationship === "subtask", "tandem_search should naturally return child relationship classification");
-
-	const parentFilteredSearch = parseJson(await runTandem(tandem, buildSearchArgs({ query: "relationship-smoke", parent: parentId }), workspace));
-	assert(resultIds(parentFilteredSearch).size === 3, "tandem_search parent filter should return all tagged tracked children");
-	for (const result of parentFilteredSearch.data.results) {
-		assert(result.parentId === parentId && result.parentRelationship === "subtask", "parent-filtered search results should expose CLI relationship fields");
-	}
-
-	const decisionSearch = parseJson(await runTandem(tandem, buildSearchArgs({ query: decisionId }), workspace));
-	assert(resultIds(decisionSearch).has(blockerId), "tandem_search should find blocker by decision reference");
-	assert(resultIds(decisionSearch).has(childId), "tandem_search should find child by decision reference");
-	assert(resultIds(decisionSearch).has(followUpId), "tandem_search should find follow-up by decision reference");
+	const taskFile = await readFile(join(workspace, ".tandem", "board", `${taskId}.md`), "utf8");
+	assertIncludes(taskFile, `parentId: "${epicId}"`, "Epic Task file");
+	assert(!taskFile.includes("\nsubtasks:"), "Task file should not contain inline checklist metadata");
+	const subtaskFile = await readFile(join(workspace, ".tandem", "board", `${subtaskId}.md`), "utf8");
+	assertIncludes(subtaskFile, `parentId: "${taskId}"`, "Subtask file");
+	assertIncludes(subtaskFile, `blockers: ["${blockerId}"]`, "Subtask file");
+	assert(!subtaskFile.includes("\nsubtasks:"), "Subtask file should not contain inline checklist metadata");
 
 	await runTandem(tandem, buildTaskArgs({
 		action: "complete",
 		id: blockerId,
-		summary: "Archive first allocated child for sequence continuity smoke",
+		summary: "Archive first Subtask for sequence continuity smoke",
 	}), workspace);
-	const loggedChild = parseJson(await runTandem(tandem, buildLogArgs({ action: "show", id: blockerId }), workspace));
-	assert(loggedChild.data.document.id === blockerId, "completed first child should be readable from logs");
-	const successorOutput = await runTandem(tandem, buildTaskArgs({
+	const loggedSubtask = parseJson(await runTandem(tandem, buildLogArgs({ action: "show", id: blockerId }), workspace));
+	assert(loggedSubtask.data.document.id === blockerId, "completed Subtask should be readable from logs");
+	assert(loggedSubtask.data.parentRelationship === "subtask", "logged Subtask should retain CLI-computed relationship");
+	const successorId = parseId(await runTandem(tandem, buildTaskArgs({
 		action: "add",
-		title: "Continue relationship sequence after completed log",
-		parent: parentId,
-	}), workspace);
-	const successorId = parseId(successorOutput);
-	assert(successorId === `${parentId}-3`, `completed-log child sequence should not be reused; expected ${parentId}-3, got ${successorId}`);
+		title: "Continue Subtask sequence after completed log",
+		parent: taskId,
+	}), workspace));
+	assert(successorId === `${taskId}-3`, `completed Subtask suffix should not be reused; expected ${taskId}-3, got ${successorId}`);
+	const taskHistory = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	const completedSummary = taskHistory.data.subtasks.find((subtask: any) => subtask.id === blockerId);
+	assert(completedSummary?.location === "logs" && typeof completedSummary.completedAt === "string", "Task show should include completed Subtasks from logs with completedAt");
+	const activeSummary = taskHistory.data.subtasks.find((subtask: any) => subtask.id === successorId);
+	assert(activeSummary?.location === "board", "Task show should include active Subtasks from the board");
 
-	const genericOutput = await runTandem(tandem, buildTaskArgs({
-		action: "add",
-		title: "Generic decision-parent relationship",
-		parent: decisionId,
-	}), workspace);
-	const genericId = parseId(genericOutput);
-	assert(/^task-\d+$/.test(genericId), `generic non-task parent should retain flat task allocation, got ${genericId}`);
-	const genericShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: genericId }), workspace));
-	assert(genericShown.data.document.parentId === decisionId, "generic parent task should preserve parentId");
-	assert(genericShown.data.parentRelationship === "parent", "decision-parent link should remain a generic parent relationship");
+	const nestedEpic = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Invalid nested Epic", kind: "epic", parent: epicId }), workspace);
+	assertFailure(nestedEpic, "nested Epic", "an Epic cannot have parentId");
 
-	const legacyFlatId = "task-200";
-	await writeFile(join(workspace, ".tandem", "board", `${legacyFlatId}.md`), `---\nid: ${legacyFlatId}\ntype: task\ntitle: "Legacy flat-ID child"\nstate: todo\nparentId: "${parentId}"\n---\n`, "utf8");
-	const legacyShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: legacyFlatId }), workspace));
-	assert(legacyShown.data.document.parentId === parentId, "existing flat-ID child should preserve canonical parentId");
-	assert(legacyShown.data.parentRelationship === "subtask", "existing flat-ID child should still classify from parentId");
+	const childBeneathSubtask = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Invalid depth", parent: subtaskId }), workspace);
+	assertFailure(childBeneathSubtask, "child beneath Subtask", `cannot attach a child beneath Subtask ${subtaskId}`);
 
-	const missingParent = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Bad missing parent", parent: "task-999" }), workspace);
-	assert(missingParent.code !== 0, "tandem_task add should reject unresolved parent core reference");
-	assertIncludes(`${missingParent.stdout}\n${missingParent.stderr}`, "Validation failed: parent document not found: task-999", "missing parent failure");
+	const standaloneId = parseId(await runTandem(tandem, buildTaskArgs({ action: "add", title: "Standalone Task" }), workspace));
+	const roleChangingReparent = await runProcess(tandem, buildTaskArgs({ action: "update", id: standaloneId, parent: taskId }), workspace);
+	assertFailure(roleChangingReparent, "role-changing reparent", `reparenting ${standaloneId} would change its canonical role from task to subtask`, "IDs are immutable");
+	const standaloneShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: standaloneId }), workspace));
+	assert(standaloneShown.data.document.parentId === undefined, "rejected reparent should not mutate the standalone Task");
 
-	const looseReferenceOutput = await runTandem(tandem, buildTaskArgs({ action: "add", title: "Loose related reference", references: ["task-999"] }), workspace);
-	assertIncludes(looseReferenceOutput, "Warning: reference not found: task-999", "loose reference warning");
+	const erroneousEpicChildId = `${epicId}-99`;
+	const erroneousEpicChildPath = join(workspace, ".tandem", "board", `${erroneousEpicChildId}.md`);
+	await writeFile(erroneousEpicChildPath, `---\nid: ${erroneousEpicChildId}\ntype: task\ntitle: "Erroneous hierarchical Epic child"\nstate: todo\nparentId: "${epicId}"\n---\n`, "utf8");
+	const erroneousCompatibilityRead = await runProcess(tandem, buildTaskArgs({ action: "list" }), workspace);
+	assertFailure(erroneousCompatibilityRead, "erroneous Epic hierarchical child", erroneousEpicChildId, "expected global `task-N`");
+	await rm(erroneousEpicChildPath, { force: true });
 
-	// Occupy every destination in one allocator retry window without matching the
-	// parent-derived IDs in frontmatter. The adapter must surface the CLI's
-	// collision failure rather than constructing or retrying IDs itself.
-	for (let suffix = 4; suffix < 1004; suffix += 1) {
-		await writeFile(
-			join(workspace, ".tandem", "board", `${parentId}-${suffix}.md`),
-			`---\nid: collision-${suffix}\ntype: decision\ntitle: "Collision fixture ${suffix}"\n---\n`,
-			"utf8",
-		);
-	}
-	const collision = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Exhaust occupied child destinations", parent: parentId }), workspace);
-	assert(collision.code !== 0, "tandem_task add should expose CLI allocation failure when child destinations remain occupied");
-	assertIncludes(`${collision.stdout}\n${collision.stderr}`, `ID allocation failure: could not reserve a new ${parentId} document`, "child allocation collision failure");
+	const erroneousGlobalSubtaskId = "task-9998";
+	const erroneousGlobalSubtaskPath = join(workspace, ".tandem", "board", `${erroneousGlobalSubtaskId}.md`);
+	await writeFile(erroneousGlobalSubtaskPath, `---\nid: ${erroneousGlobalSubtaskId}\ntype: task\ntitle: "Erroneous global-ID Subtask"\nstate: todo\nparentId: "${taskId}"\n---\n`, "utf8");
+	const erroneousGlobalSubtaskRead = await runProcess(tandem, buildTaskArgs({ action: "list" }), workspace);
+	assertFailure(erroneousGlobalSubtaskRead, "erroneous global-ID Subtask", erroneousGlobalSubtaskId, `expected \`${taskId}-M\``);
+	await rm(erroneousGlobalSubtaskPath, { force: true });
+
+	const missingParent = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Bad missing parent", parent: "task-99999" }), workspace);
+	assertFailure(missingParent, "missing parent", "Validation failed: parent document not found: task-99999");
+	const looseReferenceOutput = await runTandem(tandem, buildTaskArgs({ action: "add", title: "Loose related reference", references: ["task-99999"] }), workspace);
+	assertIncludes(looseReferenceOutput, "Warning: reference not found: task-99999", "loose reference warning");
 
 	console.log(`pi-tandem relationship smoke passed with ${tandem}`);
-	console.log(`Verified CLI-owned IDs: ${parentId} -> ${blockerId}/${childId}/${successorId}, nested ${nestedId}, generic ${decisionId} -> ${genericId}, legacy flat ${legacyFlatId}.`);
+	console.log(`Verified canonical hierarchy: ${epicId} (Epic) -> ${taskId} (Task) -> ${subtaskId}/${successorId} (Subtasks); generic ${decisionId} -> ${genericId}.`);
 } finally {
 	await rm(workspace, { recursive: true, force: true });
 }

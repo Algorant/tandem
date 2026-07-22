@@ -1,6 +1,6 @@
 # Delegated task-tree worker specification
 
-Status: accepted working direction; Pi-config compatibility bootstrap first, Tandem correction follows
+Status: accepted working direction; canonical Tandem roles implemented, Pi-config handoff remains separate
 Date: 2026-07-15
 Related: `decision-7`, `task-134`, `extensions/pi-tandem/`
 
@@ -71,8 +71,8 @@ The todo projection is not a second durable project database. It may be reconstr
 When delegating a Task with Subtasks, Shep should:
 
 1. Confirm the root is a valid Task role with a global `task-N` ID; reject Epic, Subtask, missing-parent, cyclic, and role/ID-mismatched roots.
-2. Resolve the Task's direct Subtasks from Tandem, including completed Subtasks needed for context.
-3. Include each active Subtask's ID, title, state, body/description, blockers, references, related files, and relevant accord/review context in the worker prompt.
+2. Resolve the complete direct worklist from the Task's `show --json` `data.subtasks`, which aggregates Board and Logs and identifies each summary with `location` plus `completedAt` when completed.
+3. Retain an exact-parent active read for the executable subset, then fetch active detail with `show` and completed context with `log show`; include each active Subtask's ID, title, state, body/description, blockers, references, related files, and relevant accord/review context in the worker prompt.
 4. Present a dependency-valid recommended execution order.
 5. Tell Worker A to create a matching `pi-todos` list before implementation.
 6. Tell Worker A to update the whole todo list as checkpoints start and complete.
@@ -137,33 +137,23 @@ The root settlement should include:
 
 Receiving the settlement does not automatically merge, accept, complete, push, or clean up. The parent performs those operations after one aggregate review, while retaining the option to inspect any individual checkpoint commit.
 
-## Compatibility-first bootstrap sequence
+## Canonical Pi-config consumption sequence
 
-The minimal Pi-config support should land before task-134's replacement Tasks resume so they can exercise the intended Task-with-Subtasks workflow. Current incorrect records such as `task-134-1` are not compatibility inputs; they are removed and replaced under decision-7.
+Tandem now emits decision-7's strict roles and relationships. The separate Pi-config implementation should consume that CLI output rather than reproduce final role classification or preserve invalid historical shapes. Incorrect records such as hierarchical direct Epic children are not compatibility inputs.
 
-Until Tandem emits corrected role output, the Pi-config bootstrap should validate the delegated root structurally from resolved documents:
+For a requested delegation root, Pi/Shep should:
 
-- root `kind: epic` → Epic, reject delegation;
-- global root with no task parent or a generic non-task parent → Task, allow;
-- global root whose resolved parent is an Epic → Task, allow;
-- parent-derived child whose resolved parent is a Task → Subtask, reject independent delegation;
-- Epic with a parent, child beneath a Subtask, missing parent, cycle, or role/ID mismatch → reject with diagnostics.
+1. Consume the resolved Tandem role/relationship and allow only a global-ID Task; reject Epic, Subtask, missing-parent, cyclic, and role/ID-mismatched roots.
+2. Read the Task with `tandem show <id> --json` and use its computed `data.subtasks` as the complete direct-child index across Board and Logs. Preserve each summary's `location` and optional `completedAt` so completed context is not lost.
+3. Query active exact children with `tandem list --parent <id> --json` (or the equivalent thin pi-tandem call), require every result to be a CLI-classified, parent-derived Subtask, and reconcile those IDs with the Board entries from `data.subtasks`.
+4. Fetch full detail for each indexed child according to location: `tandem show <subtask-id> --json` for Board entries and `tandem log show <subtask-id> --json` for Logs entries. Include completed detail as campaign context, but project only active Subtasks into executable todos.
+5. Derive a dependency-valid execution order from active blockers and reject deeper children because Subtasks are leaf-only.
 
-For an allowed Task root:
+Task `show` supplies the complete Board+Logs worklist; exact-parent `list` supplies the active execution set. Neither read authorizes Pi extensions to duplicate allocation, graph validation, or final relationship classification. After Pi-config changes are validated, reload/restart Pi and confirm a tracked fixture Task worker can call `manage_todo_list` and execute one Task-owned Subtask campaign.
 
-1. Query exact children with `tandem task list --parent <id> --json` (or the equivalent thin pi-tandem call).
-2. Require every active child to be a canonical parent-derived Subtask of that Task; do not accept direct Epic-child allocation errors as campaign items.
-3. Fetch each Subtask's full detail with `tandem show <id> --json` so the prompt includes body, blockers, references, related files, and state.
-4. Derive a dependency-valid execution order from blockers.
-5. Reject any deeper child because Subtasks are leaf-only.
+## Tandem repository contract
 
-This is temporary structural role determination, not legacy support. Once task-134 corrects Tandem, Pi-shep should consume Tandem's canonical role result and retain exact-parent traversal only for assembling the Subtask checklist.
-
-After the Pi-config change is validated, reload/restart Pi, confirm a tracked fixture Task worker can call `manage_todo_list`, rebuild task-133 and task-134's incorrect direct children as global Tasks, and resume the preserved paused work under its replacement Task ID.
-
-## Tandem repository changes
-
-Task-134 may proceed after the compatibility bootstrap. Tandem should then provide and document:
+Tandem provides and documents:
 
 - decision-7's correct Epic → Task → Subtask classification;
 - complete Task and Subtask summaries plus reliable exact-parent reads;
@@ -172,16 +162,16 @@ Task-134 may proceed after the compatibility bootstrap. Tandem should then provi
 - tests demonstrating that one Task root can expose its dependency-ordered Subtask campaign;
 - repository pi-tandem guidance describing Task-owned Subtask execution without duplicating protocol logic.
 
-Additional Tandem implementation should remain thin and data-oriented; worker execution policy belongs primarily in Pi/Shep. Exact-parent traversal remains the compatibility contract even if richer aggregate child output is added later.
+Additional Tandem implementation should remain data-oriented; worker execution policy belongs primarily in Pi/Shep. Exact-parent traversal remains the integration contract even if richer aggregate child output is added later.
 
 ## Pi-config implementation handoff
 
-Apply this bootstrap first in the canonical Pi configuration repository. Expected areas include:
+Apply this handoff in the canonical Pi configuration repository. Expected areas include:
 
 - `extensions/pi-shep/index.ts`
   - stop disabling `manage_todo_list` for tracked workers;
-  - allow only structurally valid Task roots during the bootstrap;
-  - fetch the Task's direct Subtask worklist through exact-parent list queries plus per-Subtask detail reads;
+  - allow only CLI-resolved, structurally valid Task roots;
+  - fetch the complete Task-owned Subtask index from Task `show`, reconcile active entries through exact-parent list, and use per-ID `show`/`log show` detail reads according to location;
   - generate dependency-aware campaign instructions and an explicit Tandem-ID-prefixed todo projection;
   - reject Epic/Subtask roots and invalid role/ID combinations rather than adding compatibility behavior;
   - retain Task-root-only settlement and parent-owned final lifecycle;
@@ -223,4 +213,4 @@ These can be reconsidered after direct task-tree execution demonstrates where ad
 - Worker A executes dependency-valid Subtasks directly and produces reviewable commits/evidence.
 - Parent receives one Task-root settlement and performs one aggregate integration review.
 - Subtasks are not prematurely archived before their campaign branch is accepted.
-- No nested worker delegation or tracked-worker Tandem lifecycle mutation is required for the initial version; the Pi-config bootstrap is applied separately before task-134's replacement Tasks resume.
+- No nested worker delegation or tracked-worker Tandem lifecycle mutation is required for the initial version; the Pi-config handoff is applied separately from Tandem repository work.

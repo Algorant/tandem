@@ -1,33 +1,41 @@
 # pi-tandem Relationship Smoke Notes
 
-Purpose: validate that pi-tandem exposes Tandem's first-class parent-linked task behavior without authoring deprecated inline checklist subtasks or reimplementing relationship logic in TypeScript.
+Purpose: verify that pi-tandem passes canonical task metadata to Tandem and consumes Tandem's strict role/relationship output without implementing protocol logic in TypeScript.
 
 ## Controlled scenario
 
-`relationship-smoke.ts` builds the current repository Tandem CLI, creates a temporary workspace, and uses pi-tandem argument builders plus `tandem` to create:
+`relationship-smoke.ts` builds the current repository CLI, creates a temporary workspace, and uses pi-tandem argument builders to create:
 
-- a normal parent task with related files;
-- a decision referenced by the parent/children;
-- a fixture-prep child and implementation sibling whose IDs are allocated as `<parent>-1` and `<parent>-2`;
-- a nested implementation child allocated as `<parent>-2-1`;
-- a validation follow-up created with a flat root ID and then attached through `tandem update --parent`, proving IDs remain immutable;
-- a completed first child followed by `<parent>-3`, proving completed-log sequence continuity;
-- a decision-parented task that retains flat allocation and generic `parentRelationship: "parent"`;
-- a manually seeded legacy flat-ID child classified from `parentId`;
-- occupied child destinations that force and expose the CLI's allocation collision error.
+```text
+Epic global task-N
+└── Task global task-M                 parentRelationship: epic-task
+    ├── Subtask task-M-1               parentRelationship: subtask
+    └── Subtask task-M-2               parentRelationship: subtask
 
-The smoke also verifies that the adapter schema omits deprecated inline `subtasks` authoring and that a legacy builder input is rejected instead of forwarding `--subtask`.
+decision-N
+└── Task global task-P                 parentRelationship: parent
+    └── Subtask task-P-1               parentRelationship: subtask
+```
+
+The first Subtask is completed and a later Subtask continues at `task-M-3`, proving per-Task suffix allocation scans logs.
 
 ## Assertions
 
-- The adapter forwards `--parent` and never constructs IDs; Tandem allocates hierarchical/nested children and flat generic-parent tasks.
-- Persisted children have `parentId`, blockers, references, and related files, with no newly-authored inline `subtasks` block.
-- Child `show --json` returns `document.parentId` and CLI-computed `parentRelationship: "subtask"`; generic and legacy relationships remain compatible.
-- Parent `show --json` returns computed summaries for direct parent-linked task children, including nested summaries on child parents.
-- `list --json` and `search --json` naturally retain the CLI's `parentId` and `parentRelationship` fields.
-- Parent filters pass through for list/search and select the tracked children.
-- Logged IDs are not reused; strict unresolved parents and exhausted destination reservations fail while unresolved loose references remain warnings.
+- The tool schema exposes `kind`, `parent`, blockers, references, and related files, but not deprecated inline `subtasks` authoring.
+- Generated prompt guidance states the canonical hierarchy, Task-only delegation boundary, and thin pass-through rule.
+- Builders forward `--kind epic` and `--parent` exactly; they do not construct IDs or emit `--subtask`.
+- A direct Epic child receives a global Task ID and CLI relationship `epic-task`, never an Epic-derived hierarchical ID.
+- A direct Task child receives `<Task ID>-M` and CLI relationship `subtask`.
+- A decision/custom-parented task remains a global Task with generic relationship `parent` and can own its own Subtasks.
+- Epic show emits `tasks`; Task show emits Board+Logs `subtasks` with `location`/`completedAt`; Subtask show emits no child collection.
+- List/search/show and exact-parent filters retain CLI-returned relationships unchanged.
+- Persisted documents contain `parentId`, blockers, references, and related files without newly authored inline checklist metadata.
+- Nested Epics and children beneath Subtasks fail.
+- Reparenting that changes Task → Subtask role fails without mutation because IDs are immutable.
+- A manually seeded hierarchical direct Epic child makes strict reads fail with `expected global task-N`; there is no compatibility exception.
+- The inverse malformed shape—a global-ID child beneath a normal Task—also fails because a Subtask must use `<Task ID>-M`.
+- Unresolved strict parents fail, while unresolved loose references remain warnings.
 
 ## Adapter boundary
 
-The adapter only builds argument arrays and returns Tandem output. ID allocation, collision handling, parent classification, and computed subtask discovery remain in the Rust CLI/protocol implementation; pi-tandem does not parse Markdown, infer relationships from IDs, construct IDs, or synthesize response fields.
+The smoke uses manual malformed frontmatter only as an invalid-input fixture. Production pi-tandem code remains an argument-array adapter. Tandem owns document resolution, canonical role classification, allocation, graph validation, relationship values, and response collections.

@@ -29,21 +29,26 @@ Maps to:
 ```text
 tandem list [filters] --json
 tandem show <id> --json
-tandem add --title <title> [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] ...
+tandem add --title <title> [--kind epic] [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] ...
 tandem move <id> --state <state>
-tandem update <id> [--title <title>] [--parent <id>] [--priority <priority>] [--tag <tag>] ...
+tandem update <id> [--title <title>] [--kind epic] [--parent <id>] [--priority <priority>] [--tag <tag>] ...
 tandem complete <id> --summary <text> ...
 ```
 
 Read actions default to JSON. Mutation actions keep the CLI's human-readable output.
 
-Relationship parameters map directly to Tandem CLI fields: `parent` → `parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, and `relatedFiles` → project paths. On add, pi-tandem only forwards `--parent`: the CLI classifies the resolved parent and allocates the ID. A task parent produces parent-derived IDs such as `task-103-1` and nested `task-103-1-1`; allocation scans active tasks and completed logs so suffixes are not reused. A decision/custom parent remains a generic relationship with a flat `task-N` ID. Existing flat-ID children remain valid because `parentId`, not ID shape, defines hierarchy. Create/inspect parent and blocker documents before using their IDs; unresolved parent/blocker references are errors, while unresolved related references are warnings. `parent` also filters list results and can attach/reparent an active task with `action: "update"` without changing its immutable ID.
+Relationship parameters map directly to Tandem CLI fields: `kind` → `--kind`, `parent` → `--parent`/`parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, and `relatedFiles` → project paths. Pi-tandem forwards these values and lets the CLI resolve the canonical role, allocate the ID, validate the graph, and return the relationship:
 
-Inline checklist `subtasks` metadata is legacy/deprecated and read-only through this adapter. `pi-tandem` does not expose it in the tool schema or forward `--subtask`; create each independently tracked work unit with a separate `action: "add"` call and `parent: "task-N"`.
+- a root `type: task`, `kind: epic` document is an Epic with a global `task-N` ID;
+- a direct Epic child is a global-ID Task with `parentRelationship: "epic-task"`;
+- a direct Task child is a leaf `<Task ID>-M` Subtask with `parentRelationship: "subtask"`;
+- a decision/custom-parented task is a global-ID Task with generic `parentRelationship: "parent"`.
 
-The adapter returns Tandem's read output without reclassifying relationships in TypeScript. Consequently, list/search JSON naturally includes CLI-computed `parentId` and `parentRelationship` fields where applicable, and show JSON naturally includes those fields plus computed `subtasks` summaries for task parents.
+Allocation scans active tasks and completed logs so global and per-Task sequences are not reused. Subtasks cannot have children, Epics cannot have parents, direct Epic children never use hierarchical IDs, and role-changing or ID-invalidating reparenting is rejected. Create/inspect parent and blocker documents first; unresolved parent/blocker references are errors, while unresolved loose references are warnings.
 
-For epics, use ordinary task hierarchy: the epic is `type: task` with the lightweight `kind: epic` classifier, children use `parent`/`parentId`, and loose decisions/sibling/log context uses `references`. The adapter does not create `type: epic`, ADR-style epic documents, custom folders, or special lifecycle states.
+Inline checklist `subtasks` metadata is legacy/deprecated and read-only through this adapter. `pi-tandem` does not expose it or forward `--subtask`; create lifecycle-bearing Subtask documents beneath their Task.
+
+The adapter returns Tandem's read output without reclassifying relationships in TypeScript. List/search JSON retains CLI-computed `parentId`/`parentRelationship`; show returns `tasks` for an Epic, `subtasks` for a Task, and no child collection for a Subtask. There is no compatibility path for erroneous hierarchical IDs directly beneath Epics.
 
 ### `tandem_accord`
 
@@ -127,7 +132,7 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repo's `.tandem` board when the checkout has one, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts` and, when needed, a temporary ignored repository `.tandem` workspace; it starts `pi --mode rpc --approve --offline` with an isolated `PI_CODING_AGENT_DIR`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes all temporary state. `relationship-smoke.ts` builds the current repository CLI, creates a temporary parent/child/blocker/reference scenario, rejects legacy inline authoring, and verifies CLI-owned hierarchical and nested allocation, completed-log sequence continuity, generic non-task parents, existing flat-ID children, occupied-destination collision failures, and CLI-computed show/list/search relationship output. `pi-runtime-smoke.ts` also seeds hierarchical/nested/log-continuity tasks in its disposable workspace before fresh Pi startup and verifies `/tandem status` observes the active hierarchy.
+`smoke.ts` performs read-only checks against this repo's `.tandem` board when the checkout has one, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts` and, when needed, a disposable repository `.tandem` workspace containing an Epic, global Task, and parent-derived Subtask; it starts `pi --mode rpc --approve --offline`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes all temporary state. `relationship-smoke.ts` verifies generated Task-only/thin-adapter guidance, canonical Epic → Task → Subtask IDs, Board+Logs Task summaries, CLI-returned `epic-task`/`subtask`/generic `parent` output, completed-log sequence continuity, exact-parent reads, and rejection of nested Epics, children beneath Subtasks, role-changing reparenting, erroneous hierarchical Epic children, and erroneous global-ID Subtasks.
 
 Manual project-local Pi smoke:
 
@@ -147,6 +152,10 @@ TANDEM_BIN="$PWD/tandem/target/debug/tandem" pi -e ./extensions/pi-tandem/index.
 
 Do not promote this extension into `~/.pi/agent/extensions` until a separate review/promotion task.
 
-## Prompt guidance
+## Prompt guidance and delegation
 
-The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or the prompt asks for durable coordination. Guidance tells agents to create independently tracked work as parent-linked child tasks rather than deprecated inline checklist entries, use `validation` for delivered work awaiting acceptance, tolerate legacy `state: review` reads, keep workflow state distinct from `review:` metadata and accord status, model epics as ordinary `type: task` + `kind: epic` parents rather than separate ADR/epic protocol behavior, and use `tandem_decision` for ADR-compatible decisions instead of inventing task lifecycle state. See `pi-tandem.md` for the human-readable agent guidance.
+The extension registers prompt snippets/guidelines and appends focused guidance when a `.tandem/tandem.md` workspace exists or durable coordination is requested. Guidance describes the strict Epic → global Task → parent-derived leaf Subtask hierarchy and consumes Tandem's `epic-task`, `subtask`, and generic `parent` output without TypeScript reclassification.
+
+Only Tasks are delegation roots initially. A delegated Task worker owns its direct Subtasks through the worker-session todo projection and produces one Task-root handoff; Epics and Subtasks are not independently delegated. Lifecycle authority stays with the parent/orchestrator.
+
+See [`pi-tandem.md`](pi-tandem.md) for agent guidance and [`../../plan/delegated-task-tree-worker-spec.md`](../../plan/delegated-task-tree-worker-spec.md) for the explicit cross-repository Pi-config handoff. Keep that Pi-config implementation separate; do not modify personal dotfiles from this repository.

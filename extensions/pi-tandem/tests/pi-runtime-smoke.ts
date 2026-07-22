@@ -159,15 +159,23 @@ async function ensureRepoWorkspace(tandem: string): Promise<boolean> {
 	return true;
 }
 
-async function prepareHierarchicalRuntimeFixture(tandem: string): Promise<void> {
-	const parentId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime hierarchy parent" }), repoRoot));
-	const completedChildId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime completed child", parent: parentId }), repoRoot));
-	assert(completedChildId === `${parentId}-1`, `Pi runtime fixture expected first hierarchical child ${parentId}-1, got ${completedChildId}`);
-	await runProcess(tandem, buildTaskArgs({ action: "complete", id: completedChildId, summary: "Exercise runtime completed-log continuity" }), repoRoot);
-	const activeChildId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime active child", parent: parentId }), repoRoot));
-	assert(activeChildId === `${parentId}-2`, `Pi runtime fixture should continue after logged child with ${parentId}-2, got ${activeChildId}`);
-	const nestedId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime nested child", parent: activeChildId }), repoRoot));
-	assert(nestedId === `${activeChildId}-1`, `Pi runtime fixture expected nested ID ${activeChildId}-1, got ${nestedId}`);
+async function prepareCanonicalRuntimeFixture(tandem: string): Promise<void> {
+	const epicId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime Epic", kind: "epic" }), repoRoot));
+	const taskId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime delegated Task", parent: epicId }), repoRoot));
+	assert(/^task-\d+$/.test(taskId) && !taskId.startsWith(`${epicId}-`), `Pi runtime fixture expected global Task beneath Epic ${epicId}, got ${taskId}`);
+	const completedSubtaskId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime completed Subtask", parent: taskId }), repoRoot));
+	assert(completedSubtaskId === `${taskId}-1`, `Pi runtime fixture expected first parent-derived Subtask ${taskId}-1, got ${completedSubtaskId}`);
+	await runProcess(tandem, buildTaskArgs({ action: "complete", id: completedSubtaskId, summary: "Exercise runtime completed-log continuity" }), repoRoot);
+	const activeSubtaskId = parseId(await runProcess(tandem, buildTaskArgs({ action: "add", title: "Pi runtime active Subtask", parent: taskId }), repoRoot));
+	assert(activeSubtaskId === `${taskId}-2`, `Pi runtime fixture should continue after logged Subtask with ${taskId}-2, got ${activeSubtaskId}`);
+
+	const epicShown = JSON.parse(await runProcess(tandem, buildTaskArgs({ action: "show", id: epicId }), repoRoot));
+	assert(epicShown.data.tasks.some((task: any) => task.id === taskId), "Pi runtime Epic show should expose its global Task in data.tasks");
+	const taskShown = JSON.parse(await runProcess(tandem, buildTaskArgs({ action: "show", id: taskId }), repoRoot));
+	assert(taskShown.data.parentRelationship === "epic-task", "Pi runtime Task should consume epic-task relationship output");
+	assert(taskShown.data.subtasks.some((subtask: any) => subtask.id === activeSubtaskId), "Pi runtime Task show should expose its active Subtask worklist");
+	const subtaskShown = JSON.parse(await runProcess(tandem, buildTaskArgs({ action: "show", id: activeSubtaskId }), repoRoot));
+	assert(subtaskShown.data.parentRelationship === "subtask", "Pi runtime Subtask should consume subtask relationship output");
 }
 
 async function stopProcess(proc: ChildProcessWithoutNullStreams): Promise<void> {
@@ -191,7 +199,7 @@ let createdRepoWorkspace = false;
 
 try {
 	createdRepoWorkspace = await ensureRepoWorkspace(tandem);
-	if (createdRepoWorkspace) await prepareHierarchicalRuntimeFixture(tandem);
+	if (createdRepoWorkspace) await prepareCanonicalRuntimeFixture(tandem);
 	await withProjectLocalLoader(async () => {
 		const proc = spawn("pi", [
 			"--mode", "rpc",
@@ -233,7 +241,7 @@ try {
 			assert(widgetLines.some((line: string) => line.includes("tandem: available")), `/tandem status did not report tandem availability: ${widgetLines.join("\n")}`);
 			assert(widgetLines.some((line: string) => line.includes("tandem list --json: ok")), `/tandem status did not smoke list --json: ${widgetLines.join("\n")}`);
 			if (createdRepoWorkspace) {
-				assert(widgetLines.some((line: string) => line.includes('counts: {"total":3')), `/tandem status should observe parent, active child, and nested child after completed-log continuity setup: ${widgetLines.join("\n")}`);
+				assert(widgetLines.some((line: string) => line.includes('counts: {"total":3')), `/tandem status should observe Epic, global Task, and active parent-derived Subtask after completed-log continuity setup: ${widgetLines.join("\n")}`);
 			}
 
 			const statusResponse = await rpc.waitFor("/tandem status response", (event) => event.type === "response" && event.id === "status");

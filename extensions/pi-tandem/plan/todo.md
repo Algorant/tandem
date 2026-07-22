@@ -1,19 +1,21 @@
 # pi-tandem Todo
 
 Status: MVP implementation
-Last updated: 2026-07-10
+Last updated: 2026-07-22
 
 ## Accomplished
 
 - [x] Defined `pi-tandem` as a lightweight Pi adapter over installed `tandem`.
-- [x] Added `tandem_status`, `tandem_task`, `tandem_accord`, `tandem_log`, `tandem_rules`, `tandem_decision`, and `tandem_search` tools.
+- [x] Added `tandem_status`, `tandem_init`, `tandem_task`, `tandem_accord`, `tandem_log`, `tandem_rules`, `tandem_decision`, and `tandem_search` tools.
 - [x] Added `/tandem help|status` command.
 - [x] Added diagnostics for missing `tandem`, missing `.tandem`, unsupported CLI surface, timeout/abort, and command failures.
 - [x] Added prompt snippets/guidelines and workspace-aware prompt guidance.
 - [x] Added smoke test coverage for CLI-backed wrapper mappings.
 - [x] Added repo read smoke coverage for this workspace's `.tandem` board.
 - [x] Added a project-local Pi runtime smoke that creates an ignored `.pi/extensions/pi-tandem/index.ts` loader, verifies fresh RPC startup discovers `/tandem`, runs `/tandem status`, and cleans up.
-- [x] Added relationship guidance and smoke coverage for first-class parent-linked child tasks, CLI-owned hierarchical/nested allocation, completed-log sequence continuity, generic non-task parents, existing flat-ID child compatibility, allocation collision errors, CLI-computed `parentRelationship`/subtask summaries, blockers, references, and related files; deprecated inline checklist authoring is no longer exposed.
+- [x] Aligned relationship guidance and Bun smokes with strict Epic → global Task → parent-derived leaf Subtask roles; pi-tandem forwards kind/parent and consumes CLI-returned `epic-task`, `subtask`, and generic `parent` without reclassification.
+- [x] Documented Task-only delegation: one Task worker owns its Subtasks through the todo projection, while Epics and Subtasks are not delegation roots.
+- [x] Added strict invalid-structure smoke coverage for nested Epics, children beneath Subtasks, role-changing reparenting, erroneous hierarchical direct Epic children, and erroneous global-ID Subtasks.
 
 ## Current tasks
 
@@ -22,9 +24,9 @@ Last updated: 2026-07-10
 
 ## Next recommended steps
 
-1. Review the project-local smoke results and decide whether they satisfy task-14.
-2. Decide whether a dedicated `tandem_init`/workspace tool is needed or whether workspace bootstrap should remain a manual CLI action.
-3. Promote accepted extension code into canonical Pi config in a separate task.
+1. Complete review and integration of the canonical hierarchy guidance and smoke coverage.
+2. Apply and validate the separate canonical Pi-config handoff in `plan/delegated-task-tree-worker-spec.md`, then reload/restart Pi; do not modify personal dotfiles from this repository.
+3. After repository and Pi-config acceptance, review promotion of the project-local adapter into shared Pi config and run an interactive `/reload` smoke if human confirmation is desired.
 
 ## Open questions
 
