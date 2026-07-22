@@ -47,7 +47,7 @@ static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
-struct CliError {
+pub(crate) struct CliError {
     message: String,
     code: i32,
 }
@@ -75,7 +75,7 @@ impl From<io::Error> for CliError {
 }
 
 #[derive(Debug, Clone)]
-struct Workspace {
+pub(crate) struct Workspace {
     board_dir: PathBuf,
     logs_dir: PathBuf,
     config_path: PathBuf,
@@ -83,7 +83,7 @@ struct Workspace {
 }
 
 #[derive(Debug, Clone)]
-struct Document {
+pub(crate) struct Document {
     path: PathBuf,
     location: DocumentLocation,
     fields: HashMap<String, String>,
@@ -106,14 +106,33 @@ impl DocumentLocation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ParentRelationship {
+pub(crate) enum TaskRole {
+    Epic,
+    Task,
+    Subtask,
+}
+
+impl TaskRole {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            TaskRole::Epic => "epic",
+            TaskRole::Task => "task",
+            TaskRole::Subtask => "subtask",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ParentRelationship {
+    EpicTask,
     Subtask,
     Parent,
 }
 
 impl ParentRelationship {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
+            ParentRelationship::EpicTask => "epic-task",
             ParentRelationship::Subtask => "subtask",
             ParentRelationship::Parent => "parent",
         }
@@ -121,9 +140,251 @@ impl ParentRelationship {
 
     fn human_label(self) -> &'static str {
         match self {
+            ParentRelationship::EpicTask => "Task of Epic",
             ParentRelationship::Subtask => "Subtask of",
             ParentRelationship::Parent => "Parent",
         }
+    }
+}
+
+/// Canonical board+logs graph used by CLI reads, allocation, and mutation validation.
+/// Kept crate-visible so the TUI can adopt the same decision-7 seam.
+#[derive(Debug, Clone)]
+pub(crate) struct HierarchyIndex {
+    pub(crate) documents: HashMap<String, Document>,
+}
+
+impl HierarchyIndex {
+    pub(crate) fn from_documents(docs: Vec<Document>) -> Result<Self, CliError> {
+        let mut documents = HashMap::new();
+        for doc in docs {
+            let id = doc.id().to_string();
+            if id.trim().is_empty() {
+                return Err(CliError::user(format!(
+                    "Validation failed for {}: missing required field `id`",
+                    display_path(&doc.path)
+                )));
+            }
+            if let Some(existing) = documents.insert(id.clone(), doc.clone()) {
+                return Err(CliError::user(format!(
+                    "Validation failed: duplicate document ID `{id}` in {} and {}",
+                    display_path(&existing.path),
+                    display_path(&doc.path)
+                )));
+            }
+        }
+        Ok(Self { documents })
+    }
+
+    pub(crate) fn from_workspace(workspace: &Workspace) -> Result<Self, CliError> {
+        Self::from_documents(read_workspace_documents(workspace)?)
+    }
+
+    fn with_replacement(&self, doc: Document) -> Self {
+        let mut documents = self.documents.clone();
+        documents.insert(doc.id().to_string(), doc);
+        Self { documents }
+    }
+
+    pub(crate) fn document(&self, id: &str) -> Option<&Document> {
+        self.documents.get(id)
+    }
+
+    pub(crate) fn task_role(&self, doc: &Document) -> Result<Option<TaskRole>, CliError> {
+        if doc.doc_type() != "task" {
+            return Ok(None);
+        }
+        let mut roles = HashMap::new();
+        let mut stack = Vec::new();
+        self.task_role_by_id(doc.id(), &mut roles, &mut stack)
+            .map(Some)
+    }
+
+    fn task_role_by_id(
+        &self,
+        id: &str,
+        roles: &mut HashMap<String, TaskRole>,
+        stack: &mut Vec<String>,
+    ) -> Result<TaskRole, CliError> {
+        if let Some(role) = roles.get(id) {
+            return Ok(*role);
+        }
+        if let Some(cycle_start) = stack.iter().position(|entry| entry == id) {
+            let mut cycle = stack[cycle_start..].to_vec();
+            cycle.push(id.to_string());
+            return Err(CliError::user(format!(
+                "Validation failed: task hierarchy cycle: {}",
+                cycle.join(" -> ")
+            )));
+        }
+        let doc = self.document(id).ok_or_else(|| {
+            CliError::user(format!(
+                "Validation failed: parent document not found: {id}"
+            ))
+        })?;
+        if doc.doc_type() != "task" {
+            return Err(CliError::user(format!(
+                "Validation failed: {id} is type {}, not task",
+                doc.doc_type()
+            )));
+        }
+        if doc.kind() == Some("epic") {
+            roles.insert(id.to_string(), TaskRole::Epic);
+            return Ok(TaskRole::Epic);
+        }
+
+        stack.push(id.to_string());
+        let role = match doc.field("parentId") {
+            None => TaskRole::Task,
+            Some(parent_id) => {
+                let parent = self.document(parent_id).ok_or_else(|| {
+                    CliError::user(format!(
+                        "Validation failed for {}: unresolved parentId `{parent_id}`",
+                        display_path(&doc.path)
+                    ))
+                })?;
+                if parent.doc_type() != "task" {
+                    TaskRole::Task
+                } else {
+                    match self.task_role_by_id(parent_id, roles, stack)? {
+                        TaskRole::Epic => TaskRole::Task,
+                        TaskRole::Task => TaskRole::Subtask,
+                        TaskRole::Subtask => {
+                            return Err(CliError::user(format!(
+                                "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
+                                display_path(&doc.path),
+                                doc.id()
+                            )))
+                        }
+                    }
+                }
+            }
+        };
+        stack.pop();
+        roles.insert(id.to_string(), role);
+        Ok(role)
+    }
+
+    pub(crate) fn relationship(
+        &self,
+        doc: &Document,
+    ) -> Result<Option<ParentRelationship>, CliError> {
+        let Some(parent_id) = doc.field("parentId") else {
+            return Ok(None);
+        };
+        let parent = self.document(parent_id).ok_or_else(|| {
+            CliError::user(format!(
+                "Validation failed for {}: unresolved parentId `{parent_id}`",
+                display_path(&doc.path)
+            ))
+        })?;
+        if doc.doc_type() != "task" || parent.doc_type() != "task" {
+            return Ok(Some(ParentRelationship::Parent));
+        }
+        Ok(Some(match self.task_role(parent)? {
+            Some(TaskRole::Epic) => ParentRelationship::EpicTask,
+            Some(TaskRole::Task) => ParentRelationship::Subtask,
+            Some(TaskRole::Subtask) => {
+                return Err(CliError::user(format!(
+                    "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
+                    display_path(&doc.path),
+                    doc.id()
+                )))
+            }
+            None => ParentRelationship::Parent,
+        }))
+    }
+
+    pub(crate) fn validate_task_hierarchy(&self, doc: &Document) -> Result<TaskRole, CliError> {
+        let role = self.task_role(doc)?.ok_or_else(|| {
+            CliError::user(format!("Validation failed: {} is not a task", doc.id()))
+        })?;
+        if role == TaskRole::Epic && doc.field("parentId").is_some() {
+            return Err(CliError::user(format!(
+                "Validation failed for {}: Epic {} cannot have parentId",
+                display_path(&doc.path),
+                doc.id()
+            )));
+        }
+        let valid_id = match role {
+            TaskRole::Epic | TaskRole::Task => global_task_number(doc.id()).is_some(),
+            TaskRole::Subtask => doc
+                .field("parentId")
+                .is_some_and(|parent_id| subtask_suffix(doc.id(), parent_id).is_some()),
+        };
+        if !valid_id {
+            let expected = match role {
+                TaskRole::Epic | TaskRole::Task => "global `task-N`".to_string(),
+                TaskRole::Subtask => format!(
+                    "`{}-M` with a positive M",
+                    doc.field("parentId").unwrap_or("task-N")
+                ),
+            };
+            return Err(CliError::user(format!(
+                "Validation failed for {}: {} {} has invalid ID `{}`; expected {expected}",
+                display_path(&doc.path),
+                role.as_str(),
+                doc.title(),
+                doc.id()
+            )));
+        }
+        if role == TaskRole::Subtask
+            && self
+                .documents
+                .values()
+                .any(|child| child.field("parentId") == Some(doc.id()))
+        {
+            return Err(CliError::user(format!(
+                "Validation failed for {}: Subtask {} cannot have children",
+                display_path(&doc.path),
+                doc.id()
+            )));
+        }
+        Ok(role)
+    }
+
+    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
+        let mut ids = self
+            .documents
+            .values()
+            .filter(|doc| doc.doc_type() == "task")
+            .map(|doc| doc.id().to_string())
+            .collect::<Vec<_>>();
+        ids.sort();
+        for id in ids {
+            self.validate_task_hierarchy(self.document(&id).expect("indexed task"))?;
+        }
+        Ok(())
+    }
+}
+
+/// Serializes cooperative CLI hierarchy snapshots and mutations on the workspace config inode.
+pub(crate) struct HierarchyLock {
+    file: File,
+}
+
+impl HierarchyLock {
+    pub(crate) fn acquire(workspace: &Workspace) -> Result<Self, CliError> {
+        let path = workspace.config_path.clone();
+        let file = OpenOptions::new().read(true).open(&path).map_err(|error| {
+            CliError::user(format!(
+                "Write failure: could not open hierarchy lock {}: {error}",
+                display_path(&path)
+            ))
+        })?;
+        file.lock().map_err(|error| {
+            CliError::user(format!(
+                "Write failure: could not lock hierarchy snapshot {}: {error}",
+                display_path(&path)
+            ))
+        })?;
+        Ok(Self { file })
+    }
+}
+
+impl Drop for HierarchyLock {
+    fn drop(&mut self) {
+        let _ = self.file.unlock();
     }
 }
 
@@ -1091,15 +1352,22 @@ fn derive_workspace_title(root: &Path) -> String {
 
 fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let docs = hierarchy
+        .documents
+        .values()
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
+        .collect::<Vec<_>>();
     let mut filtered = filter_documents(docs, &options);
     sort_documents(&mut filtered);
-    let document_types = read_document_types(&workspace)?;
 
     if options.json {
-        println!("{}", list_json(&filtered, &document_types));
+        println!("{}", list_json(&filtered, &hierarchy)?);
     } else {
-        print_list_table(&filtered, &document_types);
+        print_list_table(&filtered, &hierarchy)?;
         print_document_warnings(&filtered);
     }
 
@@ -1108,16 +1376,21 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
 
 fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_document(&workspace, &options.id)?
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let doc = hierarchy
+        .document(&options.id)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("document not found: {}", options.id)))?;
-    let document_types = read_document_types(&workspace)?;
-    let relationship = parent_relationship(&doc, &document_types);
-    let subtasks = find_subtasks(&workspace, &doc)?;
+    let relationship = hierarchy.relationship(&doc)?;
+    let children = find_hierarchy_children(&hierarchy, &doc)?;
+    let role = hierarchy.task_role(&doc)?;
 
     if options.json {
-        println!("{}", show_json(&doc, &subtasks, relationship));
+        println!("{}", show_json(&doc, &children, role, relationship));
     } else {
-        print_show(&doc, &subtasks, relationship);
+        print_show(&doc, &children, role, relationship);
     }
 
     Ok(())
@@ -1159,6 +1432,7 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
 }
 
 fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, CliError> {
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     let title =
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
     let state = options.state.as_deref().unwrap_or("todo").to_string();
@@ -1171,18 +1445,29 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         .filter(|value| !value.is_empty())
         .map(str::to_string);
 
+    if kind.as_deref() == Some("epic") && options.parent.is_some() {
+        return Err(CliError::user(
+            "Validation failed: an Epic cannot have parentId; remove --parent or --kind epic",
+        ));
+    }
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
     let parent_relationship = options
         .parent
         .as_deref()
-        .map(|parent| resolve_parent_relationship(workspace, "task", parent))
+        .map(|parent| resolve_parent_relationship(&hierarchy, "task", parent))
         .transpose()?;
     for blocker in &options.blockers {
-        require_existing_document(workspace, blocker, "blocker")?;
+        if hierarchy.document(blocker).is_none() {
+            return Err(CliError::user(format!(
+                "Validation failed: blocker document not found: {blocker}"
+            )));
+        }
     }
 
     let mut warnings = Vec::new();
     for reference in &options.references {
-        if !document_exists(workspace, reference)? {
+        if hierarchy.document(reference).is_none() {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
@@ -1192,35 +1477,41 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         _ => "task",
     };
     let now = current_timestamp();
-    let created = create_new_sequential_document(workspace, allocation_prefix, |task_id| {
-        let mut lines = vec![
-            "---".to_string(),
-            format!("id: {task_id}"),
-            "type: task".to_string(),
-        ];
-        push_optional_line(&mut lines, "kind", kind.as_deref());
-        lines.push(format!("title: {}", yaml_double_quote(&title)));
-        lines.push(format!("state: {state}"));
-        push_optional_line(&mut lines, "priority", options.priority.as_deref());
-        push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
-        push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
-        push_optional_line(&mut lines, "parentId", options.parent.as_deref());
-        push_array_line(&mut lines, "blockers", &options.blockers);
-        push_array_line(&mut lines, "references", &options.references);
-        push_array_line(&mut lines, "relatedFiles", &options.related_files);
-        push_array_line(&mut lines, "tags", &options.tags);
-        lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
-        lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-        lines.push("---".to_string());
-        lines.push(String::new());
-        if let Some(description) = options.description.as_deref() {
-            lines.push("## Description".to_string());
+    let last_allocated = next_sequential_number_in_hierarchy(&hierarchy, allocation_prefix);
+    let created = create_new_sequential_document_after(
+        workspace,
+        allocation_prefix,
+        last_allocated,
+        |task_id| {
+            let mut lines = vec![
+                "---".to_string(),
+                format!("id: {task_id}"),
+                "type: task".to_string(),
+            ];
+            push_optional_line(&mut lines, "kind", kind.as_deref());
+            lines.push(format!("title: {}", yaml_double_quote(&title)));
+            lines.push(format!("state: {state}"));
+            push_optional_line(&mut lines, "priority", options.priority.as_deref());
+            push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
+            push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
+            push_optional_line(&mut lines, "parentId", options.parent.as_deref());
+            push_array_line(&mut lines, "blockers", &options.blockers);
+            push_array_line(&mut lines, "references", &options.references);
+            push_array_line(&mut lines, "relatedFiles", &options.related_files);
+            push_array_line(&mut lines, "tags", &options.tags);
+            lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+            lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+            lines.push("---".to_string());
             lines.push(String::new());
-            lines.push(description.to_string());
-        }
-        lines.push(String::new());
-        lines.join("\n")
-    })?;
+            if let Some(description) = options.description.as_deref() {
+                lines.push("## Description".to_string());
+                lines.push(String::new());
+                lines.push(description.to_string());
+            }
+            lines.push(String::new());
+            lines.join("\n")
+        },
+    )?;
     append_event(workspace, "task.created", &created.id, &title)?;
 
     Ok(AddOutcome {
@@ -1286,11 +1577,16 @@ fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
 
 fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
     let summary = require_nonempty(
         options.summary.as_deref(),
         "complete requires --summary <text>",
     )?;
-    let doc = find_board_document(&workspace, &options.id)?
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let doc = hierarchy
+        .document(&options.id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -1299,8 +1595,8 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
             doc.doc_type()
         )));
     }
-    validate_task_document_for_mutation(&workspace, &doc)?;
-    let unresolved = unresolved_blockers(&workspace, doc.field("blockers"))?;
+    validate_task_document_against_hierarchy(&workspace, &doc, &hierarchy)?;
+    let unresolved = unresolved_blockers_in_hierarchy(&hierarchy, doc.field("blockers"));
     if !unresolved.is_empty() {
         return Err(CliError::user(format!(
             "Validation failed: {} has unresolved blockers: {}",
@@ -1378,15 +1674,16 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
 
 fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
-    let document_types = document_types_by_id(&docs);
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let docs = hierarchy.documents.values().cloned().collect::<Vec<_>>();
     let results = search_documents(docs, &options);
 
     if options.json {
-        println!("{}", search_json(&options.query, &results, &document_types));
+        println!("{}", search_json(&options.query, &results, &hierarchy)?);
     } else {
-        print_search_table(&results, &document_types);
+        print_search_table(&results, &hierarchy)?;
     }
     Ok(())
 }
@@ -1407,7 +1704,15 @@ fn cmd_log(args: &[String]) -> Result<(), CliError> {
 
 fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let mut docs = read_documents(&workspace.logs_dir, DocumentLocation::Logs)?;
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let mut docs = hierarchy
+        .documents
+        .values()
+        .filter(|doc| doc.location == DocumentLocation::Logs)
+        .cloned()
+        .collect::<Vec<_>>();
     docs.sort_by(|a, b| {
         b.field("completedAt")
             .unwrap_or("")
@@ -1428,29 +1733,40 @@ fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
 
 fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_log_document(&workspace, &options.id)?
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let doc = hierarchy
+        .document(&options.id)
+        .filter(|doc| doc.location == DocumentLocation::Logs)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("log document not found: {}", options.id)))?;
+    let relationship = hierarchy.relationship(&doc)?;
     if options.json {
-        println!("{}", log_show_json(&doc));
+        println!("{}", log_show_json(&doc, relationship));
     } else {
-        let document_types = read_document_types(&workspace)?;
-        print_log_show(&doc, parent_relationship(&doc, &document_types));
+        print_log_show(&doc, relationship);
     }
     Ok(())
 }
 
 fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let mut results = read_documents(&workspace.logs_dir, DocumentLocation::Logs)?
-        .into_iter()
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let mut results = hierarchy
+        .documents
+        .values()
+        .filter(|doc| doc.location == DocumentLocation::Logs)
+        .cloned()
         .filter_map(|doc| search_match(doc, &options.query))
         .collect::<Vec<_>>();
     results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
-    let document_types = read_document_types(&workspace)?;
     if options.json {
-        println!("{}", search_json(&options.query, &results, &document_types));
+        println!("{}", search_json(&options.query, &results, &hierarchy)?);
     } else {
-        print_search_table(&results, &document_types);
+        print_search_table(&results, &hierarchy)?;
     }
     Ok(())
 }
@@ -1481,7 +1797,12 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
 
 fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_board_document(&workspace, &options.id)?
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let doc = hierarchy
+        .document(&options.id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -1490,7 +1811,7 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
             doc.doc_type()
         )));
     }
-    validate_task_document_for_mutation(&workspace, &doc)?;
+    validate_task_document_against_hierarchy(&workspace, &doc, &hierarchy)?;
 
     validate_accord_inputs(action, &options)?;
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
@@ -1799,7 +2120,12 @@ fn cmd_decision_list(json: bool) -> Result<(), CliError> {
 
 fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_document(&workspace, &options.id)?
+    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let doc = hierarchy
+        .document(&options.id)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("decision not found: {}", options.id)))?;
     if doc.doc_type() != "decision" {
         return Err(CliError::user(format!(
@@ -1811,8 +2137,7 @@ fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", decision_show_json(&doc));
     } else {
-        let document_types = read_document_types(&workspace)?;
-        print_show(&doc, &[], parent_relationship(&doc, &document_types));
+        print_show(&doc, &[], None, hierarchy.relationship(&doc)?);
     }
     Ok(())
 }
@@ -2045,14 +2370,38 @@ fn find_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, Cl
     Ok(None)
 }
 
-fn find_subtasks(workspace: &Workspace, parent: &Document) -> Result<Vec<Document>, CliError> {
-    if parent.doc_type() != "task" {
+fn read_workspace_documents(workspace: &Workspace) -> Result<Vec<Document>, CliError> {
+    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
+    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    Ok(docs)
+}
+
+fn find_hierarchy_children(
+    hierarchy: &HierarchyIndex,
+    parent: &Document,
+) -> Result<Vec<Document>, CliError> {
+    let Some(parent_role) = hierarchy.task_role(parent)? else {
+        return Ok(Vec::new());
+    };
+    if parent_role == TaskRole::Subtask {
         return Ok(Vec::new());
     }
-    let mut subtasks = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    subtasks.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
-    subtasks.retain(|doc| doc.doc_type() == "task" && doc.field("parentId") == Some(parent.id()));
-    subtasks.sort_by(|a, b| {
+    let expected_child_role = match parent_role {
+        TaskRole::Epic => TaskRole::Task,
+        TaskRole::Task => TaskRole::Subtask,
+        TaskRole::Subtask => unreachable!(),
+    };
+    let mut children = hierarchy
+        .documents
+        .values()
+        .filter(|doc| doc.doc_type() == "task" && doc.field("parentId") == Some(parent.id()))
+        .filter_map(|doc| match hierarchy.task_role(doc) {
+            Ok(Some(role)) if role == expected_child_role => Some(Ok(doc.clone())),
+            Ok(_) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    children.sort_by(|a, b| {
         a.location
             .as_str()
             .cmp(b.location.as_str())
@@ -2063,7 +2412,7 @@ fn find_subtasks(workspace: &Workspace, parent: &Document) -> Result<Vec<Documen
             })
             .then_with(|| a.id().cmp(b.id()))
     });
-    Ok(subtasks)
+    Ok(children)
 }
 
 fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
@@ -2074,110 +2423,76 @@ fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Documen
     )
 }
 
-fn find_log_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
-    Ok(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?
-        .into_iter()
-        .find(|doc| doc.id() == id))
-}
-
 fn document_exists(workspace: &Workspace, id: &str) -> Result<bool, CliError> {
     Ok(find_document(workspace, id)?.is_some())
 }
 
-fn require_existing_document(workspace: &Workspace, id: &str, kind: &str) -> Result<(), CliError> {
-    if document_exists(workspace, id)? {
-        Ok(())
-    } else {
-        Err(CliError::user(format!(
-            "Validation failed: {kind} document not found: {id}"
-        )))
-    }
-}
-
 fn resolve_parent_relationship(
-    workspace: &Workspace,
+    hierarchy: &HierarchyIndex,
     child_type: &str,
     parent_id: &str,
 ) -> Result<ParentRelationship, CliError> {
-    let parent = find_document(workspace, parent_id)?.ok_or_else(|| {
+    let parent = hierarchy.document(parent_id).ok_or_else(|| {
         CliError::user(format!(
             "Validation failed: parent document not found: {parent_id}"
         ))
     })?;
-    Ok(if child_type == "task" && parent.doc_type() == "task" {
-        ParentRelationship::Subtask
-    } else {
-        ParentRelationship::Parent
-    })
+    if child_type != "task" || parent.doc_type() != "task" {
+        return Ok(ParentRelationship::Parent);
+    }
+    match hierarchy.task_role(parent)? {
+        Some(TaskRole::Epic) => Ok(ParentRelationship::EpicTask),
+        Some(TaskRole::Task) => Ok(ParentRelationship::Subtask),
+        Some(TaskRole::Subtask) => Err(CliError::user(format!(
+            "Validation failed: cannot attach a child beneath Subtask {parent_id}"
+        ))),
+        None => Ok(ParentRelationship::Parent),
+    }
 }
 
-fn task_id_matches_parent_designation(
-    task_id: &str,
-    parent_id: &str,
-    relationship: ParentRelationship,
-) -> bool {
-    let prefix = match relationship {
-        ParentRelationship::Subtask => format!("{parent_id}-"),
-        ParentRelationship::Parent => "task-".to_string(),
-    };
-    task_id
-        .strip_prefix(&prefix)
-        .and_then(|suffix| suffix.parse::<usize>().ok())
-        .is_some_and(|number| number > 0)
+fn positive_canonical_number(value: &str) -> Option<usize> {
+    let number = value.parse::<usize>().ok()?;
+    (number > 0 && number.to_string() == value).then_some(number)
 }
 
-fn parent_designation_warning(
-    task_id: &str,
-    parent_id: &str,
-    relationship: ParentRelationship,
-) -> String {
-    let expected = match relationship {
-        ParentRelationship::Subtask => format!("{parent_id}-N"),
-        ParentRelationship::Parent => "task-N".to_string(),
-    };
-    format!(
-        "{task_id} keeps its immutable ID while parentId changes to {parent_id}; the ID does not match the {expected} designation (legacy and reparented IDs remain valid)"
-    )
+fn global_task_number(id: &str) -> Option<usize> {
+    let suffix = id.strip_prefix("task-")?;
+    if suffix.contains('-') {
+        return None;
+    }
+    positive_canonical_number(suffix)
 }
 
-fn document_types_by_id(docs: &[Document]) -> HashMap<String, String> {
-    docs.iter()
-        .map(|doc| (doc.id().to_string(), doc.doc_type().to_string()))
-        .collect()
-}
-
-fn read_document_types(workspace: &Workspace) -> Result<HashMap<String, String>, CliError> {
-    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
-    Ok(document_types_by_id(&docs))
-}
-
-fn parent_relationship(
-    doc: &Document,
-    document_types: &HashMap<String, String>,
-) -> Option<ParentRelationship> {
-    let parent_id = doc.field("parentId")?;
-    let parent_type = document_types.get(parent_id)?;
-    Some(if doc.doc_type() == "task" && parent_type == "task" {
-        ParentRelationship::Subtask
-    } else {
-        ParentRelationship::Parent
-    })
+fn subtask_suffix(id: &str, parent_id: &str) -> Option<usize> {
+    global_task_number(parent_id)?;
+    let suffix = id.strip_prefix(&format!("{parent_id}-"))?;
+    if suffix.contains('-') {
+        return None;
+    }
+    positive_canonical_number(suffix)
 }
 
 fn unresolved_blockers(
     workspace: &Workspace,
     blockers: Option<&str>,
 ) -> Result<Vec<String>, CliError> {
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    Ok(unresolved_blockers_in_hierarchy(&hierarchy, blockers))
+}
+
+fn unresolved_blockers_in_hierarchy(
+    hierarchy: &HierarchyIndex,
+    blockers: Option<&str>,
+) -> Vec<String> {
     let mut unresolved = Vec::new();
     for blocker in blockers.map(parse_field_values).unwrap_or_default() {
-        if find_board_document(workspace, &blocker)?.is_some() {
-            unresolved.push(blocker);
-        } else if find_log_document(workspace, &blocker)?.is_none() {
-            unresolved.push(format!("{blocker} (missing)"));
+        match hierarchy.document(&blocker) {
+            Some(doc) if doc.location == DocumentLocation::Board => unresolved.push(blocker),
+            Some(_) => {}
+            None => unresolved.push(format!("{blocker} (missing)")),
         }
     }
-    Ok(unresolved)
+    unresolved
 }
 
 fn split_frontmatter(content: &str) -> Result<(String, String), &'static str> {
@@ -2455,9 +2770,14 @@ fn move_task_to_state(
     id: &str,
     state: &str,
 ) -> Result<MoveTaskOutcome, CliError> {
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     validate_state(workspace, state)?;
 
-    let doc = find_board_document(workspace, id)?
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let doc = hierarchy
+        .document(id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -2466,7 +2786,7 @@ fn move_task_to_state(
             doc.doc_type()
         )));
     }
-    validate_task_document_for_mutation(workspace, &doc)?;
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
 
     let doc_id = doc.id().to_string();
     let previous_state = doc.field("state").unwrap_or("-").to_string();
@@ -2530,7 +2850,12 @@ fn update_task_metadata(
     workspace: &Workspace,
     options: UpdateOptions,
 ) -> Result<UpdateOutcome, CliError> {
-    let doc = find_board_document(workspace, &options.id)?
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let doc = hierarchy
+        .document(&options.id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -2539,19 +2864,46 @@ fn update_task_metadata(
             doc.doc_type()
         )));
     }
-    validate_task_document_for_mutation(workspace, &doc)?;
-    let parent_relationship = validate_update_options(workspace, &options)?;
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
+    validate_update_options(&options, &hierarchy)?;
+
+    hierarchy.validate_all_task_hierarchies()?;
+    let old_role = hierarchy
+        .task_role(&doc)?
+        .expect("active task has a task role");
+    let mut prospective = doc.clone();
+    if let Some(kind) = options.kind.as_deref() {
+        prospective
+            .fields
+            .insert("kind".to_string(), kind.to_string());
+    }
+    if let Some(parent) = options.parent.as_deref() {
+        prospective
+            .fields
+            .insert("parentId".to_string(), parent.to_string());
+    }
+    let prospective_hierarchy = hierarchy.with_replacement(prospective.clone());
+    let prospective_role = prospective_hierarchy
+        .task_role(&prospective)?
+        .expect("prospective task has a task role");
+    if options.parent.is_some() && old_role != prospective_role {
+        return Err(CliError::user(format!(
+            "Validation failed: reparenting {} would change its canonical role from {} to {}; IDs are immutable",
+            doc.id(),
+            old_role.as_str(),
+            prospective_role.as_str()
+        )));
+    }
+    prospective_hierarchy.validate_all_task_hierarchies()?;
+    let parent_relationship = if options.parent.is_some() {
+        prospective_hierarchy.relationship(&prospective)?
+    } else {
+        None
+    };
 
     let mut warnings = Vec::new();
-    if let (Some(parent), Some(relationship)) = (options.parent.as_deref(), parent_relationship) {
-        if doc.field("parentId") != Some(parent)
-            && !task_id_matches_parent_designation(doc.id(), parent, relationship)
-        {
-            warnings.push(parent_designation_warning(doc.id(), parent, relationship));
-        }
-    }
     for reference in &options.references {
-        if !document_exists(workspace, reference)? {
+        if hierarchy.document(reference).is_none() {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
@@ -2665,8 +3017,8 @@ fn update_task_metadata(
 }
 
 fn validate_update_options(
-    workspace: &Workspace,
     options: &UpdateOptions,
+    hierarchy: &HierarchyIndex,
 ) -> Result<Option<ParentRelationship>, CliError> {
     if let Some(title) = options.title.as_deref() {
         require_nonempty(Some(title), "update --title must not be empty")?;
@@ -2695,7 +3047,8 @@ fn validate_update_options(
                 options.id
             )));
         }
-        Some(resolve_parent_relationship(workspace, "task", parent)?)
+        hierarchy.validate_all_task_hierarchies()?;
+        Some(resolve_parent_relationship(hierarchy, "task", parent)?)
     } else {
         None
     };
@@ -2710,7 +3063,11 @@ fn validate_update_options(
         }
     }
     for blocker in &options.blockers {
-        require_existing_document(workspace, blocker, "blocker")?;
+        if hierarchy.document(blocker).is_none() {
+            return Err(CliError::user(format!(
+                "Validation failed: blocker document not found: {blocker}"
+            )));
+        }
     }
     Ok(parent_relationship)
 }
@@ -2942,6 +3299,15 @@ fn validate_task_document_for_mutation(
     workspace: &Workspace,
     doc: &Document,
 ) -> Result<(), CliError> {
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?.with_replacement(doc.clone());
+    validate_task_document_against_hierarchy(workspace, doc, &hierarchy)
+}
+
+fn validate_task_document_against_hierarchy(
+    workspace: &Workspace,
+    doc: &Document,
+    hierarchy: &HierarchyIndex,
+) -> Result<(), CliError> {
     let mut errors = Vec::new();
     if doc.id().trim().is_empty() {
         errors.push("missing required field `id`".to_string());
@@ -2977,7 +3343,7 @@ fn validate_task_document_for_mutation(
         .field("parentId")
         .filter(|value| !value.trim().is_empty())
     {
-        if !document_exists(workspace, parent)? {
+        if hierarchy.document(parent).is_none() {
             errors.push(format!("unresolved parentId `{parent}`"));
         }
     }
@@ -2986,7 +3352,7 @@ fn validate_task_document_for_mutation(
         .map(parse_field_values)
         .unwrap_or_default()
     {
-        if !document_exists(workspace, &blocker)? {
+        if hierarchy.document(&blocker).is_none() {
             errors.push(format!("unresolved blocker `{blocker}`"));
         }
     }
@@ -3009,15 +3375,15 @@ fn validate_task_document_for_mutation(
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(CliError::user(format!(
+    if !errors.is_empty() {
+        return Err(CliError::user(format!(
             "Validation failed for {}: {}",
             display_path(&doc.path),
             errors.join("; ")
-        )))
+        )));
     }
+
+    hierarchy.validate_all_task_hierarchies()
 }
 
 fn has_metadata(doc: &Document, prefix: &str) -> bool {
@@ -3257,21 +3623,22 @@ fn sort_documents(docs: &mut [Document]) {
 
 fn parent_table_values<'a>(
     doc: &'a Document,
-    document_types: &HashMap<String, String>,
-) -> (&'static str, &'a str) {
+    hierarchy: &HierarchyIndex,
+) -> Result<(&'static str, &'a str), CliError> {
     let Some(parent_id) = doc.field("parentId") else {
-        return ("-", "-");
+        return Ok(("-", "-"));
     };
-    let relationship = parent_relationship(doc, document_types)
+    let relationship = hierarchy
+        .relationship(doc)?
         .unwrap_or(ParentRelationship::Parent)
         .as_str();
-    (relationship, parent_id)
+    Ok((relationship, parent_id))
 }
 
-fn print_list_table(docs: &[Document], document_types: &HashMap<String, String>) {
+fn print_list_table(docs: &[Document], hierarchy: &HierarchyIndex) -> Result<(), CliError> {
     if docs.is_empty() {
         println!("No active Tandem documents found.");
-        return;
+        return Ok(());
     }
 
     println!(
@@ -3279,7 +3646,7 @@ fn print_list_table(docs: &[Document], document_types: &HashMap<String, String>)
         "ID", "STATE", "TYPE", "KIND", "RELATION", "PARENT", "TITLE", "ASSIGNEE"
     );
     for doc in docs {
-        let (relationship, parent_id) = parent_table_values(doc, document_types);
+        let (relationship, parent_id) = parent_table_values(doc, hierarchy)?;
         println!(
             "{:<12} {:<12} {:<8} {:<8} {:<9} {:<12} {:<32} {:<12}",
             truncate(doc.id(), 12),
@@ -3292,6 +3659,7 @@ fn print_list_table(docs: &[Document], document_types: &HashMap<String, String>)
             truncate(doc.field("assignee").unwrap_or("-"), 12)
         );
     }
+    Ok(())
 }
 
 fn print_document_warnings(docs: &[Document]) {
@@ -3335,7 +3703,12 @@ fn print_metadata_values(label: &str, values: Vec<String>) {
     }
 }
 
-fn print_show(doc: &Document, subtasks: &[Document], relationship: Option<ParentRelationship>) {
+fn print_show(
+    doc: &Document,
+    children: &[Document],
+    role: Option<TaskRole>,
+    relationship: Option<ParentRelationship>,
+) {
     println!("ID:        {}", doc.id());
     println!("Type:      {}", doc.doc_type());
     if let Some(kind) = doc.kind() {
@@ -3363,14 +3736,19 @@ fn print_show(doc: &Document, subtasks: &[Document], relationship: Option<Parent
             .human_label();
         println!("{label}: {parent_id}");
     }
-    if !subtasks.is_empty() {
-        println!("Subtasks:   {}", subtasks.len());
-        for subtask in subtasks {
-            let status = subtask
+    if !children.is_empty() {
+        let label = if role == Some(TaskRole::Epic) {
+            "Tasks"
+        } else {
+            "Subtasks"
+        };
+        println!("{label}:   {}", children.len());
+        for child in children {
+            let status = child
                 .field("state")
-                .or_else(|| (subtask.location == DocumentLocation::Logs).then_some("completed"))
-                .unwrap_or(subtask.location.as_str());
-            println!("  {} [{}] {}", subtask.id(), status, subtask.title());
+                .or_else(|| (child.location == DocumentLocation::Logs).then_some("completed"))
+                .unwrap_or(child.location.as_str());
+            println!("  {} [{}] {}", child.id(), status, child.title());
         }
     }
     if let Some(created_at) = doc.field("createdAt") {
@@ -3486,10 +3864,13 @@ fn snippet_for_match(value: &str, query: &str) -> String {
     snippet
 }
 
-fn print_search_table(results: &[SearchResult], document_types: &HashMap<String, String>) {
+fn print_search_table(
+    results: &[SearchResult],
+    hierarchy: &HierarchyIndex,
+) -> Result<(), CliError> {
     if results.is_empty() {
         println!("No matching Tandem documents found.");
-        return;
+        return Ok(());
     }
     println!(
         "{:<12} {:<8} {:<12} {:<8} {:<8} {:<9} {:<12} {:<24} MATCH",
@@ -3497,7 +3878,7 @@ fn print_search_table(results: &[SearchResult], document_types: &HashMap<String,
     );
     for result in results {
         let doc = &result.doc;
-        let (relationship, parent_id) = parent_table_values(doc, document_types);
+        let (relationship, parent_id) = parent_table_values(doc, hierarchy)?;
         println!(
             "{:<12} {:<8} {:<12} {:<8} {:<8} {:<9} {:<12} {:<24} {}",
             truncate(doc.id(), 12),
@@ -3511,6 +3892,7 @@ fn print_search_table(results: &[SearchResult], document_types: &HashMap<String,
             truncate(&result.snippet, 80)
         );
     }
+    Ok(())
 }
 
 fn print_log_table(docs: &[Document]) {
@@ -3532,7 +3914,7 @@ fn print_log_table(docs: &[Document]) {
 
 fn print_log_show(doc: &Document, relationship: Option<ParentRelationship>) {
     println!("Log document");
-    print_show(doc, &[], relationship);
+    print_show(doc, &[], None, relationship);
     if let Some(validation) = completion_validation(doc) {
         println!();
         println!("Validation: {validation}");
@@ -4056,7 +4438,7 @@ fn add_outcome_json(outcome: &AddOutcome) -> String {
     )
 }
 
-fn list_json(docs: &[Document], document_types: &HashMap<String, String>) -> String {
+fn list_json(docs: &[Document], hierarchy: &HierarchyIndex) -> Result<String, CliError> {
     let mut by_state = BTreeMap::<String, usize>::new();
     for doc in docs {
         let state = doc.field("state").unwrap_or("unknown").to_string();
@@ -4065,8 +4447,8 @@ fn list_json(docs: &[Document], document_types: &HashMap<String, String>) -> Str
 
     let items = docs
         .iter()
-        .map(|doc| document_summary_json(doc, parent_relationship(doc, document_types)))
-        .collect::<Vec<_>>();
+        .map(|doc| Ok(document_summary_json(doc, hierarchy.relationship(doc)?)))
+        .collect::<Result<Vec<_>, CliError>>()?;
     let states = by_state
         .iter()
         .map(|(state, count)| format!("{}:{count}", json_string(state)))
@@ -4074,18 +4456,19 @@ fn list_json(docs: &[Document], document_types: &HashMap<String, String>) -> Str
         .join(",");
     let warnings = docs.iter().flat_map(document_warnings).collect::<Vec<_>>();
 
-    format!(
+    Ok(format!(
         "{{\"ok\":true,\"data\":{{\"items\":[{}],\"counts\":{{\"total\":{},\"byState\":{{{}}}}}}},\"warnings\":{}}}",
         items.join(","),
         docs.len(),
         states,
         json_array_strings(&warnings)
-    )
+    ))
 }
 
 fn show_json(
     doc: &Document,
-    subtasks: &[Document],
+    children: &[Document],
+    role: Option<TaskRole>,
     relationship: Option<ParentRelationship>,
 ) -> String {
     let warnings = document_warnings(doc);
@@ -4096,13 +4479,18 @@ fn show_json(
             json_string(relationship.as_str())
         ));
     }
-    if doc.doc_type() == "task" {
-        let subtasks = subtasks
+    if matches!(role, Some(TaskRole::Epic | TaskRole::Task)) {
+        let children = children
             .iter()
-            .map(subtask_summary_json)
+            .map(child_task_summary_json)
             .collect::<Vec<_>>()
             .join(",");
-        data_fields.push(format!("\"subtasks\":[{subtasks}]"));
+        let key = if role == Some(TaskRole::Epic) {
+            "tasks"
+        } else {
+            "subtasks"
+        };
+        data_fields.push(format!("\"{key}\":[{children}]"));
     }
     data_fields.push(format!("\"body\":{}", json_string(&doc.body)));
     data_fields.push(format!(
@@ -4129,11 +4517,20 @@ fn log_list_json(docs: &[Document]) -> String {
     )
 }
 
-fn log_show_json(doc: &Document) -> String {
+fn log_show_json(doc: &Document, relationship: Option<ParentRelationship>) -> String {
     let files = completion_files_changed(doc);
+    let relationship_field = relationship
+        .map(|relationship| {
+            format!(
+                ",\"parentRelationship\":{}",
+                json_string(relationship.as_str())
+            )
+        })
+        .unwrap_or_default();
     format!(
-        "{{\"ok\":true,\"data\":{{\"document\":{},\"completion\":{{\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
+        "{{\"ok\":true,\"data\":{{\"document\":{}{},\"completion\":{{\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
         document_detail_json(doc),
+        relationship_field,
         json_string(completion_summary(doc).unwrap_or("")),
         json_array_strings(&files),
         json_string(completion_validation(doc).unwrap_or("")),
@@ -4146,8 +4543,8 @@ fn log_show_json(doc: &Document) -> String {
 fn search_json(
     query: &str,
     results: &[SearchResult],
-    document_types: &HashMap<String, String>,
-) -> String {
+    hierarchy: &HierarchyIndex,
+) -> Result<String, CliError> {
     let items = results
         .iter()
         .map(|result| {
@@ -4161,19 +4558,16 @@ fn search_json(
             push_optional_json_field(&mut fields, "state", doc.field("state"));
             push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
             push_optional_json_field(&mut fields, "parentId", doc.field("parentId"));
-            push_parent_relationship_json_field(
-                &mut fields,
-                parent_relationship(doc, document_types),
-            );
+            push_parent_relationship_json_field(&mut fields, hierarchy.relationship(doc)?);
             push_json_field(&mut fields, "snippet", &result.snippet);
-            format!("{{{}}}", fields.join(","))
+            Ok(format!("{{{}}}", fields.join(",")))
         })
-        .collect::<Vec<_>>();
-    format!(
+        .collect::<Result<Vec<_>, CliError>>()?;
+    Ok(format!(
         "{{\"ok\":true,\"data\":{{\"query\":{},\"results\":[{}]}},\"warnings\":[]}}",
         json_string(query),
         items.join(",")
-    )
+    ))
 }
 
 fn rules_json(rules: &RulesByCategory, category_filter: Option<&str>) -> String {
@@ -4350,7 +4744,7 @@ fn document_detail_json(doc: &Document) -> String {
     format!("{{{}}}", fields.join(","))
 }
 
-fn subtask_summary_json(doc: &Document) -> String {
+fn child_task_summary_json(doc: &Document) -> String {
     let mut fields = Vec::new();
     push_json_field(&mut fields, "id", doc.id());
     push_json_field(&mut fields, "title", doc.title());
@@ -4519,16 +4913,27 @@ struct CreatedDocument {
 fn create_new_sequential_document<F>(
     workspace: &Workspace,
     prefix: &str,
+    content_for_id: F,
+) -> Result<CreatedDocument, CliError>
+where
+    F: FnMut(&str) -> String,
+{
+    let last_allocated = next_sequential_number(workspace, prefix)?;
+    create_new_sequential_document_after(workspace, prefix, last_allocated, content_for_id)
+}
+
+fn create_new_sequential_document_after<F>(
+    workspace: &Workspace,
+    prefix: &str,
+    last_allocated: usize,
     mut content_for_id: F,
 ) -> Result<CreatedDocument, CliError>
 where
     F: FnMut(&str) -> String,
 {
-    let mut next_number = next_sequential_number(workspace, prefix)?
-        .checked_add(1)
-        .ok_or_else(|| {
-            CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
-        })?;
+    let mut next_number = last_allocated.checked_add(1).ok_or_else(|| {
+        CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
+    })?;
 
     for _ in 0..MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS {
         let id = format!("{prefix}-{next_number}");
@@ -4548,18 +4953,19 @@ where
 }
 
 fn next_sequential_number(workspace: &Workspace, prefix: &str) -> Result<usize, CliError> {
-    let mut max_number = 0usize;
-    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    Ok(next_sequential_number_in_hierarchy(&hierarchy, prefix))
+}
+
+fn next_sequential_number_in_hierarchy(hierarchy: &HierarchyIndex, prefix: &str) -> usize {
     let needle = format!("{prefix}-");
-    for doc in docs {
-        if let Some(number) = doc.id().strip_prefix(&needle) {
-            if let Ok(value) = number.parse::<usize>() {
-                max_number = max_number.max(value);
-            }
-        }
-    }
-    Ok(max_number)
+    hierarchy
+        .documents
+        .values()
+        .filter_map(|doc| doc.id().strip_prefix(&needle))
+        .filter_map(positive_canonical_number)
+        .max()
+        .unwrap_or(0)
 }
 
 fn patch_frontmatter_content(
@@ -4939,6 +5345,24 @@ fn display_path(path: &Path) -> String {
 mod tests {
     use super::*;
 
+    fn test_workspace(root: &Path) -> Workspace {
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        workspace
+    }
+
     #[test]
     fn cli_version_uses_cargo_package_version() {
         assert_eq!(
@@ -5035,39 +5459,33 @@ mod tests {
     }
 
     #[test]
-    fn parent_relationships_distinguish_subtasks_from_generic_children() {
+    fn canonical_relationships_show_collections_and_task_delegation_metadata() {
         let root = std::env::temp_dir().join(format!(
-            "tandem-parent-relationships-{}-{}",
+            "tandem-canonical-relationships-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            current_timestamp()
         ));
-        let workspace = Workspace {
-            board_dir: root.join(".tandem/board"),
-            logs_dir: root.join(".tandem/logs"),
-            config_path: root.join(".tandem/tandem.md"),
-            events_path: root.join(".tandem/events.jsonl"),
-        };
-        fs::create_dir_all(&workspace.board_dir).unwrap();
-        fs::create_dir_all(&workspace.logs_dir).unwrap();
-        fs::write(
-            &workspace.config_path,
-            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
-        )
-        .unwrap();
-        fs::write(&workspace.events_path, "").unwrap();
+        let workspace = test_workspace(&root);
         fs::write(
             workspace.board_dir.join("decision-1.md"),
             "---\nid: decision-1\ntype: decision\ntitle: Parent decision\nstatus: accepted\n---\n",
         )
         .unwrap();
-
-        let parent = add_task(
+        let epic = add_task(
             &workspace,
             AddOptions {
-                title: Some("Parent task".to_string()),
+                title: Some("Epic".to_string()),
+                kind: Some("epic".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        let task = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Task of epic".to_string()),
+                parent: Some(epic.id.clone()),
+                assignee: Some("worker-a".to_string()),
                 ..AddOptions::default()
             },
         )
@@ -5075,144 +5493,110 @@ mod tests {
         let subtask = add_task(
             &workspace,
             AddOptions {
-                title: Some("Tracked subtask".to_string()),
-                parent: Some(parent.id.clone()),
+                title: Some("Task checklist item".to_string()),
+                parent: Some(task.id.clone()),
                 ..AddOptions::default()
             },
         )
         .unwrap();
-        let generic_child = add_task(
+        let generic = add_task(
             &workspace,
             AddOptions {
-                title: Some("Decision-linked task".to_string()),
+                title: Some("Decision-parented Task".to_string()),
                 parent: Some("decision-1".to_string()),
                 ..AddOptions::default()
             },
         )
         .unwrap();
+        let generic_subtask = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Generic Task checklist item".to_string()),
+                parent: Some(generic.id.clone()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
 
-        assert_eq!(parent.id, "task-1");
-        assert_eq!(subtask.id, "task-1-1");
-        assert_eq!(generic_child.id, "task-2");
+        assert_eq!(epic.id, "task-1");
+        assert_eq!(task.id, "task-2");
+        assert_eq!(subtask.id, "task-2-1");
+        assert_eq!(generic.id, "task-3");
+        assert_eq!(generic_subtask.id, "task-3-1");
+        assert_eq!(task.parent_relationship, Some(ParentRelationship::EpicTask));
         assert_eq!(
             subtask.parent_relationship,
             Some(ParentRelationship::Subtask)
         );
         assert_eq!(
-            generic_child.parent_relationship,
+            generic.parent_relationship,
             Some(ParentRelationship::Parent)
         );
-        for outcome in [&subtask, &generic_child] {
-            let content = fs::read_to_string(&outcome.path).unwrap();
-            assert!(content.contains(&format!(
-                "parentId: {}\n",
-                yaml_double_quote(outcome.parent.as_deref().unwrap())
-            )));
-            assert!(!content.contains("subtasks:"));
-        }
 
-        let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
-        let document_types = document_types_by_id(&docs);
-        let task_parent = docs.iter().find(|doc| doc.id() == "task-1").unwrap();
-        let decision_parent = docs.iter().find(|doc| doc.id() == "decision-1").unwrap();
-        let task_child = docs.iter().find(|doc| doc.id() == "task-1-1").unwrap();
-        let decision_child = docs.iter().find(|doc| doc.id() == "task-2").unwrap();
-
-        assert_eq!(
-            parent_relationship(task_child, &document_types),
-            Some(ParentRelationship::Subtask)
+        let hierarchy = HierarchyIndex::from_workspace(&workspace).unwrap();
+        hierarchy.validate_all_task_hierarchies().unwrap();
+        let task_doc = hierarchy.document(&task.id).unwrap();
+        assert_eq!(hierarchy.task_role(task_doc).unwrap(), Some(TaskRole::Task));
+        assert_eq!(task_doc.field("assignee"), Some("worker-a"));
+        let epic_doc = hierarchy.document(&epic.id).unwrap();
+        let epic_children = find_hierarchy_children(&hierarchy, epic_doc).unwrap();
+        let task_children = find_hierarchy_children(&hierarchy, task_doc).unwrap();
+        assert!(
+            show_json(epic_doc, &epic_children, Some(TaskRole::Epic), None)
+                .contains("\"tasks\":[{\"id\":\"task-2\"")
         );
-        assert_eq!(
-            parent_relationship(decision_child, &document_types),
-            Some(ParentRelationship::Parent)
-        );
-        assert_eq!(
-            parent_table_values(task_child, &document_types),
-            ("subtask", "task-1")
-        );
-        assert_eq!(
-            parent_table_values(decision_child, &document_types),
-            ("parent", "decision-1")
-        );
-
-        let linked = find_subtasks(&workspace, task_parent).unwrap();
-        assert_eq!(linked.len(), 1);
-        assert_eq!(linked[0].id(), "task-1-1");
-        assert!(find_subtasks(&workspace, decision_parent)
+        assert!(show_json(
+            task_doc,
+            &task_children,
+            Some(TaskRole::Task),
+            Some(ParentRelationship::EpicTask)
+        )
+        .contains("\"subtasks\":[{\"id\":\"task-2-1\""));
+        let docs = hierarchy.documents.values().cloned().collect::<Vec<_>>();
+        assert!(list_json(&docs, &hierarchy)
             .unwrap()
-            .is_empty());
-
-        let parent_json = show_json(task_parent, &linked, None);
-        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-1-1\""));
-        let decision_json = show_json(decision_parent, &[], None);
-        assert!(!decision_json.contains("\"subtasks\""));
-        let subtask_json = show_json(task_child, &[], Some(ParentRelationship::Subtask));
-        assert!(subtask_json.contains("\"parentRelationship\":\"subtask\""));
-        let generic_json = show_json(decision_child, &[], Some(ParentRelationship::Parent));
-        assert!(generic_json.contains("\"parentRelationship\":\"parent\""));
-        assert!(!generic_json.contains("\"parentRelationship\":\"subtask\""));
-
-        let list_output = list_json(&docs, &document_types);
-        assert!(list_output.contains("\"parentRelationship\":\"subtask\""));
-        assert!(list_output.contains("\"parentRelationship\":\"parent\""));
-        for (parent_id, expected_id, expected_relationship) in [
-            ("task-1", "task-1-1", "subtask"),
-            ("decision-1", "task-2", "parent"),
-        ] {
-            let filtered = filter_documents(
-                docs.clone(),
-                &ListOptions {
-                    parent: Some(parent_id.to_string()),
-                    ..ListOptions::default()
-                },
-            );
-            assert_eq!(filtered.len(), 1);
-            assert_eq!(filtered[0].id(), expected_id);
-
-            let search_options = SearchOptions {
-                query: "task".to_string(),
-                parent: Some(parent_id.to_string()),
+            .contains("\"parentRelationship\":\"epic-task\""));
+        let filtered = filter_documents(
+            docs.clone(),
+            &ListOptions {
+                parent: Some(epic.id.clone()),
+                ..ListOptions::default()
+            },
+        );
+        assert_eq!(
+            filtered.iter().map(Document::id).collect::<Vec<_>>(),
+            ["task-2"]
+        );
+        let results = search_documents(
+            docs,
+            &SearchOptions {
+                query: "Task of epic".to_string(),
+                parent: Some(epic.id.clone()),
                 ..SearchOptions::default()
-            };
-            let results = search_documents(docs.clone(), &search_options);
-            assert_eq!(results.len(), 1);
-            assert_eq!(results[0].doc.id(), expected_id);
-            assert!(
-                search_json("task", &results, &document_types).contains(&format!(
-                    "\"parentRelationship\":\"{expected_relationship}\""
-                ))
-            );
-        }
+            },
+        );
+        assert!(search_json("Task of epic", &results, &hierarchy)
+            .unwrap()
+            .contains("\"parentRelationship\":\"epic-task\""));
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn hierarchical_allocation_scans_logs_nests_and_preserves_ids_on_reparent() {
+    fn canonical_allocation_scans_logs_for_global_and_subtask_sequences() {
         let root = std::env::temp_dir().join(format!(
-            "tandem-hierarchical-ids-{}-{}",
+            "tandem-canonical-allocation-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
+            current_timestamp()
         ));
-        let workspace = Workspace {
-            board_dir: root.join(".tandem/board"),
-            logs_dir: root.join(".tandem/logs"),
-            config_path: root.join(".tandem/tandem.md"),
-            events_path: root.join(".tandem/events.jsonl"),
-        };
-        fs::create_dir_all(&workspace.board_dir).unwrap();
-        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        let workspace = test_workspace(&root);
         fs::write(
-            &workspace.config_path,
-            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+            workspace.logs_dir.join("task-103.md"),
+            "---\nid: task-103\ntype: task\ntitle: Logged Task\ncompletedAt: now\ncompletion:\n  summary: done\n---\n",
         )
         .unwrap();
-        fs::write(&workspace.events_path, "").unwrap();
         fs::write(
-            workspace.board_dir.join("task-103.md"),
-            "---\nid: task-103\ntype: task\ntitle: Parent\nstate: todo\n---\n",
+            workspace.logs_dir.join("task-103-1.md"),
+            "---\nid: task-103-1\ntype: task\ntitle: Logged Subtask\nparentId: task-103\ncompletedAt: now\ncompletion:\n  summary: done\n---\n",
         )
         .unwrap();
         fs::write(
@@ -5221,100 +5605,253 @@ mod tests {
         )
         .unwrap();
 
-        let first = add_task(
+        let second_subtask = add_task(
             &workspace,
             AddOptions {
-                title: Some("First child".to_string()),
+                title: Some("Second Subtask".to_string()),
                 parent: Some("task-103".to_string()),
                 ..AddOptions::default()
             },
         )
         .unwrap();
-        assert_eq!(first.id, "task-103-1");
-        fs::rename(&first.path, workspace.logs_dir.join("task-103-1.md")).unwrap();
-
-        let second = add_task(
+        let generic_task = add_task(
             &workspace,
             AddOptions {
-                title: Some("Second child".to_string()),
-                parent: Some("task-103".to_string()),
-                ..AddOptions::default()
-            },
-        )
-        .unwrap();
-        assert_eq!(second.id, "task-103-2");
-        let nested = add_task(
-            &workspace,
-            AddOptions {
-                title: Some("Nested child".to_string()),
-                parent: Some("task-103-1".to_string()),
-                ..AddOptions::default()
-            },
-        )
-        .unwrap();
-        assert_eq!(nested.id, "task-103-1-1");
-
-        let generic = add_task(
-            &workspace,
-            AddOptions {
-                title: Some("Generic parent".to_string()),
+                title: Some("Generic-parent Task".to_string()),
                 parent: Some("decision-1".to_string()),
                 ..AddOptions::default()
             },
         )
         .unwrap();
-        assert_eq!(generic.id, "task-104");
+        assert_eq!(second_subtask.id, "task-103-2");
+        assert_eq!(generic_task.id, "task-104");
+        assert_eq!(
+            second_subtask.parent_relationship,
+            Some(ParentRelationship::Subtask)
+        );
+        let hierarchy = HierarchyIndex::from_workspace(&workspace).unwrap();
+        hierarchy.validate_all_task_hierarchies().unwrap();
+        let logged_parent = hierarchy.document("task-103").unwrap();
+        assert_eq!(
+            hierarchy.task_role(logged_parent).unwrap(),
+            Some(TaskRole::Task)
+        );
+        let logged_child = hierarchy.document("task-103-1").unwrap();
+        assert!(
+            log_show_json(logged_child, hierarchy.relationship(logged_child).unwrap())
+                .contains("\"parentRelationship\":\"subtask\"")
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
-        let legacy_path = workspace.board_dir.join("task-200.md");
-        fs::write(
-            &legacy_path,
-            "---\nid: task-200\ntype: task\ntitle: Legacy flat child\nstate: todo\nparentId: task-103\n---\n",
-        )
+    #[test]
+    fn resolved_graph_rejects_duplicates_unresolved_parents_cycles_and_invalid_depth() {
+        let make_doc = |path: &str, frontmatter: &str| Document {
+            path: PathBuf::from(path),
+            location: DocumentLocation::Board,
+            fields: parse_frontmatter_fields(frontmatter).unwrap(),
+            body: String::new(),
+        };
+
+        let duplicate = HierarchyIndex::from_documents(vec![
+            make_doc("a.md", "id: task-1\ntype: task\ntitle: A\nstate: todo\n"),
+            make_doc("b.md", "id: task-1\ntype: task\ntitle: B\nstate: todo\n"),
+        ])
+        .unwrap_err();
+        assert!(duplicate.message.contains("duplicate document ID `task-1`"));
+
+        let unresolved = HierarchyIndex::from_documents(vec![make_doc(
+            "task-1.md",
+            "id: task-1\ntype: task\ntitle: Missing parent\nstate: todo\nparentId: task-9\n",
+        )])
         .unwrap();
-        let legacy = read_document(&legacy_path, DocumentLocation::Board).unwrap();
-        validate_task_document_for_mutation(&workspace, &legacy).unwrap();
-        let docs = read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap();
-        let filtered = filter_documents(
-            docs.clone(),
-            &ListOptions {
-                parent: Some("task-103".to_string()),
-                ..ListOptions::default()
-            },
-        );
-        assert!(filtered.iter().any(|doc| doc.id() == "task-200"));
-        let results = search_documents(
-            docs,
-            &SearchOptions {
-                query: "Legacy".to_string(),
-                parent: Some("task-103".to_string()),
-                ..SearchOptions::default()
-            },
-        );
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].doc.id(), "task-200");
+        assert!(unresolved
+            .validate_all_task_hierarchies()
+            .unwrap_err()
+            .message
+            .contains("unresolved parentId `task-9`"));
 
-        let outcome = update_task_metadata(
+        let cycle = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\ntitle: A\nstate: todo\nparentId: task-2\n",
+            ),
+            make_doc(
+                "task-2.md",
+                "id: task-2\ntype: task\ntitle: B\nstate: todo\nparentId: task-1\n",
+            ),
+        ])
+        .unwrap();
+        assert!(cycle
+            .validate_all_task_hierarchies()
+            .unwrap_err()
+            .message
+            .contains("task hierarchy cycle"));
+
+        let direct_epic_hierarchical = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n",
+            ),
+            make_doc(
+                "task-1-1.md",
+                "id: task-1-1\ntype: task\ntitle: Wrong Task ID\nstate: todo\nparentId: task-1\n",
+            ),
+        ])
+        .unwrap();
+        let error = direct_epic_hierarchical
+            .validate_all_task_hierarchies()
+            .unwrap_err();
+        assert!(error.message.contains("expected global `task-N`"));
+
+        let parented_epic = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\ntitle: Task\nstate: todo\n",
+            ),
+            make_doc(
+                "task-2.md",
+                "id: task-2\ntype: task\nkind: epic\ntitle: Nested Epic\nstate: todo\nparentId: task-1\n",
+            ),
+        ])
+        .unwrap();
+        assert!(parented_epic
+            .validate_all_task_hierarchies()
+            .unwrap_err()
+            .message
+            .contains("Epic task-2 cannot have parentId"));
+
+        let global_subtask = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\ntitle: Task\nstate: todo\n",
+            ),
+            make_doc(
+                "task-2.md",
+                "id: task-2\ntype: task\ntitle: Wrong Subtask ID\nstate: todo\nparentId: task-1\n",
+            ),
+        ])
+        .unwrap();
+        assert!(global_subtask
+            .validate_all_task_hierarchies()
+            .unwrap_err()
+            .message
+            .contains("expected `task-1-M`"));
+
+        let child_beneath_subtask = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\ntitle: Task\nstate: todo\n",
+            ),
+            make_doc(
+                "task-1-1.md",
+                "id: task-1-1\ntype: task\ntitle: Subtask\nstate: todo\nparentId: task-1\n",
+            ),
+            make_doc(
+                "task-1-1-1.md",
+                "id: task-1-1-1\ntype: task\ntitle: Invalid depth\nstate: todo\nparentId: task-1-1\n",
+            ),
+        ])
+        .unwrap();
+        let error = child_beneath_subtask
+            .validate_all_task_hierarchies()
+            .unwrap_err();
+        assert!(
+            error
+                .message
+                .contains("Subtask task-1-1 cannot have children")
+                || error.message.contains("child of Subtask task-1-1")
+        );
+    }
+
+    #[test]
+    fn prospective_updates_reject_role_changes_id_mismatches_and_invalid_descendants() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-prospective-hierarchy-{}-{}",
+            std::process::id(),
+            current_timestamp()
+        ));
+        let workspace = test_workspace(&root);
+        for (name, content) in [
+            (
+                "task-1.md",
+                "---\nid: task-1\ntype: task\nkind: epic\ntitle: Epic one\nstate: todo\n---\n",
+            ),
+            (
+                "task-2.md",
+                "---\nid: task-2\ntype: task\ntitle: Task\nstate: todo\nparentId: task-1\n---\n",
+            ),
+            (
+                "task-2-1.md",
+                "---\nid: task-2-1\ntype: task\ntitle: Subtask\nstate: todo\nparentId: task-2\n---\n",
+            ),
+            (
+                "task-3.md",
+                "---\nid: task-3\ntype: task\nkind: epic\ntitle: Epic two\nstate: todo\n---\n",
+            ),
+            (
+                "task-4.md",
+                "---\nid: task-4\ntype: task\ntitle: Other Task\nstate: todo\nparentId: task-3\n---\n",
+            ),
+            (
+                "task-5.md",
+                "---\nid: task-5\ntype: task\ntitle: Root with child\nstate: todo\n---\n",
+            ),
+            (
+                "task-5-1.md",
+                "---\nid: task-5-1\ntype: task\ntitle: Child\nstate: todo\nparentId: task-5\n---\n",
+            ),
+        ] {
+            fs::write(workspace.board_dir.join(name), content).unwrap();
+        }
+
+        let valid = update_task_metadata(
             &workspace,
             UpdateOptions {
-                id: second.id.clone(),
-                parent: Some("task-200".to_string()),
+                id: "task-2".to_string(),
+                parent: Some("task-3".to_string()),
                 ..UpdateOptions::default()
             },
         )
         .unwrap();
-        assert_eq!(outcome.id, "task-103-2");
-        assert!(outcome
-            .warnings
-            .iter()
-            .any(|warning| { warning.contains("immutable ID") && warning.contains("task-200-N") }));
-        let reparented = read_document(&second.path, DocumentLocation::Board).unwrap();
-        assert_eq!(reparented.id(), "task-103-2");
-        assert_eq!(reparented.field("parentId"), Some("task-200"));
+        assert_eq!(
+            valid.parent_relationship,
+            Some(ParentRelationship::EpicTask)
+        );
 
-        let json = add_outcome_json(&nested);
-        assert!(json.contains("\"id\":\"task-103-1-1\""));
-        assert!(json.contains("\"parentId\":\"task-103-1\""));
-        assert!(json.contains("\"parentRelationship\":\"subtask\""));
+        let mismatch = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-2-1".to_string(),
+                parent: Some("task-4".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap_err();
+        assert!(mismatch.message.contains("expected `task-4-M`"));
+        assert_eq!(
+            read_document(
+                &workspace.board_dir.join("task-2-1.md"),
+                DocumentLocation::Board
+            )
+            .unwrap()
+            .field("parentId"),
+            Some("task-2")
+        );
+
+        let descendant = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-5".to_string(),
+                kind: Some("epic".to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap_err();
+        assert!(
+            descendant.message.contains("task-5-1")
+                && descendant.message.contains("expected global `task-N`")
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -5395,6 +5932,10 @@ mod tests {
 
     #[test]
     fn hierarchy_change_labels_follow_resolved_parent_type() {
+        assert_eq!(
+            display_change_field("parentId", Some(ParentRelationship::EpicTask)),
+            "Task of Epic"
+        );
         assert_eq!(
             display_change_field("parentId", Some(ParentRelationship::Subtask)),
             "Subtask of"
@@ -5591,10 +6132,11 @@ rules:
             body: String::new(),
         };
 
-        assert!(
-            show_json(&doc, &[], None).contains("accord.status `claimed` suggests `in-progress`")
-        );
-        assert!(list_json(&[doc], &HashMap::new())
+        let hierarchy = HierarchyIndex::from_documents(vec![doc.clone()]).unwrap();
+        assert!(show_json(&doc, &[], Some(TaskRole::Task), None)
+            .contains("accord.status `claimed` suggests `in-progress`"));
+        assert!(list_json(&[doc], &hierarchy)
+            .unwrap()
             .contains("accord.status `claimed` suggests `in-progress`"));
     }
 
@@ -5756,7 +6298,7 @@ rules:
         fs::write(&workspace.events_path, "").unwrap();
         fs::write(
             workspace.board_dir.join("task-2.md"),
-            "---\nid: task-2\ntype: task\ntitle: Blocker\nstate: todo\n---\n",
+            "---\nid: task-2\ntype: task\nkind: epic\ntitle: Blocker Epic\nstate: todo\n---\n",
         )
         .unwrap();
         fs::write(
@@ -5776,9 +6318,8 @@ rules:
             UpdateOptions {
                 id: "task-1".to_string(),
                 title: Some("New".to_string()),
-                kind: Some("epic".to_string()),
                 priority: Some("high".to_string()),
-                parent: Some("task-2".to_string()),
+                parent: Some("decision-1".to_string()),
                 tags: vec!["cli".to_string(), "metadata".to_string()],
                 blockers: vec!["task-2".to_string()],
                 references: vec!["missing-decision".to_string()],
@@ -5789,19 +6330,18 @@ rules:
         .unwrap();
 
         let output = fs::read_to_string(&task_path).unwrap();
-        assert_eq!(outcome.changes.len(), 8);
+        assert_eq!(outcome.changes.len(), 7);
         assert_eq!(
             outcome.parent_relationship,
-            Some(ParentRelationship::Subtask)
+            Some(ParentRelationship::Parent)
         );
-        assert_eq!(outcome.warnings.len(), 2);
-        assert!(outcome.warnings[0].contains("immutable ID"));
-        assert!(outcome.warnings[0].contains("task-2-N"));
-        assert_eq!(outcome.warnings[1], "reference not found: missing-decision");
+        assert_eq!(
+            outcome.warnings,
+            vec!["reference not found: missing-decision"]
+        );
         assert!(output.contains("title: \"New\"\n"));
-        assert!(output.contains("kind: \"epic\"\n"));
         assert!(output.contains("priority: \"high\"\n"));
-        assert!(output.contains("parentId: \"task-2\"\n"));
+        assert!(output.contains("parentId: \"decision-1\"\n"));
         assert!(output.contains("tags: [\"cli\", \"metadata\"]\n"));
         assert!(output.contains("blockers: [\"task-2\"]\n"));
         assert!(output.contains("references: [\"missing-decision\"]\n"));
@@ -5812,23 +6352,23 @@ rules:
             .unwrap()
             .contains("task.updated"));
 
-        let generic_parent_outcome = update_task_metadata(
+        let epic_parent_outcome = update_task_metadata(
             &workspace,
             UpdateOptions {
                 id: "task-1".to_string(),
-                parent: Some("decision-1".to_string()),
+                parent: Some("task-2".to_string()),
                 ..UpdateOptions::default()
             },
         )
         .unwrap();
-        assert_eq!(generic_parent_outcome.changes.len(), 1);
+        assert_eq!(epic_parent_outcome.changes.len(), 1);
         assert_eq!(
-            generic_parent_outcome.parent_relationship,
-            Some(ParentRelationship::Parent)
+            epic_parent_outcome.parent_relationship,
+            Some(ParentRelationship::EpicTask)
         );
         assert!(fs::read_to_string(&task_path)
             .unwrap()
-            .contains("parentId: \"decision-1\"\n"));
+            .contains("parentId: \"task-2\"\n"));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -5874,10 +6414,10 @@ rules:
     #[test]
     fn show_json_includes_parent_id_only_when_present() {
         let child = Document {
-            path: PathBuf::from("task-2.md"),
+            path: PathBuf::from("task-1-1.md"),
             location: DocumentLocation::Board,
             fields: parse_frontmatter_fields(
-                "id: task-2\ntype: task\ntitle: Child\nstate: todo\nparentId: task-1\n",
+                "id: task-1-1\ntype: task\ntitle: Child\nstate: todo\nparentId: task-1\n",
             )
             .unwrap(),
             body: String::new(),
@@ -5892,10 +6432,20 @@ rules:
             body: String::new(),
         };
 
-        let parent_json = show_json(&parent, std::slice::from_ref(&child), None);
-        assert!(show_json(&child, &[], Some(ParentRelationship::Subtask))
-            .contains("\"parentId\":\"task-1\""));
-        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-2\""));
+        let parent_json = show_json(
+            &parent,
+            std::slice::from_ref(&child),
+            Some(TaskRole::Task),
+            None,
+        );
+        assert!(show_json(
+            &child,
+            &[],
+            Some(TaskRole::Subtask),
+            Some(ParentRelationship::Subtask)
+        )
+        .contains("\"parentId\":\"task-1\""));
+        assert!(parent_json.contains("\"subtasks\":[{\"id\":\"task-1-1\""));
         assert!(!document_detail_json(&parent).contains("\"parentId\""));
     }
 
@@ -5912,54 +6462,50 @@ rules:
         };
         assert!(document_summary_json(&doc, None).contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"kind\":\"epic\""));
+        let hierarchy = HierarchyIndex::from_documents(vec![doc.clone()]).unwrap();
         let search = search_json(
             "epic",
             &[SearchResult {
                 doc: doc.clone(),
                 snippet: "epic".to_string(),
             }],
-            &HashMap::new(),
-        );
+            &hierarchy,
+        )
+        .unwrap();
         assert!(search.contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"blockers\":[\"task-2\"]"));
         assert!(document_detail_json(&doc).contains("\"references\":[\"decision-1\"]"));
         assert!(document_detail_json(&doc).contains("\"relatedFiles\":[\"src/main.rs\"]"));
 
-        let workspace = Workspace {
-            board_dir: PathBuf::from(".tandem/board"),
-            logs_dir: PathBuf::from(".tandem/logs"),
-            config_path: PathBuf::from("missing-tandem.md"),
-            events_path: PathBuf::from(".tandem/events.jsonl"),
-        };
         let error = validate_update_options(
-            &workspace,
             &UpdateOptions {
                 id: "task-1".to_string(),
                 priority: Some("urgent".to_string()),
                 ..UpdateOptions::default()
             },
+            &hierarchy,
         )
         .unwrap_err();
         assert!(error.message.contains("invalid priority `urgent`"));
 
         let error = validate_update_options(
-            &workspace,
             &UpdateOptions {
                 id: "task-1".to_string(),
                 kind: Some("feature".to_string()),
                 ..UpdateOptions::default()
             },
+            &hierarchy,
         )
         .unwrap_err();
         assert!(error.message.contains("invalid kind `feature`"));
 
         let error = validate_update_options(
-            &workspace,
             &UpdateOptions {
                 id: "task-1".to_string(),
                 parent: Some("task-1".to_string()),
                 ..UpdateOptions::default()
             },
+            &hierarchy,
         )
         .unwrap_err();
         assert!(error.message.contains("cannot be its own parent"));
