@@ -85,6 +85,19 @@ tandem show task-1
 
 The task is a Markdown file with YAML frontmatter. You can read it in any editor, then use Tandem commands for safe state and accord updates.
 
+For a larger outcome, use the canonical three-tier hierarchy and always use each returned ID:
+
+```sh
+tandem add --title "Publish the documentation" --kind epic
+# Example result: task-2 (Epic, global ID)
+tandem add --title "Rewrite the guides" --parent task-2
+# Example result: task-3 (Task of Epic, global ID)
+tandem add --title "Update CLI examples" --parent task-3
+# Example result: task-3-1 (leaf Subtask, parent-derived ID)
+```
+
+A direct Epic child is always a global-ID Task; only a direct Task child is a parent-derived Subtask. Subtasks cannot have children. Only Tasks are delegated initially, with one Task worker owning its Subtasks as a bounded checklist.
+
 ## 4. Start and claim the work
 
 Move the task into active work and claim the accord:

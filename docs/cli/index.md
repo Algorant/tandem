@@ -39,33 +39,35 @@ tandem update task-1 --priority medium --tag docs --related-file docs/index.md
 
 The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` state.
 
-### Create and inspect subtasks
+### Create and inspect the hierarchy
 
-Create a child with the normal `add` command and the parent's returned ID:
+Create each document with the normal `add` command and use the ID returned by Tandem:
 
 ```sh
 tandem add --title "Coordinate the release" --kind epic
-# If Tandem returns task-103:
+# Tandem returns a global Epic ID, for example task-103.
+
 tandem add --title "Write release notes" --parent task-103
-# Tandem returns the next child ID, such as task-103-1.
-tandem add --title "Check upgrade notes" --parent task-103-1
+# A direct Epic child is a global Task, for example task-104.
+
+tandem add --title "Check upgrade notes" --parent task-104
+# A direct Task child is a parent-derived Subtask, for example task-104-1.
 ```
 
-The CLI—not an integration adapter—validates the parent and allocates the next available ID across the Board and Logs. Nested children extend the parent's ID, such as `task-103-1-1`. Always use the ID returned by Tandem rather than assuming a suffix.
+The CLI—not an integration adapter—resolves each parent, derives the role, and allocates IDs across the Board and Logs. Epics and Tasks use global `task-N`; only a Subtask directly beneath a Task uses `<Task ID>-M`. Subtasks are leaves, so a child beneath `task-104-1` is rejected.
 
 ```sh
-tandem show task-103
-tandem list --parent task-103
-tandem search "release" --parent task-103
+tandem show task-103       # includes its global Tasks in `tasks`
+tandem show task-104       # includes active/logged work in `subtasks`
+tandem list --parent task-104
+tandem search "release" --parent task-104
 ```
 
-To attach or reparent an active task, update its parent:
+A standalone Task can own Subtasks in the same way. A Task attached to a decision or custom document keeps a global ID and generic `parent` relationship, and it may also own Subtasks.
 
-```sh
-tandem update task-137 --parent task-103
-```
+IDs are immutable. `tandem update <id> --parent <id>` is accepted only when the prospective relationship preserves the document's canonical role and ID. Reparenting a global Task beneath a Task would turn it into a Subtask, so Tandem rejects that mutation rather than renaming the ID or rewriting references. Parented Epics, nested Subtasks, hierarchical IDs directly beneath Epics, and global-ID Subtasks are structural errors with no legacy compatibility path.
 
-The task keeps its original ID. Existing flat-ID children remain valid because `parentId`, not the ID shape, defines the relationship. The older `--subtask` inline-checklist option is deprecated; use a separate task with `--parent` for new tracked work.
+The older `--subtask` inline-checklist option is deprecated; create a first-class Subtask document with `--parent` for new lifecycle-bearing checklist work.
 
 ## Accords and validation
 

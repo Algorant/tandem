@@ -44,9 +44,18 @@ Adapters must not own:
 
 - Tandem protocol semantics.
 - Markdown/frontmatter mutation behavior.
+- ID allocation or relationship reclassification.
 - Alternate task, accord, rule, decision, or log parsers beyond trivial CLI JSON output handling.
 
-Those behaviors belong in `protocol/` and the `tandem` implementation under `tandem/`.
+Those behaviors belong in `protocol/` and the `tandem` implementation under `tandem/`. Adapters pass through and consume Tandem's canonical hierarchy:
+
+```text
+task-10       Epic: global ID
+└── task-11   Task: global ID; `epic-task`; delegation root
+    └── task-11-1   Subtask: parent-derived leaf; `subtask`; worker checklist item
+```
+
+Only Tasks are delegated initially. Epics and Subtasks are not independent delegation roots, and no adapter may add compatibility for hierarchical direct Epic children, global-ID Subtasks, or deeper nesting.
 
 ## Testing and promotion
 

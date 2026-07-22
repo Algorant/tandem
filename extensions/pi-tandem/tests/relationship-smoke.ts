@@ -101,6 +101,15 @@ assertIncludes(generatedGuidance, "a Task's direct children are leaf, parent-der
 assertIncludes(generatedGuidance, "Only Task-role roots are delegated initially", "generated Task-only delegation guidance");
 assertIncludes(generatedGuidance, "Never allocate IDs or reclassify CLI output in Pi", "generated thin-adapter guidance");
 
+const workerHandoffSpec = await readFile(join(repoRoot, "plan", "delegated-task-tree-worker-spec.md"), "utf8");
+assertIncludes(workerHandoffSpec, "Only Task-role documents with global `task-N` IDs are delegation roots", "repository worker handoff eligibility");
+assertIncludes(workerHandoffSpec, "Epics are not delegated", "repository worker handoff Epic boundary");
+assertIncludes(workerHandoffSpec, "Subtasks are not independently delegated", "repository worker handoff Subtask boundary");
+assertIncludes(workerHandoffSpec, "task-134       Epic (not delegatable)", "repository worker handoff canonical fixture");
+assertIncludes(workerHandoffSpec, "task-139   Task (delegatable)", "repository worker handoff canonical Task fixture");
+assertIncludes(workerHandoffSpec, "task-139-1   Subtask (Worker A checklist item)", "repository worker handoff canonical Subtask fixture");
+assertIncludes(workerHandoffSpec, "reports one Task-root handoff", "repository worker handoff settlement boundary");
+
 const epicArgs = buildTaskArgs({ action: "add", title: "Canonical Epic", kind: "epic" });
 assert(epicArgs.includes("--kind") && epicArgs.includes("epic"), "buildTaskArgs should pass kind=epic directly to Tandem");
 
@@ -124,6 +133,21 @@ try {
 	await writeFile(join(workspace, "src", "relationships.ts"), "export const relationshipSmoke = true;\n", "utf8");
 	await writeFile(join(workspace, "tests", "fixtures", "relationship.json"), "{\"ok\":true}\n", "utf8");
 
+	const standaloneParentId = parseId(await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Standalone implementation Task",
+	}), workspace));
+	assert(/^task-\d+$/.test(standaloneParentId), `standalone Task should receive a global task-N ID, got ${standaloneParentId}`);
+	const standaloneSubtaskId = parseId(await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Standalone Task checklist item",
+		parent: standaloneParentId,
+	}), workspace));
+	assert(standaloneSubtaskId === `${standaloneParentId}-1`, `standalone Task should own parent-derived Subtask ${standaloneParentId}-1, got ${standaloneSubtaskId}`);
+	const standaloneParentShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: standaloneParentId }), workspace));
+	assert(standaloneParentShown.data.parentRelationship === undefined, "standalone Task should have no parent relationship");
+	assert(standaloneParentShown.data.subtasks.some((subtask: any) => subtask.id === standaloneSubtaskId), "standalone Task show should expose its Subtask");
+
 	const epicOutput = await runTandem(tandem, buildTaskArgs({
 		action: "add",
 		title: "Ship canonical relationship support",
@@ -141,6 +165,13 @@ try {
 		references: [epicId],
 		tags: ["relationship-smoke"],
 	}), workspace));
+
+	await runTandem(tandem, buildTaskArgs({ action: "update", id: standaloneParentId, parent: decisionId }), workspace);
+	const reparentedStandalone = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: standaloneParentId }), workspace));
+	assert(reparentedStandalone.data.document.id === standaloneParentId, "valid Task reparenting must preserve the immutable global ID");
+	assert(reparentedStandalone.data.document.parentId === decisionId, "valid Task reparenting should persist the generic parent");
+	assert(reparentedStandalone.data.parentRelationship === "parent", "valid Task reparenting beneath a decision should remain generic parent");
+	assert(reparentedStandalone.data.subtasks.some((subtask: any) => subtask.id === standaloneSubtaskId), "valid Task reparenting should preserve the Task-owned Subtask");
 
 	const taskParams = {
 		action: "add" as const,
@@ -275,11 +306,11 @@ try {
 	const childBeneathSubtask = await runProcess(tandem, buildTaskArgs({ action: "add", title: "Invalid depth", parent: subtaskId }), workspace);
 	assertFailure(childBeneathSubtask, "child beneath Subtask", `cannot attach a child beneath Subtask ${subtaskId}`);
 
-	const standaloneId = parseId(await runTandem(tandem, buildTaskArgs({ action: "add", title: "Standalone Task" }), workspace));
-	const roleChangingReparent = await runProcess(tandem, buildTaskArgs({ action: "update", id: standaloneId, parent: taskId }), workspace);
-	assertFailure(roleChangingReparent, "role-changing reparent", `reparenting ${standaloneId} would change its canonical role from task to subtask`, "IDs are immutable");
-	const standaloneShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: standaloneId }), workspace));
-	assert(standaloneShown.data.document.parentId === undefined, "rejected reparent should not mutate the standalone Task");
+	const reparentCandidateId = parseId(await runTandem(tandem, buildTaskArgs({ action: "add", title: "Task with immutable global ID" }), workspace));
+	const roleChangingReparent = await runProcess(tandem, buildTaskArgs({ action: "update", id: reparentCandidateId, parent: taskId }), workspace);
+	assertFailure(roleChangingReparent, "role-changing reparent", `reparenting ${reparentCandidateId} would change its canonical role from task to subtask`, "IDs are immutable");
+	const reparentCandidateShown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: reparentCandidateId }), workspace));
+	assert(reparentCandidateShown.data.document.parentId === undefined, "rejected reparent should not mutate the standalone Task");
 
 	const erroneousEpicChildId = `${epicId}-99`;
 	const erroneousEpicChildPath = join(workspace, ".tandem", "board", `${erroneousEpicChildId}.md`);
@@ -301,7 +332,7 @@ try {
 	assertIncludes(looseReferenceOutput, "Warning: reference not found: task-99999", "loose reference warning");
 
 	console.log(`pi-tandem relationship smoke passed with ${tandem}`);
-	console.log(`Verified canonical hierarchy: ${epicId} (Epic) -> ${taskId} (Task) -> ${subtaskId}/${successorId} (Subtasks); generic ${decisionId} -> ${genericId}.`);
+	console.log(`Verified canonical hierarchy: standalone ${standaloneParentId} -> ${standaloneSubtaskId}; ${epicId} (Epic) -> ${taskId} (Task) -> ${subtaskId}/${successorId} (Subtasks); generic ${decisionId} -> ${genericId}.`);
 } finally {
 	await rm(workspace, { recursive: true, force: true });
 }

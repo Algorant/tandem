@@ -51,7 +51,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 
 - Protocol version: `0.1.0` for the first v0 draft.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
-- New work items use `type: task`; Epics and Tasks—including direct Epic Tasks—use global `task-N` IDs. Only a Subtask directly beneath a Task uses `task-N-M`.
+- New work items use `type: task`; the canonical shape is `task-10` Epic → `task-11` global Task → `task-11-1` parent-derived leaf Subtask. Epics and Tasks—including direct Epic Tasks—use global `task-N` IDs. Only a Subtask directly beneath a Task uses `task-N-M`.
 - First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only.
 - Epic, Task, and Subtask are derived roles over normal task documents. An Epic is `type: task` plus `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Classification resolves documents and never uses ID shape.
 - Direct Epic children use `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.

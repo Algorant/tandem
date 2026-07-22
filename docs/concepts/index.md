@@ -38,26 +38,34 @@ Accord actions can synchronize Board state. Claiming a `todo` task moves it to `
 
 This keeps agent workflows honest: a child worker can deliver evidence, while a human or parent orchestrator decides whether to accept, request rework, block, fail, or complete the task.
 
-## Epics, subtasks, and related work
+## Epics, Tasks, Subtasks, and related work
 
-A first-class subtask is a full task document whose `parentId` points to another task. It has its own state, owner, accord, validation, blockers, and completion history. The parent can be an epic or an ordinary task. If `parentId` instead resolves to a decision or custom document, it is a valid generic parent relationship—not a subtask.
+Tandem has one strict, three-tier task hierarchy:
 
-New children normally receive a parent-derived ID. For example, a child of `task-103` becomes `task-103-1`, and its child becomes `task-103-1-1`. Tandem allocates the next suffix across both the active Board and completed Logs, so completing a child does not make its ID available again.
+```text
+task-103       Epic (`type: task`, `kind: epic`)
+└── task-104   Task (`parentId: task-103`, relationship `epic-task`)
+    └── task-104-1   Subtask (`parentId: task-104`, relationship `subtask`)
+```
 
-`parentId` defines the hierarchy; the ID shape does not. Older children with flat IDs such as `task-137` remain valid. IDs are immutable, so reparenting changes `parentId` without renaming the task or rewriting links to it.
+Epics and Tasks use the global `task-N` namespace. A direct Epic child is therefore a Task such as `task-104`, never `task-103-1`. Only a direct child of a Task is a Subtask, and it must use the parent-derived `<Task ID>-M` form. Subtasks are leaves and cannot have children. Tandem allocates both global IDs and per-Task suffixes across the active Board and completed Logs, so completed IDs are never reused.
+
+Roles come from the resolved documents and `parentId`, then Tandem strictly validates the matching ID form. There is no compatibility exception for a hierarchical direct Epic child or a global-ID Subtask. IDs are immutable: reparenting is allowed only when it preserves both the role and the existing canonical ID.
+
+A Task whose `parentId` resolves to a decision or custom document remains a global-ID Task with generic relationship `parent`; it may own parent-derived Subtasks. Unresolved parents are errors, while `references` remain loose related links.
 
 Choose each relationship for its meaning:
 
 | Use | When |
 | --- | --- |
-| Epic (`kind: epic`) | A broad outcome groups several independently managed tasks. An epic is still a normal task. |
-| Ordinary parent task | One task naturally breaks into tracked child work but does not need to be called an epic. |
-| First-class child task | Work needs its own owner, state, accord, validation, blockers, or completion record. |
-| `blockers` | Another document must be resolved before this task can proceed. |
+| Epic (`kind: epic`) | A root-only broad outcome groups global-ID Tasks. An Epic is still a normal task document. |
+| Task | Independently delegated work. It can be standalone, directly beneath an Epic, or attached to a non-task parent. |
+| Subtask | A Task worker's first-class, lifecycle-bearing checklist item. It is not independently delegated. |
+| `blockers` | Another document must be resolved before this work can proceed. |
 | `references` | A decision, sibling task, log, or other document is useful context but not a dependency or parent. |
 | Inline `subtasks` checklist | Preserve an older checklist already in a task. Inline items are legacy data and should not be created for new tracked work. |
 
-Completed children move to Logs like any other task. They still count toward their parent's history and ID allocation, while active children remain on the Board.
+Only Tasks are delegation roots in the initial worker model. Epics are split into independently delegated Tasks; one worker owns a delegated Task's direct Subtasks through its session todo projection and returns one Task-level handoff. Completed Subtasks move to Logs but remain in their Task's history and suffix allocation.
 
 ## Rules
 

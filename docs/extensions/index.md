@@ -16,27 +16,32 @@ Adapters own tool schemas, editor or agent ergonomics, output formatting, and di
 
 `extensions/pi-tandem/` provides a Pi adapter that exposes Tandem task, accord, rule, decision, and log operations through Pi tools and commands. Agents should use `tandem_decision` for ADR-compatible decisions instead of inventing task states or a separate ADR type.
 
-### Create and delegate child tasks
+### Create a Task campaign
 
-With Pi, create a normal child task by passing the parent task's ID:
+With Pi, pass `kind` and `parent` through to Tandem and consume the IDs and relationships returned by the CLI:
 
 ```ts
-tandem_task({
-  action: "add",
-  title: "Write release notes",
-  parent: "task-103",
-})
+// Returns a global Epic ID, for example task-103.
+tandem_task({ action: "add", title: "Coordinate the release", kind: "epic" })
+
+// A direct Epic child is a global Task, for example task-104.
+tandem_task({ action: "add", title: "Write release notes", parent: "task-103" })
+
+// A direct Task child is a parent-derived leaf Subtask, for example task-104-1.
+tandem_task({ action: "add", title: "Check upgrade notes", parent: "task-104" })
 ```
 
-The adapter forwards `parent` to the Tandem CLI as `parentId`. The CLI validates the relationship and returns the allocated ID, such as `task-103-1`; the adapter does not generate IDs. Read that returned ID, then delegate the existing child with Shep:
+The adapter never allocates IDs or reclassifies relationships. Tandem returns `epic-task` for the global Task beneath the Epic, `subtask` for the parent-derived Subtask, and generic `parent` for a global Task attached to a decision or custom document.
+
+Only global-ID Tasks are initial Shep delegation roots. Delegate the Task—not its Epic or Subtask:
 
 ```ts
 shep_delegate({
-  taskId: "task-103-1",
+  taskId: "task-104",
   checkoutMode: "worktree",
 })
 ```
 
-Shep receives the existing `taskId`; it does not allocate or forward a parent field. Use a child task when delegated work needs its own owner, accord, review, or completion lifecycle; do not create new inline checklist `subtasks` for delegation.
+One worker owns the delegated Task's direct Subtasks as its session todo projection and produces one Task-root handoff. Epics and Subtasks are not independently delegated. The adapter does not expose deprecated inline checklist `subtasks` authoring, and there is no compatibility path for hierarchical direct Epic children, global-ID Subtasks, or deeper nesting.
 
 Global Pi config promotion is a separate explicit task. Repository-local extension development should not edit `~/.pi/agent` directly.

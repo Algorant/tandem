@@ -18,7 +18,7 @@ The Tandem protocol defines the local `.tandem/` data model used by the CLI, TUI
 
 ## Documents
 
-V0 supports `task` and `decision` documents. Task IDs are sequential by default, such as `task-1`; subtasks use parent-based IDs such as `task-1-1`.
+V0 supports `task` and `decision` documents. Epics and Tasks use the global `task-N` namespace; only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 
 Task documents use frontmatter for structured fields and Markdown for the human-readable body. Tools should preserve unknown fields and minimize rewrites.
 
@@ -34,7 +34,7 @@ title: Ship documentation refresh
 state: in-progress
 ```
 
-Child work links to the epic through `parentId`:
+A direct Epic child is a global-ID Task linked through `parentId`:
 
 ```yaml
 id: task-11
@@ -46,7 +46,21 @@ references:
   - decision-3
 ```
 
-`parentId` is strict hierarchy. `references` are loose related links. Epic tasks are completed and archived with the normal task flow; v0 does not define `type: epic`, `epic-N` IDs, a separate ADR/epic record type, or special epic lifecycle behavior.
+A direct Task child is a parent-derived leaf Subtask:
+
+```yaml
+id: task-11-1
+type: task
+title: Update hierarchy examples
+state: todo
+parentId: task-11
+```
+
+Tandem resolves the documents before deriving roles: `task-10` is an Epic, `task-11` is its Task with relationship `epic-task`, and `task-11-1` is that Task's Subtask with relationship `subtask`. A Task attached to a decision or custom document remains a global-ID Task with generic relationship `parent` and may own Subtasks.
+
+`parentId` is strict hierarchy; `references` are loose related links. Epics are root-only, Subtasks cannot have children, and IDs are immutable. Role-changing or ID-invalidating reparenting is rejected, as are hierarchical direct Epic children and global-ID Subtasks. There is no legacy compatibility exception. Epic tasks are completed and archived with the normal task flow; v0 does not define `type: epic`, `epic-N` IDs, a separate ADR/epic record type, or special epic lifecycle behavior.
+
+Only Tasks are initial delegation roots. One worker owns a delegated Task's direct Subtasks as its execution checklist; Epics and Subtasks are not independently delegated.
 
 ## Decisions
 
@@ -60,7 +74,7 @@ Per-actor logs avoid Git file-level append conflicts, but semantic conflicts bet
 
 ## Validation rules
 
-Built-in structural validation checks required fields and core relationships. Unresolved `parentId` or blockers are errors. Unresolved related references are warnings in v0.
+Built-in structural validation checks required fields, core relationships, derived hierarchy roles, and their required ID forms. Unresolved `parentId` or blockers, parented Epics, children beneath Subtasks, role/ID mismatches, and invalid reparenting are errors. Unresolved related references are warnings in v0.
 
 ## Design notes
 

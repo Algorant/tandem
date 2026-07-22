@@ -63,7 +63,15 @@ See the [agent-first quickstart](https://trytandem.dev/quick-start/) to take a s
 
 Human describes task to agent -> agent creates task and accord (contract with deliverables) -> human or agent orchestrator delegates the task to begin being worked on -> agent returns results when done to orchestrator -> work is either auto approved by meeting the requirements or, optionally a human gets final sign off -> task is completed, all work committed and cleaned up.
 
-Large outcomes can use an epic, while any task can have full child tasks linked with `parentId`. Child tasks keep their own owner, accord, validation, and completion history; see [Epics, subtasks, and related work](https://trytandem.dev/concepts/#epics-subtasks-and-related-work).
+Large outcomes use a strict Epic → Task → Subtask hierarchy:
+
+```text
+task-10       Epic (root `kind: epic`, global ID)
+└── task-11   Task (direct Epic child, global ID, `epic-task`)
+    └── task-11-1   Subtask (direct Task child, parent-derived ID, `subtask`)
+```
+
+Only Tasks are delegated initially. One Task worker owns its leaf Subtasks as a bounded execution checklist and returns one Task-level handoff; Epics and Subtasks are not independently delegated. Tandem rejects nested Epics, children beneath Subtasks, role/ID mismatches, and role-changing or ID-invalidating reparenting. See [Epics, Tasks, Subtasks, and related work](https://trytandem.dev/concepts/#epics-tasks-subtasks-and-related-work).
 
 ## TUI
 

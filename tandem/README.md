@@ -46,22 +46,33 @@ cargo run -- tui
 
 Use `cargo run -- <command>` during early development. The package binary name is `tandem`.
 
-## Task hierarchy
+## Epic, Task, and Subtask hierarchy
 
-A task becomes a tracked subtask when its `parentId` resolves to another task. Create it with the same `add` command as any other task:
+The CLI derives roles from resolved documents and enforces one strict three-tier hierarchy:
 
 ```text
-tandem add --title "Coordinate the release"
-tandem add --title "Write release notes" --parent task-1
+task-10       Epic: root `type: task`, `kind: epic`; global ID
+└── task-11   Task: `parentId: task-10`; global ID; `epic-task`
+    └── task-11-1   Subtask: `parentId: task-11`; parent-derived ID; `subtask`
 ```
 
-The child receives the next parent-derived task ID, such as `task-1-1`, then `task-1-2`; nested children extend the full parent ID, such as `task-1-1-1`. Allocation scans active board documents and completed logs, so completed IDs are never reused. `tandem list --parent task-1` and `tandem search <query> --parent task-1` select documents with that parent, while `tandem show task-1` includes linked task children as subtask summaries.
+Create the same structure with normal `add` commands and always consume the returned IDs:
 
-Existing flat-ID children remain valid. `tandem update task-2 --parent task-1` attaches or reparents an active task without changing its immutable ID and warns when the preserved ID no longer matches the target parent's default designation.
+```text
+tandem add --title "Coordinate the release" --kind epic
+tandem add --title "Write release notes" --parent task-10
+tandem add --title "Check upgrade notes" --parent task-11
+```
 
-`parentId` may also resolve to a decision or another Tandem document type. Those valid relationships remain generic parents: human output uses `Parent` rather than `Subtask of`, JSON uses `parentRelationship: "parent"`, and showing the non-task parent does not fabricate a `subtasks` collection. Task-to-task links use `Subtask of` and `parentRelationship: "subtask"`.
+Epics and Tasks—including standalone, generic-parent, and direct Epic Tasks—allocate the next global `task-N` across active Board documents and completed Logs. Only a Subtask directly beneath a Task allocates the next `<Task ID>-M` suffix. Completed suffixes are not reused. `tandem show` exposes `tasks` for an Epic, `subtasks` for a Task, and no child collection for a Subtask.
 
-The earlier `add --subtask <title>` inline-checklist authoring path is deprecated and rejected with guidance to create a parent-linked task. Existing inline `subtasks` metadata remains readable for compatibility, but the CLI does not create new inline entries.
+Subtasks are leaves. A parented Epic, child beneath a Subtask, direct Epic Task with a hierarchical ID, global-ID Subtask, or deeper task ID is a structural error. There is no legacy compatibility exception. IDs are immutable, so `tandem update --parent` is accepted only when the prospective parent preserves the document's canonical role and existing ID; invalid reparenting is rejected without mutation.
+
+`parentId` may also resolve to a decision or custom document. That child remains a global-ID Task with human label `Parent` and JSON `parentRelationship: "parent"`, and it may own parent-derived Subtasks. Direct Epic Tasks use `Task of Epic` / `epic-task`; only direct Task children use `Subtask of` / `subtask`.
+
+Only Tasks are initial delegation roots. Epics are decomposed into independently delegated Tasks; one delegated Task worker executes its direct Subtasks through a session todo projection and returns one Task-level handoff. Epics and Subtasks are not independently delegated.
+
+The earlier `add --subtask <title>` inline-checklist authoring path is deprecated and rejected. Existing inline `subtasks` metadata remains readable, but the CLI does not create it for new lifecycle-bearing work.
 
 ## Release and install target
 
