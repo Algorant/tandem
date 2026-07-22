@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -228,6 +228,14 @@ impl HierarchyIndex {
                 doc.doc_type()
             )));
         }
+        if let Some(kind) = doc.field("kind") {
+            validate_task_kind_value(kind).map_err(|message| {
+                CliError::user(format!(
+                    "Validation failed for {}: {message}",
+                    display_path(&doc.path)
+                ))
+            })?;
+        }
         if doc.kind() == Some("epic") {
             roles.insert(id.to_string(), TaskRole::Epic);
             return Ok(TaskRole::Epic);
@@ -351,10 +359,25 @@ impl HierarchyIndex {
             .map(|doc| doc.id().to_string())
             .collect::<Vec<_>>();
         ids.sort();
+        let mut errors = BTreeSet::new();
         for id in ids {
-            self.validate_task_hierarchy(self.document(&id).expect("indexed task"))?;
+            if let Err(error) =
+                self.validate_task_hierarchy(self.document(&id).expect("indexed task"))
+            {
+                errors.insert(error.message);
+            }
         }
-        Ok(())
+        if errors.is_empty() {
+            return Ok(());
+        }
+        if errors.len() == 1 {
+            return Err(CliError::user(errors.into_iter().next().unwrap()));
+        }
+        let count = errors.len();
+        Err(CliError::user(format!(
+            "Validation failed: hierarchy contains {count} structural errors:\n- {}",
+            errors.into_iter().collect::<Vec<_>>().join("\n- ")
+        )))
     }
 }
 
@@ -5659,6 +5682,45 @@ mod tests {
         ])
         .unwrap_err();
         assert!(duplicate.message.contains("duplicate document ID `task-1`"));
+
+        let unsupported_kind = HierarchyIndex::from_documents(vec![make_doc(
+            "task-1.md",
+            "id: task-1\ntype: task\nkind: Epic\ntitle: Wrong kind casing\nstate: todo\n",
+        )])
+        .unwrap();
+        let unsupported_doc = unsupported_kind.document("task-1").unwrap();
+        assert!(unsupported_kind
+            .task_role(unsupported_doc)
+            .unwrap_err()
+            .message
+            .contains("invalid kind `Epic`"));
+        let error = unsupported_kind
+            .validate_all_task_hierarchies()
+            .unwrap_err();
+        assert!(error.message.contains("invalid kind `Epic`"));
+        assert!(error.message.contains("expected one of: epic"));
+
+        let aggregate = HierarchyIndex::from_documents(vec![
+            make_doc(
+                "task-1.md",
+                "id: task-1\ntype: task\ntitle: Task\nstate: todo\n",
+            ),
+            make_doc(
+                "task-2.md",
+                "id: task-2\ntype: task\ntitle: First global child\nstate: todo\nparentId: task-1\n",
+            ),
+            make_doc(
+                "task-3.md",
+                "id: task-3\ntype: task\ntitle: Second global child\nstate: todo\nparentId: task-1\n",
+            ),
+        ])
+        .unwrap();
+        let error = aggregate.validate_all_task_hierarchies().unwrap_err();
+        assert!(error
+            .message
+            .contains("hierarchy contains 2 structural errors"));
+        assert!(error.message.contains("task-2"));
+        assert!(error.message.contains("task-3"));
 
         let unresolved = HierarchyIndex::from_documents(vec![make_doc(
             "task-1.md",
