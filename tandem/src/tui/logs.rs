@@ -9,7 +9,7 @@ use ratatui::widgets::ListItem;
 use crate::{
     accord_status, completion_files_changed, completion_reviewer, completion_summary,
     completion_validation, display_path, parse_field_values, read_document, review_status,
-    Document, DocumentLocation,
+    Document, DocumentLocation, HierarchyIndex,
 };
 
 use super::{markdownish_lines, StatusTone, TuiTheme};
@@ -168,18 +168,22 @@ fn extract_json_string(line: &str, key: &str) -> Option<String> {
     None
 }
 
-pub(super) fn filter_logs<'a>(logs: &'a [Document], query: &str) -> Vec<&'a Document> {
+pub(super) fn filter_logs<'a>(
+    logs: &'a [Document],
+    hierarchy: Option<&HierarchyIndex>,
+    query: &str,
+) -> Vec<&'a Document> {
     let query = query.trim().to_ascii_lowercase();
     if query.is_empty() {
         return logs.iter().collect();
     }
 
     logs.iter()
-        .filter(|doc| log_matches_query(doc, &query))
+        .filter(|doc| log_matches_query(doc, hierarchy, &query))
         .collect()
 }
 
-fn log_matches_query(doc: &Document, query: &str) -> bool {
+fn log_matches_query(doc: &Document, hierarchy: Option<&HierarchyIndex>, query: &str) -> bool {
     let mut haystack = String::new();
     haystack.push_str(doc.id());
     haystack.push('\n');
@@ -192,6 +196,31 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
     haystack.push_str(&completion_files_changed(doc).join("\n"));
     haystack.push('\n');
     haystack.push_str(&doc.body);
+    if let Some(hierarchy) = hierarchy {
+        let valid_task = doc.doc_type() != "task" || hierarchy.validate_task_hierarchy(doc).is_ok();
+        if valid_task {
+            if let Ok(Some(role)) = hierarchy.task_role(doc) {
+                haystack.push('\n');
+                haystack.push_str(role.as_str());
+            }
+        }
+        if valid_task {
+            if let Ok(Some(relationship)) = hierarchy.relationship(doc) {
+                haystack.push('\n');
+                haystack.push_str(relationship.as_str());
+                haystack.push('\n');
+                haystack.push_str(relationship.human_label());
+            }
+        }
+        if let Some(parent_id) = doc.field("parentId") {
+            haystack.push('\n');
+            haystack.push_str(parent_id);
+            if let Some(parent) = hierarchy.document(parent_id) {
+                haystack.push('\n');
+                haystack.push_str(parent.title());
+            }
+        }
+    }
     haystack
         .to_ascii_lowercase()
         .contains(&query.to_ascii_lowercase())
@@ -199,15 +228,25 @@ fn log_matches_query(doc: &Document, query: &str) -> bool {
 
 pub(super) fn list_item_for_log(
     doc: &Document,
+    hierarchy: Option<&HierarchyIndex>,
     theme: &TuiTheme,
     available_width: u16,
 ) -> ListItem<'static> {
-    ListItem::new(line_for_log(doc, theme, available_width))
+    ListItem::new(line_for_log(doc, hierarchy, theme, available_width))
 }
 
-fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
+fn line_for_log(
+    doc: &Document,
+    hierarchy: Option<&HierarchyIndex>,
+    theme: &TuiTheme,
+    available_width: u16,
+) -> Line<'static> {
     let title = log_row_title(doc);
-    let prefix_width = doc.id().chars().count() + 2;
+    let role = hierarchy
+        .and_then(|hierarchy| hierarchy.validate_task_hierarchy(doc).ok())
+        .map(|role| format!("[{}] ", role.as_str().to_ascii_uppercase()))
+        .unwrap_or_default();
+    let prefix_width = doc.id().chars().count() + role.chars().count() + 2;
     let title_width = (available_width as usize).saturating_sub(prefix_width);
 
     Line::from(vec![
@@ -215,6 +254,7 @@ fn line_for_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<
             format!("{}  ", doc.id()),
             theme.status_style(StatusTone::Accent),
         ),
+        Span::styled(role, theme.muted_style()),
         Span::styled(truncate_for_log(&title, title_width), theme.text_style()),
     ])
 }
@@ -271,6 +311,7 @@ fn completed_at_time_label(value: &str) -> String {
 
 pub(super) fn detail_lines_for_log(
     doc: &Document,
+    hierarchy: Option<&HierarchyIndex>,
     events: &[LogEvent],
     theme: &TuiTheme,
 ) -> Vec<Line<'static>> {
@@ -324,6 +365,34 @@ pub(super) fn detail_lines_for_log(
         format!("path {}", display_path(&doc.path)),
         theme.muted_style(),
     )));
+
+    if let Some(hierarchy) = hierarchy {
+        let validation = if doc.doc_type() == "task" {
+            hierarchy.validate_task_hierarchy(doc).map(Some)
+        } else {
+            Ok(None)
+        };
+        let role = validation.as_ref().ok().copied().flatten();
+        let relationship = hierarchy.relationship(doc).ok().flatten();
+        if role.is_some() || relationship.is_some() || validation.is_err() {
+            lines.push(Line::from(""));
+            lines.push(section_heading("Hierarchy", theme));
+            if let Some(role) = role {
+                push_compact_optional(&mut lines, "role", Some(role.as_str()), theme);
+            }
+            if let Err(error) = validation {
+                push_compact_optional(&mut lines, "Hierarchy error", Some(&error.message), theme);
+            } else if let (Some(relationship), Some(parent_id)) =
+                (relationship, doc.field("parentId"))
+            {
+                let parent = hierarchy
+                    .document(parent_id)
+                    .map(|parent| format!("{} ({parent_id})", parent.title()))
+                    .unwrap_or_else(|| format!("missing parent {parent_id}"));
+                push_compact_optional(&mut lines, relationship.human_label(), Some(&parent), theme);
+            }
+        }
+    }
 
     let chips = compact_metadata(doc);
     if !chips.is_empty() {
@@ -537,6 +606,16 @@ mod tests {
             .collect()
     }
 
+    fn test_hierarchy(active_docs: &[Document], logs: &[Document]) -> HierarchyIndex {
+        HierarchyIndex::from_documents(active_docs.iter().chain(logs.iter()).cloned().collect())
+            .unwrap()
+    }
+
+    fn line_for_test_log(doc: &Document, theme: &TuiTheme, available_width: u16) -> Line<'static> {
+        let hierarchy = test_hierarchy(&[], std::slice::from_ref(doc));
+        line_for_log(doc, Some(&hierarchy), theme, available_width)
+    }
+
     fn log_doc(id: &str, title: &str, summary: &str, completed_at: &str, body: &str) -> Document {
         let mut fields = HashMap::new();
         fields.insert("id".to_string(), id.to_string());
@@ -571,11 +650,48 @@ mod tests {
             ),
         ];
 
-        assert_eq!(filter_logs(&logs, "task-1").len(), 1);
-        assert_eq!(filter_logs(&logs, "theme").len(), 1);
-        assert_eq!(filter_logs(&logs, "palette").len(), 1);
-        assert_eq!(filter_logs(&logs, "logs").len(), 1);
-        assert_eq!(filter_logs(&logs, "missing").len(), 0);
+        assert_eq!(filter_logs(&logs, None, "task-1").len(), 1);
+        assert_eq!(filter_logs(&logs, None, "theme").len(), 1);
+        assert_eq!(filter_logs(&logs, None, "palette").len(), 1);
+        assert_eq!(filter_logs(&logs, None, "logs").len(), 1);
+        assert_eq!(filter_logs(&logs, None, "missing").len(), 0);
+    }
+
+    #[test]
+    fn logs_render_and_filter_canonical_epic_task_and_subtask_context() {
+        let mut epic = log_doc("task-100", "Epic", "", "2026-01-01T00:00:00Z", "");
+        epic.location = DocumentLocation::Board;
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut task = log_doc("task-101", "Epic task", "", "2026-01-02T00:00:00Z", "");
+        task.fields
+            .insert("parentId".to_string(), "task-100".to_string());
+        let mut subtask = log_doc("task-101-1", "Leaf subtask", "", "2026-01-03T00:00:00Z", "");
+        subtask
+            .fields
+            .insert("parentId".to_string(), "task-101".to_string());
+        let logs = vec![task, subtask];
+        let theme = TuiTheme::default_dark();
+        let hierarchy = test_hierarchy(std::slice::from_ref(&epic), &logs);
+
+        assert_eq!(
+            filter_logs(&logs, Some(&hierarchy), "task of epic").len(),
+            1
+        );
+        assert_eq!(filter_logs(&logs, Some(&hierarchy), "subtask of").len(), 1);
+        let task_row = line_text(&line_for_log(&logs[0], Some(&hierarchy), &theme, 80));
+        let subtask_row = line_text(&line_for_log(&logs[1], Some(&hierarchy), &theme, 80));
+        assert!(task_row.contains("[TASK]"));
+        assert!(!task_row.contains("[SUBTASK]"));
+        assert!(subtask_row.contains("[SUBTASK]"));
+
+        let detail = detail_lines_for_log(&logs[0], Some(&hierarchy), &[], &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        assert!(detail.iter().any(|line| line.contains("role: task")));
+        assert!(detail
+            .iter()
+            .any(|line| line.contains("Task of Epic: Epic (task-100)")));
     }
 
     #[test]
@@ -590,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn log_list_item_is_task_id_and_title_only() {
+    fn log_list_item_adds_canonical_role_to_task_id_and_title() {
         let theme = TuiTheme::default_dark();
         let mut doc = log_doc(
             "task-36",
@@ -606,8 +722,8 @@ mod tests {
             "[\"docs/index.md\", \"tandem/src/tui.rs\"]".to_string(),
         );
 
-        let row = line_text(&line_for_log(&doc, &theme, 80));
-        assert_eq!(row, "task-36  Implement Tandem docs site foundation");
+        let row = line_text(&line_for_test_log(&doc, &theme, 80));
+        assert_eq!(row, "task-36  [TASK] Implement Tandem docs site foundation");
         assert!(!row.contains("17:34"));
         assert!(!row.contains("06-28"));
         assert!(!row.contains("2026-06-28T17:34:12Z"));
@@ -628,8 +744,8 @@ mod tests {
             "Body",
         );
 
-        let row = line_text(&line_for_log(&doc, &theme, 32));
-        assert_eq!(row, "task-36  Implement Tandem docs…");
+        let row = line_text(&line_for_test_log(&doc, &theme, 32));
+        assert_eq!(row, "task-36  [TASK] Implement Tande…");
         assert!(row.chars().count() <= 32);
         assert!(row.ends_with('…'));
         assert!(!row.contains("17:34"));
@@ -646,8 +762,8 @@ mod tests {
             "Body",
         );
 
-        let row = line_text(&line_for_log(&doc, &theme, 80));
-        assert_eq!(row, "task-36  Completed the useful thing");
+        let row = line_text(&line_for_test_log(&doc, &theme, 80));
+        assert_eq!(row, "task-36  [TASK] Completed the useful thing");
     }
 
     #[test]
@@ -667,7 +783,8 @@ mod tests {
             "[\"docs/index.md\"]".to_string(),
         );
 
-        let lines = detail_lines_for_log(&doc, &[], &theme)
+        let hierarchy = test_hierarchy(&[], std::slice::from_ref(&doc));
+        let lines = detail_lines_for_log(&doc, Some(&hierarchy), &[], &theme)
             .iter()
             .map(line_text)
             .collect::<Vec<_>>();

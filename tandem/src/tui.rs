@@ -347,6 +347,34 @@ impl ReloadFingerprint {
 }
 
 #[derive(Debug, Clone, Default)]
+struct TuiHierarchySnapshot {
+    index: Option<HierarchyIndex>,
+    errors: Vec<String>,
+}
+
+impl TuiHierarchySnapshot {
+    fn from_documents(active_docs: &[Document], completed_logs: &[Document]) -> Self {
+        match hierarchy_index_for(active_docs, completed_logs) {
+            Ok(index) => Self {
+                errors: index.task_hierarchy_errors(),
+                index: Some(index),
+            },
+            Err(error) => Self {
+                index: None,
+                errors: vec![error.message],
+            },
+        }
+    }
+
+    fn valid_index(&self) -> Option<&HierarchyIndex> {
+        self.errors
+            .is_empty()
+            .then_some(self.index.as_ref())
+            .flatten()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 struct ReloadSelection {
     board_doc_id: Option<String>,
     board_state: Option<String>,
@@ -363,6 +391,7 @@ struct TuiApp {
     configured_states: Vec<String>,
     docs: Vec<Document>,
     logs: Vec<Document>,
+    hierarchy: TuiHierarchySnapshot,
     log_events: logs::LogEventsById,
     rules: RulesByCategory,
     load_errors: Vec<String>,
@@ -405,6 +434,7 @@ impl TuiApp {
             configured_states: Vec::new(),
             docs: Vec::new(),
             logs: Vec::new(),
+            hierarchy: TuiHierarchySnapshot::default(),
             log_events: logs::LogEventsById::new(),
             rules: empty_rules(),
             load_errors: Vec::new(),
@@ -441,6 +471,19 @@ impl TuiApp {
     }
 
     fn reload(&mut self) -> ReloadOutcome {
+        let _hierarchy_lock = match HierarchyLock::acquire(&self.workspace) {
+            Ok(lock) => lock,
+            Err(error) => {
+                let warning = format!("TUI reload failed closed: {}", error.message);
+                self.load_errors = vec![warning.clone()];
+                self.hierarchy = TuiHierarchySnapshot {
+                    index: None,
+                    errors: vec![warning.clone()],
+                };
+                self.status = warning.clone();
+                return ReloadOutcome::from_warnings(&[warning]);
+            }
+        };
         let selection = self.capture_reload_selection();
         let mut load_errors = Vec::new();
         let mut docs = read_documents_tolerant(
@@ -479,13 +522,15 @@ impl TuiApp {
 
         let theme_load = TuiTheme::load_for_workspace(&self.workspace);
         let log_load = logs::load_logs(&self.workspace.logs_dir);
+        let hierarchy = TuiHierarchySnapshot::from_documents(&docs, &log_load.docs);
         load_errors.extend(log_load.warnings);
         let (log_events, event_warnings) = logs::load_log_events(&self.workspace.events_path);
         load_errors.extend(event_warnings);
-        load_errors.extend(validation_load_errors(
+        load_errors.extend(validation_load_errors_with_hierarchy(
             &docs,
             &log_load.docs,
             &configured_states,
+            &hierarchy,
         ));
 
         self.title = title;
@@ -493,6 +538,7 @@ impl TuiApp {
         self.configured_states = configured_states;
         self.docs = docs;
         self.logs = log_load.docs;
+        self.hierarchy = hierarchy;
         let active_ids = self
             .docs
             .iter()
@@ -1022,6 +1068,12 @@ impl TuiApp {
     }
 
     fn start_quick_add(&mut self) {
+        if !self.hierarchy.errors.is_empty() {
+            self.status =
+                "Quick add disabled: fix the persistent Board hierarchy errors and reload first."
+                    .to_string();
+            return;
+        }
         let (state, fallback_note) = quick_add_state_for_selection(
             &self.configured_states,
             &self.states,
@@ -1176,6 +1228,11 @@ impl TuiApp {
     }
 
     fn start_validation_apply_accepted(&mut self) {
+        if !self.hierarchy.errors.is_empty() {
+            self.status = "Apply accepted disabled: fix the persistent Board hierarchy errors and reload first."
+                .to_string();
+            return;
+        }
         let candidates = accepted_validation_candidates(&self.docs);
         if candidates.is_empty() {
             self.status = "No accepted Validation tasks are ready to apply/archive.".to_string();
@@ -1780,11 +1837,28 @@ impl TuiApp {
     }
 
     fn toggle_board_expansion(&mut self) {
-        let Some(doc_id) = self.selected_doc().map(|doc| doc.id().to_string()) else {
-            self.status = "No selected Board item to expand.".to_string();
+        let Some((doc_id, role)) = self.selected_doc().map(|doc| {
+            (
+                doc.id().to_string(),
+                self.hierarchy
+                    .index
+                    .as_ref()
+                    .and_then(|hierarchy| hierarchy.task_role(doc).ok().flatten()),
+            )
+        }) else {
+            self.status = "No selected Board item to expand or preview.".to_string();
             return;
         };
-        let has_active_descendants = self.selected_doc().is_some_and(is_task_doc)
+        if self.board_arrangement == BoardArrangement::Epic {
+            self.toggle_board_preview();
+            self.status = if self.expanded_board_doc_id.as_deref() == Some(doc_id.as_str()) {
+                format!("Previewing {doc_id} inline; press Enter to close.")
+            } else {
+                format!("Closed preview for {doc_id}.")
+            };
+            return;
+        }
+        let has_active_descendants = role.is_some()
             && count_task_descendants(
                 &doc_id,
                 &self.docs,
@@ -1792,13 +1866,19 @@ impl TuiApp {
                 &mut BTreeSet::from([doc_id.clone()]),
             )
             .0 > 0;
-        if self.board_arrangement == BoardArrangement::State && has_active_descendants {
+        if has_active_descendants {
+            let children = match role {
+                Some(TaskRole::Epic) => "Tasks",
+                Some(TaskRole::Task) => "Subtasks",
+                _ => "children",
+            };
             self.expanded_board_doc_id = None;
             if self.expanded_board_hierarchy_ids.remove(&doc_id) {
-                self.status = format!("Collapsed subtasks under {doc_id}.");
+                self.status = format!("Collapsed {children} under {doc_id}.");
             } else {
                 self.expanded_board_hierarchy_ids.insert(doc_id.clone());
-                self.status = format!("Expanded subtasks under {doc_id}; press Enter to collapse.");
+                self.status =
+                    format!("Expanded {children} under {doc_id}; press Enter to collapse.");
             }
             self.clamp_selection();
         } else {
@@ -2103,17 +2183,33 @@ impl TuiApp {
     }
 
     fn state_board_entries(&self, state: &str) -> Vec<StateBoardEntry<'_>> {
-        state_board_entries(
+        let Some(hierarchy) = self.hierarchy.valid_index() else {
+            return Vec::new();
+        };
+        state_board_entries_with_hierarchy(
             &self.docs,
             &self.logs,
             state,
             &self.board_filters,
             &self.expanded_board_hierarchy_ids,
+            hierarchy,
         )
     }
 
     fn epic_board_entries(&self) -> Vec<EpicBoardEntry<'_>> {
-        epic_board_entries(&self.docs, &self.logs, &self.board_filters)
+        let Some(hierarchy) = self.hierarchy.valid_index() else {
+            return Vec::new();
+        };
+        epic_board_entries_with_hierarchy(&self.docs, &self.logs, &self.board_filters, hierarchy)
+    }
+
+    fn relationship_context(&self, doc: &Document) -> BoardRelationshipContext {
+        relationship_context_for_doc_with_hierarchy(
+            doc,
+            &self.docs,
+            &self.logs,
+            self.hierarchy.index.as_ref(),
+        )
     }
 
     fn detail_line_count(&self) -> usize {
@@ -2122,7 +2218,12 @@ impl TuiApp {
                 detail_lines_for_doc_with_context(
                     doc,
                     &self.theme,
-                    &relationship_context_for_doc(doc, &self.docs, &self.logs),
+                    &relationship_context_for_doc_with_hierarchy(
+                        doc,
+                        &self.docs,
+                        &self.logs,
+                        self.hierarchy.index.as_ref(),
+                    ),
                 )
             })
             .map(|lines| lines.len())
@@ -2130,7 +2231,11 @@ impl TuiApp {
     }
 
     fn filtered_logs(&self) -> Vec<&Document> {
-        logs::filter_logs(&self.logs, &self.log_search_filter)
+        logs::filter_logs(
+            &self.logs,
+            self.hierarchy.index.as_ref(),
+            &self.log_search_filter,
+        )
     }
 
     fn selected_log(&self) -> Option<&Document> {
@@ -2155,7 +2260,14 @@ impl TuiApp {
 
     fn log_detail_line_count(&self) -> usize {
         self.selected_log()
-            .map(|doc| logs::detail_lines_for_log(doc, self.log_events_for(doc.id()), &self.theme))
+            .map(|doc| {
+                logs::detail_lines_for_log(
+                    doc,
+                    self.hierarchy.index.as_ref(),
+                    self.log_events_for(doc.id()),
+                    &self.theme,
+                )
+            })
             .map(|lines| lines.len())
             .unwrap_or(1)
     }
@@ -2181,7 +2293,7 @@ impl TuiApp {
 
     #[allow(dead_code)]
     fn review_items(&self) -> Vec<review::ReviewQueueItem> {
-        review::queue_items(&self.docs, &self.logs)
+        review::queue_items_with_hierarchy(&self.docs, &self.logs, self.hierarchy.index.as_ref())
     }
 
     #[allow(dead_code)]
@@ -2536,7 +2648,14 @@ impl TuiApp {
         } else {
             filtered
                 .iter()
-                .map(|doc| logs::list_item_for_log(doc, &self.theme, area.width.saturating_sub(4)))
+                .map(|doc| {
+                    logs::list_item_for_log(
+                        doc,
+                        self.hierarchy.index.as_ref(),
+                        &self.theme,
+                        area.width.saturating_sub(4),
+                    )
+                })
                 .collect::<Vec<_>>()
         };
 
@@ -2598,7 +2717,12 @@ impl TuiApp {
         let (title, lines) = match self.selected_log() {
             Some(doc) => (
                 format!(" Log detail {} ", doc.id()),
-                logs::detail_lines_for_log(doc, self.log_events_for(doc.id()), &self.theme),
+                logs::detail_lines_for_log(
+                    doc,
+                    self.hierarchy.index.as_ref(),
+                    self.log_events_for(doc.id()),
+                    &self.theme,
+                ),
             ),
             None if self.logs.is_empty() => (
                 " Log detail ".to_string(),
@@ -2708,6 +2832,11 @@ impl TuiApp {
             area
         };
 
+        if !self.hierarchy.errors.is_empty() {
+            self.draw_hierarchy_errors(frame, content_area);
+            return;
+        }
+
         if self.show_board_detail {
             let detail_height = (content_area.height / 3)
                 .clamp(5, 12)
@@ -2727,6 +2856,40 @@ impl TuiApp {
         } else {
             self.draw_state_tabs(frame, content_area);
         }
+    }
+
+    fn draw_hierarchy_errors(&self, frame: &mut Frame<'_>, area: Rect) {
+        let mut lines = vec![
+            Line::from(Span::styled(
+                "Board hierarchy is invalid; task rows and graph-sensitive mutations are disabled.",
+                self.theme.status_style(StatusTone::Error),
+            )),
+            Line::from(Span::styled(
+                "Fix the referenced documents, then reload. Canonical shape: Epic → Task → Subtask.",
+                self.theme.muted_style(),
+            )),
+            Line::from(""),
+        ];
+        for error in &self.hierarchy.errors {
+            lines.push(Line::from(vec![
+                Span::styled("• ", self.theme.status_style(StatusTone::Error)),
+                Span::styled(error.clone(), self.theme.text_style()),
+            ]));
+        }
+        let panel = Paragraph::new(lines)
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!(
+                        " Hierarchy errors ({}) ",
+                        self.hierarchy.errors.len()
+                    ))
+                    .border_style(self.theme.status_style(StatusTone::Error))
+                    .style(self.theme.panel_style()),
+            )
+            .wrap(Wrap { trim: false });
+        frame.render_widget(panel, area);
     }
 
     fn draw_board_filter_bar(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -2789,7 +2952,7 @@ impl TuiApp {
                 .iter()
                 .enumerate()
                 .map(|(index, entry)| {
-                    let context = relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                    let context = self.relationship_context(entry.doc);
                     epic_list_item_for_entry(
                         entry,
                         &context,
@@ -2828,8 +2991,7 @@ impl TuiApp {
                 .iter()
                 .map(|entry| {
                     if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
-                        let context =
-                            relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                        let context = self.relationship_context(entry.doc);
                         1 + inline_preview_height_with_context(
                             entry.doc,
                             &context,
@@ -2932,7 +3094,7 @@ impl TuiApp {
                 .iter()
                 .enumerate()
                 .map(|(index, entry)| {
-                    let context = relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                    let context = self.relationship_context(entry.doc);
                     state_list_item_for_entry(
                         entry,
                         &context,
@@ -2984,8 +3146,7 @@ impl TuiApp {
                 .iter()
                 .map(|entry| {
                     if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
-                        let context =
-                            relationship_context_for_doc(entry.doc, &self.docs, &self.logs);
+                        let context = self.relationship_context(entry.doc);
                         1 + inline_preview_height_with_context(
                             entry.doc,
                             &context,
@@ -3052,7 +3213,12 @@ impl TuiApp {
                 detail_lines_for_doc_with_context(
                     doc,
                     &self.theme,
-                    &relationship_context_for_doc(doc, &self.docs, &self.logs),
+                    &relationship_context_for_doc_with_hierarchy(
+                        doc,
+                        &self.docs,
+                        &self.logs,
+                        self.hierarchy.index.as_ref(),
+                    ),
                 ),
             ),
             None => (
@@ -3086,6 +3252,10 @@ impl TuiApp {
     }
 
     fn board_footer_text(&self) -> String {
+        if !self.hierarchy.errors.is_empty() {
+            return "board · HIERARCHY INVALID · fix referenced documents and reload · ? help"
+                .to_string();
+        }
         let context = match self.focus {
             FocusPane::Board => "board",
             FocusPane::Detail => "detail",
@@ -3098,14 +3268,18 @@ impl TuiApp {
             BoardArrangement::State => "b Epic Board",
             BoardArrangement::Epic => "b State Board",
         };
+        let enter_hint = match self.board_arrangement {
+            BoardArrangement::State => "Enter expand/preview · Space preview",
+            BoardArrangement::Epic => "Enter/Space preview",
+        };
         let commands = if self.focus == FocusPane::Detail {
             format!("Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
         } else if selected_is_validation {
-            format!("Enter expand · Space preview · A accept · R rework · C apply accepted · {arrangement_hint} · ? help")
+            format!("{enter_hint} · A accept · R rework · C apply accepted · {arrangement_hint} · ? help")
         } else if self.board_filters.is_active() {
-            format!("Enter expand · Space preview · F clear filter · H prev · L next · {arrangement_hint} · ? help")
+            format!("{enter_hint} · F clear filter · H prev · L next · {arrangement_hint} · ? help")
         } else {
-            format!("Enter expand · Space preview · a add · t tag · p priority · {arrangement_hint} · ? help")
+            format!("{enter_hint} · a add · t tag · p priority · {arrangement_hint} · ? help")
         };
         self.with_status(format!(
             "{context} · {} · {commands}",
@@ -3740,10 +3914,21 @@ fn read_documents_tolerant(
     docs
 }
 
+#[cfg(test)]
 fn validation_load_errors(
     docs: &[Document],
     logs: &[Document],
     configured_states: &[String],
+) -> Vec<String> {
+    let hierarchy = TuiHierarchySnapshot::from_documents(docs, logs);
+    validation_load_errors_with_hierarchy(docs, logs, configured_states, &hierarchy)
+}
+
+fn validation_load_errors_with_hierarchy(
+    docs: &[Document],
+    logs: &[Document],
+    configured_states: &[String],
+    hierarchy: &TuiHierarchySnapshot,
 ) -> Vec<String> {
     let mut warnings = Vec::new();
     let mut ids = BTreeSet::new();
@@ -3765,6 +3950,8 @@ fn validation_load_errors(
             paths.join(", ")
         ));
     }
+
+    warnings.extend(hierarchy.errors.iter().cloned());
 
     for doc in docs.iter().chain(logs.iter()) {
         let mut errors = Vec::new();
@@ -4009,6 +4196,8 @@ fn create_basic_task(
     if title.is_empty() {
         return Err(CliError::usage("task title must not be empty"));
     }
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
     validate_state(workspace, state)?;
 
     let now = current_timestamp();
@@ -4086,6 +4275,8 @@ fn apply_accepted_validation_tasks(
     if candidates.is_empty() {
         return Err(CliError::usage("no accepted Validation tasks to apply"));
     }
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
     let mut completed_ids = Vec::new();
     for candidate in candidates {
         complete_validation_candidate(workspace, &candidate.id)?;
@@ -4178,6 +4369,8 @@ fn apply_validation_action(
     id: &str,
     action: ValidationAction,
 ) -> Result<ValidationActionOutcome, CliError> {
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
     let doc = find_board_document(workspace, id)?
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
@@ -4482,10 +4675,12 @@ struct BoardRelatedChild {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct BoardRelationshipContext {
+    task_role: Option<TaskRole>,
+    parent_relationship: Option<ParentRelationship>,
     parent_id: Option<String>,
     parent_title: Option<String>,
-    parent_is_task: bool,
     parent_missing: bool,
+    hierarchy_error: Option<String>,
     active_children: Vec<BoardRelatedChild>,
     completed_children: Vec<BoardRelatedChild>,
 }
@@ -4517,6 +4712,7 @@ enum StateBoardEntryRole {
 struct StateBoardEntry<'a> {
     doc: &'a Document,
     role: StateBoardEntryRole,
+    task_role: Option<TaskRole>,
     depth: usize,
     active_descendants: usize,
     completed_descendants: usize,
@@ -4526,12 +4722,35 @@ struct StateBoardEntry<'a> {
     last_sibling: bool,
 }
 
+#[cfg(test)]
 fn state_board_entries<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
     state: &str,
     filters: &BoardFilters,
     expanded_ids: &BTreeSet<String>,
+) -> Vec<StateBoardEntry<'a>> {
+    let snapshot = TuiHierarchySnapshot::from_documents(active_docs, completed_logs);
+    let Some(hierarchy) = snapshot.valid_index() else {
+        return Vec::new();
+    };
+    state_board_entries_with_hierarchy(
+        active_docs,
+        completed_logs,
+        state,
+        filters,
+        expanded_ids,
+        hierarchy,
+    )
+}
+
+fn state_board_entries_with_hierarchy<'a>(
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    state: &str,
+    filters: &BoardFilters,
+    expanded_ids: &BTreeSet<String>,
+    hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
     let mut entries = Vec::new();
     for root in active_docs.iter().filter(|doc| {
@@ -4580,6 +4799,7 @@ fn state_board_entries<'a>(
         entries.push(StateBoardEntry {
             doc: root,
             role,
+            task_role: hierarchy.task_role(root).ok().flatten(),
             depth: 0,
             active_descendants,
             completed_descendants,
@@ -4598,6 +4818,7 @@ fn state_board_entries<'a>(
                 filters,
                 expanded_ids,
                 expanded || filters.is_active(),
+                hierarchy,
                 &mut BTreeSet::from([root.id().to_string()]),
                 &mut entries,
             );
@@ -4629,6 +4850,7 @@ fn collect_visible_state_descendants<'a>(
     filters: &BoardFilters,
     expanded_ids: &BTreeSet<String>,
     parent_open: bool,
+    hierarchy: &HierarchyIndex,
     visited: &mut BTreeSet<String>,
     entries: &mut Vec<StateBoardEntry<'a>>,
 ) {
@@ -4662,9 +4884,11 @@ fn collect_visible_state_descendants<'a>(
         );
         let has_active_children = active_descendants > 0;
         let expanded = expanded_ids.contains(child.id());
+        let task_role = hierarchy.task_role(child).ok().flatten();
         entries.push(StateBoardEntry {
             doc: child,
             role: StateBoardEntryRole::Child,
+            task_role,
             depth,
             active_descendants,
             completed_descendants,
@@ -4682,6 +4906,7 @@ fn collect_visible_state_descendants<'a>(
             filters,
             expanded_ids,
             expanded || filters.is_active(),
+            hierarchy,
             visited,
             entries,
         );
@@ -4702,6 +4927,7 @@ fn collect_visible_state_descendants<'a>(
                 filters,
                 expanded_ids,
                 true,
+                hierarchy,
                 visited,
                 entries,
             );
@@ -4801,7 +5027,8 @@ fn task_subtree_matches_filters(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EpicBoardEntryRole {
     Epic,
-    Child,
+    Task,
+    Subtask,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -4813,17 +5040,30 @@ struct EpicBoardEntry<'a> {
     completed_descendants: usize,
 }
 
+#[cfg(test)]
 fn epic_board_entries<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
     filters: &BoardFilters,
 ) -> Vec<EpicBoardEntry<'a>> {
+    let snapshot = TuiHierarchySnapshot::from_documents(active_docs, completed_logs);
+    let Some(hierarchy) = snapshot.valid_index() else {
+        return Vec::new();
+    };
+    epic_board_entries_with_hierarchy(active_docs, completed_logs, filters, hierarchy)
+}
+
+fn epic_board_entries_with_hierarchy<'a>(
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    filters: &BoardFilters,
+    hierarchy: &HierarchyIndex,
+) -> Vec<EpicBoardEntry<'a>> {
     let mut entries = Vec::new();
 
-    for epic in active_docs
-        .iter()
-        .filter(|doc| is_board_visible_doc(doc) && is_epic_task(doc))
-    {
+    for epic in active_docs.iter().filter(|doc| {
+        is_board_visible_doc(doc) && matches!(hierarchy.task_role(doc), Ok(Some(TaskRole::Epic)))
+    }) {
         let mut visited = BTreeSet::from([epic.id().to_string()]);
         let mut descendants = Vec::new();
         collect_visible_epic_descendants(
@@ -4832,6 +5072,7 @@ fn epic_board_entries<'a>(
             active_docs,
             completed_logs,
             filters,
+            hierarchy,
             &mut visited,
             &mut descendants,
         );
@@ -4851,13 +5092,21 @@ fn epic_board_entries<'a>(
             active_descendants,
             completed_descendants,
         });
-        entries.extend(descendants.into_iter().map(|(doc, depth)| EpicBoardEntry {
-            doc,
-            role: EpicBoardEntryRole::Child,
-            depth,
-            active_descendants: 0,
-            completed_descendants: 0,
-        }));
+        entries.extend(
+            descendants
+                .into_iter()
+                .map(|(doc, depth, role)| EpicBoardEntry {
+                    doc,
+                    role: match role {
+                        TaskRole::Task => EpicBoardEntryRole::Task,
+                        TaskRole::Subtask => EpicBoardEntryRole::Subtask,
+                        TaskRole::Epic => EpicBoardEntryRole::Epic,
+                    },
+                    depth,
+                    active_descendants: 0,
+                    completed_descendants: 0,
+                }),
+        );
     }
     entries
 }
@@ -4868,8 +5117,9 @@ fn collect_visible_epic_descendants<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
     filters: &BoardFilters,
+    hierarchy: &HierarchyIndex,
     visited: &mut BTreeSet<String>,
-    entries: &mut Vec<(&'a Document, usize)>,
+    entries: &mut Vec<(&'a Document, usize, TaskRole)>,
 ) -> bool {
     let mut any_visible = false;
 
@@ -4881,14 +5131,19 @@ fn collect_visible_epic_descendants<'a>(
         if !visited.insert(child.id().to_string()) {
             continue;
         }
+        let Ok(Some(role @ (TaskRole::Task | TaskRole::Subtask))) = hierarchy.task_role(child)
+        else {
+            continue;
+        };
         let insert_at = entries.len();
-        entries.push((child, depth));
+        entries.push((child, depth, role));
         let descendant_visible = collect_visible_epic_descendants(
             child.id(),
             depth + 1,
             active_docs,
             completed_logs,
             filters,
+            hierarchy,
             visited,
             entries,
         );
@@ -4913,6 +5168,7 @@ fn collect_visible_epic_descendants<'a>(
             active_docs,
             completed_logs,
             filters,
+            hierarchy,
             visited,
             entries,
         ) {
@@ -4961,11 +5217,67 @@ fn count_task_descendants(
     (active, completed)
 }
 
+fn hierarchy_index_for(
+    active_docs: &[Document],
+    completed_logs: &[Document],
+) -> Result<HierarchyIndex, CliError> {
+    HierarchyIndex::from_documents(
+        active_docs
+            .iter()
+            .chain(completed_logs.iter())
+            .cloned()
+            .collect(),
+    )
+}
+
+#[cfg(test)]
 fn relationship_context_for_doc(
     doc: &Document,
     active_docs: &[Document],
     completed_logs: &[Document],
 ) -> BoardRelationshipContext {
+    let snapshot = TuiHierarchySnapshot::from_documents(active_docs, completed_logs);
+    relationship_context_for_doc_with_hierarchy(
+        doc,
+        active_docs,
+        completed_logs,
+        snapshot.index.as_ref(),
+    )
+}
+
+fn relationship_context_for_doc_with_hierarchy(
+    doc: &Document,
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    hierarchy: Option<&HierarchyIndex>,
+) -> BoardRelationshipContext {
+    let (task_role, parent_relationship, hierarchy_error) = match hierarchy {
+        Some(hierarchy) => {
+            let task_role = hierarchy.task_role(doc);
+            let relationship = hierarchy.relationship(doc);
+            let validation = if doc.doc_type() == "task" {
+                hierarchy.validate_task_hierarchy(doc).map(|_| ())
+            } else {
+                Ok(())
+            };
+            match (task_role, relationship, validation) {
+                (Ok(role), Ok(relationship), Ok(())) => (role, relationship, None),
+                (role, relationship, Err(error)) => (
+                    role.ok().flatten(),
+                    relationship.ok().flatten(),
+                    Some(error.message.clone()),
+                ),
+                (Err(error), _, _) | (_, Err(error), _) => {
+                    (None, None, Some(error.message.clone()))
+                }
+            }
+        }
+        None => (
+            None,
+            None,
+            Some("Validation failed: hierarchy snapshot is unavailable".to_string()),
+        ),
+    };
     let parent_id = normalized_parent_id(doc).filter(|parent_id| parent_id.as_str() != doc.id());
     let parent_doc = parent_id.as_deref().and_then(|parent_id| {
         active_docs
@@ -4974,7 +5286,6 @@ fn relationship_context_for_doc(
             .find(|candidate| candidate.id() == parent_id)
     });
     let parent_title = parent_doc.map(|parent| parent.title().to_string());
-    let parent_is_task = parent_doc.is_some_and(is_task_doc);
     let parent_missing = parent_id.is_some() && parent_doc.is_none();
     let active_children = if is_task_doc(doc) {
         active_docs
@@ -4999,10 +5310,12 @@ fn relationship_context_for_doc(
         Vec::new()
     };
     BoardRelationshipContext {
+        task_role,
+        parent_relationship,
         parent_id,
         parent_title,
-        parent_is_task,
         parent_missing,
+        hierarchy_error,
         active_children,
         completed_children,
     }
@@ -5084,7 +5397,7 @@ fn board_item_lines_for_doc_with_context_and_limit(
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in expanded rows and the detail pane. Relationship context is shown
     // as nesting/expanded-row content, not noisy parent-id chips.
-    let chips = board_scan_chips(doc, theme);
+    let chips = board_scan_chips(doc, relationship_context.task_role, theme);
 
     let mut lines = vec![board_row_line(
         doc,
@@ -5108,13 +5421,17 @@ fn board_item_lines_for_doc_with_context_and_limit(
     lines
 }
 
-fn board_scan_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, Style)> {
+fn board_scan_chips(
+    doc: &Document,
+    task_role: Option<TaskRole>,
+    theme: &TuiTheme,
+) -> Vec<(String, Style)> {
     let priority = doc.field("priority").unwrap_or("-");
     let mut chips = Vec::new();
     if let Some(priority_chip) = priority_chip(priority, theme) {
         chips.push((priority_chip, theme.priority_chip_style(priority)));
     }
-    if is_epic_task(doc) {
+    if task_role == Some(TaskRole::Epic) {
         chips.push((
             chip_text("EPIC", theme),
             theme.progress_chip_style(StatusTone::Accent),
@@ -5190,6 +5507,7 @@ fn state_lines_for_entry(
     selected: bool,
 ) -> Vec<Line<'static>> {
     let doc = entry.doc;
+    debug_assert!(entry.task_role.is_none() || is_task_doc(doc));
     let meta_width = content_width.saturating_div(2).min(32);
     let right_meta = if entry.active_descendants + entry.completed_descendants > 0 {
         truncate(
@@ -5201,7 +5519,10 @@ fn state_lines_for_entry(
     };
     let mut chips = vec![(state_hierarchy_prefix(entry), theme.muted_style())];
     match entry.role {
-        StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, theme)),
+        StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, entry.task_role, theme)),
+        StateBoardEntryRole::Child if entry.depth == 0 => {
+            chips.extend(board_scan_chips(doc, entry.task_role, theme));
+        }
         StateBoardEntryRole::Child => {
             let state = compact_epic_state(&document_state_label(doc));
             if entry.cross_state {
@@ -5221,7 +5542,7 @@ fn state_lines_for_entry(
         doc,
         theme,
         content_width,
-        show_doc_type && entry.role == StateBoardEntryRole::Root,
+        show_doc_type && entry.depth == 0,
         chips,
         right_meta,
         0,
@@ -5346,7 +5667,16 @@ fn epic_row_line(
             prefix.push(Span::raw(" "));
             text_width(&indent) + text_width(&chip_text("EPIC", theme)) + 1
         }
-        EpicBoardEntryRole::Child => {
+        EpicBoardEntryRole::Task => {
+            let state = compact_epic_state(&document_state_label(doc));
+            prefix.push(Span::styled(
+                chip_text(&format!("{state:<4}"), theme),
+                theme.progress_chip_style(StatusTone::Muted),
+            ));
+            prefix.push(Span::raw(" "));
+            text_width(&indent) + text_width(&chip_text(&format!("{state:<4}"), theme)) + 1
+        }
+        EpicBoardEntryRole::Subtask => {
             let state = compact_epic_state(&document_state_label(doc));
             prefix.push(Span::styled(
                 chip_text("SUB", theme),
@@ -5373,7 +5703,7 @@ fn epic_row_line(
         EpicBoardEntryRole::Epic => {
             descendant_rollup(entry.active_descendants, entry.completed_descendants)
         }
-        EpicBoardEntryRole::Child => compact_relationship_meta(
+        EpicBoardEntryRole::Task | EpicBoardEntryRole::Subtask => compact_relationship_meta(
             relationship_context.parent_id.as_deref().unwrap_or("?"),
             doc.id(),
             meta_column_width,
@@ -5550,23 +5880,15 @@ fn relationship_detail_summary(context: &BoardRelationshipContext) -> String {
 
 fn doc_type_badge(doc: &Document, show_doc_type: bool) -> Option<String> {
     let doc_type = doc.doc_type().trim();
-    if doc_type.is_empty() || (!show_doc_type && doc_type.eq_ignore_ascii_case("task")) {
+    if doc_type.is_empty() || (!show_doc_type && doc_type == "task") {
         None
     } else {
-        Some(doc_type.to_ascii_lowercase())
+        Some(doc_type.to_string())
     }
 }
 
 fn is_task_doc(doc: &Document) -> bool {
-    doc.doc_type().eq_ignore_ascii_case("task")
-}
-
-fn is_epic_task(doc: &Document) -> bool {
-    is_task_doc(doc)
-        && doc
-            .field("kind")
-            .map(|kind| kind.trim().eq_ignore_ascii_case("epic"))
-            .unwrap_or(false)
+    doc.doc_type() == "task"
 }
 
 fn priority_chip(priority: &str, theme: &TuiTheme) -> Option<String> {
@@ -5800,7 +6122,7 @@ fn inline_preview_lines_for_doc_with_context(
         .unwrap_or_default();
     let subtasks = board_subtasks(doc);
     let checklist_progress = subtask_progress(doc);
-    let relationship_lines = inline_relationship_preview_lines(doc, relationship_context, theme);
+    let relationship_lines = inline_relationship_preview_lines(relationship_context, theme);
     let mut trailing_sections = validation_inline_preview_sections(doc, theme, content_width);
     trailing_sections.extend(inline_preview_list_section(
         "Files",
@@ -5922,16 +6244,22 @@ fn validation_inline_preview_sections(
 }
 
 fn inline_relationship_preview_lines(
-    doc: &Document,
     relationship_context: &BoardRelationshipContext,
     theme: &TuiTheme,
 ) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
-    if is_epic_task(doc) || relationship_context.has_children() {
-        lines.push(inline_preview_heading("Epic", theme));
+    if relationship_context.task_role == Some(TaskRole::Epic) || relationship_context.has_children()
+    {
+        let (heading, children_label) = match relationship_context.task_role {
+            Some(TaskRole::Epic) => ("Epic", "Tasks"),
+            Some(TaskRole::Task) => ("Task", "Subtasks"),
+            Some(TaskRole::Subtask) => ("Subtask", "Children"),
+            None => ("Relationships", "Children"),
+        };
+        lines.push(inline_preview_heading(heading, theme));
         if relationship_context.has_children() {
             lines.push(Line::from(vec![
-                Span::styled("   Children: ", theme.label_style()),
+                Span::styled(format!("   {children_label}: "), theme.label_style()),
                 Span::styled(
                     relationship_detail_summary(relationship_context),
                     theme.text_style(),
@@ -5982,10 +6310,10 @@ fn inline_relationship_preview_lines(
                 .parent_title
                 .as_deref()
                 .unwrap_or("untitled parent");
-            let label = if relationship_context.parent_is_task {
-                "   Subtask of: "
-            } else {
-                "   Parent: "
+            let label = match relationship_context.parent_relationship {
+                Some(ParentRelationship::EpicTask) => "   Task of Epic: ",
+                Some(ParentRelationship::Subtask) => "   Subtask of: ",
+                Some(ParentRelationship::Parent) | None => "   Parent: ",
             };
             lines.push(Line::from(vec![
                 Span::styled(label, theme.label_style()),
@@ -6419,6 +6747,9 @@ fn detail_lines_for_doc_with_context(
     lines.push(detail_field_line("ID", doc.id(), theme));
     lines.push(detail_field_line("Type", doc.doc_type(), theme));
     push_optional_detail_line(&mut lines, "Kind", doc.field("kind"), theme);
+    if let Some(role) = relationship_context.task_role {
+        lines.push(detail_field_line("Role", role.as_str(), theme));
+    }
     push_optional_detail_line(&mut lines, "State", doc.field("state"), theme);
     push_optional_detail_line(&mut lines, "Priority", doc.field("priority"), theme);
     push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
@@ -6430,16 +6761,23 @@ fn detail_lines_for_doc_with_context(
             .as_deref()
             .map(|title| format!("{title} ({parent_id})"))
             .unwrap_or_else(|| format!("missing parent {parent_id}"));
-        let label = if relationship_context.parent_is_task {
-            "Subtask of"
-        } else {
-            "Parent"
-        };
+        let label = relationship_context
+            .parent_relationship
+            .map(ParentRelationship::human_label)
+            .unwrap_or("Parent");
         lines.push(detail_field_line(label, &parent, theme));
     }
+    if let Some(error) = relationship_context.hierarchy_error.as_deref() {
+        lines.push(detail_field_line("Hierarchy error", error, theme));
+    }
     if relationship_context.has_children() {
+        let label = match relationship_context.task_role {
+            Some(TaskRole::Epic) => "Tasks",
+            Some(TaskRole::Task) => "Subtasks",
+            _ => "Children",
+        };
         lines.push(detail_field_line(
-            "Children",
+            label,
             &relationship_detail_summary(relationship_context),
             theme,
         ));
@@ -7127,8 +7465,13 @@ mod tests {
             .insert("title".to_string(), "Launch docs epic".to_string());
         epic.fields.insert("kind".to_string(), "epic".to_string());
 
-        let title =
-            line_text(&board_item_lines_for_doc(&epic, &theme, 120, false, false, false)[0]);
+        let context = relationship_context_for_doc(&epic, std::slice::from_ref(&epic), &[]);
+        let title = line_text(
+            &board_item_lines_for_doc_with_context(
+                &epic, &theme, 120, false, &context, false, false,
+            )[0],
+        );
+        assert_eq!(context.task_role, Some(TaskRole::Epic));
         assert!(title.contains(" EPIC  Launch docs epic"));
         assert!(!title.contains("task Launch docs epic"));
 
@@ -7140,6 +7483,76 @@ mod tests {
         );
         assert_eq!(tabs[0].count, 0);
         assert_eq!(tabs[1].count, 1);
+    }
+
+    #[test]
+    fn mixed_case_task_and_epic_values_are_custom_or_invalid_not_canonical_roles() {
+        let theme = TuiTheme::default_dark();
+        let mut custom = doc_with_state("custom-1", Some("todo"));
+        custom.fields.insert("type".to_string(), "Task".to_string());
+        custom.fields.insert("kind".to_string(), "Epic".to_string());
+        custom.fields.insert(
+            "title".to_string(),
+            "Mixed-case custom document".to_string(),
+        );
+        custom
+            .fields
+            .insert("parentId".to_string(), "task-91".to_string());
+        assert!(!is_task_doc(&custom));
+        assert_eq!(doc_type_badge(&custom, false), Some("Task".to_string()));
+        let custom_hierarchy = hierarchy_index_for(std::slice::from_ref(&custom), &[]).unwrap();
+        assert_eq!(custom_hierarchy.task_role(&custom).unwrap(), None);
+
+        let mut epic = doc_with_state("task-91", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let docs = vec![epic, custom.clone()];
+        let epic_entries = epic_board_entries(&docs, &[], &BoardFilters::default());
+        assert_eq!(
+            epic_entries
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-91"],
+            "a custom `Task`/`Epic` document parented by an Epic must not be nested as a canonical Task"
+        );
+        let state_entries = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        let custom_entry = state_entries
+            .iter()
+            .find(|entry| entry.doc.id() == "custom-1")
+            .expect("custom task-like document should remain a contextual root");
+        let custom_context = relationship_context_for_doc(&custom, &docs, &[]);
+        let custom_row = line_text(
+            &state_lines_for_entry(
+                custom_entry,
+                &custom_context,
+                &theme,
+                100,
+                true,
+                INLINE_PREVIEW_MAX_LINES,
+                false,
+                false,
+            )[0],
+        );
+        assert_eq!(custom_entry.task_role, None);
+        assert!(!custom_row.contains("EPIC"));
+
+        let mut invalid_kind = doc_with_state("task-90", Some("todo"));
+        invalid_kind
+            .fields
+            .insert("kind".to_string(), "Epic".to_string());
+        let snapshot =
+            TuiHierarchySnapshot::from_documents(std::slice::from_ref(&invalid_kind), &[]);
+        assert!(snapshot
+            .errors
+            .iter()
+            .any(|error| error.contains("invalid kind `Epic`; expected one of: epic")));
+        assert!(snapshot.valid_index().is_none());
     }
 
     #[test]
@@ -7215,7 +7628,7 @@ mod tests {
         .join("\n");
         assert!(expanded_text.contains("Epic"));
         assert!(
-            expanded_text.contains("Children: 1 active child, 1 completed child in Logs (2 total)")
+            expanded_text.contains("Tasks: 1 active child, 1 completed child in Logs (2 total)")
         );
         assert!(expanded_text.contains("Task task-81"));
         assert!(expanded_text.contains("Task task-82"));
@@ -7225,28 +7638,28 @@ mod tests {
             .map(line_text)
             .collect::<Vec<_>>();
         assert!(parent_detail.contains(&"Kind: epic".to_string()));
-        assert!(parent_detail.contains(
-            &"Children: 1 active child, 1 completed child in Logs (2 total)".to_string()
-        ));
+        assert!(parent_detail
+            .contains(&"Tasks: 1 active child, 1 completed child in Logs (2 total)".to_string()));
 
         let child_detail = detail_lines_for_doc_with_context(&active_child, &theme, &child_context)
             .iter()
             .map(line_text)
             .collect::<Vec<_>>();
-        assert!(child_detail.contains(&"Subtask of: Launch docs epic (task-80)".to_string()));
+        assert!(child_detail.contains(&"Task of Epic: Launch docs epic (task-80)".to_string()));
     }
 
     #[test]
     fn state_board_collapses_task_children_and_expands_nested_cross_state_rows() {
-        let parent = doc_with_state("task-103", Some("todo"));
+        let mut parent = doc_with_state("task-103", Some("todo"));
+        parent.fields.insert("kind".to_string(), "epic".to_string());
         let mut legacy_child = doc_with_state("task-9", Some("validation"));
         legacy_child
             .fields
-            .insert("title".to_string(), "Legacy child".to_string());
+            .insert("title".to_string(), "Epic task".to_string());
         legacy_child
             .fields
             .insert("parentId".to_string(), "task-103".to_string());
-        let mut grandchild = doc_with_state("task-103-1-1", Some("todo"));
+        let mut grandchild = doc_with_state("task-9-1", Some("todo"));
         grandchild
             .fields
             .insert("parentId".to_string(), "task-9".to_string());
@@ -7262,7 +7675,7 @@ mod tests {
             generic_parent_child,
             decision,
         ];
-        let mut completed = doc_with_state("task-103-2", Some("validation"));
+        let mut completed = doc_with_state("task-10", Some("validation"));
         completed.location = DocumentLocation::Logs;
         completed
             .fields
@@ -7302,7 +7715,7 @@ mod tests {
             vec![
                 ("task-103", 0),
                 ("task-9", 1),
-                ("task-103-1-1", 2),
+                ("task-9-1", 2),
                 ("task-7", 0),
             ]
         );
@@ -7327,13 +7740,13 @@ mod tests {
         assert!(!rendered.contains("task-9"));
         assert!(!rendered.contains('→'));
         assert!(rendered.contains("└▾"));
-        assert!(rendered.contains("Legacy child"));
+        assert!(rendered.contains("Epic task"));
         assert!(rendered.find("1 active").is_some());
         assert!(rendered.lines().all(|line| text_width(line) <= 42));
     }
 
     #[test]
-    fn state_board_promotes_one_stable_root_for_parent_cycles() {
+    fn state_board_rejects_parent_cycles_instead_of_promoting_a_fake_root() {
         let mut a = doc_with_state("task-1", Some("todo"));
         a.fields
             .insert("parentId".to_string(), "task-3".to_string());
@@ -7352,13 +7765,7 @@ mod tests {
             &BoardFilters::default(),
             &BTreeSet::new(),
         );
-        assert_eq!(
-            collapsed
-                .iter()
-                .map(|entry| entry.doc.id())
-                .collect::<Vec<_>>(),
-            vec!["task-1"]
-        );
+        assert!(collapsed.is_empty());
         let expanded = state_board_entries(
             &docs,
             &[],
@@ -7370,13 +7777,138 @@ mod tests {
                 "task-3".to_string(),
             ]),
         );
-        assert_eq!(
-            expanded
-                .iter()
-                .map(|entry| entry.doc.id())
-                .collect::<Vec<_>>(),
-            vec!["task-1", "task-2", "task-3"]
+        assert!(expanded.is_empty());
+        let errors = validation_load_errors(&docs, &[], &["todo".to_string()]);
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("task hierarchy cycle")));
+    }
+
+    #[test]
+    fn invalid_hierarchies_surface_actionable_diagnostics_and_render_no_flattened_rows() {
+        let nested_epic_parent = doc_with_state("task-1", Some("todo"));
+        let mut nested_epic = doc_with_state("task-2", Some("todo"));
+        nested_epic
+            .fields
+            .insert("kind".to_string(), "epic".to_string());
+        nested_epic
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+
+        let task_parent = doc_with_state("task-10", Some("todo"));
+        let mut subtask = doc_with_state("task-10-1", Some("todo"));
+        subtask
+            .fields
+            .insert("parentId".to_string(), "task-10".to_string());
+        let mut child_beneath_subtask = doc_with_state("task-10-1-1", Some("todo"));
+        child_beneath_subtask
+            .fields
+            .insert("parentId".to_string(), "task-10-1".to_string());
+
+        let mut epic = doc_with_state("task-20", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut hierarchical_epic_task = doc_with_state("task-20-1", Some("todo"));
+        hierarchical_epic_task
+            .fields
+            .insert("parentId".to_string(), "task-20".to_string());
+
+        let task = doc_with_state("task-30", Some("todo"));
+        let mut global_subtask = doc_with_state("task-31", Some("todo"));
+        global_subtask
+            .fields
+            .insert("parentId".to_string(), "task-30".to_string());
+
+        let docs = vec![
+            nested_epic_parent,
+            nested_epic,
+            task_parent,
+            subtask,
+            child_beneath_subtask,
+            epic,
+            hierarchical_epic_task,
+            task,
+            global_subtask,
+        ];
+        let errors = validation_load_errors(&docs, &[], &["todo".to_string()]).join("\n");
+        assert!(
+            errors.contains("Epic task-2 cannot have parentId"),
+            "{errors}"
         );
+        assert!(
+            errors.contains("cannot be a child of Subtask task-10-1"),
+            "{errors}"
+        );
+        assert!(
+            errors.contains("task-20-1") && errors.contains("expected global `task-N`"),
+            "{errors}"
+        );
+        assert!(
+            errors.contains("task-31") && errors.contains("expected `task-30-M`"),
+            "{errors}"
+        );
+
+        let entries = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert!(
+            entries.is_empty(),
+            "invalid descendants must not be flattened into roots"
+        );
+    }
+
+    #[test]
+    fn invalid_hierarchy_renders_persistent_actionable_panel_in_both_arrangements() {
+        let root = unique_test_dir("tandem-invalid-hierarchy-panel");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-1-1.md"),
+            "---\nid: task-1-1\ntype: task\ntitle: Invalid Epic child ID\nstate: todo\nparentId: task-1\n---\n",
+        )
+        .unwrap();
+        write_task_doc(&workspace, "task-10", "Task parent", "todo");
+        fs::write(
+            workspace.board_dir.join("task-11.md"),
+            "---\nid: task-11\ntype: task\ntitle: Invalid global Subtask ID\nstate: todo\nparentId: task-10\n---\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace).unwrap();
+        assert_eq!(app.hierarchy.errors.len(), 2);
+
+        let render = |app: &mut TuiApp| {
+            let mut terminal = Terminal::new(TestBackend::new(130, 28)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .map(|cell| cell.symbol())
+                .collect::<String>()
+        };
+        for arrangement in [BoardArrangement::State, BoardArrangement::Epic] {
+            app.board_arrangement = arrangement;
+            let rendered = render(&mut app);
+            assert!(rendered.contains("Hierarchy errors (2)"), "{rendered}");
+            assert!(rendered.contains("task-1-1"), "{rendered}");
+            assert!(rendered.contains("expected global `task-N`"), "{rendered}");
+            assert!(rendered.contains("task-11"), "{rendered}");
+            assert!(rendered.contains("expected `task-10-M`"), "{rendered}");
+            assert!(!rendered.contains("No active items"), "{rendered}");
+            assert!(!rendered.contains("No epic groups"), "{rendered}");
+        }
+        app.start_quick_add();
+        assert!(app.quick_add.is_none());
+        assert!(app.status.contains("Quick add disabled"));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -7391,20 +7923,32 @@ mod tests {
             .insert("parentId".to_string(), "note-1".to_string());
         let mut logged_parent = doc_with_state("task-8", Some("validation"));
         logged_parent.location = DocumentLocation::Logs;
-        let mut active_child = doc_with_state("task-8-1", Some("todo"));
+        logged_parent
+            .fields
+            .insert("kind".to_string(), "epic".to_string());
+        let mut active_child = doc_with_state("task-9", Some("todo"));
         active_child
             .fields
             .insert("parentId".to_string(), "task-8".to_string());
-        let active_root = doc_with_state("task-10", Some("todo"));
-        let mut logged_middle = doc_with_state("task-10-1", Some("validation"));
+        active_child
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+        active_child
+            .fields
+            .insert("accord.status".to_string(), "blocked".to_string());
+        let mut active_root = doc_with_state("task-10", Some("todo"));
+        active_root
+            .fields
+            .insert("kind".to_string(), "epic".to_string());
+        let mut logged_middle = doc_with_state("task-11", Some("validation"));
         logged_middle.location = DocumentLocation::Logs;
         logged_middle
             .fields
             .insert("parentId".to_string(), "task-10".to_string());
-        let mut deep_active = doc_with_state("task-10-1-1", Some("validation"));
+        let mut deep_active = doc_with_state("task-11-1", Some("validation"));
         deep_active
             .fields
-            .insert("parentId".to_string(), "task-10-1".to_string());
+            .insert("parentId".to_string(), "task-11".to_string());
         let docs = vec![
             custom_parent,
             generic_child,
@@ -7429,7 +7973,7 @@ mod tests {
             vec![
                 ("note-1", StateBoardEntryRole::Root),
                 ("task-7", StateBoardEntryRole::Root),
-                ("task-8-1", StateBoardEntryRole::Child),
+                ("task-9", StateBoardEntryRole::Child),
                 ("task-10", StateBoardEntryRole::Root),
             ]
         );
@@ -7438,6 +7982,22 @@ mod tests {
         assert!(entries[3].has_active_children);
         assert_eq!(entries[3].active_descendants, 1);
         assert_eq!(entries[3].completed_descendants, 1);
+        let contextual_root = &entries[2];
+        assert_eq!(contextual_root.depth, 0);
+        let contextual_row = line_text(
+            &state_lines_for_entry(
+                contextual_root,
+                &relationship_context_for_doc(contextual_root.doc, &docs, &logs),
+                &TuiTheme::default_dark(),
+                100,
+                false,
+                10,
+                false,
+                false,
+            )[0],
+        );
+        assert!(contextual_row.contains("HIGH"), "{contextual_row}");
+        assert!(contextual_row.contains("BLOCKED"), "{contextual_row}");
 
         let expanded = state_board_entries(
             &docs,
@@ -7448,7 +8008,7 @@ mod tests {
         );
         assert!(expanded
             .iter()
-            .any(|entry| entry.doc.id() == "task-10-1-1" && entry.depth == 2));
+            .any(|entry| entry.doc.id() == "task-11-1" && entry.depth == 2));
     }
 
     #[test]
@@ -7457,14 +8017,15 @@ mod tests {
         app.docs[0]
             .fields
             .insert("title".to_string(), "Hierarchy parent".to_string());
-        let mut child = doc_with_state("task-9", Some("validation"));
+        let mut child = doc_with_state("task-1-1", Some("validation"));
         child
             .fields
-            .insert("title".to_string(), "Hidden legacy child".to_string());
+            .insert("title".to_string(), "Hidden subtask".to_string());
         child
             .fields
             .insert("parentId".to_string(), "task-1".to_string());
         app.docs.push(child);
+        refresh_test_hierarchy(&mut app);
 
         let render = |app: &mut TuiApp| {
             let mut terminal = Terminal::new(TestBackend::new(110, 24)).unwrap();
@@ -7480,11 +8041,11 @@ mod tests {
         let collapsed = render(&mut app);
         assert!(collapsed.contains("Hierarchy parent"));
         assert!(collapsed.contains("1 active"));
-        assert!(!collapsed.contains("Hidden legacy child"));
+        assert!(!collapsed.contains("Hidden subtask"));
 
         app.handle_key(key(KeyCode::Enter)).unwrap();
         let expanded = render(&mut app);
-        assert!(expanded.contains("Hidden legacy child"));
+        assert!(expanded.contains("Hidden subtask"));
         assert!(!expanded.contains("SUB"));
         assert!(expanded.contains("VAL"));
         assert!(!expanded.contains("task-1 → task-9"));
@@ -7506,7 +8067,7 @@ mod tests {
         same_state
             .fields
             .insert("parentId".to_string(), "task-20".to_string());
-        let mut cross_state = doc_with_state("legacy-7", Some("in-progress"));
+        let mut cross_state = doc_with_state("task-20-2", Some("in-progress"));
         cross_state
             .fields
             .insert("title".to_string(), "Cross state child".to_string());
@@ -7542,7 +8103,7 @@ mod tests {
         assert!(!parent_line.contains("task-20"));
         assert!(parent_line.contains("2 active"));
         assert!(!same_line.contains("task-20-1"));
-        assert!(!cross_line.contains("legacy-7"));
+        assert!(!cross_line.contains("task-20-2"));
         assert!(!same_line.contains("SUB"));
         assert!(!cross_line.contains("SUB"));
         assert!(!same_line.contains("TODO"));
@@ -7559,17 +8120,18 @@ mod tests {
     #[test]
     fn state_board_filters_reveal_matching_descendant_ancestor_path() {
         let mut parent = doc_with_state("task-1", Some("todo"));
+        parent.fields.insert("kind".to_string(), "epic".to_string());
         parent
             .fields
             .insert("tags".to_string(), "[\"backend\"]".to_string());
-        let mut child = doc_with_state("task-1-1", Some("in-progress"));
+        let mut child = doc_with_state("task-2", Some("in-progress"));
         child
             .fields
             .insert("parentId".to_string(), "task-1".to_string());
-        let mut grandchild = doc_with_state("task-1-1-1", Some("validation"));
+        let mut grandchild = doc_with_state("task-2-1", Some("validation"));
         grandchild
             .fields
-            .insert("parentId".to_string(), "task-1-1".to_string());
+            .insert("parentId".to_string(), "task-2".to_string());
         grandchild
             .fields
             .insert("tags".to_string(), "[\"ux\"]".to_string());
@@ -7588,7 +8150,7 @@ mod tests {
                 .iter()
                 .map(|entry| entry.doc.id())
                 .collect::<Vec<_>>(),
-            vec!["task-1", "task-1-1", "task-1-1-1"]
+            vec!["task-1", "task-2", "task-2-1"]
         );
         let tabs = board_subview_tabs(
             &[
@@ -7608,20 +8170,22 @@ mod tests {
     #[test]
     fn state_board_enter_and_mouse_expand_children_while_space_controls_preview() {
         let mut app = keyboard_test_app();
-        let mut child = doc_with_state("task-9", Some("validation"));
+        let mut child = doc_with_state("task-1-1", Some("validation"));
         child
             .fields
             .insert("parentId".to_string(), "task-1".to_string());
         app.docs.push(child);
+        refresh_test_hierarchy(&mut app);
 
         assert_eq!(app.selected_state_count(), 1);
         app.handle_key(key(KeyCode::Enter)).unwrap();
         assert!(app.expanded_board_hierarchy_ids.contains("task-1"));
+        assert!(app.status.contains("Expanded Subtasks under task-1"));
         assert_eq!(app.selected_state_count(), 2);
         app.next_item();
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-9"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-1-1"));
         app.handle_key(key(KeyCode::Char(' '))).unwrap();
-        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-9"));
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1-1"));
 
         app.selected_item = 0;
         app.hits = vec![HitRegion {
@@ -7639,31 +8203,58 @@ mod tests {
     }
 
     #[test]
+    fn enter_labels_state_epic_tasks_and_previews_in_epic_arrangement() {
+        let mut app = keyboard_test_app();
+        app.docs.clear();
+        let mut epic = doc_with_state("task-1", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut task = doc_with_state("task-2", Some("todo"));
+        task.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        app.docs = vec![epic, task];
+        app.states = vec!["todo".to_string()];
+        app.configured_states = app.states.clone();
+        refresh_test_hierarchy(&mut app);
+
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("Expanded Tasks under task-1"));
+        assert!(app.expanded_board_hierarchy_ids.contains("task-1"));
+
+        app.board_arrangement = BoardArrangement::Epic;
+        app.selected_item = 0;
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1"));
+        assert!(app.status.contains("press Enter to close"));
+        assert!(!app.status.contains("Expanded Tasks"));
+        assert!(app.board_footer_text().contains("Enter/Space preview"));
+    }
+
+    #[test]
     fn state_board_reload_preserves_expansion_and_selected_child() {
         let root = unique_test_dir("tandem-state-hierarchy-reload");
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Parent", "todo");
         fs::write(
-            workspace.board_dir.join("task-9.md"),
-            "---\nid: task-9\ntype: task\ntitle: Legacy child\nstate: validation\nparentId: task-1\n---\n",
+            workspace.board_dir.join("task-1-1.md"),
+            "---\nid: task-1-1\ntype: task\ntitle: Subtask\nstate: validation\nparentId: task-1\n---\n",
         )
         .unwrap();
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         app.expanded_board_hierarchy_ids
             .insert("task-1".to_string());
-        assert!(app.select_document_by_id("task-9"));
+        assert!(app.select_document_by_id("task-1-1"));
 
         fs::write(
-            workspace.board_dir.join("task-9.md"),
-            "---\nid: task-9\ntype: task\ntitle: Reloaded child\nstate: validation\nparentId: task-1\n---\n",
+            workspace.board_dir.join("task-1-1.md"),
+            "---\nid: task-1-1\ntype: task\ntitle: Reloaded subtask\nstate: validation\nparentId: task-1\n---\n",
         )
         .unwrap();
         app.reload();
         assert!(app.expanded_board_hierarchy_ids.contains("task-1"));
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-9"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-1-1"));
         assert_eq!(
             app.selected_doc().map(Document::title),
-            Some("Reloaded child")
+            Some("Reloaded subtask")
         );
         fs::remove_dir_all(root).unwrap();
     }
@@ -7682,7 +8273,7 @@ mod tests {
             .fields
             .insert("parentId".to_string(), "task-80".to_string());
         let non_epic_parent = doc_with_state("task-83", Some("todo"));
-        let mut non_epic_child = doc_with_state("task-84", Some("todo"));
+        let mut non_epic_child = doc_with_state("task-83-1", Some("todo"));
         non_epic_child
             .fields
             .insert("parentId".to_string(), "task-83".to_string());
@@ -7706,23 +8297,23 @@ mod tests {
         assert_eq!(ids, vec!["task-80", "task-81"]);
         assert_eq!(
             roles,
-            vec![EpicBoardEntryRole::Epic, EpicBoardEntryRole::Child]
+            vec![EpicBoardEntryRole::Epic, EpicBoardEntryRole::Task]
         );
         assert_eq!(depths, vec![0, 1]);
     }
 
     #[test]
-    fn epic_board_nests_deep_and_legacy_flat_children_and_preserves_filter_context() {
+    fn epic_board_nests_canonical_tasks_and_subtasks_and_preserves_filter_context() {
         let mut epic = doc_with_state("task-103", Some("in-progress"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
-        let mut child = doc_with_state("task-103-1", Some("todo"));
+        let mut child = doc_with_state("task-104", Some("todo"));
         child
             .fields
             .insert("parentId".to_string(), "task-103".to_string());
-        let mut grandchild = doc_with_state("task-103-1-1", Some("validation"));
+        let mut grandchild = doc_with_state("task-104-1", Some("validation"));
         grandchild
             .fields
-            .insert("parentId".to_string(), "task-103-1".to_string());
+            .insert("parentId".to_string(), "task-104".to_string());
         grandchild
             .fields
             .insert("tags".to_string(), "[\"ux\"]".to_string());
@@ -7740,11 +8331,30 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 ("task-103", 0),
-                ("task-103-1", 1),
-                ("task-103-1-1", 2),
+                ("task-104", 1),
+                ("task-104-1", 2),
                 ("task-9", 1)
             ]
         );
+        assert_eq!(entries[1].role, EpicBoardEntryRole::Task);
+        assert_eq!(entries[2].role, EpicBoardEntryRole::Subtask);
+        let theme = TuiTheme::default_dark();
+        let task_row = line_text(&epic_row_line(
+            &entries[1],
+            &relationship_context_for_doc(entries[1].doc, &docs, &[]),
+            &theme,
+            100,
+            false,
+        ));
+        let subtask_row = line_text(&epic_row_line(
+            &entries[2],
+            &relationship_context_for_doc(entries[2].doc, &docs, &[]),
+            &theme,
+            100,
+            false,
+        ));
+        assert!(!task_row.contains("SUB"));
+        assert!(subtask_row.contains("SUB"));
 
         let filtered = epic_board_entries(
             &docs,
@@ -7759,7 +8369,7 @@ mod tests {
                 .iter()
                 .map(|entry| entry.doc.id())
                 .collect::<Vec<_>>(),
-            vec!["task-103", "task-103-1", "task-103-1-1"]
+            vec!["task-103", "task-104", "task-104-1"]
         );
     }
 
@@ -7767,15 +8377,15 @@ mod tests {
     fn epic_board_rollup_counts_completed_nested_descendants_without_active_rows() {
         let mut epic = doc_with_state("task-103", Some("in-progress"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
-        let mut active_child = doc_with_state("task-103-1", Some("todo"));
+        let mut active_child = doc_with_state("task-104", Some("todo"));
         active_child
             .fields
             .insert("parentId".to_string(), "task-103".to_string());
-        let mut completed_grandchild = doc_with_state("task-103-1-1", Some("validation"));
+        let mut completed_grandchild = doc_with_state("task-104-1", Some("validation"));
         completed_grandchild.location = DocumentLocation::Logs;
         completed_grandchild
             .fields
-            .insert("parentId".to_string(), "task-103-1".to_string());
+            .insert("parentId".to_string(), "task-104".to_string());
         let docs = vec![epic, active_child];
         let logs = vec![completed_grandchild];
 
@@ -7787,20 +8397,18 @@ mod tests {
     }
 
     #[test]
-    fn epic_board_traverses_logged_ancestors_to_active_filtered_descendants_cycle_safely() {
+    fn epic_board_traverses_logged_task_to_active_filtered_subtask() {
         let mut epic = doc_with_state("task-1", Some("in-progress"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
-        epic.fields
-            .insert("parentId".to_string(), "task-1-1-1".to_string());
-        let mut completed_child = doc_with_state("task-1-1", Some("validation"));
+        let mut completed_child = doc_with_state("task-2", Some("validation"));
         completed_child.location = DocumentLocation::Logs;
         completed_child
             .fields
             .insert("parentId".to_string(), "task-1".to_string());
-        let mut active_grandchild = doc_with_state("task-1-1-1", Some("todo"));
+        let mut active_grandchild = doc_with_state("task-2-1", Some("todo"));
         active_grandchild
             .fields
-            .insert("parentId".to_string(), "task-1-1".to_string());
+            .insert("parentId".to_string(), "task-2".to_string());
         active_grandchild
             .fields
             .insert("tags".to_string(), "[\"ux\"]".to_string());
@@ -7820,13 +8428,17 @@ mod tests {
                 .iter()
                 .map(|entry| (entry.doc.id(), entry.depth))
                 .collect::<Vec<_>>(),
-            vec![("task-1", 0), ("task-1-1-1", 2)]
+            vec![("task-1", 0), ("task-2-1", 2)]
         );
         assert_eq!(entries[0].active_descendants, 1);
         assert_eq!(entries[0].completed_descendants, 1);
         let context = relationship_context_for_doc(&docs[1], &docs, &logs);
-        assert!(context.parent_is_task);
-        assert_eq!(context.parent_id.as_deref(), Some("task-1-1"));
+        assert_eq!(context.task_role, Some(TaskRole::Subtask));
+        assert_eq!(
+            context.parent_relationship,
+            Some(ParentRelationship::Subtask)
+        );
+        assert_eq!(context.parent_id.as_deref(), Some("task-2"));
         let rendered = epic_lines_for_entry(
             &entries[1],
             &context,
@@ -7840,8 +8452,8 @@ mod tests {
         .map(line_text)
         .collect::<Vec<_>>()
         .join("\n");
-        assert!(rendered.contains("task-1-1-1"));
-        assert!(rendered.contains("task-1-1 → task-1-1-1"));
+        assert!(rendered.contains("task-2-1"));
+        assert!(rendered.contains("task-2 → task-2-1"));
     }
 
     #[test]
@@ -7898,39 +8510,39 @@ mod tests {
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-103-1.md"),
-            "---\nid: task-103-1\ntype: task\ntitle: Child\nstate: todo\nparentId: task-103\n---\n",
+            workspace.board_dir.join("task-104.md"),
+            "---\nid: task-104\ntype: task\ntitle: Task\nstate: todo\nparentId: task-103\n---\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-103-1-1.md"),
-            "---\nid: task-103-1-1\ntype: task\ntitle: Grandchild\nstate: validation\nparentId: task-103-1\n---\n",
+            workspace.board_dir.join("task-104-1.md"),
+            "---\nid: task-104-1\ntype: task\ntitle: Subtask\nstate: validation\nparentId: task-104\n---\n",
         )
         .unwrap();
         let mut app = TuiApp::load(workspace).unwrap();
         app.board_arrangement = BoardArrangement::Epic;
         app.next_item();
         app.next_item();
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-103-1-1"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-104-1"));
         app.previous_item();
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-103-1"));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-104"));
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn epic_child_row_names_subtask_and_immediate_parent() {
         let theme = TuiTheme::default_dark();
-        let parent = doc_with_state("task-103-1", Some("todo"));
-        let mut child = doc_with_state("task-103-1-1", Some("validation"));
+        let parent = doc_with_state("task-103", Some("todo"));
+        let mut child = doc_with_state("task-103-1", Some("validation"));
         child
             .fields
-            .insert("parentId".to_string(), "task-103-1".to_string());
+            .insert("parentId".to_string(), "task-103".to_string());
         let docs = vec![parent, child.clone()];
         let context = relationship_context_for_doc(&child, &docs, &[]);
         let lines = epic_lines_for_entry(
             &EpicBoardEntry {
                 doc: &child,
-                role: EpicBoardEntryRole::Child,
+                role: EpicBoardEntryRole::Subtask,
                 depth: 2,
                 active_descendants: 0,
                 completed_descendants: 0,
@@ -7946,25 +8558,26 @@ mod tests {
         assert!(text.contains("SUB"));
         assert!(!text.contains("SUBTASK"));
         assert!(text.contains("VAL"));
-        assert!(text.contains("task-103-1 → task-103-1-1"));
+        assert!(text.contains("task-103 → task-103-1"));
         assert!(!text.contains("subtask of"));
     }
 
     #[test]
     fn epic_rows_use_compact_aligned_state_and_relationship_columns() {
         let theme = TuiTheme::default_dark();
-        let parent = doc_with_state("task-1", Some("in-progress"));
-        let mut todo = doc_with_state("task-1-1", Some("todo"));
+        let mut parent = doc_with_state("task-1", Some("in-progress"));
+        parent.fields.insert("kind".to_string(), "epic".to_string());
+        let mut todo = doc_with_state("task-2", Some("todo"));
         todo.fields
             .insert("title".to_string(), "Todo title".to_string());
         todo.fields
             .insert("parentId".to_string(), "task-1".to_string());
-        let mut wip = doc_with_state("task-1-2", Some("in-progress"));
+        let mut wip = doc_with_state("task-3", Some("in-progress"));
         wip.fields
             .insert("title".to_string(), "Wip title".to_string());
         wip.fields
             .insert("parentId".to_string(), "task-1".to_string());
-        let mut validation = doc_with_state("task-1-3", Some("validation"));
+        let mut validation = doc_with_state("task-4", Some("validation"));
         validation
             .fields
             .insert("title".to_string(), "Val title".to_string());
@@ -7978,7 +8591,7 @@ mod tests {
             line_text(&epic_row_line(
                 &EpicBoardEntry {
                     doc,
-                    role: EpicBoardEntryRole::Child,
+                    role: EpicBoardEntryRole::Task,
                     depth: 1,
                     active_descendants: 0,
                     completed_descendants: 0,
@@ -7993,7 +8606,7 @@ mod tests {
         let wip_line = render(&docs[2], 100);
         let val_line = render(&docs[3], 100);
 
-        assert!(todo_line.contains("SUB"));
+        assert!(!todo_line.contains("SUB"));
         assert!(todo_line.contains("TODO"));
         assert!(wip_line.contains("WIP"));
         assert!(val_line.contains("VAL"));
@@ -8001,7 +8614,7 @@ mod tests {
         assert_eq!(todo_line.find("Todo title"), val_line.find("Val title"));
         assert_eq!(todo_line.find("task-1 →"), wip_line.find("task-1 →"));
         assert_eq!(todo_line.find("task-1 →"), val_line.find("task-1 →"));
-        assert!(todo_line.contains("task-1 → task-1-1"));
+        assert!(todo_line.contains("task-1 → task-2"));
 
         let narrow = render(&docs[3], 42);
         assert!(
@@ -8024,18 +8637,18 @@ mod tests {
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-1-1.md"),
-            "---\nid: task-1-1\ntype: task\ntitle: Hierarchical child\nstate: in-progress\npriority: medium\nparentId: task-1\n---\n\nNormal allocated child.\n",
-        )
-        .unwrap();
-        fs::write(
             workspace.board_dir.join("task-2.md"),
-            "---\nid: task-2\ntype: task\ntitle: Legacy flat child\nstate: todo\nparentId: task-1\n---\n\nCreated as a root, then reparented; ID remains immutable.\n",
+            "---\nid: task-2\ntype: task\ntitle: First epic task\nstate: in-progress\npriority: medium\nparentId: task-1\n---\n\nGlobally allocated direct Epic task.\n",
         )
         .unwrap();
         fs::write(
-            workspace.logs_dir.join("task-1-2.md"),
-            "---\nid: task-1-2\ntype: task\ntitle: Completed child\nstate: validation\nparentId: task-1\ncompletedAt: \"2026-07-01T00:00:00Z\"\ncompletion:\n  summary: \"Completed child\"\n---\n\nCompleted child body.\n",
+            workspace.board_dir.join("task-3.md"),
+            "---\nid: task-3\ntype: task\ntitle: Second epic task\nstate: todo\nparentId: task-1\n---\n\nAnother globally allocated direct Epic task.\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.logs_dir.join("task-4.md"),
+            "---\nid: task-4\ntype: task\ntitle: Completed epic task\nstate: validation\nparentId: task-1\ncompletedAt: \"2026-07-01T00:00:00Z\"\ncompletion:\n  summary: \"Completed epic task\"\n---\n\nCompleted task body.\n",
         )
         .unwrap();
 
@@ -8063,11 +8676,12 @@ mod tests {
             "Epic Board row should include concise active/logged rollup text: {rendered}"
         );
         assert!(
-            rendered.contains("Hierarchical child")
-                && rendered.contains("task-1 → task-1-1")
-                && rendered.contains("Legacy flat child")
-                && rendered.contains("task-1 → task-2"),
-            "Epic Board should show normal hierarchical and immutable legacy-flat children: {rendered}"
+            rendered.contains("First epic task")
+                && rendered.contains("task-1 → task-2")
+                && rendered.contains("Second epic task")
+                && rendered.contains("task-1 → task-3")
+                && !rendered.contains("SUB"),
+            "Epic Board should show global-ID direct Tasks without Subtask labels: {rendered}"
         );
         assert!(
             !rendered.contains("P:task-1"),
@@ -8078,7 +8692,7 @@ mod tests {
             "detail pane should include task kind: {rendered}"
         );
         assert!(
-            rendered.contains("Children: 2 active children, 1 completed child in Logs (3 total)"),
+            rendered.contains("Tasks: 2 active children, 1 completed child in Logs (3 total)"),
             "detail pane should include derived child summary: {rendered}"
         );
         fs::remove_dir_all(root).unwrap();
@@ -8388,7 +9002,8 @@ tone = "success"
         app.selected_item = 5;
         app.docs = (0..6)
             .map(|index| {
-                let mut doc = doc_with_state(&format!("task-{index}"), Some("validation"));
+                let id = index + 1;
+                let mut doc = doc_with_state(&format!("task-{id}"), Some("validation"));
                 doc.fields
                     .insert("title".to_string(), format!("Validation task {index}"));
                 doc.fields
@@ -8400,7 +9015,7 @@ tone = "success"
                 doc
             })
             .collect();
-        app.expanded_board_doc_id = Some("task-5".to_string());
+        app.expanded_board_doc_id = Some("task-6".to_string());
 
         let mut terminal = Terminal::new(TestBackend::new(100, 18)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
@@ -8583,6 +9198,10 @@ tone = "success"
         .unwrap();
     }
 
+    fn refresh_test_hierarchy(app: &mut TuiApp) {
+        app.hierarchy = TuiHierarchySnapshot::from_documents(&app.docs, &app.logs);
+    }
+
     fn keyboard_test_app() -> TuiApp {
         let docs = vec![
             doc_with_state("task-1", Some("todo")),
@@ -8600,6 +9219,7 @@ tone = "success"
             view: TuiView::Board,
             states: vec!["todo".to_string(), "validation".to_string()],
             configured_states: vec!["todo".to_string(), "validation".to_string()],
+            hierarchy: TuiHierarchySnapshot::from_documents(&docs, &[]),
             docs,
             logs: Vec::new(),
             log_events: logs::LogEventsById::new(),
@@ -8679,7 +9299,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 row · Enter expand · Space preview · a add · t tag · p priority · b Epic Board · ? help"
+            "board · TODO · 1 row · Enter expand/preview · Space preview · a add · t tag · p priority · b Epic Board · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -8753,7 +9373,7 @@ tone = "success"
         app.states = vec!["todo".to_string()];
         app.configured_states = app.states.clone();
         app.docs = (0..20)
-            .map(|index| doc_with_state(&format!("task-{index}"), Some("todo")))
+            .map(|index| doc_with_state(&format!("task-{}", index + 1), Some("todo")))
             .collect();
         app.selected_state = 0;
         app.selected_item = 19;
@@ -9169,6 +9789,37 @@ tone = "success"
         assert!(log.contains("completedAt:"));
         assert!(log.contains("Applied accepted Validation sign-off for task-1"));
         assert!(log.contains("  reviewer: \"tui\""));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn graph_sensitive_tui_mutations_fail_closed_on_fresh_invalid_snapshot() {
+        let root = unique_test_dir("tandem-mutation-hierarchy-lock");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.board_dir.join("task-10.md"),
+            "---\nid: task-10\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-10-1.md"),
+            "---\nid: task-10-1\ntype: task\ntitle: Invalid Epic Task ID\nstate: todo\nparentId: task-10\n---\n",
+        )
+        .unwrap();
+
+        let add_error = create_basic_task(&workspace, "Must not be created", "todo").unwrap_err();
+        assert!(add_error.message.contains("expected global `task-N`"));
+        assert!(!workspace.board_dir.join("task-11.md").exists());
+
+        write_accepted_validation_task(&workspace, "task-20", "Accepted candidate");
+        let candidates = vec![ValidationApplyCandidate {
+            id: "task-20".to_string(),
+            title: "Accepted candidate".to_string(),
+        }];
+        let apply_error = apply_accepted_validation_tasks(&workspace, &candidates).unwrap_err();
+        assert!(apply_error.message.contains("expected global `task-N`"));
+        assert!(workspace.board_dir.join("task-20.md").exists());
+        assert!(!workspace.logs_dir.join("task-20.md").exists());
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -6,10 +6,12 @@ use ratatui::{
     Frame,
 };
 
-use super::super::{accord_status, display_path, parse_field_values, review_status, Document};
+use super::super::{
+    accord_status, display_path, parse_field_values, review_status, Document, HierarchyIndex,
+};
 use super::{
-    document_state_label, markdownish_lines, rect_contains, FocusPane, HitAction, HitRegion,
-    StatusTone, TuiTheme,
+    document_state_label, hierarchy_index_for, markdownish_lines, rect_contains, FocusPane,
+    HitAction, HitRegion, StatusTone, TuiTheme,
 };
 
 const QUEUE_ROW_HEIGHT: u16 = 3;
@@ -18,6 +20,7 @@ const QUEUE_ROW_HEIGHT: u16 = 3;
 pub(super) struct ReviewQueueItem {
     id: String,
     doc_type: String,
+    task_role: Option<String>,
     title: String,
     state: String,
     priority: String,
@@ -64,6 +67,7 @@ impl ReviewQueueItem {
         doc: &Document,
         active_docs: &[Document],
         completed_logs: &[Document],
+        hierarchy: Option<&HierarchyIndex>,
     ) -> Option<Self> {
         let reasons = typed_attention_reasons(doc);
         if reasons.is_empty() {
@@ -79,12 +83,17 @@ impl ReviewQueueItem {
                 .chain(completed_logs.iter())
                 .find(|candidate| candidate.id() == id)
         });
+        let task_role = hierarchy
+            .and_then(|hierarchy| hierarchy.validate_task_hierarchy(doc).ok())
+            .map(|role| role.as_str().to_string());
         let parent_label = parent_id.map(|_| {
-            if parent_doc.is_some_and(|parent| parent.doc_type() == "task") {
-                "Subtask of".to_string()
-            } else {
-                "Parent".to_string()
-            }
+            hierarchy
+                .filter(|hierarchy| {
+                    doc.doc_type() != "task" || hierarchy.validate_task_hierarchy(doc).is_ok()
+                })
+                .and_then(|hierarchy| hierarchy.relationship(doc).ok().flatten())
+                .map(|relationship| relationship.human_label().to_string())
+                .unwrap_or_else(|| "Parent".to_string())
         });
         let parent_value = parent_id.map(|id| {
             parent_doc
@@ -95,6 +104,7 @@ impl ReviewQueueItem {
         Some(Self {
             id: doc.id().to_string(),
             doc_type: doc.doc_type().to_string(),
+            task_role,
             title: doc.title().to_string(),
             state: document_state_label(doc),
             priority: doc.field("priority").unwrap_or("-").to_string(),
@@ -210,13 +220,25 @@ impl ReviewReasonKind {
     }
 }
 
+#[cfg(test)]
 pub(super) fn queue_items(
     active_docs: &[Document],
     completed_logs: &[Document],
 ) -> Vec<ReviewQueueItem> {
+    let hierarchy = hierarchy_index_for(active_docs, completed_logs).ok();
+    queue_items_with_hierarchy(active_docs, completed_logs, hierarchy.as_ref())
+}
+
+pub(super) fn queue_items_with_hierarchy(
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    hierarchy: Option<&HierarchyIndex>,
+) -> Vec<ReviewQueueItem> {
     let mut items = active_docs
         .iter()
-        .filter_map(|doc| ReviewQueueItem::from_document(doc, active_docs, completed_logs))
+        .filter_map(|doc| {
+            ReviewQueueItem::from_document(doc, active_docs, completed_logs, hierarchy)
+        })
         .collect::<Vec<_>>();
 
     items.sort_by(|a, b| {
@@ -240,7 +262,8 @@ pub(super) fn selected_item(
     completed_logs: &[Document],
     selected: usize,
 ) -> Option<ReviewQueueItem> {
-    queue_items(active_docs, completed_logs)
+    let hierarchy = hierarchy_index_for(active_docs, completed_logs).ok();
+    queue_items_with_hierarchy(active_docs, completed_logs, hierarchy.as_ref())
         .into_iter()
         .nth(selected)
 }
@@ -403,7 +426,10 @@ fn queue_list_item(item: &ReviewQueueItem, theme: &TuiTheme) -> ListItem<'static
                 theme.priority_style(&item.priority),
             ),
             Span::raw(" "),
-            Span::styled(format!("[{}] ", item.doc_type), theme.muted_style()),
+            Span::styled(
+                format!("[{}] ", item.task_role.as_deref().unwrap_or(&item.doc_type)),
+                theme.muted_style(),
+            ),
             Span::styled(
                 ellipsize(&item.title, 56),
                 theme.text_style().add_modifier(Modifier::BOLD),
@@ -468,6 +494,7 @@ fn detail_lines(item: &ReviewQueueItem, theme: &TuiTheme) -> Vec<Line<'static>> 
     lines.push(field_line("Title", &item.title, theme));
     lines.push(field_line("ID", &item.id, theme));
     lines.push(field_line("Type", &item.doc_type, theme));
+    optional_field_line(&mut lines, "Role", item.task_role.as_deref(), theme);
     lines.push(field_line("State", &item.state, theme));
     lines.push(field_line("Priority", &item.priority, theme));
     lines.push(field_line("Assignee", &item.assignee, theme));
@@ -883,7 +910,12 @@ mod tests {
     }
 
     #[test]
-    fn review_detail_preserves_task_subtask_and_generic_parent_context() {
+    fn review_detail_preserves_epic_task_subtask_and_generic_parent_context() {
+        let mut epic_parent = doc_with_fields("task-200", &[]);
+        epic_parent.location = DocumentLocation::Logs;
+        epic_parent
+            .fields
+            .insert("kind".to_string(), "epic".to_string());
         let mut task_parent = doc_with_fields("task-103", &[]);
         task_parent.location = DocumentLocation::Logs;
         let mut decision_parent = doc_with_fields("decision-4", &[]);
@@ -891,6 +923,10 @@ mod tests {
         decision_parent
             .fields
             .insert("type".to_string(), "decision".to_string());
+        let epic_task = doc_with_fields(
+            "task-201",
+            &[("parentId", "task-200"), ("accord.status", "delivered")],
+        );
         let task_child = doc_with_fields(
             "task-103-1",
             &[("parentId", "task-103"), ("accord.status", "delivered")],
@@ -899,12 +935,22 @@ mod tests {
             "task-7",
             &[("parentId", "decision-4"), ("accord.status", "delivered")],
         );
-        let docs = vec![task_child, generic_child];
-        let logs = vec![task_parent, decision_parent];
+        let docs = vec![epic_task, task_child, generic_child];
+        let logs = vec![epic_parent, task_parent, decision_parent];
         let items = queue_items(&docs, &logs);
         let theme = TuiTheme::default_dark();
+        let epic_task_item = items.iter().find(|item| item.id() == "task-201").unwrap();
         let task_item = items.iter().find(|item| item.id() == "task-103-1").unwrap();
         let generic_item = items.iter().find(|item| item.id() == "task-7").unwrap();
+        let epic_task_text = detail_lines(epic_task_item, &theme)
+            .iter()
+            .map(|line| {
+                line.spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect::<String>()
+            })
+            .collect::<Vec<_>>();
         let task_text = detail_lines(task_item, &theme)
             .iter()
             .map(|line| {
@@ -923,6 +969,9 @@ mod tests {
                     .collect::<String>()
             })
             .collect::<Vec<_>>();
+        assert!(epic_task_text.contains(&"Role: task".to_string()));
+        assert!(epic_task_text.contains(&"Task of Epic: Task task-200 (task-200)".to_string()));
+        assert!(task_text.contains(&"Role: subtask".to_string()));
         assert!(task_text.contains(&"Subtask of: Task task-103 (task-103)".to_string()));
         assert!(generic_text.contains(&"Parent: Task decision-4 (decision-4)".to_string()));
         assert!(!generic_text.iter().any(|line| line.contains("Subtask")));

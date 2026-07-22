@@ -138,7 +138,7 @@ impl ParentRelationship {
         }
     }
 
-    fn human_label(self) -> &'static str {
+    pub(crate) fn human_label(self) -> &'static str {
         match self {
             ParentRelationship::EpicTask => "Task of Epic",
             ParentRelationship::Subtask => "Subtask of",
@@ -351,7 +351,7 @@ impl HierarchyIndex {
         Ok(role)
     }
 
-    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
+    pub(crate) fn task_hierarchy_errors(&self) -> Vec<String> {
         let mut ids = self
             .documents
             .values()
@@ -367,6 +367,11 @@ impl HierarchyIndex {
                 errors.insert(error.message);
             }
         }
+        errors.into_iter().collect()
+    }
+
+    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
+        let errors = self.task_hierarchy_errors();
         if errors.is_empty() {
             return Ok(());
         }
@@ -376,7 +381,7 @@ impl HierarchyIndex {
         let count = errors.len();
         Err(CliError::user(format!(
             "Validation failed: hierarchy contains {count} structural errors:\n- {}",
-            errors.into_iter().collect::<Vec<_>>().join("\n- ")
+            errors.join("\n- ")
         )))
     }
 }
