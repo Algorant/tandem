@@ -1,21 +1,18 @@
-# Tandem v0.6.1
+# Tandem v0.6.2
 
-Tandem v0.6.1 adds safe Task body editing and auditable cancellation before the larger Rust architecture refactor begins.
+Tandem v0.6.2 makes the Board hierarchy easier to scan, navigate, and trust.
 
-## Highlights
+## TUI
 
-- `tandem update <id> --body <markdown>` now replaces or clears an active Task's complete Markdown body while preserving unrelated frontmatter and unknown fields.
-- Body updates are exact and no-op aware: unchanged content does not rewrite the file, timestamp, or event history.
-- `tandem cancel <id> --reason <text>` archives mistaken or abandoned Tasks to Logs with a distinct `canceled` outcome while preserving their body, metadata, references, and ID.
-- CLI, JSON, TUI Logs, Board rollups, and `pi-tandem` distinguish canceled work from successful completion.
+- Board rows now show compact `#<task-number>` identifiers across State and Epic arrangements, including nested hierarchy rows.
+- Every visible State Board row now shows its own workflow state (`TODO`, `WIP`, or `VAL`).
+- In-progress Subtasks appear in the In Progress pane with their Epic → Task context revealed, so the counter and visible work agree.
+- Same-state hierarchies remain collapsed by default while cross-state work is surfaced in the correct state pane.
+- Selecting an Epic now shows a compact descendant-completion progress bar in the Board header, including its completed/total ratio.
+- Themes may customize the progress-bar fill through `[colors] progress`.
 
 ## Bug fixes
 
-- Fixed agents needing to edit `.tandem` Markdown directly to correct an existing Task body.
-- Fixed empty, whitespace-only, multiline, Unicode, and leading-dash body replacements being unavailable through `tandem update` and `pi-tandem`.
-- Fixed mistaken or intentionally abandoned Tasks having to be recorded as successfully completed to leave the active Board.
-- Fixed canceled work being counted as successful completion in hierarchy rollups or rendered as malformed/completed Log history.
-
-## Compatibility note
-
-Existing Logs without `completion.outcome` continue to mean `completed`. Canceled Logs use the additive `completion.outcome: canceled` value while retaining the existing protocol `0.1.0` format.
+- Fixed Board hierarchy expansion revealing all same-state Epic descendants by default.
+- Fixed active Subtasks and direct Epic-child Tasks being difficult to identify in State Board views.
+- Fixed small nonzero Epic completion ratios appearing indistinguishable from zero by increasing progress-bar resolution.
