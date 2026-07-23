@@ -96,6 +96,7 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 
 const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
+assert(taskSchemaProperties.reason, "tandem_task schema should expose a reason for cancel actions");
 assert(taskSchemaProperties.body, "tandem_task schema should expose exact body replacement for update actions");
 assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for canonical hierarchy creation");
 assert(taskSchemaProperties.kind, "tandem_task schema should expose kind for Epic creation");
@@ -141,6 +142,8 @@ assert(legacySubtasksRejected, "tandem_task builder should reject deprecated inl
 const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
 assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");
 assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
+const cancelArgs = buildTaskArgs({ action: "cancel", id: "task-2", reason: "Created by mistake" });
+assert(cancelArgs.join(" ") === "cancel task-2 --reason Created by mistake", "tandem_task cancel builder should map id and reason");
 
 const tandem = await ensureTandem();
 await runRepoReadSmoke(tandem);
@@ -252,6 +255,19 @@ try {
 	const search = parseJson(await runTandem(tandem, buildSearchArgs({ query: "Smoke" }), workspace));
 	assert(search.data.results.length >= 2, "search should find smoke task and decision");
 
+	const cancelOutput = await runTandem(tandem, buildTaskArgs({
+		action: "add",
+		title: "Canceled smoke task",
+		description: "Preserve this canceled body.",
+	}), workspace);
+	const canceledId = parseId(cancelOutput);
+	const cancelResult = await runTandem(tandem, buildTaskArgs({ action: "cancel", id: canceledId, reason: "Created by mistake" }), workspace);
+	assert(cancelResult.includes(`Canceled ${canceledId}`), "cancel should report the archived Task");
+	const canceled = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: canceledId }), workspace));
+	assert(canceled.data.location === "logs", "canceled Task should move to Logs");
+	assert(canceled.data.document.completionOutcome === "canceled", "show JSON should identify the canceled outcome");
+	assert(canceled.data.body.includes("Preserve this canceled body."), "cancel should preserve the Task body");
+
 	await runTandem(tandem, buildTaskArgs({
 		action: "complete",
 		id: taskId,
@@ -260,7 +276,8 @@ try {
 		validation: "smoke passed",
 	}), workspace);
 	const logs = parseJson(await runTandem(tandem, buildLogArgs({ action: "list" }), workspace));
-	assert(logs.data.count === 1, "log list should include completed task");
+	assert(logs.data.count === 2, "log list should include completed and canceled Tasks");
+	assert(logs.data.items.find((item: any) => item.id === canceledId)?.outcome === "canceled", "log list should expose canceled outcome");
 	const logSearch = parseJson(await runTandem(tandem, buildLogArgs({ action: "search", query: "Smoke complete" }), workspace));
 	assert(logSearch.data.results.length === 1, "log search should find completed smoke task");
 

@@ -36,9 +36,12 @@ tandem show task-1
 tandem move task-1 --state in-progress
 tandem update task-1 --priority medium --tag docs --related-file docs/index.md
 tandem update task-1 --body "$revised_body"
+tandem cancel task-2 --reason "Created by mistake"
 ```
 
 `tandem update --body` replaces an active Task's complete Markdown body exactly; pass an explicit empty string to clear it. Unchanged body or metadata values are no-ops and do not write a timestamp or event.
+
+`tandem cancel` archives an active Task to Logs with an auditable canceled outcome and preserved body/metadata. It requires a reason and refuses to cancel a Task that still has active descendants.
 
 The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` state.
 
@@ -139,6 +142,6 @@ The TUI is the daily Board view for tasks, validation, logs, rules, and decision
 
 ## Command families
 
-V0 command families are `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `search`, `log`, `accord`, `rules`, `decision`, `tui`, and `version` / `--version`.
+V0 command families are `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `search`, `log`, `accord`, `rules`, `decision`, `tui`, and `version` / `--version`.
 
 The CLI uses canonical command names and long flags only in v0.

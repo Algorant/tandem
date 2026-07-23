@@ -48,7 +48,7 @@ task-103       Epic (`type: task`, `kind: epic`)
     └── task-104-1   Subtask (`parentId: task-104`, relationship `subtask`)
 ```
 
-Epics and Tasks use the global `task-N` namespace. A direct Epic child is therefore a Task such as `task-104`, never `task-103-1`. Only a direct child of a Task is a Subtask, and it must use the parent-derived `<Task ID>-M` form. Subtasks are leaves and cannot have children. Tandem allocates both global IDs and per-Task suffixes across the active Board and completed Logs, so completed IDs are never reused.
+Epics and Tasks use the global `task-N` namespace. A direct Epic child is therefore a Task such as `task-104`, never `task-103-1`. Only a direct child of a Task is a Subtask, and it must use the parent-derived `<Task ID>-M` form. Subtasks are leaves and cannot have children. Tandem allocates both global IDs and per-Task suffixes across the active Board and archived Logs, so completed or canceled IDs are never reused.
 
 Roles come from the resolved documents and `parentId`, then Tandem strictly validates the matching ID form. There is no compatibility exception for a hierarchical direct Epic child or a global-ID Subtask. IDs are immutable: reparenting is allowed only when it preserves both the role and the existing canonical ID.
 
@@ -81,7 +81,7 @@ Decisions do not use task workflow state. They remain active records that tasks 
 
 ## Logs
 
-Logs are completed task documents stored in `.tandem/logs/`. They preserve the task body, completion summary, validation notes, changed files, relevant accord metadata, and event context.
+Logs are completed or canceled Task documents stored in `.tandem/logs/`. They preserve the Task body, terminal summary, validation notes, changed files, relevant accord metadata, and event context. Missing `completion.outcome` means completed; cancellation records `canceled`, requires a reason, and remains auditable rather than deleting the file.
 
 Use logs when you need to answer “what changed?”, “why was it accepted?”, or “what evidence did we have?” later:
 

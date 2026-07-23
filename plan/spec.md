@@ -91,13 +91,13 @@ Protocol:
 - `accord` replaces Brainfile's contract concept with statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References may point to any Tandem document by ID.
 - Completion warns but does not block on review/accord acceptance in v0.
-- Archived markdown docs in `.tandem/logs/` are the completed-log source of truth; per-actor `.tandem/events/<actor_id>.jsonl` logs record minimal audit-only lifecycle events, with legacy `.tandem/events.jsonl` read during transition.
+- Archived Markdown docs in `.tandem/logs/` are the terminal work-history source of truth: missing `completion.outcome` means completed, while reasoned cancellation writes `completion.outcome: canceled`; event logs record minimal audit-only lifecycle history.
 - Validation is built-in structural validation only for v0, with strict structure/core refs and role/ID checks: unresolved `parentId`/`blockers`, a parented Epic, a child beneath a Subtask, a role/ID mismatch, or role-changing reparenting are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.
 
 CLI/TUI:
 
-- v0 commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- v0 commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
 - `tandem log` includes `list`, `show`, `search`; `tandem rules` includes `list`, `add`, `edit`, `delete`; `tandem accord` includes `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
 - Human-readable output is default using compact tables for list/search and labeled detail blocks for show/log/decision; all read commands support `--json` envelope objects.
 - First CLI implementation language is Rust inside `tandem/`; the current implementation remains one `tandem` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.

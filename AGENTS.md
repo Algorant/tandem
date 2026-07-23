@@ -48,7 +48,7 @@ Protocol:
 - Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
 - References: `parentId`, blockers, and related references may point to any Tandem document by ID.
 - Role-specific IDs are strict: Epics and Tasks allocate the next global `task-N` across active board documents and completed logs; Subtasks allocate the next `task-N-M` suffix beneath their Task across board and logs without reuse. Resolved documents define roles, while the role constrains valid ID shape. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid; there is no decision-4 compatibility exception.
-- Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0.
+- Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0. `tandem cancel` archives reasoned cancellation with `completion.outcome: canceled`, rejects active descendants, and does not require blockers/review/accord acceptance.
 - Events: per-actor `.tandem/events/<actor_id>.jsonl` logs store minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`; legacy `.tandem/events.jsonl` remains readable during transition.
 - Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
 - Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings. Epics with `parentId`, children beneath Subtasks, and reparenting that would create either condition are structural errors; Subtasks cannot have children.
@@ -56,7 +56,7 @@ Protocol:
 
 CLI/TUI:
 
-- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `complete`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
 - v0 `tandem log`: `list`, `show`, `search` only.
 - v0 `tandem rules`: `list`, `add`, `edit`, `delete`.
 - v0 `tandem accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.

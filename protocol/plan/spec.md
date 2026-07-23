@@ -353,12 +353,13 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 
 ### Completion metadata fields
 
-Completed task documents in `.tandem/logs/` should include `completedAt` and `completion` metadata. Missing required log metadata is an error because logs are the completed-work source of truth.
+Archived task documents in `.tandem/logs/` include `completedAt` and `completion` metadata. Missing required log metadata is an error because Logs are the terminal work-history source of truth. The field name `completedAt` remains the compatible archive timestamp for both successful completion and cancellation in protocol 0.1.0.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
-| `completedAt` | yes in logs | error | Completion/archive timestamp. |
-| `completion.summary` | yes in logs | error | Human-readable completion summary. |
+| `completedAt` | yes in logs | error | Terminal archive timestamp retained for backward compatibility. |
+| `completion.outcome` | no | error if unsupported | `completed` or `canceled`; omission means `completed` for legacy Logs. |
+| `completion.summary` | yes in logs | error | Human-readable completion or cancellation summary. |
 | `completion.filesChanged` | no | warning if malformed | Array of project paths changed. |
 | `completion.validation` | no | warning if malformed | Recorded validation result summary; v0 lint does not execute commands. |
 | `completion.reviewer` | no | none | Reviewer or completer identifier. |
@@ -366,9 +367,9 @@ Completed task documents in `.tandem/logs/` should include `completedAt` and `co
 
 ### Log document expectations
 
-Archived Markdown documents in `.tandem/logs/` are the completed-work source of truth. Events may enrich timelines, but a log document must remain understandable without replaying any event log.
+Archived Markdown documents in `.tandem/logs/` are the terminal work-history source of truth. Events may enrich timelines, but a log document must remain understandable without replaying any event log.
 
-A valid completed task log should contain:
+A valid archived task log should contain:
 
 - original task identity fields: `id`, `type: task`, `title`
 - `completedAt`
@@ -820,7 +821,7 @@ accord:
   status: accepted
 ```
 
-Archived Markdown documents in `.tandem/logs/` are the source of truth for completed history. Events enrich timeline, audit, and search views, but tools should not need events to reconstruct the current board or completed-log corpus.
+Archived Markdown documents in `.tandem/logs/` are the source of truth for completed and canceled history. Missing `completion.outcome` means `completed`; cancellation writes `completion.outcome: canceled` and a `Canceled: <reason>` summary. Events enrich timeline, audit, and search views, but tools should not need events to reconstruct the current board or archived-log corpus.
 
 ## Events
 
@@ -876,6 +877,7 @@ Task events:
 - `task.updated`
 - `task.moved`
 - `task.completed`
+- `task.canceled`
 
 Decision events:
 
@@ -902,7 +904,8 @@ Review events:
 
 Completion/archive events:
 
-- `task.completed` — completion/archive mutation from `.tandem/board/` to `.tandem/logs/`.
+- `task.completed` — successful completion/archive mutation from `.tandem/board/` to `.tandem/logs/`.
+- `task.canceled` — reasoned cancellation/archive mutation from `.tandem/board/` to `.tandem/logs/`.
 
 Restore/reopen events, post-v0 names reserved:
 
@@ -994,7 +997,7 @@ Errors fail validation and should block normal mutations.
 | `E062` | parented Epic | A `kind: epic` task has `parentId`; Epics are root-only. |
 | `E063` | child beneath Subtask | A task targets a resolved Subtask. |
 | `E064` | invalid role transition | Reparenting changes Epic/Task/Subtask role or leaves the immutable ID invalid for the prospective relationship. |
-| `E070` | invalid completed log | A log task lacks `completedAt` or `completion.summary`. |
+| `E070` | invalid archived log | A Log Task lacks `completedAt` or `completion.summary`, or has an unsupported `completion.outcome`. |
 
 ### Warning categories
 
@@ -1128,6 +1131,19 @@ Requesting changes does not automatically set accord status to `rework` or move 
 
 Completion is not a persistent board state. The completed log may omit active-only `state`, but must retain enough identity, completion, body, review, accord, relationship, reference, and retained legacy inline-checklist information to stand alone.
 
+### Cancel/archive
+
+| Aspect | Semantics |
+| --- | --- |
+| Required inputs | Active Task ID and a non-empty cancellation reason. |
+| Files read | `.tandem/tandem.md`, target Task in `.tandem/board/`, Board/Logs hierarchy, and destination Log path. |
+| Files written | Canceled Task document in `.tandem/logs/`; remove/move the active Board document; append the current actor event ledger. |
+| Validation/errors/warnings | Error if the target is missing/non-task/already archived, structure is invalid, the destination exists, or any active descendant remains. Blockers and unaccepted review/accord do not prevent cancellation; canceled Logs remain terminal blocker targets. |
+| Event | `task.canceled`. |
+| Resulting state | Preserve body/frontmatter, remove active `state`, set `updatedAt` and `completedAt`, and write `completion.outcome: canceled` plus `completion.summary: "Canceled: <reason>"`. |
+
+Cancellation never cascades, permanently deletes a document, or reuses its ID. Canceled records remain hierarchy/reference anchors but do not count as successfully completed work in progress rollups. CLI/JSON/TUI Log readers must distinguish them from completed records; a TUI cancellation action is not required in this MVP.
+
 ### Post-v0 restore/reopen boundaries
 
 Restore/reopen is not part of the v0 command surface. The protocol reserves event names so future tooling can distinguish two concepts:
@@ -1167,6 +1183,7 @@ tandem add --title ... --state todo --kind epic
 tandem move <id> --state validation
 tandem update <id> --body <markdown> --kind epic --priority high --tag cli --parent task-1
 tandem complete <id> --summary ...
+tandem cancel <id> --reason <text>
 tandem log list|show|search
 tandem search <query>
 tandem accord ready|claim|deliver|accept|rework|block|fail

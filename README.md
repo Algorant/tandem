@@ -53,7 +53,7 @@ tandem init --title "My Project"
 
 ## [placeholder for workflow diagram]
 
-Initialization creates a `.tandem/` workspace containing active board documents, completed logs, lifecycle events, project rules, and configuration. The Markdown files remain the source of truth; use the CLI or TUI for structured updates.
+Initialization creates a `.tandem/` workspace containing active Board documents, completed or canceled Logs, lifecycle events, project rules, and configuration. The Markdown files remain the source of truth; use the CLI or TUI for structured updates.
 
 [placeholder for .tandem directory structure]
 

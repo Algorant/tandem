@@ -99,6 +99,7 @@ const generatedGuidance = tandemPromptGuidance("/tmp/canonical-tandem-workspace"
 assertIncludes(generatedGuidance, "their direct children are global-ID Tasks", "generated canonical hierarchy guidance");
 assertIncludes(generatedGuidance, "a Task's direct children are leaf, parent-derived", "generated canonical Subtask guidance");
 assertIncludes(generatedGuidance, "Only Task-role roots are delegated initially", "generated Task-only delegation guidance");
+assertIncludes(generatedGuidance, "action=cancel only when the user or orchestrator explicitly asks", "generated cancellation authority guidance");
 assertIncludes(generatedGuidance, "Never allocate IDs or reclassify CLI output in Pi", "generated thin-adapter guidance");
 
 const workerHandoffSpec = await readFile(join(repoRoot, "plan", "delegated-task-tree-worker-spec.md"), "utf8");

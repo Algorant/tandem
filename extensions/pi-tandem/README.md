@@ -33,9 +33,10 @@ tandem add --title <title> [--kind epic] [--parent <id>] [--blocker <id>] [--ref
 tandem move <id> --state <state>
 tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] [--tag <tag>] ...
 tandem complete <id> --summary <text> ...
+tandem cancel <id> --reason <text>
 ```
 
-Read actions default to JSON. Mutation actions keep the CLI's human-readable output. For `action=update`, `body` maps to exact complete Markdown-body replacement without trimming; an explicit empty string clears the body. The add-only `description` convenience remains separate, and accord/review mutations continue through their dedicated lifecycle flows.
+Read actions default to JSON. Mutation actions keep the CLI's human-readable output. For `action=update`, `body` maps to exact complete Markdown-body replacement without trimming; an explicit empty string clears the body. The add-only `description` convenience remains separate, and accord/review mutations continue through their dedicated lifecycle flows. `action=cancel` requires a reason and archives an auditable canceled Log; it is not permanent deletion and fails while active descendants remain.
 
 Relationship parameters map directly to Tandem CLI fields: `kind` → `--kind`, `parent` → `--parent`/`parentId`, `blockers` → strict dependency IDs, `references` → related Tandem document IDs, and `relatedFiles` → project paths. Pi-tandem forwards these values and lets the CLI resolve the canonical role, allocate the ID, validate the graph, and return the relationship:
 

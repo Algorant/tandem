@@ -7,9 +7,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::ListItem;
 
 use crate::{
-    accord_status, completion_files_changed, completion_reviewer, completion_summary,
-    completion_validation, display_path, parse_field_values, read_document, review_status,
-    Document, DocumentLocation, HierarchyIndex,
+    accord_status, completion_files_changed, completion_outcome, completion_reviewer,
+    completion_summary, completion_validation, display_path, is_canceled_log, parse_field_values,
+    read_document, review_status, Document, DocumentLocation, HierarchyIndex,
 };
 
 use super::{markdownish_lines, StatusTone, TuiTheme};
@@ -191,6 +191,8 @@ fn log_matches_query(doc: &Document, hierarchy: Option<&HierarchyIndex>, query: 
     haystack.push('\n');
     haystack.push_str(completion_summary(doc).unwrap_or(""));
     haystack.push('\n');
+    haystack.push_str(completion_outcome(doc));
+    haystack.push('\n');
     haystack.push_str(completion_validation(doc).unwrap_or(""));
     haystack.push('\n');
     haystack.push_str(&completion_files_changed(doc).join("\n"));
@@ -246,7 +248,13 @@ fn line_for_log(
         .and_then(|hierarchy| hierarchy.validate_task_hierarchy(doc).ok())
         .map(|role| format!("[{}] ", role.as_str().to_ascii_uppercase()))
         .unwrap_or_default();
-    let prefix_width = doc.id().chars().count() + role.chars().count() + 2;
+    let outcome = if is_canceled_log(doc) {
+        "[CANCELED] "
+    } else {
+        ""
+    };
+    let prefix_width =
+        doc.id().chars().count() + role.chars().count() + outcome.chars().count() + 2;
     let title_width = (available_width as usize).saturating_sub(prefix_width);
 
     Line::from(vec![
@@ -255,6 +263,7 @@ fn line_for_log(
             theme.status_style(StatusTone::Accent),
         ),
         Span::styled(role, theme.muted_style()),
+        Span::styled(outcome, theme.status_style(StatusTone::Warning)),
         Span::styled(truncate_for_log(&title, title_width), theme.text_style()),
     ])
 }
@@ -326,7 +335,14 @@ pub(super) fn detail_lines_for_log(
     let reviewer = completion_reviewer(doc);
     if summary.is_some() || validation.is_some() || reviewer.is_some() {
         lines.push(Line::from(""));
-        lines.push(section_heading("Completion", theme));
+        lines.push(section_heading(
+            if is_canceled_log(doc) {
+                "Cancellation"
+            } else {
+                "Completion"
+            },
+            theme,
+        ));
         push_compact_optional(&mut lines, "summary", summary, theme);
         push_compact_optional(&mut lines, "validation", validation, theme);
         push_compact_optional(&mut lines, "reviewer", reviewer, theme);
@@ -355,7 +371,14 @@ pub(super) fn detail_lines_for_log(
         Span::styled(doc.id().to_string(), theme.status_style(StatusTone::Accent)),
         Span::styled(" · ", theme.muted_style()),
         Span::styled(doc.doc_type().to_string(), theme.muted_style()),
-        Span::styled(" · completed ", theme.muted_style()),
+        Span::styled(
+            if is_canceled_log(doc) {
+                " · canceled "
+            } else {
+                " · completed "
+            },
+            theme.muted_style(),
+        ),
         Span::styled(
             completed_at_compact(doc.field("completedAt").unwrap_or("unknown")),
             theme.text_style(),
@@ -731,6 +754,38 @@ mod tests {
         assert!(!row.contains("docs/index.md"));
         assert!(!row.contains("Long completion summary"));
         assert!(row.chars().count() <= 80);
+    }
+
+    #[test]
+    fn canceled_logs_render_and_filter_as_canceled_not_completed() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = log_doc(
+            "task-37",
+            "Abandoned experiment",
+            "Canceled: Created by mistake",
+            "2026-06-28T18:00:00Z",
+            "Preserved body",
+        );
+        doc.fields.insert(
+            "completion.outcome".to_string(),
+            crate::COMPLETION_OUTCOME_CANCELED.to_string(),
+        );
+        let hierarchy = test_hierarchy(&[], std::slice::from_ref(&doc));
+
+        let row = line_text(&line_for_log(&doc, Some(&hierarchy), &theme, 80));
+        assert!(row.contains("[CANCELED]"));
+        assert_eq!(
+            filter_logs(std::slice::from_ref(&doc), Some(&hierarchy), "canceled").len(),
+            1
+        );
+
+        let detail = detail_lines_for_log(&doc, Some(&hierarchy), &[], &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        assert!(detail.iter().any(|line| line == "Cancellation"));
+        assert!(!detail.iter().any(|line| line == "Completion"));
+        assert!(detail.iter().any(|line| line.contains(" · canceled ")));
     }
 
     #[test]

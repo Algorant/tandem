@@ -40,6 +40,9 @@ const DECISION_STATUSES: &[&str] = &[
 ];
 const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
 const TASK_KINDS: &[&str] = &["epic"];
+const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
+const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
+const COMPLETION_OUTCOMES: &[&str] = &[COMPLETION_OUTCOME_COMPLETED, COMPLETION_OUTCOME_CANCELED];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
 
@@ -542,6 +545,20 @@ struct CompleteOptions {
 }
 
 #[derive(Debug, Default)]
+struct CancelOptions {
+    id: String,
+    reason: Option<String>,
+}
+
+#[derive(Debug)]
+struct CancelOutcome {
+    id: String,
+    reason: String,
+    board_path: PathBuf,
+    log_path: PathBuf,
+}
+
+#[derive(Debug, Default)]
 struct SearchOptions {
     query: String,
     state: Option<String>,
@@ -639,6 +656,7 @@ fn run() -> Result<(), CliError> {
         "move" => cmd_move(parse_move_args(&args)?)?,
         "update" => cmd_update(parse_update_args(&args)?)?,
         "complete" => cmd_complete(parse_complete_args(&args)?)?,
+        "cancel" => cmd_cancel(parse_cancel_args(&args)?)?,
         "search" => cmd_search(parse_search_args(&args)?)?,
         "log" => cmd_log(&args)?,
         "accord" => cmd_accord(&args)?,
@@ -649,7 +667,7 @@ fn run() -> Result<(), CliError> {
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, list, show, add, move, update, complete, search, log, accord, rules, decision, tui, version"
+                "unknown command `{other}`. Supported commands: init, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version"
             )))
         }
     }
@@ -668,6 +686,7 @@ fn print_help() {
     println!("  tandem move <id> --state <state>");
     println!("  tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
     println!("  tandem complete <id> --summary <text>");
+    println!("  tandem cancel <id> --reason <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem log list|show|search ...");
     println!("  tandem accord ready|claim|deliver|accept|rework|block|fail ...");
@@ -998,6 +1017,28 @@ fn parse_complete_args(args: &[String]) -> Result<CompleteOptions, CliError> {
     }
     if options.id.is_empty() {
         return Err(CliError::usage("complete requires an <id>"));
+    }
+    Ok(options)
+}
+
+fn parse_cancel_args(args: &[String]) -> Result<CancelOptions, CliError> {
+    let mut options = CancelOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--reason" => {
+                index += 1;
+                options.reason = Some(required_raw_value(args, index, "--reason")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown cancel flag `{flag}`")))
+            }
+            value => set_single_positional(&mut options.id, value, "cancel")?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage("cancel requires an <id>"));
     }
     Ok(options)
 }
@@ -1687,6 +1728,7 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     let patched = patch_completion_content(
         &patched,
         summary,
+        None,
         &options.files_changed,
         options.validation.as_deref(),
         options.reviewer.as_deref(),
@@ -1717,6 +1759,101 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     );
     println!("Event: task.completed");
     Ok(())
+}
+
+fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let reason = require_nonempty(options.reason.as_deref(), "cancel requires --reason <text>")?;
+    let outcome = cancel_task(&workspace, &options.id, reason)?;
+
+    println!("Canceled {}", outcome.id);
+    println!("Reason: {}", outcome.reason);
+    println!(
+        "Moved: {} -> {}",
+        display_path(&outcome.board_path),
+        display_path(&outcome.log_path)
+    );
+    println!("Event: task.canceled");
+    Ok(())
+}
+
+fn cancel_task(workspace: &Workspace, id: &str, reason: &str) -> Result<CancelOutcome, CliError> {
+    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let reason = require_nonempty(Some(reason), "cancel requires --reason <text>")?.to_string();
+    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let doc = hierarchy
+        .document(id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
+        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+    if doc.doc_type() != "task" {
+        return Err(CliError::user(format!(
+            "Validation failed: only active task documents can be canceled: {} is type {}",
+            doc.id(),
+            doc.doc_type()
+        )));
+    }
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
+
+    let active_descendants = active_task_descendant_ids(&hierarchy, doc.id());
+    if !active_descendants.is_empty() {
+        return Err(CliError::user(format!(
+            "Validation failed: cannot cancel {} while it has active descendants: {}",
+            doc.id(),
+            active_descendants.join(", ")
+        )));
+    }
+
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let mut updates = BTreeMap::new();
+    updates.insert("completedAt".to_string(), now.clone());
+    updates.insert("updatedAt".to_string(), now);
+    let patched = patch_frontmatter_content(
+        &content,
+        &updates,
+        &[
+            "state",
+            "completionSummary",
+            "completionValidation",
+            "completionReviewer",
+            "filesChanged",
+        ],
+    )?;
+    let summary = format!("Canceled: {reason}");
+    let patched = patch_completion_content(
+        &patched,
+        &summary,
+        Some(COMPLETION_OUTCOME_CANCELED),
+        &[],
+        None,
+        None,
+    )?;
+    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
+    if log_path.exists() {
+        return Err(CliError::user(format!(
+            "Validation failed: log document already exists: {}",
+            display_path(&log_path)
+        )));
+    }
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&log_path, &patched)?;
+    fs::remove_file(&doc.path).map_err(|error| {
+        CliError::user(format!(
+            "Write failure: could not remove active document {} after writing canceled log {}: {error}",
+            display_path(&doc.path),
+            display_path(&log_path)
+        ))
+    })?;
+    append_event(workspace, "task.canceled", doc.id(), &summary)?;
+
+    Ok(CancelOutcome {
+        id: doc.id().to_string(),
+        reason,
+        board_path: doc.path,
+        log_path,
+    })
 }
 
 fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
@@ -2460,6 +2597,31 @@ fn find_hierarchy_children(
             .then_with(|| a.id().cmp(b.id()))
     });
     Ok(children)
+}
+
+fn active_task_descendant_ids(hierarchy: &HierarchyIndex, root_id: &str) -> Vec<String> {
+    let mut visited = BTreeSet::from([root_id.to_string()]);
+    let mut pending = vec![root_id.to_string()];
+    let mut active = BTreeSet::new();
+
+    while let Some(parent_id) = pending.pop() {
+        for doc in hierarchy
+            .documents
+            .values()
+            .filter(|doc| doc.doc_type() == "task")
+            .filter(|doc| doc.field("parentId") == Some(parent_id.as_str()))
+        {
+            if !visited.insert(doc.id().to_string()) {
+                continue;
+            }
+            if doc.location == DocumentLocation::Board {
+                active.insert(doc.id().to_string());
+            }
+            pending.push(doc.id().to_string());
+        }
+    }
+
+    active.into_iter().collect()
 }
 
 fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
@@ -3303,6 +3465,15 @@ fn completion_summary(doc: &Document) -> Option<&str> {
         .or_else(|| doc.field("completionSummary"))
 }
 
+fn completion_outcome(doc: &Document) -> &str {
+    doc.field("completion.outcome")
+        .unwrap_or(COMPLETION_OUTCOME_COMPLETED)
+}
+
+fn is_canceled_log(doc: &Document) -> bool {
+    doc.location == DocumentLocation::Logs && completion_outcome(doc) == COMPLETION_OUTCOME_CANCELED
+}
+
 fn completion_validation(doc: &Document) -> Option<&str> {
     doc.field("completion.validation")
         .or_else(|| doc.field("completion.validation.summary"))
@@ -3809,7 +3980,9 @@ fn print_show(
         for child in children {
             let status = child
                 .field("state")
-                .or_else(|| (child.location == DocumentLocation::Logs).then_some("completed"))
+                .or_else(|| {
+                    (child.location == DocumentLocation::Logs).then(|| completion_outcome(child))
+                })
                 .unwrap_or(child.location.as_str());
             println!("  {} [{}] {}", child.id(), status, child.title());
         }
@@ -3821,7 +3994,14 @@ fn print_show(
         println!("Updated:   {updated_at}");
     }
     if let Some(completed_at) = doc.field("completedAt") {
-        println!("Completed: {completed_at}");
+        if is_canceled_log(doc) {
+            println!("Canceled:  {completed_at}");
+        } else {
+            println!("Completed: {completed_at}");
+        }
+    }
+    if doc.location == DocumentLocation::Logs && doc.doc_type() == "task" {
+        println!("Outcome:   {}", completion_outcome(doc));
     }
     if let Some(status) = accord_status(doc) {
         println!("Accord:    {status}");
@@ -3946,7 +4126,14 @@ fn print_search_table(
             "{:<12} {:<8} {:<12} {:<8} {:<8} {:<9} {:<12} {:<24} {}",
             truncate(doc.id(), 12),
             doc.location.as_str(),
-            truncate(doc.field("state").unwrap_or("-"), 12),
+            truncate(
+                doc.field("state")
+                    .or_else(|| {
+                        (doc.location == DocumentLocation::Logs).then(|| completion_outcome(doc))
+                    })
+                    .unwrap_or("-"),
+                12,
+            ),
             truncate(doc.doc_type(), 8),
             truncate(doc.kind().unwrap_or("-"), 8),
             relationship,
@@ -3960,15 +4147,19 @@ fn print_search_table(
 
 fn print_log_table(docs: &[Document]) {
     if docs.is_empty() {
-        println!("No completed Tandem logs found.");
+        println!("No archived Tandem logs found.");
         return;
     }
-    println!("{:<12} {:<20} {:<36} SUMMARY", "ID", "COMPLETED", "TITLE");
+    println!(
+        "{:<12} {:<20} {:<10} {:<36} SUMMARY",
+        "ID", "ARCHIVED", "OUTCOME", "TITLE"
+    );
     for doc in docs {
         println!(
-            "{:<12} {:<20} {:<36} {}",
+            "{:<12} {:<20} {:<10} {:<36} {}",
             truncate(doc.id(), 12),
             truncate(doc.field("completedAt").unwrap_or("-"), 20),
+            truncate(completion_outcome(doc), 10),
             truncate(doc.title(), 36),
             truncate(completion_summary(doc).unwrap_or("-"), 80)
         );
@@ -4144,12 +4335,14 @@ fn warn_missing_rule_source(workspace: &Workspace, source: Option<&str>) -> Resu
 fn patch_completion_content(
     content: &str,
     summary: &str,
+    outcome: Option<&str>,
     files_changed: &[String],
     validation: Option<&str>,
     reviewer: Option<&str>,
 ) -> Result<String, CliError> {
     let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let completion_block = render_completion_block(summary, files_changed, validation, reviewer);
+    let completion_block =
+        render_completion_block(summary, outcome, files_changed, validation, reviewer);
     let mut output_frontmatter = String::new();
     let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
     let mut index = 0usize;
@@ -4201,12 +4394,16 @@ fn patch_completion_content(
 
 fn render_completion_block(
     summary: &str,
+    outcome: Option<&str>,
     files_changed: &[String],
     validation: Option<&str>,
     reviewer: Option<&str>,
 ) -> String {
     let mut lines = Vec::new();
     lines.push("completion:".to_string());
+    if let Some(outcome) = outcome {
+        lines.push(format!("  outcome: {}", yaml_double_quote(outcome)));
+    }
     lines.push(format!("  summary: {}", yaml_double_quote(summary)));
     if !files_changed.is_empty() {
         lines.push(format!("  filesChanged: {}", inline_array(files_changed)));
@@ -4591,9 +4788,10 @@ fn log_show_json(doc: &Document, relationship: Option<ParentRelationship>) -> St
         })
         .unwrap_or_default();
     format!(
-        "{{\"ok\":true,\"data\":{{\"document\":{}{},\"completion\":{{\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
+        "{{\"ok\":true,\"data\":{{\"document\":{}{},\"completion\":{{\"outcome\":{},\"summary\":{},\"filesChanged\":{},\"validation\":{},\"reviewer\":{}}},\"body\":{},\"path\":{}}},\"warnings\":[]}}",
         document_detail_json(doc),
         relationship_field,
+        json_string(completion_outcome(doc)),
         json_string(completion_summary(doc).unwrap_or("")),
         json_array_strings(&files),
         json_string(completion_validation(doc).unwrap_or("")),
@@ -4620,6 +4818,9 @@ fn search_json(
             push_json_field(&mut fields, "location", doc.location.as_str());
             push_optional_json_field(&mut fields, "state", doc.field("state"));
             push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+            if doc.location == DocumentLocation::Logs && doc.doc_type() == "task" {
+                push_json_field(&mut fields, "completionOutcome", completion_outcome(doc));
+            }
             push_optional_json_field(&mut fields, "parentId", doc.field("parentId"));
             push_parent_relationship_json_field(&mut fields, hierarchy.relationship(doc)?);
             push_json_field(&mut fields, "snippet", &result.snippet);
@@ -4790,6 +4991,9 @@ fn document_detail_json(doc: &Document) -> String {
         push_optional_json_field(&mut fields, key, doc.field(key));
     }
     push_optional_json_field(&mut fields, "completionSummary", completion_summary(doc));
+    if doc.location == DocumentLocation::Logs && doc.doc_type() == "task" {
+        push_json_field(&mut fields, "completionOutcome", completion_outcome(doc));
+    }
     for key in ["tags", "blockers", "references", "relatedFiles"] {
         if let Some(value) = doc.field(key) {
             fields.push(format!(
@@ -4813,6 +5017,9 @@ fn child_task_summary_json(doc: &Document) -> String {
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "state", doc.field("state"));
     push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+    if doc.location == DocumentLocation::Logs {
+        push_json_field(&mut fields, "completionOutcome", completion_outcome(doc));
+    }
     push_json_field(&mut fields, "location", doc.location.as_str());
     format!("{{{}}}", fields.join(","))
 }
@@ -4824,6 +5031,7 @@ fn log_summary_json(doc: &Document) -> String {
     push_optional_json_field(&mut fields, "kind", doc.kind());
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "completedAt", doc.field("completedAt"));
+    push_json_field(&mut fields, "outcome", completion_outcome(doc));
     push_optional_json_field(&mut fields, "summary", completion_summary(doc));
     push_optional_json_field(&mut fields, "validationStatus", completion_validation(doc));
     format!("{{{}}}", fields.join(","))
@@ -6093,6 +6301,19 @@ mod tests {
     }
 
     #[test]
+    fn cancel_parser_accepts_reason_and_requires_an_id() {
+        let parsed = parse_cancel_args(&[
+            "task-1".to_string(),
+            "--reason".to_string(),
+            "- no longer needed".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(parsed.id, "task-1");
+        assert_eq!(parsed.reason.as_deref(), Some("- no longer needed"));
+        assert!(parse_cancel_args(&["--reason".to_string(), "why".to_string()]).is_err());
+    }
+
+    #[test]
     fn parses_yaml_frontmatter_and_preserves_body() {
         let input = "---\nid: task-1\ntitle: \"Hello\"\nstate: todo\n---\n\nBody\n";
         let (frontmatter, body) = split_frontmatter(input).unwrap();
@@ -6308,6 +6529,7 @@ rules:
         let output = patch_completion_content(
             input,
             "Done",
+            None,
             &["src/main.rs".to_string()],
             Some("cargo test passed"),
             Some("Algorant"),
@@ -6615,6 +6837,132 @@ rules:
                 .count(),
             2
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cancel_task_archives_auditable_outcome_and_rejects_active_descendants() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-cancel-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.1.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        fs::write(
+            workspace.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Parent\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-2.md"),
+            "---\nid: task-2\ntype: task\ntitle: Blocker\nstate: in-progress\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("task-3.md"),
+            "---\nid: task-3\ntype: task\ntitle: Dependent\nstate: todo\nblockers: [task-2]\n---\n",
+        )
+        .unwrap();
+        let child_path = workspace.board_dir.join("task-1-1.md");
+        fs::write(
+            &child_path,
+            "---\nid: task-1-1\ntype: task\ntitle: Child\nstate: validation\nparentId: task-1\nblockers: [task-2]\nreview:\n  status: pending\naccord:\n  status: delivered\ncustom: keep\n---\n\nCanceled body\n",
+        )
+        .unwrap();
+
+        let parent_error = cancel_task(&workspace, "task-1", "Parent canceled").unwrap_err();
+        assert!(parent_error
+            .message
+            .contains("active descendants: task-1-1"));
+        assert!(workspace.board_dir.join("task-1.md").exists());
+
+        let child = cancel_task(&workspace, "task-1-1", "Created by mistake").unwrap();
+        assert_eq!(child.id, "task-1-1");
+        assert!(!child_path.exists());
+        let canceled_content = fs::read_to_string(&child.log_path).unwrap();
+        let canceled_doc = read_document(&child.log_path, DocumentLocation::Logs).unwrap();
+        assert_eq!(
+            completion_outcome(&canceled_doc),
+            COMPLETION_OUTCOME_CANCELED
+        );
+        assert_eq!(
+            completion_summary(&canceled_doc),
+            Some("Canceled: Created by mistake")
+        );
+        assert!(canceled_doc.field("state").is_none());
+        assert!(canceled_doc.field("completedAt").is_some());
+        assert!(canceled_doc.field("updatedAt").is_some());
+        assert!(canceled_content.contains("custom: keep\n"));
+        assert_eq!(canceled_doc.body, "\nCanceled body\n");
+        assert!(canceled_content.contains("review:\n  status: pending\n"));
+        assert!(canceled_content.contains("accord:\n  status: delivered\n"));
+        assert!(log_summary_json(&canceled_doc).contains("\"outcome\":\"canceled\""));
+        assert!(document_detail_json(&canceled_doc).contains("\"completionOutcome\":\"canceled\""));
+        assert!(fs::read_to_string(&workspace.events_path)
+            .unwrap()
+            .contains("task.canceled"));
+
+        let next_child = add_task(
+            &workspace,
+            AddOptions {
+                title: Some("Fresh child".to_string()),
+                parent: Some("task-1".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(next_child.id, "task-1-2");
+
+        cancel_task(&workspace, "task-2", "Dependency intentionally waived").unwrap();
+        assert!(unresolved_blockers(&workspace, Some("[task-2]"))
+            .unwrap()
+            .is_empty());
+
+        let legacy_completed = Document {
+            path: PathBuf::from(".tandem/logs/task-99.md"),
+            location: DocumentLocation::Logs,
+            fields: parse_frontmatter_fields(
+                "id: task-99\ntype: task\ntitle: Legacy\ncompletedAt: now\ncompletion:\n  summary: Done\n",
+            )
+            .unwrap(),
+            body: String::new(),
+        };
+        assert_eq!(
+            completion_outcome(&legacy_completed),
+            COMPLETION_OUTCOME_COMPLETED
+        );
+
+        fs::write(
+            workspace.board_dir.join("task-4.md"),
+            "---\nid: task-4\ntype: task\ntitle: Duplicate board\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.logs_dir.join("task-4.md"),
+            "---\nid: task-4\ntype: task\ntitle: Duplicate log\ncompletedAt: now\ncompletion:\n  summary: Existing\n---\n",
+        )
+        .unwrap();
+        let duplicate_error = cancel_task(&workspace, "task-4", "Should fail").unwrap_err();
+        assert!(duplicate_error
+            .message
+            .contains("duplicate document ID `task-4`"));
+        assert!(workspace.board_dir.join("task-4.md").exists());
+        assert!(workspace.logs_dir.join("task-4.md").exists());
         fs::remove_dir_all(root).unwrap();
     }
 

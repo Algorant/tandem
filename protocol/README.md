@@ -11,7 +11,7 @@ The protocol area owns:
 - `.tandem/` workspace layout
 - `.tandem/tandem.md` workspace config shape
 - active work documents in `.tandem/board/`
-- completed work documents in `.tandem/logs/`
+- completed and canceled work-history documents in `.tandem/logs/`
 - per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with legacy `.tandem/events.jsonl` reads during transition
 - `accord` work-agreement model
 - review and completion semantics
@@ -43,7 +43,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 - Work agreement object: `accord`
 - Completion is an action/archive transition, not a default `done` column.
 - Human workflow state, accord state, and review state are separate.
-- Logs are first-class completed-work history.
+- Logs are first-class terminal work history: missing `completion.outcome` means completed, while reasoned cancellation uses `completion.outcome: canceled`.
 - Match Brainfile's basic protocol feature shape unless Tandem intentionally improves or omits something.
 
 

@@ -9,7 +9,7 @@ description: Using the Tandem terminal user interface.
 The v0 TUI includes:
 
 - **Board** — active tasks grouped by configured workflow state, including the Validation state/subview.
-- **Logs** — completed task history.
+- **Logs** — completed and canceled Task history.
 - **Rules** — project coordination rules.
 - **Decisions** — ADR-compatible `decision` documents.
 
@@ -27,7 +27,7 @@ Board tag/priority filters automatically reveal each matching descendant with it
 
 Press `b` from the Board to switch between State Board and Epic Board. Epic Board groups each active Epic with its direct global-ID Tasks and their parent-derived Subtasks. It keeps the ancestor path visible when filters match a Subtask. Direct Task rows use compact state labels such as `TODO`, `WIP`, and `VAL` without a misleading `SUB` marker; only leaf Subtask rows use `SUB`. Stable `<parentId> → <childId>` context remains visible where useful.
 
-Completed Tasks and Subtasks stay in Logs rather than returning as active rows. Epic and Task rows show concise active/logged rollups such as `2 active · 3 logged`, while expanded details explicitly say completed work is in Logs. Invalid nested Epics, children beneath Subtasks, direct Epic Tasks with hierarchical IDs, and global-ID Subtasks fail workspace validation instead of being rendered through compatibility behavior.
+Completed and canceled Tasks/Subtasks stay in Logs rather than returning as active rows. Canceled Logs are visibly labeled and excluded from successful-completion rollups; Epic and Task rows otherwise show concise active/logged completion context such as `2 active · 3 logged`. Invalid nested Epics, children beneath Subtasks, direct Epic Tasks with hierarchical IDs, and global-ID Subtasks fail workspace validation instead of being rendered through compatibility behavior.
 
 ## Themes
 

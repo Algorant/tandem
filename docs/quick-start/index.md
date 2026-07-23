@@ -73,7 +73,7 @@ Run this at the root of the project repository you want to coordinate:
 tandem init --title "My Project"
 ```
 
-Tandem creates `.tandem/tandem.md`, active board files in `.tandem/board/`, completed logs in `.tandem/logs/`, and lifecycle event logs. The default active task states are `todo`, `in-progress`, and `validation`.
+Tandem creates `.tandem/tandem.md`, active Board files in `.tandem/board/`, completed or canceled Logs in `.tandem/logs/`, and lifecycle event logs. The default active task states are `todo`, `in-progress`, and `validation`.
 
 ## 3. Add a task
 

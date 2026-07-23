@@ -73,6 +73,7 @@ tandem add ...
 tandem move <id> --state <state>
 tandem update <id> ...
 tandem complete <id>
+tandem cancel <id> --reason <text>
 tandem log list|show|search
 tandem search <query>
 tandem accord ready|claim|deliver|accept|rework|block|fail
@@ -94,8 +95,9 @@ Command behavior rules:
 - `tandem accord` supports `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, and `fail` in v0.
 - `tandem decision` supports `list`, `show`, and `add` in v0.
 - The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
-- `tandem complete` moves completed work to logs and warns about missing review or accord acceptance instead of blocking completion in v0.
-- `tandem update <id>` edits active task metadata only. It never updates completed logs or workflow `state`; state changes remain `tandem move`. `--parent <id>` resolves the prospective hierarchy: an Epic parent yields a global-ID Task with `epic-task`, a Task parent yields a `task-N-M` Subtask with `subtask`, and a non-task parent yields a global-ID Task with generic `parent`. Role-changing or ID-invalidating reparenting is rejected.
+- `tandem complete` moves completed work to Logs and warns about missing review or accord acceptance instead of blocking completion in v0.
+- `tandem cancel` archives reasoned cancellation to Logs, rejects active descendants, and does not require blockers/review/accord acceptance.
+- `tandem update <id>` edits an active Task's exact Markdown body and supported metadata only. It never updates completed logs or workflow `state`; state changes remain `tandem move`. `--parent <id>` resolves the prospective hierarchy: an Epic parent yields a global-ID Task with `epic-task`, a Task parent yields a `task-N-M` Subtask with `subtask`, and a non-task parent yields a global-ID Task with generic `parent`. Role-changing or ID-invalidating reparenting is rejected.
 - The first implementation language is Rust, implemented inside `tandem/`.
 - The current implementation package is a Rust binary crate in `tandem/` with manual argument parsing, the approved `yaml-rust2` dependency for frontmatter reads, raw-source CLI mutation patches, and Ratatui/crossterm for the first TUI shell. Completion writes nested `completion` metadata and accord actions write canonical validation/timestamp metadata while preserving legacy read aliases. Additional dependency changes still require an explicit decision.
 
@@ -377,11 +379,34 @@ Event: task.completed
   - warns but does not fail for missing accepted review or accepted accord in v0.
   - fails when the ID is missing, the document is not completable, the document is already completed, blockers remain unresolved, structure validation fails, or the move/write fails.
 
+### `tandem cancel`
+
+- Purpose: archive an active Task as canceled while retaining its ID, body, metadata, references, and audit history.
+- Kind: mutation.
+- Syntax:
+
+```text
+tandem cancel <id> --reason <text>
+```
+
+- Required inputs:
+  - `<id>`: active Task ID.
+  - `--reason <text>`: non-empty human explanation.
+- Behavior:
+  - rejects non-Tasks, archived-only IDs, duplicate Log destinations, invalid hierarchy, and any active descendant;
+  - does not cascade and does not require resolved blockers or accepted review/accord;
+  - preserves raw body/frontmatter, removes active `state`, updates `updatedAt`, sets compatible archive timestamp `completedAt`, and writes `completion.outcome: canceled` plus `completion.summary: "Canceled: <reason>"`;
+  - emits `task.canceled`; a canceled blocker is terminal/resolved, but canceled work is excluded from successful-completion progress;
+  - retains the ID in Logs, so existing allocation rules prevent reuse.
+- Human output shape: canceled ID, reason, Board-to-Logs path, and event name.
+- JSON/Log/TUI reads expose `canceled`; legacy Logs without `completion.outcome` default to `completed`.
+- Out of scope: permanent deletion, cascades, same-ID recreation, a dedicated recreate command, and a TUI cancellation action. TUI read/render compatibility is required.
+
 ### `tandem log`
 
 #### `tandem log list`
 
-- Purpose: list completed log documents.
+- Purpose: list archived completed and canceled Log documents.
 - Kind: read.
 - Syntax:
 
@@ -393,11 +418,11 @@ tandem log list [--limit <count>] [--json]
 - Optional inputs:
   - `--limit <count>`: maximum rows to show.
   - `--json`: emit structured output.
-- Human output shape: compact table sorted by most recent completion.
+- Human output shape: compact table sorted by most recent archive timestamp.
 
 ```text
-ID      COMPLETED            TITLE                    ACCORD    SUMMARY
-task-7  2026-06-26 15:00     Implement theme loader   accepted  Theme loader complete
+ID      ARCHIVED             OUTCOME    TITLE                    SUMMARY
+task-7  2026-06-26 15:00     completed  Implement theme loader   Theme loader complete
 ```
 
 - `--json` data shape:
@@ -412,6 +437,7 @@ task-7  2026-06-26 15:00     Implement theme loader   accepted  Theme loader com
         "type": "task",
         "title": "Implement theme loader",
         "completedAt": "2026-06-26T15:00:00Z",
+        "outcome": "completed",
         "summary": "Theme loader complete",
         "accordStatus": "accepted",
         "validationStatus": "passed"
@@ -425,7 +451,7 @@ task-7  2026-06-26 15:00     Implement theme loader   accepted  Theme loader com
 
 #### `tandem log show`
 
-- Purpose: show one completed log document.
+- Purpose: show one completed or canceled Log document.
 - Kind: read.
 - Syntax:
 
@@ -434,7 +460,7 @@ tandem log show <id> [--json]
 ```
 
 - Required inputs:
-  - `<id>`: completed task ID.
+  - `<id>`: archived Task ID.
 - Optional inputs:
   - `--json`: emit structured output.
 - Human output shape: labeled completion detail block with body, completion metadata, accord evidence, validation, files changed, and timeline where available.
@@ -451,6 +477,7 @@ tandem log show <id> [--json]
       "completedAt": "2026-06-26T15:00:00Z"
     },
     "completion": {
+      "outcome": "completed",
       "summary": "Theme loader complete",
       "filesChanged": ["src/tui/theme.rs"],
       "validation": { "status": "passed", "summary": "cargo test passed" },
@@ -468,7 +495,7 @@ tandem log show <id> [--json]
 
 #### `tandem log search`
 
-- Purpose: search completed logs only.
+- Purpose: search completed and canceled Logs only.
 - Kind: read.
 - Syntax:
 
@@ -818,7 +845,7 @@ tandem tui
   - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows minimal.
   - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
-  - renders the Logs view as a first-class completed-work browser: recency-sorted `.tandem/logs/` list, local list/detail focus, selected-log detail pane, completion summary/timestamp/files/validation/reviewer, accord/review status and accord evidence where present, Markdown body, raw path, event context aggregated from per-actor `.tandem/events/*.jsonl` logs plus legacy `.tandem/events.jsonl`, safe per-log load warnings, and `/` search filtering across ID/title/summary/body/validation/files.
+  - renders the Logs view as a first-class terminal work-history browser: recency-sorted `.tandem/logs/` list, explicit completed/canceled outcome labels, local list/detail focus, selected-log completion/cancellation summary and timestamp, files/validation/reviewer where present, accord/review metadata, Markdown body, raw path, event context, safe per-log load warnings, and `/` search filtering across ID/title/outcome/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
   - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
@@ -980,7 +1007,7 @@ This should answer: “What needs me?” without imposing hard-coded workflow se
 
 ### 3. Logs view
 
-A first-class completed-work browser.
+A first-class completed and canceled work-history browser.
 
 Logs should show:
 
@@ -1438,7 +1465,7 @@ These v0 command families mutate files and must follow the minimal-diff behavior
 - Append lifecycle events separately from document rewrites. The event append should not require reserializing the changed document.
 - Append new lifecycle events to the current actor's `.tandem/events/<actor_id>.jsonl`; do not append to legacy `.tandem/events.jsonl` by default. Readers should aggregate per-actor logs plus the legacy global log when present.
 - Event records must include the protocol envelope `ts`, `event`, `id`, `summary`, `actor`, and `seq`; `<actor>:<seq>` is the event identity. Optional `actorName` is display-only and must not determine canonical identity or file ownership.
-- Event names must use Tandem-native domains, for example `task.created`, `task.moved`, `task.completed`, `decision.created`, `accord.delivered`, `review.updated`, and `rules.updated`.
+- Event names must use Tandem-native domains, for example `task.created`, `task.moved`, `task.completed`, `task.canceled`, `decision.created`, `accord.delivered`, `review.updated`, and `rules.updated`.
 - If a document mutation succeeds but event append fails, report the failure clearly. The implementation should either roll back when safe or surface a repair instruction; silently dropping the event is not acceptable.
 
 ### Error handling for writes

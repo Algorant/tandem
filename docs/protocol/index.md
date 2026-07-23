@@ -10,7 +10,7 @@ The Tandem protocol defines the local `.tandem/` data model used by the CLI, TUI
 .tandem/
 ├── tandem.md        # workspace config and rules
 ├── board/           # active Markdown documents
-├── logs/            # completed Markdown documents
+├── logs/            # completed or canceled Markdown documents
 ├── events/          # per-actor append-only lifecycle events
 │   └── <actor_id>.jsonl
 └── events.jsonl     # legacy global event log; readable during transition
@@ -20,7 +20,7 @@ The Tandem protocol defines the local `.tandem/` data model used by the CLI, TUI
 
 V0 supports `task` and `decision` documents. Epics and Tasks use the global `task-N` namespace; only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 
-Task documents use frontmatter for structured fields and Markdown for the human-readable body. Tools should preserve unknown fields and minimize rewrites.
+Task documents use frontmatter for structured fields and Markdown for the human-readable body. Tools should preserve unknown fields and minimize rewrites. `tandem update --body` replaces an active Task's complete body exactly while preserving unrelated frontmatter.
 
 ## Epic convention
 
@@ -66,6 +66,10 @@ Only Tasks are initial delegation roots. One worker owns a delegated Task's dire
 
 Decision documents are the ADR-compatible durable record type. Required fields are `id`, `type: decision`, and `title`; optional ADR-style metadata may include `status`, `date`, `deciders`, `tags`, `supersedes`, and `supersededBy`. Supersession links should also appear in `references` when current CLI/TUI relationship views should find them.
 
+## Completion and cancellation
+
+Successful completion and reasoned cancellation both archive the Task to `.tandem/logs/`, preserve its body/metadata, remove active `state`, and retain its ID. Archived Tasks require `completedAt` and `completion.summary`; the compatible optional `completion.outcome` is `completed` or `canceled`, with omission meaning completed for legacy Logs. Cancellation rejects active descendants and emits `task.canceled`; canceled work remains auditable but does not count as successful completion.
+
 ## Events
 
 New event writes append to the current writer's `.tandem/events/<actor_id>.jsonl`; readers aggregate all per-actor logs plus any legacy `.tandem/events.jsonl`. Event records require `ts`, `event`, `id`, `summary`, canonical `actor`, and per-actor `seq`; the event identity is `<actor>:<seq>`. Optional `actorName` is display-only and never determines canonical identity or file ownership.
@@ -81,7 +85,7 @@ Built-in structural validation checks required fields, core relationships, deriv
 - Protocol version starts at `0.1.0`.
 - The canonical workflow field is `state`.
 - The work agreement object is `accord`.
-- Completion is an archive action, not a persistent `done` state.
+- Completion and cancellation are archive actions, not persistent Board states.
 - Brainfile import or migration is not required for v0.
 
 See `protocol/plan/spec.md` in the repository for the detailed draft while the public docs are still being expanded.

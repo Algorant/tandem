@@ -2276,13 +2276,13 @@ impl TuiApp {
         let visible = self.filtered_logs().len();
         if self.log_search_filter.is_empty() {
             format!(
-                "Logs view active: {} completed item{} loaded. Press / to search, j/k to select, and h/l or Tab for list/detail focus.",
+                "Logs view active: {} archived item{} loaded. Press / to search, j/k to select, and h/l or Tab for list/detail focus.",
                 self.logs.len(),
                 if self.logs.len() == 1 { "" } else { "s" }
             )
         } else {
             format!(
-                "Logs filter `{}` matched {} of {} completed item{}; Esc clears filter.",
+                "Logs filter `{}` matched {} of {} archived item{}; Esc clears filter.",
                 self.log_search_filter,
                 visible,
                 self.logs.len(),
@@ -2431,15 +2431,20 @@ impl TuiApp {
                 self.selected_log()
                     .map(|doc| {
                         format!(
-                            "Selected {} · completed {}{}",
+                            "Selected {} · {} {}{}",
                             doc.id(),
+                            if is_canceled_log(doc) {
+                                "canceled"
+                            } else {
+                                "completed"
+                            },
                             logs::completed_at_compact(
                                 doc.field("completedAt").unwrap_or("unknown")
                             ),
                             filter
                         )
                     })
-                    .unwrap_or_else(|| format!("No completed log selected{filter}"))
+                    .unwrap_or_else(|| format!("No archived log selected{filter}"))
             }
             TuiView::Rules => self.rules_context(),
             TuiView::Decisions => self.decisions_context(),
@@ -3985,6 +3990,12 @@ fn validation_load_errors_with_hierarchy(
             if completion_summary(doc).is_none() {
                 errors.push("missing required log field `completion.summary`".to_string());
             }
+            let outcome = completion_outcome(doc);
+            if !COMPLETION_OUTCOMES.contains(&outcome) {
+                errors.push(format!(
+                    "invalid completion.outcome `{outcome}`; expected completed or canceled"
+                ));
+            }
         }
 
         if let Some(parent) = doc
@@ -4334,6 +4345,7 @@ fn complete_validation_candidate(workspace: &Workspace, id: &str) -> Result<(), 
     let patched = patch_completion_content(
         &patched,
         &summary,
+        None,
         &[],
         Some("Accepted by Validation apply-accepted workflow"),
         Some("tui"),
@@ -5207,7 +5219,9 @@ fn count_task_descendants(
         .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
     {
         if visited.insert(doc.id().to_string()) {
-            completed += 1;
+            if completion_outcome(doc) == COMPLETION_OUTCOME_COMPLETED {
+                completed += 1;
+            }
             let nested = count_task_descendants(doc.id(), active_docs, completed_logs, visited);
             active += nested.0;
             completed += nested.1;
@@ -5302,6 +5316,7 @@ fn relationship_context_for_doc_with_hierarchy(
         completed_logs
             .iter()
             .filter(|child| is_task_doc(child))
+            .filter(|child| completion_outcome(child) == COMPLETION_OUTCOME_COMPLETED)
             .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
             .filter(|child| child.id() != doc.id())
             .map(|child| related_child_summary(child, true))
@@ -7785,6 +7800,25 @@ mod tests {
     }
 
     #[test]
+    fn archived_log_validation_rejects_unknown_completion_outcomes() {
+        let mut log = doc_with_state("task-1", None);
+        log.location = DocumentLocation::Logs;
+        log.fields
+            .insert("completedAt".to_string(), "now".to_string());
+        log.fields
+            .insert("completion.summary".to_string(), "Archived".to_string());
+        log.fields
+            .insert("completion.outcome".to_string(), "abandoned".to_string());
+
+        let errors = validation_load_errors(&[], &[log], &["todo".to_string()]).join("\n");
+        assert!(
+            errors
+                .contains("invalid completion.outcome `abandoned`; expected completed or canceled"),
+            "{errors}"
+        );
+    }
+
+    #[test]
     fn invalid_hierarchies_surface_actionable_diagnostics_and_render_no_flattened_rows() {
         let nested_epic_parent = doc_with_state("task-1", Some("todo"));
         let mut nested_epic = doc_with_state("task-2", Some("todo"));
@@ -8394,6 +8428,30 @@ mod tests {
         assert_eq!(entries[0].active_descendants, 1);
         assert_eq!(entries[0].completed_descendants, 1);
         assert_eq!(descendant_rollup(1, 1), "1 active · 1 logged");
+    }
+
+    #[test]
+    fn canceled_descendants_do_not_count_as_successful_completion() {
+        let mut epic = doc_with_state("task-103", Some("in-progress"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut canceled_child = doc_with_state("task-104", Some("todo"));
+        canceled_child.location = DocumentLocation::Logs;
+        canceled_child
+            .fields
+            .insert("parentId".to_string(), "task-103".to_string());
+        canceled_child.fields.insert(
+            "completion.outcome".to_string(),
+            COMPLETION_OUTCOME_CANCELED.to_string(),
+        );
+        let docs = vec![epic];
+        let logs = vec![canceled_child];
+
+        let entries = epic_board_entries(&docs, &logs, &BoardFilters::default());
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].active_descendants, 0);
+        assert_eq!(entries[0].completed_descendants, 0);
+        let relationship = relationship_context_for_doc(&docs[0], &docs, &logs);
+        assert!(relationship.completed_children.is_empty());
     }
 
     #[test]
@@ -9437,7 +9495,7 @@ tone = "success"
     #[test]
     fn footer_status_style_does_not_leak_into_hotkey_hints() {
         let mut app = keyboard_test_app();
-        app.status = "Logs view active: 0 completed logs loaded.".to_string();
+        app.status = "Logs view active: 0 archived logs loaded.".to_string();
         let line = app.footer_line_for_text(app.logs_footer_text());
 
         assert_eq!(line_text(&line), app.logs_footer_text());
