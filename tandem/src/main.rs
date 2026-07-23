@@ -504,6 +504,7 @@ struct MoveOptions {
 struct UpdateOptions {
     id: String,
     title: Option<String>,
+    body: Option<String>,
     kind: Option<String>,
     priority: Option<String>,
     assignee: Option<String>,
@@ -665,7 +666,7 @@ fn print_help() {
     println!("  tandem show <id> [--json]");
     println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>] [--json]");
     println!("  tandem move <id> --state <state>");
-    println!("  tandem update <id> [--title <title>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
+    println!("  tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
     println!("  tandem complete <id> --summary <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem log list|show|search ...");
@@ -892,6 +893,10 @@ fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
             "--title" => {
                 index += 1;
                 options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--body" => {
+                index += 1;
+                options.body = Some(required_raw_value(args, index, "--body")?.to_string());
             }
             "--kind" => {
                 index += 1;
@@ -1303,6 +1308,16 @@ fn required_value<'a>(args: &'a [String], index: usize, flag: &str) -> Result<&'
         .ok_or_else(|| CliError::usage(format!("{flag} requires a value")))
 }
 
+fn required_raw_value<'a>(
+    args: &'a [String],
+    index: usize,
+    flag: &str,
+) -> Result<&'a str, CliError> {
+    args.get(index)
+        .map(String::as_str)
+        .ok_or_else(|| CliError::usage(format!("{flag} requires a value")))
+}
+
 fn inline_subtask_authoring_error(command: &str) -> CliError {
     CliError::usage(format!(
         "{command} --subtask is deprecated; create a tracked subtask with `tandem add --title <title> --parent <task-id>`"
@@ -1592,12 +1607,16 @@ fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
 
     println!("Updated {}", outcome.id);
     for change in outcome.changes {
-        println!(
-            "{}: {} -> {}",
-            display_change_field(&change.field, outcome.parent_relationship),
-            display_change_value(&change.old),
-            display_change_value(&change.new)
-        );
+        if change.field == "body" {
+            println!("body: changed");
+        } else {
+            println!(
+                "{}: {} -> {}",
+                display_change_field(&change.field, outcome.parent_relationship),
+                display_change_value(&change.old),
+                display_change_value(&change.new)
+            );
+        }
     }
     println!("Path: {}", display_path(&outcome.path));
     Ok(())
@@ -3002,6 +3021,17 @@ fn update_task_metadata(
         "relatedFiles",
         &options.related_files,
     );
+    let replacement_body = options
+        .body
+        .as_deref()
+        .filter(|body| doc.body.as_str() != *body);
+    if replacement_body.is_some() {
+        changes.push(UpdateChange {
+            field: "body".to_string(),
+            old: "<body>".to_string(),
+            new: "<body>".to_string(),
+        });
+    }
 
     let doc_id = doc.id().to_string();
     let path = doc.path.clone();
@@ -3018,6 +3048,11 @@ fn update_task_metadata(
     updates.insert("updatedAt".to_string(), current_timestamp());
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let patched = if let Some(body) = replacement_body {
+        replace_markdown_body(&patched, body)?
+    } else {
+        patched
+    };
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
     append_event(
@@ -4996,6 +5031,11 @@ fn next_sequential_number_in_hierarchy(hierarchy: &HierarchyIndex, prefix: &str)
         .unwrap_or(0)
 }
 
+fn replace_markdown_body(content: &str, body: &str) -> Result<String, CliError> {
+    let (frontmatter, _) = split_frontmatter(content).map_err(CliError::user)?;
+    Ok(format!("---\n{}---\n{}", frontmatter, body))
+}
+
 fn patch_frontmatter_content(
     content: &str,
     updates: &BTreeMap<String, String>,
@@ -6038,6 +6078,21 @@ mod tests {
     }
 
     #[test]
+    fn update_body_parser_accepts_empty_and_flag_looking_markdown() {
+        let leading_dash = parse_update_args(&[
+            "task-1".to_string(),
+            "--body".to_string(),
+            "- first item\n\nBody".to_string(),
+        ])
+        .unwrap();
+        assert_eq!(leading_dash.body.as_deref(), Some("- first item\n\nBody"));
+
+        let empty = parse_update_args(&["task-1".to_string(), "--body".to_string(), String::new()])
+            .unwrap();
+        assert_eq!(empty.body.as_deref(), Some(""));
+    }
+
+    #[test]
     fn parses_yaml_frontmatter_and_preserves_body() {
         let input = "---\nid: task-1\ntitle: \"Hello\"\nstate: todo\n---\n\nBody\n";
         let (frontmatter, body) = split_frontmatter(input).unwrap();
@@ -6475,6 +6530,91 @@ rules:
         assert!(outcome.changes.is_empty());
         assert_eq!(fs::read_to_string(&task_path).unwrap(), before);
         assert_eq!(fs::read_to_string(&workspace.events_path).unwrap(), "");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn update_task_body_replaces_clears_and_noops_exactly() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-update-body-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let workspace = Workspace {
+            board_dir: root.join(".tandem/board"),
+            logs_dir: root.join(".tandem/logs"),
+            config_path: root.join(".tandem/tandem.md"),
+            events_path: root.join(".tandem/events.jsonl"),
+        };
+        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.logs_dir).unwrap();
+        fs::write(&workspace.config_path, "---\nstates: [todo]\n---\n").unwrap();
+        fs::write(&workspace.events_path, "").unwrap();
+        let task_path = workspace.board_dir.join("task-1.md");
+        fs::write(
+            &task_path,
+            "---\nid: task-1\ntype: task\ntitle: Demo\nstate: todo\ncustom: keep\nupdatedAt: \"old\"\n---\n\nOld body\n",
+        )
+        .unwrap();
+
+        let replacement = "- first item\n\nUnicode: café 🦀\n";
+        let changed = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                body: Some(replacement.to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(changed.changes.len(), 1);
+        assert_eq!(changed.changes[0].field, "body");
+        let after_change = fs::read_to_string(&task_path).unwrap();
+        assert!(after_change.contains("custom: keep\n"));
+        assert_eq!(split_frontmatter(&after_change).unwrap().1, replacement);
+        let events_after_change = fs::read_to_string(&workspace.events_path).unwrap();
+        assert!(events_after_change.contains("task.updated"));
+        assert!(!events_after_change.contains("Unicode"));
+        assert!(!events_after_change.contains("first item"));
+
+        let noop = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                body: Some(replacement.to_string()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+        assert!(noop.changes.is_empty());
+        assert_eq!(fs::read_to_string(&task_path).unwrap(), after_change);
+        assert_eq!(
+            fs::read_to_string(&workspace.events_path).unwrap(),
+            events_after_change
+        );
+
+        let cleared = update_task_metadata(
+            &workspace,
+            UpdateOptions {
+                id: "task-1".to_string(),
+                body: Some(String::new()),
+                ..UpdateOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(cleared.changes.len(), 1);
+        let after_clear = fs::read_to_string(&task_path).unwrap();
+        assert!(after_clear.contains("custom: keep\n"));
+        assert_eq!(split_frontmatter(&after_clear).unwrap().1, "");
+        assert_eq!(
+            fs::read_to_string(&workspace.events_path)
+                .unwrap()
+                .matches("task.updated")
+                .count(),
+            2
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

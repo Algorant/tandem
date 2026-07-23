@@ -314,23 +314,24 @@ tandem move <id> --state <state>
 
 ### `tandem update`
 
-- Purpose: edit workflow-orthogonal metadata on an active task without changing state.
+- Purpose: replace the complete Markdown body or edit workflow-orthogonal metadata on an active task without changing state.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
+tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--priority <critical|high|medium|low>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
 ```
 
 - Required inputs:
   - `<id>`: active board task ID.
 - Optional inputs:
+  - exact body replacement: `--body <markdown>` replaces all text after the closing frontmatter delimiter. Empty, whitespace-only, multiline, Unicode, and leading-dash values are valid; omission means no body edit.
   - scalar replacements: `--title`, `--kind`, `--priority`, `--assignee`, `--due-date`.
   - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the prospective role graph. An Epic target requires the document to remain a global-ID Task with `epic-task`; a Task target would require a matching `task-N-M` Subtask with `subtask`; a decision/custom target requires a global-ID Task with generic `parent`. Reject a parented Epic, a Subtask target, every role/ID mismatch, and any role-changing or ID-invalidating reparenting. The immutable ID is never renamed.
   - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
-  - no body authoring such as `--description`; inline `--subtask` authoring is deprecated in favor of a separate task with `--parent`.
+  - no update-time `--description`; that flag remains an add-time convenience that creates a Description section. Use `--body` to replace the exact complete Markdown body. Inline `--subtask` authoring is deprecated in favor of a separate task with `--parent`.
   - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata.
   - no clear/remove flags in v0, including no way to clear an existing `parentId`.
   - completed logs are not updated.
@@ -338,8 +339,8 @@ tandem update <id> [--title <title>] [--kind epic] [--priority <critical|high|me
   - kind, when set, must be `epic`; an Epic must have no `parentId`.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
   - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; references warn when unresolved; related files remain path metadata.
-- Human output shape: warnings first, then changed fields with old/new values and the path. If every requested value already exists, the command prints a clear no-op and does not update `updatedAt` or append an event.
-- Mutation notes: raw-source frontmatter patches preserve unknown fields and the Markdown body, update `updatedAt` only on real changes, and append `task.updated` on real changes.
+- Human output shape: warnings first, then changed metadata fields with old/new values; a body replacement reports only `body: changed` and never echoes body content. If every requested value already exists byte-for-byte, the command prints a clear no-op and does not update `updatedAt` or append an event.
+- Mutation notes: raw-source patches preserve unrelated/unknown frontmatter; metadata-only updates preserve the Markdown body, while `--body` replaces it exactly. Real changes update `updatedAt` and append `task.updated`; event summaries name `body` without copying body content.
 
 ### `tandem complete`
 

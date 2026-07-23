@@ -96,6 +96,7 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 
 const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
 assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
+assert(taskSchemaProperties.body, "tandem_task schema should expose exact body replacement for update actions");
 assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for canonical hierarchy creation");
 assert(taskSchemaProperties.kind, "tandem_task schema should expose kind for Epic creation");
 assert(!taskSchemaProperties.subtasks, "tandem_task schema should not expose deprecated inline subtask authoring");
@@ -108,6 +109,12 @@ assert(epicArgs.join(" ") === "add --title Canonical Epic --kind epic", "tandem_
 
 const updateArgs = buildTaskArgs({ action: "update", id: "task-1", kind: "epic", priority: "high", parent: "task-2", tags: ["cli"] });
 assert(updateArgs.join(" ") === "update task-1 --kind epic --priority high --parent task-2 --tag cli", "tandem_task update builder should map kind, metadata, and parent flags");
+
+for (const body of ["", "   ", "- first item\n\nUnicode: café 🦀\n"]) {
+	const bodyArgs = buildTaskArgs({ action: "update", id: "task-1", body });
+	const flagIndex = bodyArgs.indexOf("--body");
+	assert(flagIndex >= 0 && bodyArgs[flagIndex + 1] === body, "tandem_task update should preserve exact body values without trimming");
+}
 
 for (const [field, params] of [
 	["description", { description: "new body" }],
@@ -167,6 +174,18 @@ try {
 		unsupportedUpdateRejected = err instanceof Error && err.message.includes("description") && err.message.includes("Supported update fields");
 	}
 	assert(unsupportedUpdateRejected, "unsupported update fields should fail before invoking tandem update");
+
+	const exactBody = "- first item\n\nUnicode: café 🦀\n";
+	const bodyUpdateOutput = await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: exactBody }), workspace);
+	assert(bodyUpdateOutput.includes("body: changed"), "body update should report a content-free change summary");
+	assert(!bodyUpdateOutput.includes("first item"), "body update output should not echo body contents");
+	const bodyUpdated = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	assert(bodyUpdated.data.body === exactBody, "show JSON should round-trip the exact updated body");
+	const bodyNoopOutput = await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: exactBody }), workspace);
+	assert(bodyNoopOutput.includes("No changes"), "byte-identical body replacement should be a no-op");
+	await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: "" }), workspace);
+	const bodyCleared = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
+	assert(bodyCleared.data.body === "", "an explicit empty body should clear the complete Markdown body");
 
 	const updateOutput = await runTandem(tandem, buildTaskArgs({
 		action: "update",

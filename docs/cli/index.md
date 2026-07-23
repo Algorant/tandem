@@ -35,7 +35,10 @@ tandem list
 tandem show task-1
 tandem move task-1 --state in-progress
 tandem update task-1 --priority medium --tag docs --related-file docs/index.md
+tandem update task-1 --body "$revised_body"
 ```
+
+`tandem update --body` replaces an active Task's complete Markdown body exactly; pass an explicit empty string to clear it. Unchanged body or metadata values are no-ops and do not write a timestamp or event.
 
 The default active states are `todo`, `in-progress`, and `validation`. Completion archives a task into logs instead of moving it to a permanent `done` state.
 

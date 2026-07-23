@@ -1165,7 +1165,7 @@ tandem list
 tandem show <id>
 tandem add --title ... --state todo --kind epic
 tandem move <id> --state validation
-tandem update <id> --kind epic --priority high --tag cli --parent task-1
+tandem update <id> --body <markdown> --kind epic --priority high --tag cli --parent task-1
 tandem complete <id> --summary ...
 tandem log list|show|search
 tandem search <query>
@@ -1175,7 +1175,7 @@ tandem decision list|show|add
 tandem tui
 ```
 
-This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` is the v0 metadata-edit path for active board tasks, including `parentId` changes through `--parent`; it does not update completed logs or workflow `state`. Before writing, update resolves the prospective hierarchy and rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and any reparenting that changes role or invalidates the immutable ID. Valid reparenting never renames IDs or rewrites references.
+This is protocol-facing command shape only. Detailed CLI/TUI behavior belongs in `../tandem/`. `tandem update` replaces the exact complete Markdown body through `--body` and edits supported metadata on active board tasks, including `parentId` changes through `--parent`; it does not update completed logs or workflow `state`. An omitted body means no body edit, while an explicit empty value clears it. Body and metadata mutations preserve unrelated/unknown frontmatter, update timestamps and append `task.updated` only on real changes, and never include body contents in event summaries. Before writing, update resolves the prospective hierarchy and rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and any reparenting that changes role or invalidates the immutable ID. Valid reparenting never renames IDs or rewrites references.
 
 ## Brainfile design mapping/reference only
 
