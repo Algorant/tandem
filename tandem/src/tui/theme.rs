@@ -107,6 +107,7 @@ struct ThemeColors {
     muted: Color,
     accent: Color,
     success: Color,
+    progress: Color,
     warning: Color,
     error: Color,
     border: Color,
@@ -157,6 +158,7 @@ impl TuiTheme {
                 muted: Color::Rgb(107, 114, 128),
                 accent: Color::Rgb(56, 189, 248),
                 success: Color::Rgb(74, 222, 128),
+                progress: Color::Rgb(74, 222, 128),
                 warning: Color::Rgb(250, 204, 21),
                 error: Color::Rgb(248, 113, 113),
                 border: Color::Rgb(55, 65, 81),
@@ -206,6 +208,7 @@ impl TuiTheme {
                 muted: Color::Rgb(146, 131, 116),
                 accent: Color::Rgb(142, 192, 124),
                 success: Color::Rgb(142, 192, 124),
+                progress: Color::Rgb(142, 192, 124),
                 warning: Color::Rgb(230, 191, 134),
                 error: Color::Rgb(227, 111, 99),
                 border: Color::Rgb(102, 92, 84),
@@ -375,6 +378,14 @@ impl TuiTheme {
     pub(super) fn muted_style(&self) -> Style {
         self.style(
             self.colors.muted,
+            self.panel_background(),
+            Modifier::empty(),
+        )
+    }
+
+    pub(super) fn progress_style(&self) -> Style {
+        self.style(
+            self.colors.progress,
             self.panel_background(),
             Modifier::empty(),
         )
@@ -670,6 +681,7 @@ impl TuiTheme {
             muted: Color::Reset,
             accent: Color::Reset,
             success: Color::Reset,
+            progress: Color::Reset,
             warning: Color::Reset,
             error: Color::Reset,
             border: Color::Reset,
@@ -924,6 +936,7 @@ impl TuiTheme {
             ("colors", "muted") => self.colors.muted = color,
             ("colors", "accent") => self.colors.accent = color,
             ("colors", "success") => self.colors.success = color,
+            ("colors", "progress") => self.colors.progress = color,
             ("colors", "warning") => self.colors.warning = color,
             ("colors", "error") => self.colors.error = color,
             ("colors", "border") => self.colors.border = color,

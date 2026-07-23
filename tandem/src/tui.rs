@@ -2416,61 +2416,98 @@ impl TuiApp {
         frame.render_widget(message, area);
     }
 
+    fn board_header_context(&self) -> Line<'static> {
+        let Some(doc) = self.selected_doc() else {
+            return Line::from(Span::styled("No selected item", self.theme.muted_style()));
+        };
+        let mut spans = vec![Span::styled(
+            format!("Selected {}", doc.id()),
+            self.theme.muted_style(),
+        )];
+        let is_epic = self
+            .hierarchy
+            .valid_index()
+            .is_some_and(|hierarchy| hierarchy.task_role(doc).ok() == Some(Some(TaskRole::Epic)));
+        if is_epic {
+            let (outstanding, completed) = count_task_descendants(
+                doc.id(),
+                &self.docs,
+                &self.logs,
+                &mut BTreeSet::from([doc.id().to_string()]),
+            );
+            let total = outstanding + completed;
+            if total > 0 {
+                let width = 24usize;
+                let filled = completed * width / total;
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled(
+                    "█".repeat(filled),
+                    self.theme.progress_style(),
+                ));
+                spans.push(Span::styled(
+                    "░".repeat(width - filled),
+                    self.theme.muted_style(),
+                ));
+                spans.push(Span::styled(
+                    format!(" {completed}/{total} complete"),
+                    self.theme.muted_style(),
+                ));
+            }
+        }
+        Line::from(spans)
+    }
+
     fn draw_header(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let context = match self.view {
-            TuiView::Board => self
-                .selected_doc()
-                .map(|doc| format!("Selected {}", doc.id()))
-                .unwrap_or_else(|| "No selected item".to_string()),
+            TuiView::Board => self.board_header_context(),
             TuiView::Logs => {
                 let filter = if self.log_search_filter.is_empty() {
                     String::new()
                 } else {
                     format!(" · filter `{}`", self.log_search_filter)
                 };
-                self.selected_log()
-                    .map(|doc| {
-                        format!(
-                            "Selected {} · {} {}{}",
-                            doc.id(),
-                            if is_canceled_log(doc) {
-                                "canceled"
-                            } else {
-                                "completed"
-                            },
-                            logs::completed_at_compact(
-                                doc.field("completedAt").unwrap_or("unknown")
-                            ),
-                            filter
-                        )
-                    })
-                    .unwrap_or_else(|| format!("No archived log selected{filter}"))
+                Line::from(
+                    self.selected_log()
+                        .map(|doc| {
+                            format!(
+                                "Selected {} · {} {}{}",
+                                doc.id(),
+                                if is_canceled_log(doc) {
+                                    "canceled"
+                                } else {
+                                    "completed"
+                                },
+                                logs::completed_at_compact(
+                                    doc.field("completedAt").unwrap_or("unknown")
+                                ),
+                                filter
+                            )
+                        })
+                        .unwrap_or_else(|| format!("No archived log selected{filter}")),
+                )
             }
-            TuiView::Rules => self.rules_context(),
-            TuiView::Decisions => self.decisions_context(),
+            TuiView::Rules => Line::from(self.rules_context()),
+            TuiView::Decisions => Line::from(self.decisions_context()),
         };
         let tab_area = header_inner_row(area, 0);
-        let header = Paragraph::new(vec![
-            self.view_tab_line(tab_area.width),
-            Line::from(Span::styled(context, self.theme.muted_style())),
-        ])
-        .style(self.theme.panel_style())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(Line::from(vec![
-                    Span::raw(" "),
-                    Span::styled(self.title.clone(), self.theme.title_style()),
-                    Span::raw(" · "),
-                    Span::styled(
-                        self.view.label(),
-                        self.theme.text_style().add_modifier(Modifier::BOLD),
-                    ),
-                    Span::raw(" "),
-                ]))
-                .border_style(self.theme.border_style(false))
-                .style(self.theme.panel_style()),
-        );
+        let header = Paragraph::new(vec![self.view_tab_line(tab_area.width), context])
+            .style(self.theme.panel_style())
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled(self.title.clone(), self.theme.title_style()),
+                        Span::raw(" · "),
+                        Span::styled(
+                            self.view.label(),
+                            self.theme.text_style().add_modifier(Modifier::BOLD),
+                        ),
+                        Span::raw(" "),
+                    ]))
+                    .border_style(self.theme.border_style(false))
+                    .style(self.theme.panel_style()),
+            );
         frame.render_widget(header, area);
         self.register_view_tab_hits(header_inner_row(area, 0));
     }
@@ -4730,7 +4767,6 @@ struct StateBoardEntry<'a> {
     completed_descendants: usize,
     has_active_children: bool,
     expanded: bool,
-    cross_state: bool,
     last_sibling: bool,
 }
 
@@ -4770,20 +4806,20 @@ fn state_board_entries_with_hierarchy<'a>(
     }) {
         let mut visited = BTreeSet::from([root.id().to_string()]);
         let root_matches_state = document_state_label(root) == state;
-        let subtree_matches = if filters.is_active() {
-            (root_matches_state && board_filters_match(root, filters))
-                || (is_task_doc(root)
-                    && task_subtree_matches_filters(
-                        root.id(),
-                        active_docs,
-                        completed_logs,
-                        state,
-                        filters,
-                        &mut visited,
-                    ))
-        } else {
-            root_matches_state
-        };
+        let descendant_matches_state = is_task_doc(root)
+            && task_subtree_matches_filters(
+                root.id(),
+                active_docs,
+                completed_logs,
+                state,
+                filters,
+                &mut visited,
+            );
+        // A state pane must expose every task counted by its tab, even when that task
+        // sits below an ancestor in another workflow state. Keep the ancestor path as
+        // context and automatically open the matching branch.
+        let subtree_matches =
+            (root_matches_state && board_filters_match(root, filters)) || descendant_matches_state;
         if !subtree_matches {
             continue;
         }
@@ -4798,7 +4834,10 @@ fn state_board_entries_with_hierarchy<'a>(
             (0, 0)
         };
         let has_active_children = active_descendants > 0;
-        let expanded = expanded_ids.contains(root.id());
+        // Auto-expand only an ancestor whose own state differs from this pane. A
+        // same-state hierarchy remains collapsed by default and user-controlled.
+        let expanded =
+            expanded_ids.contains(root.id()) || (descendant_matches_state && !root_matches_state);
         let role = if normalized_parent_id(root).is_some_and(|parent_id| {
             completed_logs
                 .iter()
@@ -4817,7 +4856,6 @@ fn state_board_entries_with_hierarchy<'a>(
             completed_descendants,
             has_active_children,
             expanded,
-            cross_state: document_state_label(root) != state,
             last_sibling: false,
         });
         if is_task_doc(root) {
@@ -4895,7 +4933,17 @@ fn collect_visible_state_descendants<'a>(
             &mut BTreeSet::from([child.id().to_string()]),
         );
         let has_active_children = active_descendants > 0;
-        let expanded = expanded_ids.contains(child.id());
+        let descendant_matches_state = task_subtree_matches_filters(
+            child.id(),
+            active_docs,
+            completed_logs,
+            target_state,
+            filters,
+            &mut BTreeSet::from([child.id().to_string()]),
+        );
+        let child_matches_state = document_state_label(child) == target_state;
+        let expanded =
+            expanded_ids.contains(child.id()) || (descendant_matches_state && !child_matches_state);
         let task_role = hierarchy.task_role(child).ok().flatten();
         entries.push(StateBoardEntry {
             doc: child,
@@ -4906,7 +4954,6 @@ fn collect_visible_state_descendants<'a>(
             completed_descendants,
             has_active_children,
             expanded,
-            cross_state: document_state_label(child) != target_state,
             last_sibling: false,
         });
         collect_visible_state_descendants(
@@ -5533,25 +5580,18 @@ fn state_lines_for_entry(
         String::new()
     };
     let mut chips = vec![(state_hierarchy_prefix(entry), theme.muted_style())];
+    chips.push(board_id_chip(doc, theme));
+    let state = compact_epic_state(&document_state_label(doc));
+    chips.push((
+        chip_text(&format!("{state:<4}"), theme),
+        theme.progress_chip_style(StatusTone::Muted),
+    ));
     match entry.role {
         StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, entry.task_role, theme)),
         StateBoardEntryRole::Child if entry.depth == 0 => {
             chips.extend(board_scan_chips(doc, entry.task_role, theme));
         }
-        StateBoardEntryRole::Child => {
-            let state = compact_epic_state(&document_state_label(doc));
-            if entry.cross_state {
-                chips.push((
-                    chip_text(&format!("{state:<4}"), theme),
-                    theme.progress_chip_style(StatusTone::Muted),
-                ));
-            } else {
-                chips.push((
-                    " ".repeat(text_width(&chip_text("TODO", theme))),
-                    theme.muted_style(),
-                ));
-            }
-        }
+        StateBoardEntryRole::Child => {}
     }
     let mut lines = vec![board_row_line(
         doc,
@@ -5673,7 +5713,7 @@ fn epic_row_line(
         theme.text_style().add_modifier(Modifier::BOLD)
     };
     let mut prefix = vec![Span::styled(indent.clone(), theme.muted_style())];
-    let prefix_width = match entry.role {
+    let mut prefix_width = match entry.role {
         EpicBoardEntryRole::Epic => {
             prefix.push(Span::styled(
                 chip_text("EPIC", theme),
@@ -5709,6 +5749,10 @@ fn epic_row_line(
                 + 2
         }
     };
+    let (id_chip, id_style) = board_id_chip(doc, theme);
+    prefix_width += text_width(&id_chip) + 1;
+    prefix.push(Span::styled(id_chip, id_style));
+    prefix.push(Span::raw(" "));
 
     let meta_column_width = EPIC_META_COLUMN_WIDTH
         .min(content_width.saturating_sub(prefix_width + EPIC_MIN_TITLE_WIDTH + 1));
@@ -5745,6 +5789,15 @@ fn epic_row_line(
         ));
     }
     Line::from(prefix)
+}
+
+fn board_id_chip(doc: &Document, theme: &TuiTheme) -> (String, Style) {
+    let id = doc
+        .id()
+        .strip_prefix("task-")
+        .map(|suffix| format!("#{suffix}"))
+        .unwrap_or_else(|| doc.id().to_string());
+    (chip_text(&id, theme), theme.muted_style())
 }
 
 fn compact_epic_state(state: &str) -> String {
@@ -7713,6 +7766,7 @@ mod tests {
         );
         assert_eq!(collapsed[0].active_descendants, 2);
         assert_eq!(collapsed[0].completed_descendants, 1);
+        assert!(!collapsed[0].expanded);
         assert_eq!(collapsed[1].role, StateBoardEntryRole::Root);
 
         let expanded = state_board_entries(
@@ -7758,6 +7812,54 @@ mod tests {
         assert!(rendered.contains("Epic task"));
         assert!(rendered.find("1 active").is_some());
         assert!(rendered.lines().all(|line| text_width(line) <= 42));
+    }
+
+    #[test]
+    fn in_progress_subtask_is_visible_with_its_ancestor_path() {
+        let mut epic = doc_with_state("task-1", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut task = doc_with_state("task-2", Some("todo"));
+        task.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut subtask = doc_with_state("task-2-1", Some("in-progress"));
+        subtask
+            .fields
+            .insert("parentId".to_string(), "task-2".to_string());
+        let docs = vec![epic, task, subtask];
+
+        let entries = state_board_entries(
+            &docs,
+            &[],
+            "in-progress",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+
+        assert_eq!(
+            entries
+                .iter()
+                .map(|entry| (entry.doc.id(), entry.depth))
+                .collect::<Vec<_>>(),
+            vec![("task-1", 0), ("task-2", 1), ("task-2-1", 2)]
+        );
+        assert!(entries[0].expanded);
+        assert!(entries[1].expanded);
+        assert_eq!(document_state_label(entries[2].doc), "in-progress");
+        let subtask_row = state_lines_for_entry(
+            &entries[2],
+            &relationship_context_for_doc(entries[2].doc, &docs, &[]),
+            &TuiTheme::default_dark(),
+            100,
+            false,
+            0,
+            false,
+            false,
+        )
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+        assert!(subtask_row.contains("WIP"), "{subtask_row}");
     }
 
     #[test]
@@ -8088,7 +8190,7 @@ mod tests {
     }
 
     #[test]
-    fn state_board_rows_keep_identity_quiet_and_align_cross_state_children() {
+    fn state_board_rows_label_subtasks_and_align_child_titles() {
         let theme = TuiTheme::default_dark();
         let mut parent = doc_with_state("task-20", Some("todo"));
         parent
@@ -8138,9 +8240,11 @@ mod tests {
         assert!(parent_line.contains("2 active"));
         assert!(!same_line.contains("task-20-1"));
         assert!(!cross_line.contains("task-20-2"));
+        assert!(same_line.contains("#20-1"));
+        assert!(cross_line.contains("#20-2"));
         assert!(!same_line.contains("SUB"));
         assert!(!cross_line.contains("SUB"));
-        assert!(!same_line.contains("TODO"));
+        assert!(same_line.contains("TODO"));
         assert!(cross_line.contains("WIP"));
         assert_eq!(
             same_line.find("Same state child"),
