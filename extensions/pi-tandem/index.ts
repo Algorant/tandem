@@ -66,8 +66,11 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	reason?: string;
 };
 
+export const ACCORD_ACTIONS = ["claim", "deliver", "accept", "rework", "block", "fail"] as const;
+export type AccordAction = (typeof ACCORD_ACTIONS)[number];
+
 export type AccordToolParams = CwdFlag & {
-	action: "claim" | "deliver" | "accept" | "rework" | "block" | "fail";
+	action: AccordAction;
 	id: string;
 	assignee?: string;
 	summary?: string;
@@ -284,7 +287,11 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 }
 
 export function buildAccordArgs(params: AccordToolParams): string[] {
-	const args = ["accord", params.action, requireString(params.id, "tandem_accord requires id")];
+	const action = requireString(params.action, "tandem_accord requires action");
+	if (!(ACCORD_ACTIONS as readonly string[]).includes(action)) {
+		throw new Error(`unsupported tandem_accord action: ${action}`);
+	}
+	const args = ["accord", action, requireString(params.id, "tandem_accord requires id")];
 	addOptionalFlag(args, "--assignee", params.assignee);
 	addOptionalFlag(args, "--summary", params.summary);
 	addOptionalFlag(args, "--reviewer", params.reviewer);
@@ -591,6 +598,22 @@ export const tandemTaskParameters = Type.Object({
 	reason: Type.Optional(Type.String({ description: "Required for action=cancel; maps to `tandem cancel --reason` and is retained in the canceled Log summary." })),
 });
 
+export const tandemAccordParameters = Type.Object({
+	...cwdSchema,
+	action: StringEnum(ACCORD_ACTIONS),
+	id: Type.String(),
+	assignee: Type.Optional(Type.String()),
+	summary: Type.Optional(Type.String()),
+	reviewer: Type.Optional(Type.String()),
+	note: Type.Optional(Type.String()),
+	reason: Type.Optional(Type.String()),
+	deliverables: Type.Optional(Type.Array(Type.String())),
+	validations: Type.Optional(Type.Array(Type.String({ description: "Validation commands/descriptions; maps to repeated `--validation`." }))),
+	constraints: Type.Optional(Type.Array(Type.String())),
+	evidence: Type.Optional(Type.Array(Type.String())),
+	filesChanged: Type.Optional(Type.Array(Type.String())),
+});
+
 export function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
 	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update for supported active Task edits: body replaces the exact complete Markdown body; title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles edit metadata. State remains action=move, description remains an add-time convenience field, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Use tandem_task action=cancel only when the user or orchestrator explicitly asks to archive abandoned or mistaken work. Provide a reason; Tandem preserves an auditable canceled Log and rejects cancellation while active descendants remain.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
@@ -678,21 +701,7 @@ export default function piTandem(pi: ExtensionAPI) {
 			"Deliver finished agent work into the Validation workflow state for acceptance/rework decisions; do not treat automated validation evidence as human acceptance.",
 			"Do not accept, complete, or otherwise finalize Tandem work unless the user/orchestrator explicitly asks for that lifecycle transition.",
 		],
-		parameters: Type.Object({
-			...cwdSchema,
-			action: StringEnum(["claim", "deliver", "accept", "rework", "block", "fail"] as const),
-			id: Type.String(),
-			assignee: Type.Optional(Type.String()),
-			summary: Type.Optional(Type.String()),
-			reviewer: Type.Optional(Type.String()),
-			note: Type.Optional(Type.String()),
-			reason: Type.Optional(Type.String()),
-			deliverables: Type.Optional(Type.Array(Type.String())),
-			validations: Type.Optional(Type.Array(Type.String({ description: "Validation commands/descriptions; maps to repeated `--validation`." }))),
-			constraints: Type.Optional(Type.Array(Type.String())),
-			evidence: Type.Optional(Type.Array(Type.String())),
-			filesChanged: Type.Optional(Type.Array(Type.String())),
-		}),
+		parameters: tandemAccordParameters,
 		async execute(_toolCallId, params, signal, onUpdate, ctx) {
 			try {
 				return await executeTandemTool("tandem_accord", buildAccordArgs(params as AccordToolParams), ctx.cwd, params, signal, onUpdate);

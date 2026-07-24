@@ -24,6 +24,7 @@ const ACCORD_STATUSES: &[&str] = &[
     "blocked",
 ];
 const LEGACY_ACCORD_STATUSES: &[&str] = &["ready"];
+const ACCORD_ACTIONS: &[&str] = &["claim", "deliver", "accept", "rework", "block", "fail"];
 const REVIEW_STATUSES: &[&str] = &[
     "not-ready",
     "pending",
@@ -690,7 +691,7 @@ fn print_help() {
     println!("  tandem cancel <id> --reason <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem log list|show|search ...");
-    println!("  tandem accord claim|deliver|accept|rework|block|fail ...");
+    println!("  tandem accord {} ...", accord_actions_help());
     println!("  tandem rules list|add|edit|delete ...");
     println!("  tandem decision list|show|add ... [--status <status>] [--date <date>]");
     println!("  tandem tui");
@@ -1956,11 +1957,23 @@ fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
     Ok(())
 }
 
+fn accord_actions_help() -> String {
+    ACCORD_ACTIONS.join("|")
+}
+
+fn accord_actions_usage() -> String {
+    let (last, leading) = ACCORD_ACTIONS
+        .split_last()
+        .expect("accord actions must not be empty");
+    format!("{}, or {last}", leading.join(", "))
+}
+
 fn cmd_accord(args: &[String]) -> Result<(), CliError> {
     let Some((action, rest)) = args.split_first() else {
-        return Err(CliError::usage(
-            "tandem accord requires ready, claim, deliver, accept, rework, block, or fail",
-        ));
+        return Err(CliError::usage(format!(
+            "tandem accord requires {}",
+            accord_actions_usage()
+        )));
     };
     let status = match action.as_str() {
         "claim" => "claimed",
@@ -1971,7 +1984,8 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
         "fail" => "failed",
         other => {
             return Err(CliError::usage(format!(
-                "unknown accord subcommand `{other}`; use claim, deliver, accept, rework, block, or fail"
+                "unknown accord subcommand `{other}`; use {}",
+                accord_actions_usage()
             )))
         }
     };
@@ -3855,13 +3869,11 @@ fn validate_accord_transition(action: &str, previous_status: &str) -> Result<(),
                 "accord rework requires current accord.status=delivered; current status is {previous_status}"
             )))
         }
-        "ready" | "claim" | "deliver" | "block" | "fail"
-            if previous_status == "accepted" && action != "ready" =>
-        {
-            Err(CliError::user(
-                "accepted accord cannot transition without resetting with `tandem accord ready`".to_string(),
-            ))
-        }
+        "claim" | "deliver" | "block" | "fail" if previous_status == "accepted" => Err(
+            CliError::user(format!(
+                "accepted accord cannot transition with `tandem accord {action}`"
+            )),
+        ),
         _ => Ok(()),
     }
 }
@@ -3874,16 +3886,6 @@ fn apply_accord_action(
 ) {
     accord.status = status.to_string();
     match action {
-        "ready" => {
-            accord.claimed_at = None;
-            accord.delivered_at = None;
-            accord.summary = None;
-            accord.evidence.clear();
-            accord.files_changed.clear();
-            accord.reviewer = None;
-            accord.note = None;
-            accord.reason = None;
-        }
         "claim" => {
             accord.claimed_at = Some(accord.updated_at.clone());
             accord.delivered_at = None;
@@ -5791,6 +5793,33 @@ mod tests {
             version_text(),
             format!("tandem {}", env!("CARGO_PKG_VERSION"))
         );
+    }
+
+    #[test]
+    fn accord_usage_lists_only_current_actions() {
+        assert_eq!(
+            ACCORD_ACTIONS,
+            ["claim", "deliver", "accept", "rework", "block", "fail"]
+        );
+        assert_eq!(
+            accord_actions_help(),
+            "claim|deliver|accept|rework|block|fail"
+        );
+
+        let bare_error = cmd_accord(&[]).unwrap_err();
+        assert_eq!(bare_error.code, 2);
+        assert_eq!(
+            bare_error.message,
+            "tandem accord requires claim, deliver, accept, rework, block, or fail"
+        );
+        assert!(!bare_error.message.contains("ready"));
+
+        let retired_error = cmd_accord(&["ready".to_string()]).unwrap_err();
+        assert_eq!(retired_error.code, 2);
+        assert!(retired_error
+            .message
+            .contains("unknown accord subcommand `ready`"));
+        assert!(!retired_error.message.contains("use ready"));
     }
 
     #[test]

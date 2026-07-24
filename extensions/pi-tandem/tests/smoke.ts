@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+	ACCORD_ACTIONS,
 	buildAccordArgs,
 	buildDecisionArgs,
 	buildInitArgs,
@@ -11,6 +12,7 @@ import {
 	buildRulesArgs,
 	buildSearchArgs,
 	buildTaskArgs,
+	tandemAccordParameters,
 	tandemTaskParameters,
 } from "../index";
 
@@ -101,6 +103,20 @@ assert(taskSchemaProperties.body, "tandem_task schema should expose exact body r
 assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for canonical hierarchy creation");
 assert(taskSchemaProperties.kind, "tandem_task schema should expose kind for Epic creation");
 assert(!taskSchemaProperties.subtasks, "tandem_task schema should not expose deprecated inline subtask authoring");
+
+const acceptedAccordActions = ["claim", "deliver", "accept", "rework", "block", "fail"];
+assert(JSON.stringify(ACCORD_ACTIONS) === JSON.stringify(acceptedAccordActions), "tandem_accord should expose only the accepted action list");
+const accordSchemaActions = (tandemAccordParameters as any).properties?.action?.enum;
+assert(JSON.stringify(accordSchemaActions) === JSON.stringify(acceptedAccordActions), "tandem_accord schema should expose only the accepted action list");
+const claimAccordArgs = buildAccordArgs({ action: "claim", id: "task-1", assignee: "pi-tandem-smoke" });
+assert(claimAccordArgs.join(" ") === "accord claim task-1 --assignee pi-tandem-smoke", "tandem_accord should build accepted actions");
+let retiredReadyRejected = false;
+try {
+	buildAccordArgs({ action: "ready", id: "task-1" } as any);
+} catch (err) {
+	retiredReadyRejected = err instanceof Error && err.message.includes("unsupported tandem_accord action: ready");
+}
+assert(retiredReadyRejected, "tandem_accord builder should reject the retired ready action");
 
 const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
 assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");

@@ -35,7 +35,7 @@ Current MVP tools:
 
 - `tandem_status` — `tandem --help`, workspace discovery, and optional `tandem list --json` health check.
 - `tandem_task` — `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`; update supports presence-sensitive exact Markdown `body` replacement, cancellation requires a reason and archives a canceled Log, while `kind` and `parent` pass directly to Tandem. The CLI owns canonical role resolution and allocation: Epics are root global tasks, direct Epic children are global Tasks, and direct Task children are parent-derived leaf Subtasks. Deprecated inline checklist authoring is not exposed or forwarded.
-- `tandem_accord` — `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- `tandem_accord` — `claim`, `deliver`, `accept`, `rework`, `block`, `fail`. Legacy persisted `accord.status: ready` remains readable but is not an action.
 - `tandem_log` — `list`, `show`, `search`.
 - `tandem_rules` — `list`, `add`, `edit`, `delete`.
 - `tandem_decision` — `list`, `show`, `add` for first-class decisions, including ADR-compatible durable records that stay `type: decision`.
