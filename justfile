@@ -83,18 +83,19 @@ site-build: _check-docs-node
 	bun install --frozen-lockfile
 	bun run build
 
-# Bump tandem to VERSION, validate, commit, tag, and push main + tag.
-# Usage: just release 0.2.1
-# Pushing the tandem-v* tag triggers cargo-dist release automation; curate tandem/GITHUB_RELEASE_NOTES.md for human-facing notes before tagging.
+# Validate a prepared VERSION, tag it, publish it, and verify the GitHub Release
+# and AUR update.
+# Usage: just release 0.6.5
+# Before running, add one meaningful ## VERSION section to RELEASES.md.
 release VERSION:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	version="{{VERSION}}"
 	case "$version" in
-		v*) echo "Pass the bare semver version, e.g. 0.2.1, not v0.2.1" >&2; exit 2 ;;
+		v*) echo "Pass the bare semver version, e.g. 0.6.5, not v0.6.5" >&2; exit 2 ;;
 	esac
 	if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-		echo "VERSION must be semver like 0.2.1" >&2
+		echo "VERSION must be semver like 0.6.5" >&2
 		exit 2
 	fi
 	if [[ "$(git branch --show-current)" != "main" ]]; then
@@ -111,32 +112,16 @@ release VERSION:
 		echo "Tag ${tag} already exists" >&2
 		exit 2
 	fi
-	python3 - "$version" <<-'PY'
-	import pathlib, re, sys
-	version = sys.argv[1]
-	cargo = pathlib.Path("tandem/Cargo.toml")
-	text = cargo.read_text()
-	text, count = re.subn(r'(?m)^version = "[^"]+"$', f'version = "{version}"', text, count=1)
-	if count != 1:
-	    raise SystemExit("failed to update tandem/Cargo.toml version")
-	cargo.write_text(text)
 
-	release = pathlib.Path("tandem/RELEASE.md")
-	text = release.read_text()
-	text, count = re.subn(r'## v[0-9]+\.[0-9]+\.[0-9]+ \(recommended tag: `tandem-v[0-9]+\.[0-9]+\.[0-9]+`\)', f'## v{version} (recommended tag: `tandem-v{version}`)', text, count=1)
-	if count != 1:
-	    raise SystemExit("failed to update tandem/RELEASE.md heading")
-	text = re.sub(r'tandem-v[0-9]+\.[0-9]+\.[0-9]+', f'tandem-v{version}', text)
-	release.write_text(text)
+	notes_file="$(mktemp)"
+	manifest_file="$(mktemp)"
+	release_file="$(mktemp)"
+	trap 'rm -f "$notes_file" "$manifest_file" "$release_file"' EXIT
+	python3 scripts/release_checks.py notes "$version" "$notes_file"
+	python3 scripts/release_checks.py cargo "$version"
+	cargo dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
+	python3 scripts/release_checks.py manifest "$notes_file" "$manifest_file"
 
-	notes = pathlib.Path("tandem/GITHUB_RELEASE_NOTES.md")
-	text = notes.read_text()
-	text, count = re.subn(r'(?m)^# Tandem v[0-9]+\.[0-9]+\.[0-9]+$', f'# Tandem v{version}', text, count=1)
-	if count != 1:
-	    raise SystemExit("failed to update tandem/GITHUB_RELEASE_NOTES.md heading")
-	text = re.sub(r'tandem-v[0-9]+\.[0-9]+\.[0-9]+', f'tandem-v{version}', text)
-	notes.write_text(text)
-	PY
 	cd tandem
 	cargo fmt --check
 	cargo test
@@ -153,8 +138,31 @@ release VERSION:
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 	git diff --check
-	git add tandem/Cargo.toml tandem/Cargo.lock tandem/RELEASE.md tandem/GITHUB_RELEASE_NOTES.md
-	git commit -m "Release tandem v${version}"
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main
 	git push origin "$tag"
+
+	repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+	wait_for_workflow() {
+		local workflow="$1"
+		local run_id=""
+		local runs=""
+		for _ in {1..180}; do
+			runs="$(gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,createdAt)"
+			run_id="$(jq -r --arg tag "$tag" '[.[] | select(.headBranch == $tag)] | sort_by(.createdAt) | last | .databaseId // empty' <<<"$runs")"
+			if [[ -n "$run_id" ]]; then
+				echo "Waiting for $workflow run $run_id for $tag"
+				gh run watch "$run_id" --repo "$repo" --exit-status
+				return
+			fi
+			sleep 10
+		done
+		echo "Timed out waiting for $workflow to start for $tag" >&2
+		exit 1
+	}
+	wait_for_workflow "Release"
+
+	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
+	python3 scripts/release_checks.py published "$notes_file" "$release_file"
+	wait_for_workflow "Update tandem-bin AUR package"
+	echo "Release $tag, GitHub assets/notes, and the tandem-bin AUR workflow verified."

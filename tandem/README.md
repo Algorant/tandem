@@ -76,12 +76,12 @@ The earlier `add --subtask <title>` inline-checklist authoring path is deprecate
 
 ## Release and install target
 
-Current release: `tandem` package version `0.6.0`, `tandem` binary, annotated git tag `tandem-v0.6.0`.
+Current release: `tandem` package version `0.6.4`, `tandem` binary, annotated git tag `tandem-v0.6.4`.
 
 Downstream integrations such as `pi-tandem` can install the released CLI with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.0 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.4 --path tandem --locked
 ```
 
 For local checkout installs before a tag is published:
@@ -91,7 +91,7 @@ cargo install --path tandem --locked
 tandem --version
 ```
 
-`pi-tandem` should locate the installed binary through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Concise public GitHub Release notes are curated in `GITHUB_RELEASE_NOTES.md`; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
+`pi-tandem` should locate the installed binary through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
 
 ## Implemented TUI themes and keys
 

@@ -1,33 +1,18 @@
 # Tandem CLI/TUI release checklist
 
-## v0.6.4 (recommended tag: `tandem-v0.6.4`)
+## Release procedure
 
 Package scope: the `tandem` Rust package in this directory, which builds the user-facing `tandem` binary.
 
-This file is the reusable release checklist and validation record. Do not use it directly as the GitHub Release body. Public GitHub Release notes live in `GITHUB_RELEASE_NOTES.md` so each release can stay concise and version-specific while this checklist keeps install, validation, and operational details available.
+`RELEASES.md` at the repository root is the canonical curated release history. cargo-dist natively discovers it and appends the selected `## X.Y.Z` section to the GitHub Release body with generated install/download information. Keep reusable validation, installation, and operational details in this checklist rather than in public release notes.
 
-### Public GitHub Release notes workflow
+### Curated release notes workflow
 
-Recommendation: maintain curated, per-release public notes in `tandem/GITHUB_RELEASE_NOTES.md`, and maintain reusable validation/install procedure details in this checklist.
-
-| Option | Fit for Tandem |
-| --- | --- |
-| Curated per-release notes | Best default. Produces concise, useful highlights and known limitations, and lets the release owner group work by user impact instead of commit order. |
-| Generated changelog from commits/tags | Useful as an internal drafting aid, but noisy unless commit hygiene and grouping are consistently release-note quality. |
-| GitHub auto-generated release notes (`gh release create --generate-notes`) | Useful as a compare/draft source and can be configured with `.github/release.yml`, but should be reviewed before publishing because PR labels/titles may not explain CLI/TUI user impact. |
-| Reusable checklist as release body | Avoid. It preserves validation detail, but makes public releases verbose and repeats boilerplate. Keep it in this file instead. |
-
-Release flow:
-
-1. Update `GITHUB_RELEASE_NOTES.md` with version-specific highlights, user-facing changes, a dedicated bug-fix section when applicable, and any current limitations users need to know. Public release notes must not include installation commands or installation guidance.
-2. Group release notes by product surface when a release includes distinct kinds of work. Prefer sections such as `Protocol`, `CLI`, `TUI`, `Docs`, and `Integrations` over a flat commit list when multiple areas changed.
-3. Keep reusable validation commands, `pi-tandem` install notes, and operational checks in this checklist.
-4. Optionally compare against generated notes from commits/PRs before publishing; copy only user-relevant items into the curated public notes.
-5. Do not include a `Not included` section in public release notes. Readers do not have context for rejected, shelved, or never-shipped work; mention only shipped behavior and current user-facing limitations when useful.
-6. Run `just release <version>`, which pushes the release commit and `tandem-v<version>` tag; the cargo-dist GitHub Actions workflow is the official binary artifact path and creates the GitHub Release with installer, archives, and checksums.
-7. Verify the GitHub Release contains the expected cargo-dist assets for the supported initial targets: Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon. Windows artifacts are not published initially.
-8. Smoke-test the primary installer command: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
-9. After the Release workflow succeeds, verify the `Update tandem-bin AUR package` workflow updates the `tandem-bin` AUR package from the published Linux x86_64 archive and `sha256.sum`. See `../docs/packaging/aur-tandem-bin.md` for secret setup, AUR remote setup, and recovery steps.
+1. While preparing a release, update `tandem/Cargo.toml` to `X.Y.Z` and add exactly one meaningful `## X.Y.Z` section to root `RELEASES.md`. Group user-facing notes by product surface when useful, use a dedicated `Fixed` section for fixes, and mention only shipped behavior or current user-facing limitations. Do not add installation instructions or a required rolling Unreleased section.
+2. Commit the prepared version and release notes. Keep detailed task, commit, and completed-log history in Tandem; use `RELEASES.md` only for concise curated release history. A larger future release may be drafted there ahead of time.
+3. Run `just release X.Y.Z` from a clean local `main` checkout. It rejects a missing, duplicate, or empty matching release section; a requested version that disagrees with `Cargo.toml`; and a cargo-dist announcement body that omits the curated notes before it creates the tag.
+4. `just release` then runs the repository validation suite, pushes `main` and `tandem-vX.Y.Z`, waits for the Release workflow, and checks the published non-draft/non-prerelease GitHub Release body and assets. It also waits for the `Update tandem-bin AUR package` workflow to succeed.
+5. Smoke-test the primary installer command after automated publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
 
 ### Current capabilities
 
@@ -124,40 +109,28 @@ TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/re
 TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 git diff --check
 
-# After the tag workflow publishes the GitHub Release:
-gh release view tandem-v0.6.4 --json tagName,assets
-for asset in \
-  tandem-installer.sh \
-  tandem-x86_64-unknown-linux-gnu.tar.xz \
-  tandem-aarch64-unknown-linux-gnu.tar.xz \
-  tandem-x86_64-apple-darwin.tar.xz \
-  tandem-aarch64-apple-darwin.tar.xz \
-  sha256.sum; do
-  gh release download tandem-v0.6.4 --pattern "$asset" --dir /tmp/tandem-release-check
-  test -s "/tmp/tandem-release-check/$asset"
-done
-grep -E 'tandem-(x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|x86_64-apple-darwin|aarch64-apple-darwin)\.tar\.xz' /tmp/tandem-release-check/sha256.sum
+# `just release X.Y.Z` performs these checks before reporting success:
+# - cargo-dist's generated announcement body contains the matching RELEASES.md section
+# - the published GitHub Release is not draft/prerelease and has that section plus all expected assets
+# - the Update tandem-bin AUR package workflow succeeds
+#
+# For an independent post-publication inspection, substitute the actual tag:
+tag=tandem-vX.Y.Z
+gh release view "$tag" --json isDraft,isPrerelease,body,assets
+gh run list --workflow Release --limit 20
+gh run list --workflow "Update tandem-bin AUR package" --limit 20
 curl -fsSL https://trytandem.dev/install.sh | sh
 tandem --version
-# Verify the AUR workflow completed, or manually re-run it for tandem-v0.6.4 and confirm PKGBUILD/.SRCINFO updated tandem-bin.
 ```
 
 ### Release commands
 
 ```text
-just release 0.6.0
+just release X.Y.Z
 ```
 
-The pushed `tandem-v0.6.4` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon, per-artifact SHA-256 files, and `sha256.sum`. Windows artifacts are not part of the initial release target set.
+The pushed `tandem-vX.Y.Z` tag triggers `.github/workflows/release.yml`, which uses cargo-dist to create the GitHub Release and upload `tandem-installer.sh`, platform archives for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon, per-artifact SHA-256 files, and `sha256.sum`. Windows artifacts are not part of the initial release target set.
 
-If a release workflow fails before creating a GitHub Release, fix the release configuration, delete the failed remote tag, and rerun `just release 0.6.0` from the corrected commit. For example:
+If a release workflow fails before creating a GitHub Release, fix the release configuration, delete the failed remote tag, and rerun `just release X.Y.Z` from the corrected commit. Do not delete or reuse a tag if a GitHub Release or published artifacts were created; publish a follow-up patch version instead.
 
-```text
-git push origin :refs/tags/tandem-v0.6.4
-git tag -d tandem-v0.6.4
-just release 0.6.0
-```
-
-Do not delete or reuse the tag if a GitHub Release or published artifacts were created; publish a follow-up patch version instead.
-
-After that workflow completes successfully, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for the x86_64-only initial `tandem-bin` package, and pushes the AUR Git remote with the configured SSH key. If the AUR update needs to be retried, run the workflow manually with the same `tandem-v0.6.4` tag.
+After the Release workflow succeeds, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for the x86_64-only initial `tandem-bin` package, and pushes the AUR Git remote. `just release` treats failure or absence of this workflow as a failed release; for recovery details see `../docs/packaging/aur-tandem-bin.md`.
