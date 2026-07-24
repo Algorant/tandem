@@ -57,6 +57,34 @@ def check_manifest(notes_path: pathlib.Path, manifest_path: pathlib.Path) -> Non
         fail("cargo-dist announcement body does not include the curated RELEASES.md section")
 
 
+def select_workflow_run(
+    role: str,
+    runs: list[dict],
+    tag: str,
+    release_commit: str,
+    not_before: str,
+) -> dict | None:
+    if role == "release":
+        candidates = [
+            run
+            for run in runs
+            if run.get("event") == "push"
+            and run.get("headBranch") == tag
+            and run.get("headSha") == release_commit
+        ]
+    elif role == "aur":
+        candidates = [
+            run
+            for run in runs
+            if run.get("event") == "workflow_run"
+            and run.get("headSha") == release_commit
+            and run.get("createdAt", "") >= not_before
+        ]
+    else:
+        fail(f"unknown workflow role: {role}")
+    return max(candidates, key=lambda run: run.get("createdAt", ""), default=None)
+
+
 def check_published_release(notes_path: pathlib.Path, release_path: pathlib.Path) -> None:
     notes = notes_path.read_text(encoding="utf-8").strip()
     release = json.loads(release_path.read_text(encoding="utf-8"))
@@ -77,7 +105,7 @@ def check_published_release(notes_path: pathlib.Path, release_path: pathlib.Path
 
 def main() -> None:
     if len(sys.argv) < 2:
-        fail("usage: release_checks.py {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE}")
+        fail("usage: release_checks.py {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE|select-run ROLE RUNS TAG COMMIT NOT_BEFORE}")
     command, *args = sys.argv[1:]
     if command == "notes" and len(args) == 2:
         pathlib.Path(args[1]).write_text(release_section(args[0]) + "\n", encoding="utf-8")
@@ -87,8 +115,18 @@ def main() -> None:
         check_manifest(pathlib.Path(args[0]), pathlib.Path(args[1]))
     elif command == "published" and len(args) == 2:
         check_published_release(pathlib.Path(args[0]), pathlib.Path(args[1]))
+    elif command == "select-run" and len(args) == 5:
+        selected = select_workflow_run(
+            args[0],
+            json.loads(pathlib.Path(args[1]).read_text(encoding="utf-8")),
+            args[2],
+            args[3],
+            args[4],
+        )
+        if selected:
+            print(json.dumps(selected))
     else:
-        fail("usage: release_checks.py {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE}")
+        fail("usage: release_checks.py {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE|select-run ROLE RUNS TAG COMMIT NOT_BEFORE}")
 
 
 if __name__ == "__main__":

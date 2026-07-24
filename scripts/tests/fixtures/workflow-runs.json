@@ -1,0 +1,56 @@
+{
+  "release": [
+    {
+      "databaseId": 9001,
+      "event": "push",
+      "headBranch": "tandem-v0.6.5",
+      "headSha": "release-commit",
+      "createdAt": "2026-07-25T10:00:00Z",
+      "updatedAt": "2026-07-25T10:03:00Z"
+    },
+    {
+      "databaseId": 9002,
+      "event": "push",
+      "headBranch": "tandem-v0.6.5",
+      "headSha": "wrong-commit",
+      "createdAt": "2026-07-25T10:01:00Z"
+    },
+    {
+      "databaseId": 9003,
+      "event": "push",
+      "headBranch": "tandem-v0.6.4",
+      "headSha": "release-commit",
+      "createdAt": "2026-07-25T10:02:00Z"
+    }
+  ],
+  "aur": [
+    {
+      "databaseId": 9101,
+      "event": "workflow_dispatch",
+      "headBranch": "main",
+      "headSha": "release-commit",
+      "createdAt": "2026-07-25T10:03:00Z"
+    },
+    {
+      "databaseId": 9102,
+      "event": "workflow_run",
+      "headBranch": "main",
+      "headSha": "release-commit",
+      "createdAt": "2026-07-25T09:59:59Z"
+    },
+    {
+      "databaseId": 9103,
+      "event": "workflow_run",
+      "headBranch": "main",
+      "headSha": "other-commit",
+      "createdAt": "2026-07-25T10:03:01Z"
+    },
+    {
+      "databaseId": 9104,
+      "event": "workflow_run",
+      "headBranch": "main",
+      "headSha": "release-commit",
+      "createdAt": "2026-07-25T10:03:02Z"
+    }
+  ]
+}

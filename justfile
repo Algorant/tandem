@@ -116,7 +116,8 @@ release VERSION:
 	notes_file="$(mktemp)"
 	manifest_file="$(mktemp)"
 	release_file="$(mktemp)"
-	trap 'rm -f "$notes_file" "$manifest_file" "$release_file"' EXIT
+	runs_file="$(mktemp)"
+	trap 'rm -f "$notes_file" "$manifest_file" "$release_file" "$runs_file"' EXIT
 	python3 scripts/release_checks.py notes "$version" "$notes_file"
 	python3 scripts/release_checks.py cargo "$version"
 	cargo dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
@@ -143,16 +144,23 @@ release VERSION:
 	git push origin "$tag"
 
 	repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+	release_commit="$(git rev-parse "${tag}^{}")"
+	release_run_completed_at=""
 	wait_for_workflow() {
-		local workflow="$1"
+		local role="$1"
+		local workflow="$2"
+		local selection=""
 		local run_id=""
-		local runs=""
 		for _ in {1..180}; do
-			runs="$(gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,createdAt)"
-			run_id="$(jq -r --arg tag "$tag" '[.[] | select(.headBranch == $tag)] | sort_by(.createdAt) | last | .databaseId // empty' <<<"$runs")"
-			if [[ -n "$run_id" ]]; then
+			gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,headSha,event,createdAt,updatedAt > "$runs_file"
+			selection="$(python3 scripts/release_checks.py select-run "$role" "$runs_file" "$tag" "$release_commit" "$release_run_completed_at")"
+			if [[ -n "$selection" ]]; then
+				run_id="$(jq -r .databaseId <<<"$selection")"
 				echo "Waiting for $workflow run $run_id for $tag"
 				gh run watch "$run_id" --repo "$repo" --exit-status
+				if [[ "$role" == "release" ]]; then
+					release_run_completed_at="$(gh run view "$run_id" --repo "$repo" --json updatedAt --jq .updatedAt)"
+				fi
 				return
 			fi
 			sleep 10
@@ -160,9 +168,9 @@ release VERSION:
 		echo "Timed out waiting for $workflow to start for $tag" >&2
 		exit 1
 	}
-	wait_for_workflow "Release"
+	wait_for_workflow release "Release"
 
 	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
 	python3 scripts/release_checks.py published "$notes_file" "$release_file"
-	wait_for_workflow "Update tandem-bin AUR package"
+	wait_for_workflow aur "Update tandem-bin AUR package"
 	echo "Release $tag, GitHub assets/notes, and the tandem-bin AUR workflow verified."
