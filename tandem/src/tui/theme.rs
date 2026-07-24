@@ -1586,6 +1586,25 @@ in_progress = "state-active"
     }
 
     #[test]
+    fn verdigris_example_maps_active_and_validation_states_but_leaves_todo_muted() {
+        let mut theme = TuiTheme::verdigris();
+        let fallback = theme.state_chip_style("todo");
+        let warnings =
+            theme.apply_theme_content(include_str!("../../examples/themes/verdigris.toml"));
+
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert_eq!(
+            theme.state_badges.get("in-progress"),
+            Some(&Color::Rgb(201, 111, 61))
+        );
+        assert_eq!(
+            theme.state_badges.get("validation"),
+            Some(&Color::Rgb(173, 130, 148))
+        );
+        assert_eq!(theme.state_chip_style("todo"), fallback);
+    }
+
+    #[test]
     fn aliases_must_precede_their_uses_in_a_theme_file() {
         let mut theme = TuiTheme::default_dark();
         let warnings = theme.apply_theme_content(

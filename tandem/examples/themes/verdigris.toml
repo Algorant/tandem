@@ -16,3 +16,12 @@
 base = "verdigris"
 name = "verdigris"
 badge_style = "muted"
+
+# Board workflow-state chips. TODO intentionally keeps the muted fallback.
+[aliases]
+burnt-copper = "#c96f3d"
+heather = "#ad8294"
+
+[badges.states]
+in-progress = "burnt-copper"
+validation = "heather"

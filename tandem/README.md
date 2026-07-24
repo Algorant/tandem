@@ -145,6 +145,8 @@ cp tandem/examples/themes/default-dark.toml ~/.config/tandem/themes/default-dark
 cp tandem/examples/themes/verdigris.toml ~/.config/tandem/themes/verdigris.toml
 ```
 
+The Verdigris example maps `in-progress` to burnt copper (`#c96f3d`) and `validation` to heather (`#ad8294`) through readable aliases; `todo` deliberately retains the muted fallback.
+
 A user theme file may inherit from a built-in and provide only overrides:
 
 ```toml
