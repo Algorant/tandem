@@ -71,7 +71,7 @@ GitHub Pages cannot express this redirect from the repository, and `site/public/
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.4 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.5 --path tandem --locked
 tandem --version
 ```
 

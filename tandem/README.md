@@ -76,12 +76,12 @@ The earlier `add --subtask <title>` inline-checklist authoring path is deprecate
 
 ## Release and install target
 
-Current release: `tandem` package version `0.6.4`, `tandem` binary, annotated git tag `tandem-v0.6.4`.
+Current release: `tandem` package version `0.6.5`, `tandem` binary, annotated git tag `tandem-v0.6.5`.
 
 Downstream integrations such as `pi-tandem` can install the released CLI with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.4 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.5 --path tandem --locked
 ```
 
 For local checkout installs before a tag is published:
