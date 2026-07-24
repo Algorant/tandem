@@ -120,6 +120,23 @@ theme = "my-custom-dark"
 accent = "#8ec07c"
 ```
 
+Color aliases declared earlier in the same theme file can be reused by all color settings, including workflow-state chips. State IDs are not limited to the defaults; add each configured ID that needs a distinct override. Omitted IDs keep the muted fallback and all badge styles retain their existing shape/labels (`TODO`, `WIP`, `VAL`, and compact equivalents):
+
+```toml
+[aliases]
+state-todo = "#7aa2f7"
+state-active = "#e0af68"
+state-validation = "#bb9af7"
+
+[colors]
+accent = "state-active"
+
+[badges.states]
+todo = "state-todo"
+in-progress = "state-active"
+validation = "state-validation"
+```
+
 Install example presets as user themes with:
 
 ```text
@@ -147,6 +164,8 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - `[board.badges]` or legacy `[badges]`: `disabled` (list of built-in badge IDs or configured tag names to suppress)
 - `[board.badges.tags.<tag>]` or legacy `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, or `muted`) for project/user opt-in tag badges
 - `[badges.accord]`: legacy `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
+- `[aliases]`: named colors declared before their uses in the same file; aliases may reuse an earlier alias
+- `[badges.states]`: arbitrary configured workflow state IDs mapped to colors; IDs without an entry use the existing muted fallback
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
 In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.

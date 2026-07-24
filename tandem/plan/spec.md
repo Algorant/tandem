@@ -1171,7 +1171,7 @@ base = "default-dark"
 accent = "#8ec07c"
 ```
 
-After selection, user config and `.tandem/theme.toml` may override any supported color key and supported root settings such as `transparent_background` and `badge_style`. The parser intentionally accepts only simple TOML-style root keys, `key = "color-or-setting"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names for color entries. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, invalid colors, invalid display config, and invalid badge styles are non-fatal TUI status warnings.
+After selection, user config and `.tandem/theme.toml` may override any supported color key and supported root settings such as `transparent_background` and `badge_style`. The parser intentionally accepts only simple TOML-style root keys, `key = "color-or-setting"` entries, and section headers; it supports truecolor hex strings (`"#RRGGBB"` and `"#RGB"`) and terminal color names for color entries. A `[aliases]` color name declared earlier in the same file may be reused by later color settings, including `[badges.states]` entries. `[badges.states]` accepts every configured workflow-state ID; omitted IDs retain the current muted chip fallback while labels and badge shape stay unchanged. Unknown keys, unknown selected themes/bases, duplicate user theme names, unreadable user theme/config files, invalid colors, invalid display config, and invalid badge styles are non-fatal TUI status warnings.
 
 Implemented keys:
 
@@ -1184,6 +1184,12 @@ badge_style = "muted" # muted, accent, text, ghost, or solid; rounded-edge style
 
 [badges]
 style = "muted"
+
+# Aliases must appear before settings that use them, and apply only to this file.
+[aliases]
+state-todo = "#7aa2f7"
+state-active = "#e0af68"
+state-validation = "#bb9af7"
 
 [colors]
 background = "#1d2021"
@@ -1223,6 +1229,13 @@ changes-requested = "#e6bf86"
 rejected = "#e36f63"
 failed = "#e36f63"
 unknown = "#928374"
+
+# Every configured workflow state ID can receive its own chip color.
+# Omitted IDs use the existing muted fallback.
+[badges.states]
+todo = "state-todo"
+in-progress = "state-active"
+validation = "state-validation"
 ```
 
 Workspace display config uses `.tandem/config.toml`:

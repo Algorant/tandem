@@ -5584,7 +5584,7 @@ fn state_lines_for_entry(
     let state = compact_epic_state(&document_state_label(doc));
     chips.push((
         chip_text(&format!("{state:<4}"), theme),
-        theme.progress_chip_style(StatusTone::Muted),
+        theme.state_chip_style(&document_state_label(doc)),
     ));
     match entry.role {
         StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, entry.task_role, theme)),
@@ -5726,7 +5726,7 @@ fn epic_row_line(
             let state = compact_epic_state(&document_state_label(doc));
             prefix.push(Span::styled(
                 chip_text(&format!("{state:<4}"), theme),
-                theme.progress_chip_style(StatusTone::Muted),
+                theme.state_chip_style(&document_state_label(doc)),
             ));
             prefix.push(Span::raw(" "));
             text_width(&indent) + text_width(&chip_text(&format!("{state:<4}"), theme)) + 1
@@ -5740,7 +5740,7 @@ fn epic_row_line(
             prefix.push(Span::raw(" "));
             prefix.push(Span::styled(
                 chip_text(&format!("{state:<4}"), theme),
-                theme.progress_chip_style(StatusTone::Muted),
+                theme.state_chip_style(&document_state_label(doc)),
             ));
             prefix.push(Span::raw(" "));
             text_width(&indent)
@@ -7858,6 +7858,55 @@ mod tests {
         .collect::<Vec<_>>()
         .join("\n");
         assert!(subtask_row.contains("WIP"), "{subtask_row}");
+    }
+
+    #[test]
+    fn board_state_chip_uses_the_configured_color_without_changing_wip_label() {
+        let mut epic = doc_with_state("task-1", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut task = doc_with_state("task-2", Some("in-progress"));
+        task.fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let docs = vec![epic, task];
+        let entries = state_board_entries(
+            &docs,
+            &[],
+            "in-progress",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        let task_entry = entries
+            .iter()
+            .find(|entry| entry.doc.id() == "task-2")
+            .expect("in-progress task entry");
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r##"
+[aliases]
+active = "#e0af68"
+
+[badges.states]
+in-progress = "active"
+"##,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+
+        let line = &state_lines_for_entry(
+            task_entry,
+            &relationship_context_for_doc(task_entry.doc, &docs, &[]),
+            &theme,
+            100,
+            false,
+            0,
+            false,
+            false,
+        )[0];
+        let state = compact_epic_state("in-progress");
+        let chip = chip_text(&format!("{state:<4}"), &theme);
+        assert!(line_text(line).contains("WIP"));
+        assert!(line.spans.iter().any(|span| {
+            span.content.as_ref() == chip && span.style == theme.state_chip_style("in-progress")
+        }));
     }
 
     #[test]

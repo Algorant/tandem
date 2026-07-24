@@ -67,6 +67,7 @@ pub(super) struct TuiTheme {
     priority: PriorityPalette,
     accord: AccordPalette,
     review: ReviewPalette,
+    state_badges: BTreeMap<String, Color>,
     badge_style: BadgeStyle,
     badge_config: BadgeConfig,
     transparent_background: bool,
@@ -191,6 +192,7 @@ impl TuiTheme {
                 failed: Color::Rgb(248, 113, 113),
                 unknown: Color::Rgb(107, 114, 128),
             },
+            state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
             badge_config: BadgeConfig::default(),
             transparent_background: false,
@@ -241,6 +243,7 @@ impl TuiTheme {
                 failed: Color::Rgb(227, 111, 99),
                 unknown: Color::Rgb(146, 131, 116),
             },
+            state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
             badge_config: BadgeConfig::default(),
             transparent_background: false,
@@ -495,6 +498,15 @@ impl TuiTheme {
         self.chip_style(color)
     }
 
+    pub(super) fn state_chip_style(&self, state: &str) -> Style {
+        let color = self
+            .state_badges
+            .get(&normalized(state))
+            .copied()
+            .unwrap_or(self.colors.muted);
+        self.chip_style(color)
+    }
+
     pub(super) fn progress_chip_style(&self, tone: StatusTone) -> Style {
         let color = match tone {
             StatusTone::Accent => self.colors.accent,
@@ -728,6 +740,7 @@ impl TuiTheme {
 
     pub(super) fn apply_theme_content(&mut self, content: &str) -> Vec<String> {
         let mut section = String::new();
+        let mut aliases = BTreeMap::new();
         let mut warnings = Vec::new();
 
         for (index, raw_line) in content.lines().enumerate() {
@@ -804,11 +817,23 @@ impl TuiTheme {
                 continue;
             }
 
+            if section == "aliases" {
+                match parse_color_with_aliases(&value, &aliases) {
+                    Ok(color) => {
+                        aliases.insert(normalized(&key), color);
+                    }
+                    Err(message) => warnings.push(format!(
+                        "Theme warning line {line_number}: invalid color alias `{key}`: {message}"
+                    )),
+                }
+                continue;
+            }
+
             if is_display_badge_section(&section) {
                 continue;
             }
 
-            match parse_color(&value) {
+            match parse_color_with_aliases(&value, &aliases) {
                 Ok(color) => {
                     if !self.apply_color(&section, &key, color) {
                         warnings.push(format!(
@@ -929,6 +954,15 @@ impl TuiTheme {
     }
 
     fn apply_color(&mut self, section: &str, key: &str, color: Color) -> bool {
+        if section == "badges.states" {
+            let state = normalized(key);
+            if state.is_empty() {
+                return false;
+            }
+            self.state_badges.insert(state, color);
+            return true;
+        }
+
         match (section, key) {
             ("colors", "background") => self.colors.background = color,
             ("colors", "panel") => self.colors.panel = color,
@@ -1360,6 +1394,17 @@ fn parse_string_list(value: &str) -> Vec<String> {
         .collect()
 }
 
+fn parse_color_with_aliases(
+    value: &str,
+    aliases: &BTreeMap<String, Color>,
+) -> Result<Color, String> {
+    let alias = normalized(value);
+    if let Some(color) = aliases.get(&alias) {
+        return Ok(*color);
+    }
+    parse_color(value)
+}
+
 fn parse_color(value: &str) -> Result<Color, String> {
     let value = value.trim();
     if value.is_empty() {
@@ -1500,6 +1545,62 @@ changes-requested = "#eb6f92"
         assert_eq!(theme.priority.high, Color::Rgb(246, 193, 119));
         assert_eq!(theme.accord.delivered, Color::Rgb(196, 167, 231));
         assert_eq!(theme.review.changes_requested, Color::Rgb(235, 111, 146));
+    }
+
+    #[test]
+    fn state_badge_colors_resolve_earlier_aliases_and_fall_back_to_muted() {
+        let mut theme = TuiTheme::default_dark();
+        let fallback = theme.state_chip_style("custom-state");
+        assert_eq!(fallback, theme.progress_chip_style(StatusTone::Muted));
+
+        let warnings = theme.apply_theme_content(
+            r##"
+[aliases]
+state-todo = "#7aa2f7"
+state-active = "#e0af68"
+
+[colors]
+accent = "state-active"
+
+[badges.states]
+todo = "state-todo"
+in_progress = "state-active"
+"##,
+        );
+
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert_eq!(theme.colors.accent, Color::Rgb(224, 175, 104));
+        assert_eq!(
+            theme.state_badges.get("todo"),
+            Some(&Color::Rgb(122, 162, 247))
+        );
+        assert_eq!(
+            theme.state_badges.get("in-progress"),
+            Some(&Color::Rgb(224, 175, 104))
+        );
+        assert_eq!(
+            theme.state_chip_style("todo"),
+            theme.chip_style(Color::Rgb(122, 162, 247))
+        );
+        assert_eq!(theme.state_chip_style("custom-state"), fallback);
+    }
+
+    #[test]
+    fn aliases_must_precede_their_uses_in_a_theme_file() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r##"
+[badges.states]
+todo = "state-todo"
+
+[aliases]
+state-todo = "#7aa2f7"
+"##,
+        );
+
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("invalid color for `badges.states.todo`"));
+        assert!(theme.state_badges.is_empty());
     }
 
     #[test]
