@@ -1,15 +1,15 @@
-# Tandem v0.6.3
+# Tandem v0.6.4
 
-Tandem v0.6.3 simplifies delegation claims and adds supported correction paths for decision records.
+Tandem v0.6.4 is a small consistency release for the retired `ready` accord action.
 
-## Protocol and CLI
+## CLI and protocol
 
-- Accords now begin directly with `tandem accord claim`; the redundant `ready` action and new-status surface are removed.
-- Existing legacy `ready` accord documents remain readable, while new work uses direct claim for ordinary delegation and recovery.
-- Added `tandem decision update` to amend a decision’s title, body, or ADR status without manual Markdown editing.
-- Added `tandem decision withdraw <id> --reason <text>` for decisions created in error. Withdrawal preserves the record with timestamped reason metadata and an audit event.
+- Bare `tandem accord` usage now lists only the supported actions: `claim`, `deliver`, `accept`, `rework`, `block`, and `fail`.
+- `tandem accord ready` remains rejected with a clear current-action list.
+- Existing persisted `accord.status: ready` records remain readable for compatibility.
 
-## TUI and Pi integration
+## Pi-Tandem integration
 
-- Decision-view guidance now points to supported decision update/withdraw workflows.
-- Pi-Tandem’s typed accord action surface and smoke workflow now use direct claim rather than ready-then-claim ceremony.
+- Centralized the accepted accord action list across Pi-Tandem’s type, runtime argument builder, and tool schema.
+- Added regression coverage ensuring the retired `ready` action is neither advertised nor accepted by the adapter.
+- Updated repository guidance and release documentation to describe direct claims consistently.
