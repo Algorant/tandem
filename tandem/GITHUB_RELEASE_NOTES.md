@@ -1,18 +1,15 @@
-# Tandem v0.6.2
+# Tandem v0.6.3
 
-Tandem v0.6.2 makes the Board hierarchy easier to scan, navigate, and trust.
+Tandem v0.6.3 simplifies delegation claims and adds supported correction paths for decision records.
 
-## TUI
+## Protocol and CLI
 
-- Board rows now show compact `#<task-number>` identifiers across State and Epic arrangements, including nested hierarchy rows.
-- Every visible State Board row now shows its own workflow state (`TODO`, `WIP`, or `VAL`).
-- In-progress Subtasks appear in the In Progress pane with their Epic → Task context revealed, so the counter and visible work agree.
-- Same-state hierarchies remain collapsed by default while cross-state work is surfaced in the correct state pane.
-- Selecting an Epic now shows a compact descendant-completion progress bar in the Board header, including its completed/total ratio.
-- Themes may customize the progress-bar fill through `[colors] progress`.
+- Accords now begin directly with `tandem accord claim`; the redundant `ready` action and new-status surface are removed.
+- Existing legacy `ready` accord documents remain readable, while new work uses direct claim for ordinary delegation and recovery.
+- Added `tandem decision update` to amend a decision’s title, body, or ADR status without manual Markdown editing.
+- Added `tandem decision withdraw <id> --reason <text>` for decisions created in error. Withdrawal preserves the record with timestamped reason metadata and an audit event.
 
-## Bug fixes
+## TUI and Pi integration
 
-- Fixed Board hierarchy expansion revealing all same-state Epic descendants by default.
-- Fixed active Subtasks and direct Epic-child Tasks being difficult to identify in State Board views.
-- Fixed small nonzero Epic completion ratios appearing indistinguishable from zero by increasing progress-bar resolution.
+- Decision-view guidance now points to supported decision update/withdraw workflows.
+- Pi-Tandem’s typed accord action surface and smoke workflow now use direct claim rather than ready-then-claim ceremony.
