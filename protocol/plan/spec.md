@@ -36,7 +36,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Allocation scans active board documents and completed logs without reuse. Epics/Tasks allocate the next global `task-N`; Subtasks allocate the next `task-N-M` suffix beneath their Task. IDs are immutable and tools never silently rename IDs or rewrite references.
 - Inline `subtasks:` checklist objects are legacy and deprecated for new work. Tools must continue to read, validate, preserve, and operate on existing entries, but new lifecycle-bearing checklist work uses first-class Subtask documents.
 - The work-agreement object is `accord`.
-- Accord statuses are `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`.
+- Accord statuses are `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`. `ready` is legacy-readable only; new work begins unclaimed and transitions directly to `claimed`.
 - Rules are structured objects with stable IDs: `{ id, rule, source? }`.
 - `parentId`, `blockers`, and `references` may point to any Tandem document by ID. A task-to-task `parentId` is `epic-task` when the resolved parent is an Epic and `subtask` only when the resolved parent has the Task role; a non-task target is generic `parent`.
 - Completion warns about missing accepted review or accepted accord, but allows completion in v0.
@@ -309,7 +309,7 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 | `id` | yes | error | Canonical ID. New decision IDs are sequential, e.g. `decision-1`. |
 | `type` | yes | error | Must be `decision`. |
 | `title` | yes | error | Display title. |
-| `status` | no | warning if unrecognized | ADR-style decision status. Suggested values: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`. This is decision metadata, not task workflow `state`. New CLI-created decisions default to `proposed`. |
+| `status` | no | warning if unrecognized | ADR-style decision status. Suggested values: `proposed`, `accepted`, `rejected`, `deprecated`, `superseded`, `withdrawn`. A withdrawn decision remains a durable record created in error; record `withdrawnAt` and `withdrawalReason` rather than deleting it. This is decision metadata, not task workflow `state`. New CLI-created decisions default to `proposed`. |
 | `date` | no | warning if malformed | ADR decision date, usually `YYYY-MM-DD`. New CLI-created decisions default to the current UTC date. |
 | `deciders` | no | warning if malformed | Array of humans/agents responsible for the decision. |
 | `context` | no | none | Brief ADR context summary; longer context may live in the Markdown body. |
@@ -328,7 +328,7 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
-| `status` | yes | error | One of `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`. |
+| `status` | yes | error | One of `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`. Legacy `ready` documents remain readable as unclaimed work. |
 | `assignee` | no | none | Human or agent responsible for the accord. |
 | `claimedAt` | no | warning if malformed | Timestamp when claimed. |
 | `deliveredAt` | no | warning if malformed | Timestamp when delivered. |
@@ -754,7 +754,7 @@ accord:
 ### Accord lifecycle
 
 ```text
-ready → claimed → delivered → accepted
+missing → claimed → delivered → accepted
                  ↘ rework → claimed/delivered
                  ↘ failed
                  ↘ blocked
@@ -764,7 +764,7 @@ Suggested relationship to task state:
 
 | Accord status | Suggested task state |
 | --- | --- |
-| `ready` | `todo` |
+| missing | `todo` |
 | `claimed` | `in-progress` |
 | `delivered` | `validation` |
 | `accepted` | `validation` until completion/archive |
@@ -883,6 +883,7 @@ Decision events:
 
 - `decision.created`
 - `decision.updated`
+- `decision.withdrawn`
 
 Accord events:
 
@@ -1186,9 +1187,9 @@ tandem complete <id> --summary ...
 tandem cancel <id> --reason <text>
 tandem log list|show|search
 tandem search <query>
-tandem accord ready|claim|deliver|accept|rework|block|fail
+tandem accord claim|deliver|accept|rework|block|fail
 tandem rules list|add|edit|delete
-tandem decision list|show|add
+tandem decision list|show|add|update|withdraw
 tandem tui
 ```
 

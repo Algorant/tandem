@@ -212,13 +212,12 @@ try {
 	assert(moved.data.document.state === "in-progress", "move should update task state");
 
 	await runTandem(tandem, buildAccordArgs({
-		action: "ready",
+		action: "claim",
 		id: taskId,
 		assignee: "pi-tandem-smoke",
 		deliverables: ["test:extensions/pi-tandem/tests/smoke.ts:smoke exercise"],
 		validations: ["bun extensions/pi-tandem/tests/smoke.ts"],
 	}), workspace);
-	await runTandem(tandem, buildAccordArgs({ action: "claim", id: taskId, assignee: "pi-tandem-smoke" }), workspace);
 	await runTandem(tandem, buildAccordArgs({
 		action: "deliver",
 		id: taskId,

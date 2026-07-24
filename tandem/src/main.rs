@@ -16,7 +16,6 @@ const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
 const LEGACY_REVIEW_STATE: &str = "review";
 const VALIDATION_STATE: &str = "validation";
 const ACCORD_STATUSES: &[&str] = &[
-    "ready",
     "claimed",
     "delivered",
     "accepted",
@@ -24,6 +23,7 @@ const ACCORD_STATUSES: &[&str] = &[
     "failed",
     "blocked",
 ];
+const LEGACY_ACCORD_STATUSES: &[&str] = &["ready"];
 const REVIEW_STATUSES: &[&str] = &[
     "not-ready",
     "pending",
@@ -37,6 +37,7 @@ const DECISION_STATUSES: &[&str] = &[
     "rejected",
     "deprecated",
     "superseded",
+    "withdrawn",
 ];
 const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
 const TASK_KINDS: &[&str] = &["epic"];
@@ -689,7 +690,7 @@ fn print_help() {
     println!("  tandem cancel <id> --reason <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem log list|show|search ...");
-    println!("  tandem accord ready|claim|deliver|accept|rework|block|fail ...");
+    println!("  tandem accord claim|deliver|accept|rework|block|fail ...");
     println!("  tandem rules list|add|edit|delete ...");
     println!("  tandem decision list|show|add ... [--status <status>] [--date <date>]");
     println!("  tandem tui");
@@ -1962,7 +1963,6 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
         ));
     };
     let status = match action.as_str() {
-        "ready" => "ready",
         "claim" => "claimed",
         "deliver" => "delivered",
         "accept" => "accepted",
@@ -1971,7 +1971,7 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
         "fail" => "failed",
         other => {
             return Err(CliError::usage(format!(
-                "unknown accord subcommand `{other}`; use ready, claim, deliver, accept, rework, block, or fail"
+                "unknown accord subcommand `{other}`; use claim, deliver, accept, rework, block, or fail"
             )))
         }
     };
@@ -2175,17 +2175,33 @@ fn cmd_rules_delete(options: RuleDeleteOptions) -> Result<(), CliError> {
 fn cmd_decision(args: &[String]) -> Result<(), CliError> {
     let Some((subcommand, rest)) = args.split_first() else {
         return Err(CliError::usage(
-            "tandem decision requires list, show, or add",
+            "tandem decision requires list, show, add, update, or withdraw",
         ));
     };
     match subcommand.as_str() {
         "list" => cmd_decision_list(parse_json_only_args(rest, "decision list")?),
         "show" => cmd_decision_show(parse_show_args(rest)?),
         "add" => cmd_decision_add(parse_decision_add_args(rest)?),
+        "update" => cmd_decision_update(parse_decision_update_args(rest)?),
+        "withdraw" => cmd_decision_withdraw(parse_decision_withdraw_args(rest)?),
         other => Err(CliError::usage(format!(
-            "unknown decision subcommand `{other}`; use list, show, or add"
+            "unknown decision subcommand `{other}`; use list, show, add, update, or withdraw"
         ))),
     }
+}
+
+#[derive(Debug, Default)]
+struct DecisionUpdateOptions {
+    id: String,
+    title: Option<String>,
+    body: Option<String>,
+    status: Option<String>,
+}
+
+#[derive(Debug)]
+struct DecisionWithdrawOptions {
+    id: String,
+    reason: String,
 }
 
 #[derive(Debug, Default)]
@@ -2326,6 +2342,73 @@ fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     Ok(())
 }
 
+fn cmd_decision_update(options: DecisionUpdateOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let doc = find_board_document(&workspace, &options.id)?
+        .filter(|doc| doc.doc_type() == "decision")
+        .ok_or_else(|| CliError::user(format!("active decision not found: {}", options.id)))?;
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let mut updates = BTreeMap::new();
+    if let Some(title) = options.title.as_deref() {
+        updates.insert("title".to_string(), title.to_string());
+    }
+    if let Some(status) = options.status.as_deref() {
+        updates.insert("status".to_string(), status.to_string());
+    }
+    updates.insert("updatedAt".to_string(), current_timestamp());
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let patched = if let Some(body) = options.body.as_deref() {
+        replace_markdown_body(&patched, body)?
+    } else {
+        patched
+    };
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        &workspace,
+        "decision.updated",
+        doc.id(),
+        &format!("Updated decision {}", doc.id()),
+    )?;
+    println!(
+        "Updated decision\nID:    {}\nPath:  {}",
+        doc.id(),
+        display_path(&doc.path)
+    );
+    Ok(())
+}
+
+fn cmd_decision_withdraw(options: DecisionWithdrawOptions) -> Result<(), CliError> {
+    let workspace = discover_workspace()?;
+    let doc = find_board_document(&workspace, &options.id)?
+        .filter(|doc| doc.doc_type() == "decision")
+        .ok_or_else(|| CliError::user(format!("active decision not found: {}", options.id)))?;
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let updates = BTreeMap::from([
+        ("status".to_string(), "withdrawn".to_string()),
+        ("withdrawnAt".to_string(), now.clone()),
+        ("withdrawalReason".to_string(), options.reason.clone()),
+        ("updatedAt".to_string(), now),
+    ]);
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        &workspace,
+        "decision.withdrawn",
+        doc.id(),
+        &format!("Withdrew decision {}: {}", doc.id(), options.reason),
+    )?;
+    println!(
+        "Withdrew decision\nID:      {}\nReason:  {}\nPath:    {}",
+        doc.id(),
+        options.reason,
+        display_path(&doc.path)
+    );
+    Ok(())
+}
+
 fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let title = require_nonempty(
@@ -2383,6 +2466,69 @@ fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
     println!("Title:  {title}");
     println!("Path:   {}", display_path(&created.path));
     Ok(())
+}
+
+fn parse_decision_update_args(args: &[String]) -> Result<DecisionUpdateOptions, CliError> {
+    let Some((id, rest)) = args.split_first() else {
+        return Err(CliError::usage("decision update requires <decision-id>"));
+    };
+    let mut options = DecisionUpdateOptions {
+        id: id.clone(),
+        ..Default::default()
+    };
+    let mut index = 0;
+    while index < rest.len() {
+        match rest[index].as_str() {
+            "--title" => {
+                index += 1;
+                options.title = Some(required_value(rest, index, "--title")?.to_string());
+            }
+            "--body" => {
+                index += 1;
+                options.body = Some(required_value(rest, index, "--body")?.to_string());
+            }
+            "--status" => {
+                index += 1;
+                options.status = Some(required_value(rest, index, "--status")?.to_string());
+            }
+            flag => {
+                return Err(CliError::usage(format!(
+                    "unknown decision update flag `{flag}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    if options.title.is_none() && options.body.is_none() && options.status.is_none() {
+        return Err(CliError::usage(
+            "decision update requires --title, --body, or --status",
+        ));
+    }
+    if let Some(status) = options.status.as_deref() {
+        validate_decision_status(status)?;
+    }
+    Ok(options)
+}
+
+fn parse_decision_withdraw_args(args: &[String]) -> Result<DecisionWithdrawOptions, CliError> {
+    let Some((id, rest)) = args.split_first() else {
+        return Err(CliError::usage(
+            "decision withdraw requires <decision-id> --reason <text>",
+        ));
+    };
+    if rest.len() != 2 || rest[0] != "--reason" {
+        return Err(CliError::usage(
+            "decision withdraw requires <decision-id> --reason <text>",
+        ));
+    }
+    Ok(DecisionWithdrawOptions {
+        id: id.clone(),
+        reason: require_nonempty(
+            Some(&rest[1]),
+            "decision withdraw --reason must not be empty",
+        )?
+        .to_string(),
+    })
 }
 
 fn validate_decision_add_options(options: &DecisionAddOptions) -> Result<(), CliError> {
@@ -3593,6 +3739,7 @@ fn validate_task_document_against_hierarchy(
     if has_metadata(doc, "accord") || doc.field("accordStatus").is_some() {
         match accord_status(doc) {
             Some(status) if ACCORD_STATUSES.contains(&status) => {}
+            Some(status) if LEGACY_ACCORD_STATUSES.contains(&status) => {}
             Some(status) => errors.push(format!("invalid accord.status `{status}`")),
             None => {
                 errors.push("accord.status is required when accord metadata is present".to_string())
@@ -3820,7 +3967,6 @@ fn apply_accord_action(
 
 fn accord_event_name(action: &str) -> &'static str {
     match action {
-        "ready" => "accord.ready",
         "claim" => "accord.claimed",
         "deliver" => "accord.delivered",
         "accept" => "accord.accepted",

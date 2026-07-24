@@ -67,7 +67,7 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 };
 
 export type AccordToolParams = CwdFlag & {
-	action: "ready" | "claim" | "deliver" | "accept" | "rework" | "block" | "fail";
+	action: "claim" | "deliver" | "accept" | "rework" | "block" | "fail";
 	id: string;
 	assignee?: string;
 	summary?: string;
@@ -671,8 +671,8 @@ export default function piTandem(pi: ExtensionAPI) {
 		name: "tandem_accord",
 		label: "Tandem Accord",
 		...createTandemToolRenderer("tandem_accord", "Tandem Accord"),
-		description: "Run `tandem accord ready|claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
-		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (ready, claim, deliver, accept, rework, block, fail).",
+		description: "Run `tandem accord claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
+		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (claim, deliver, accept, rework, block, fail).",
 		promptGuidelines: [
 			"Use tandem_accord for accord state changes instead of direct frontmatter edits.",
 			"Deliver finished agent work into the Validation workflow state for acceptance/rework decisions; do not treat automated validation evidence as human acceptance.",
@@ -680,7 +680,7 @@ export default function piTandem(pi: ExtensionAPI) {
 		],
 		parameters: Type.Object({
 			...cwdSchema,
-			action: StringEnum(["ready", "claim", "deliver", "accept", "rework", "block", "fail"] as const),
+			action: StringEnum(["claim", "deliver", "accept", "rework", "block", "fail"] as const),
 			id: Type.String(),
 			assignee: Type.Optional(Type.String()),
 			summary: Type.Optional(Type.String()),

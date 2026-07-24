@@ -769,7 +769,7 @@ impl TuiApp {
                 self.status = "Completed logs are read-only in the TUI; $EDITOR is intentionally disabled for generated history.".to_string()
             }
             KeyCode::Char('e') if self.view == TuiView::Decisions => {
-                self.status = "Decision document editing in $EDITOR is deferred; use Decisions add or edit the file manually for now.".to_string()
+                self.status = "Use `tandem decision update <id> …` or `tandem decision withdraw <id> --reason …`; editor-based decision actions are deferred.".to_string()
             }
             KeyCode::Tab | KeyCode::BackTab => self.cycle_focus_or_hint(),
             KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
@@ -3614,7 +3614,7 @@ impl TuiApp {
         self.push_help_command(
             &mut lines,
             "e",
-            "deferred; edit decision files manually for now",
+            "use CLI decision update/withdraw; editor actions are deferred",
         );
 
         self.push_help_section(&mut lines, "Prompts");
@@ -7032,7 +7032,7 @@ fn accord_detail_status_style(status: &str, theme: &TuiTheme) -> Style {
 
 fn accord_state_signal(status: &str) -> &'static str {
     match normalized_accord_status(status).as_str() {
-        "ready" => "Ready: scope is recorded and the work can be claimed.",
+        "ready" => "Legacy ready: treat as unclaimed and claim when an owner is known.",
         "claimed" => "Claimed: an owner is actively working the accord.",
         "delivered" => "Delivered: inspect summary/evidence, then accept or request rework.",
         "accepted" => "Accepted: accord review passed; completion/logging is still separate.",
@@ -7046,16 +7046,14 @@ fn accord_state_signal(status: &str) -> &'static str {
 
 fn accord_next_action(status: &str) -> &'static str {
     match normalized_accord_status(status).as_str() {
-        "ready" => "Claim the accord when an owner is known.",
+        "ready" => "Legacy status: claim the accord when an owner is known.",
         "claimed" => "Deliver when complete, or block/fail with a reason if work cannot proceed.",
         "delivered" => "Inspect the delivery, then accept it or request rework.",
         "accepted" => "Complete/archive the task when it is ready to leave the Board.",
         "rework" => "Apply requested changes, then deliver again with a fresh summary.",
-        "blocked" => "Resolve the blocker, then ready/claim/deliver; fail only if unrecoverable.",
-        "failed" => "Review the failure and reset to ready if retrying the work.",
-        "missing" | "" => {
-            "Create a ready accord once scope, deliverables, and validation are known."
-        }
+        "blocked" => "Resolve the blocker, then claim/deliver; fail only if unrecoverable.",
+        "failed" => "Review the failure and claim again if retrying the work.",
+        "missing" | "" => "Claim the accord when an owner is known.",
         _ => "Inspect current metadata before choosing the next accord action.",
     }
 }
@@ -7074,11 +7072,11 @@ fn accord_cli_hint(id: &str, status: &str) -> String {
         ),
         "rework" => format!("tandem accord deliver {id} --summary <text> [--evidence <text>]"),
         "blocked" => format!(
-            "tandem accord ready {id} [--assignee <name>] OR tandem accord fail {id} --reason <text>"
+            "tandem accord claim {id} --assignee <name> OR tandem accord fail {id} --reason <text>"
         ),
-        "failed" => format!("tandem accord ready {id} [--assignee <name>]"),
+        "failed" => format!("tandem accord claim {id} --assignee <name>"),
         "missing" | "" => format!(
-            "tandem accord ready {id} [--assignee <name>] [--deliverable <spec>] [--validation <command>]"
+            "tandem accord claim {id} --assignee <name> [--deliverable <spec>] [--validation <command>]"
         ),
         _ => format!("tandem show {id}  # inspect accord metadata before mutating"),
     }
@@ -9637,7 +9635,7 @@ tone = "success"
         assert!(text.contains("A           open accept confirmation"));
         assert!(text.contains("/           search id, title"));
         assert!(text.contains("e / d       edit or delete"));
-        assert!(text.contains("deferred; edit decision files manually"));
+        assert!(text.contains("use CLI decision update/withdraw; editor actions are deferred"));
         assert!(!text.contains("Review actions"));
     }
 

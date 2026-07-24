@@ -56,7 +56,7 @@ The adapter returns Tandem's read output without reclassifying relationships in 
 Maps to:
 
 ```text
-tandem accord ready|claim|deliver|accept|rework|block|fail <id> ...
+tandem accord claim|deliver|accept|rework|block|fail <id> ...
 ```
 
 Use this for work-agreement lifecycle transitions. Deliver finished agent work into the Validation workflow state (`state: validation`) for acceptance/rework decisions. Agents should not accept or complete work unless explicitly instructed by the user/orchestrator; automated validation evidence is not the same as human/product acceptance.

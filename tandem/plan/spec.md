@@ -93,7 +93,7 @@ Command behavior rules:
 - `tandem log` is limited to `list`, `show`, and `search` in v0.
 - `tandem rules` supports `list`, `add`, `edit`, and `delete` in v0.
 - `tandem accord` supports `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, and `fail` in v0.
-- `tandem decision` supports `list`, `show`, and `add` in v0.
+- `tandem decision` supports `list`, `show`, `add`, `update`, and `withdraw`; withdrawal preserves the decision record with reasoned ADR metadata.
 - The TUI launches through `tandem tui` only in v0; no standalone TUI binary is part of v0.
 - `tandem complete` moves completed work to Logs and warns about missing review or accord acceptance instead of blocking completion in v0.
 - `tandem cancel` archives reasoned cancellation to Logs, rejects active descendants, and does not require blockers/review/accord acceptance.
@@ -1124,6 +1124,7 @@ Optional progress bars:
 - Board Validation flow: delivered / accepted work awaiting accept, rework, or completion
 - validation: passed / total delivered
 - decision/review progress if useful
+- decision correction and withdrawal actions with auditable reason prompts
 
 ## Theming
 
