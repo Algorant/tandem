@@ -129,6 +129,106 @@ fn process_help_version_usage_and_missing_project_contracts() {
 }
 
 #[test]
+fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() {
+    let project = TempProject::new("protocol-upgrade");
+    project.init();
+    let config_path = project.path(".tandem/tandem.md");
+    let legacy_config = project
+        .read(".tandem/tandem.md")
+        .replacen("protocolVersion: 0.2.0", "protocolVersion: 0.1.0", 1)
+        .replacen(
+            "rules:\n",
+            "types:\n  note:\n    idPrefix: note\ncompletion:\n  requireReview: true\nrules:\n",
+            1,
+        );
+    fs::write(&config_path, legacy_config.clone()).expect("seed legacy protocol config");
+    fs::write(
+        project.path(".tandem/board/note-1.md"),
+        "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\nunknownField: preserve\n---\n\nLegacy custom body.\n",
+    )
+    .expect("seed legacy custom document");
+    let event_before = "{\"event\":\"legacy.event\",\"id\":\"note-1\"}\n";
+    fs::write(project.path(".tandem/events.jsonl"), event_before).expect("seed legacy event");
+    let log_before = "---\nid: task-99\ntype: task\ntitle: Historical log\ncompletedAt: 2026-01-01T00:00:00Z\n---\n\nHistorical body.\n";
+    fs::write(project.path(".tandem/logs/task-99.md"), log_before).expect("seed historical log");
+
+    let refused = project.run(&["list"]);
+    refused.assert_exit(1);
+    assert!(refused.stdout.is_empty());
+    assert!(refused.stderr.contains("Protocol 0.1.0 project detected"));
+    assert!(refused.stderr.contains("tandem upgrade"));
+    project.run(&["--help"]).assert_success();
+    project.run(&["--version"]).assert_success();
+
+    let upgrade = project.run(&["upgrade"]);
+    upgrade.assert_success();
+    assert!(upgrade.stdout.contains("0.1.0 -> 0.2.0"));
+    assert!(upgrade.stdout.contains("without conversion"));
+    let upgraded_config = project.read(".tandem/tandem.md");
+    assert!(upgraded_config.contains("protocolVersion: \"0.2.0\""));
+    assert!(upgraded_config.contains("idPrefix: note"));
+    assert!(upgraded_config.contains("requireReview: true"));
+    assert_eq!(project.read(".tandem/board/note-1.md"), "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\nunknownField: preserve\n---\n\nLegacy custom body.\n");
+    assert_eq!(project.read(".tandem/events.jsonl"), event_before);
+    assert_eq!(project.read(".tandem/logs/task-99.md"), log_before);
+
+    let listed = project.run(&["list"]);
+    listed.assert_success();
+    assert!(listed.stdout.contains("note-1"));
+    assert!(listed
+        .stdout
+        .contains("custom type declarations are deprecated"));
+    assert!(listed.stdout.contains("legacy custom type `note`"));
+    let shown = project.run(&["show", "note-1", "--json"]);
+    shown.assert_success();
+    assert!(shown.stdout.contains("\"type\":\"note\""));
+    let searched = project.run(&["search", "Legacy"]);
+    searched.assert_success();
+    assert!(searched.stdout.contains("note-1"));
+
+    let mutation = project.run(&["move", "note-1", "--state", "in-progress"]);
+    mutation.assert_exit(1);
+    assert!(mutation.stderr.contains("only task documents can be moved"));
+    let completion = project.run(&["complete", "note-1", "--summary", "Nope"]);
+    completion.assert_exit(1);
+    assert!(completion
+        .stderr
+        .contains("only task documents can be completed"));
+
+    let canonical = project.run(&[
+        "add",
+        "--title",
+        "Canonical task",
+        "--priority",
+        "high",
+        "--effort",
+        "small",
+    ]);
+    canonical.assert_success();
+    assert!(canonical.stdout.contains("ID:    task-100"));
+    let task = project.read(".tandem/board/task-100.md");
+    assert!(task.contains("priority: \"high\""));
+    assert!(task.contains("effort: \"small\""));
+    let invalid_priority = project.run(&["add", "--title", "Bad priority", "--priority", "urgent"]);
+    invalid_priority.assert_exit(1);
+    assert!(invalid_priority
+        .stderr
+        .contains("invalid priority `urgent`"));
+    let invalid_effort = project.run(&["update", "task-100", "--effort", "xlarge"]);
+    invalid_effort.assert_exit(1);
+    assert!(invalid_effort.stderr.contains("invalid effort `xlarge`"));
+
+    let complete = project.run(&["complete", "task-100", "--summary", "Canonical completion"]);
+    complete.assert_success();
+    assert!(complete
+        .stdout
+        .contains("completion-policy settings are deprecated and ignored"));
+    assert!(complete
+        .stdout
+        .contains("Completing anyway under the canonical protocol policy."));
+}
+
+#[test]
 fn reads_mutations_accords_events_and_preservation_use_the_real_command() {
     let project = TempProject::new("mutations");
     project.init();

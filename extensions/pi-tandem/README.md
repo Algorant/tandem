@@ -29,9 +29,9 @@ Maps to:
 ```text
 tandem list [filters] --json
 tandem show <id> --json
-tandem add --title <title> [--kind epic] [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] ...
+tandem add --title <title> [--kind epic] [--priority <priority>] [--effort <effort>] [--parent <id>] [--blocker <id>] [--reference <id>] [--related-file <path>] ...
 tandem move <id> --state <state>
-tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] [--tag <tag>] ...
+tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] [--effort <effort>] [--tag <tag>] ...
 tandem complete <id> --summary <text> ...
 tandem cancel <id> --reason <text>
 ```
@@ -48,6 +48,10 @@ Relationship parameters map directly to Tandem CLI fields: `kind` → `--kind`, 
 Allocation scans active tasks and completed logs so global and per-Task sequences are not reused. Subtasks cannot have children, Epics cannot have parents, direct Epic children never use hierarchical IDs, and role-changing or ID-invalidating reparenting is rejected. Create/inspect parent and blocker documents first; unresolved parent/blocker references are errors, while unresolved loose references are warnings.
 
 Inline checklist `subtasks` metadata is legacy/deprecated and read-only through this adapter. `pi-tandem` does not expose it or forward `--subtask`; create lifecycle-bearing Subtask documents beneath their Task.
+
+### Protocol compatibility
+
+New workspaces are protocol `0.2.0`. On a discovered `0.1.0` workspace, all project tools fail with Tandem's explicit-upgrade diagnostic; do not work around it by editing files. Run `tandem upgrade` directly only when the user authorizes the conversion. Upgrade patches only `protocolVersion` and preserves project content. Legacy custom-type declarations/documents then remain listable, showable, and searchable but are deprecated read-only content. Legacy project completion-policy settings are likewise preserved/deprecated/ignored; canonical completion warns for missing review or accord acceptance but proceeds unless structural validation blocks it. Optional `priority` is `low|medium|high|critical`; optional `effort` is `trivial|small|medium|large`.
 
 The adapter returns Tandem's read output without reclassifying relationships in TypeScript. List/search JSON retains CLI-computed `parentId`/`parentRelationship`; show returns `tasks` for an Epic, `subtasks` for a Task, and no child collection for a Subtask. There is no compatibility path for erroneous hierarchical IDs directly beneath Epics.
 

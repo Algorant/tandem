@@ -11,7 +11,8 @@ use yaml_rust2::{Yaml, YamlLoader};
 mod tui;
 
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
-const PROTOCOL_VERSION: &str = "0.1.0";
+const PROTOCOL_VERSION: &str = "0.2.0";
+const LEGACY_PROTOCOL_VERSION: &str = "0.1.0";
 const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
 const LEGACY_REVIEW_STATE: &str = "review";
 const VALIDATION_STATE: &str = "validation";
@@ -40,7 +41,8 @@ const DECISION_STATUSES: &[&str] = &[
     "superseded",
     "withdrawn",
 ];
-const PRIORITIES: &[&str] = &["critical", "high", "medium", "low"];
+const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
+const EFFORTS: &[&str] = &["trivial", "small", "medium", "large"];
 const TASK_KINDS: &[&str] = &["epic"];
 const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
 const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
@@ -182,7 +184,9 @@ impl HierarchyIndex {
     }
 
     pub(crate) fn from_workspace(workspace: &Workspace) -> Result<Self, CliError> {
-        Self::from_documents(read_workspace_documents(workspace)?)
+        let index = Self::from_documents(read_workspace_documents(workspace)?)?;
+        index.validate_document_metadata()?;
+        Ok(index)
     }
 
     fn with_replacement(&self, doc: Document) -> Self {
@@ -375,6 +379,23 @@ impl HierarchyIndex {
         errors.into_iter().collect()
     }
 
+    fn validate_document_metadata(&self) -> Result<(), CliError> {
+        for doc in self.documents.values() {
+            for (field, allowed) in [("priority", PRIORITIES), ("effort", EFFORTS)] {
+                if let Some(value) = doc.field(field) {
+                    if !allowed.contains(&value) {
+                        return Err(CliError::user(format!(
+                            "Validation failed for {}: invalid {field} `{value}`; expected one of: {}",
+                            display_path(&doc.path),
+                            allowed.join(", ")
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
         let errors = self.task_hierarchy_errors();
         if errors.is_empty() {
@@ -478,6 +499,7 @@ struct AddOptions {
     description: Option<String>,
     kind: Option<String>,
     priority: Option<String>,
+    effort: Option<String>,
     tags: Vec<String>,
     assignee: Option<String>,
     due_date: Option<String>,
@@ -512,6 +534,7 @@ struct UpdateOptions {
     body: Option<String>,
     kind: Option<String>,
     priority: Option<String>,
+    effort: Option<String>,
     assignee: Option<String>,
     due_date: Option<String>,
     parent: Option<String>,
@@ -652,6 +675,7 @@ fn run() -> Result<(), CliError> {
     let command = args.remove(0);
     match command.as_str() {
         "init" => cmd_init(parse_init_args(&args)?)?,
+        "upgrade" => cmd_upgrade(&args)?,
         "list" => cmd_list(parse_list_args(&args)?)?,
         "show" => cmd_show(parse_show_args(&args)?)?,
         "add" => cmd_add(parse_add_args(&args)?)?,
@@ -669,7 +693,7 @@ fn run() -> Result<(), CliError> {
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version"
+                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version"
             )))
         }
     }
@@ -682,11 +706,12 @@ fn print_help() {
     println!();
     println!("Usage:");
     println!("  tandem init [--title <title>]");
+    println!("  tandem upgrade");
     println!("  tandem list [--state <state>] [--type <type>] [--parent <id>] [--json]");
     println!("  tandem show <id> [--json]");
-    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>] [--json]");
+    println!("  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>] [--priority <priority>] [--effort <effort>] [--json]");
     println!("  tandem move <id> --state <state>");
-    println!("  tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] ...");
+    println!("  tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] [--effort <effort>] ...");
     println!("  tandem complete <id> --summary <text>");
     println!("  tandem cancel <id> --reason <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
@@ -831,6 +856,10 @@ fn parse_add_args(args: &[String]) -> Result<AddOptions, CliError> {
                 index += 1;
                 options.priority = Some(required_value(args, index, "--priority")?.to_string());
             }
+            "--effort" => {
+                index += 1;
+                options.effort = Some(required_value(args, index, "--effort")?.to_string());
+            }
             "--tag" => {
                 index += 1;
                 options
@@ -926,6 +955,10 @@ fn parse_update_args(args: &[String]) -> Result<UpdateOptions, CliError> {
             "--priority" => {
                 index += 1;
                 options.priority = Some(required_value(args, index, "--priority")?.to_string());
+            }
+            "--effort" => {
+                index += 1;
+                options.effort = Some(required_value(args, index, "--effort")?.to_string());
             }
             "--assignee" => {
                 index += 1;
@@ -1453,6 +1486,7 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", list_json(&filtered, &hierarchy)?);
     } else {
+        print_workspace_deprecation_warnings(&workspace)?;
         print_list_table(&filtered, &hierarchy)?;
         print_document_warnings(&filtered);
     }
@@ -1476,7 +1510,9 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", show_json(&doc, &children, role, relationship));
     } else {
+        print_workspace_deprecation_warnings(&workspace)?;
         print_show(&doc, &children, role, relationship);
+        print_document_warnings(&[doc]);
     }
 
     Ok(())
@@ -1524,6 +1560,13 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
     let state = options.state.as_deref().unwrap_or("todo").to_string();
     validate_state(workspace, &state)?;
     validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
+    validate_optional_vocabulary(
+        options.priority.as_deref(),
+        "add --priority",
+        PRIORITIES,
+        "priority",
+    )?;
+    validate_optional_vocabulary(options.effort.as_deref(), "add --effort", EFFORTS, "effort")?;
     let kind = options
         .kind
         .as_deref()
@@ -1578,6 +1621,7 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
             lines.push(format!("title: {}", yaml_double_quote(&title)));
             lines.push(format!("state: {state}"));
             push_optional_line(&mut lines, "priority", options.priority.as_deref());
+            push_optional_line(&mut lines, "effort", options.effort.as_deref());
             push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
             push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
             push_optional_line(&mut lines, "parentId", options.parent.as_deref());
@@ -1706,8 +1750,9 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
             doc.id()
         );
     }
+    print_workspace_deprecation_warnings(&workspace)?;
     if review_status != "accepted" || accord_status != "accepted" {
-        println!("Completing anyway in v0.");
+        println!("Completing anyway under the canonical protocol policy.");
         println!();
     }
 
@@ -1869,7 +1914,14 @@ fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     if options.json {
         println!("{}", search_json(&options.query, &results, &hierarchy)?);
     } else {
+        print_workspace_deprecation_warnings(&workspace)?;
         print_search_table(&results, &hierarchy)?;
+        print_document_warnings(
+            &results
+                .iter()
+                .map(|result| result.doc.clone())
+                .collect::<Vec<_>>(),
+        );
     }
     Ok(())
 }
@@ -2627,6 +2679,12 @@ fn cmd_tui(args: &[String]) -> Result<(), CliError> {
 }
 
 fn discover_workspace() -> Result<Workspace, CliError> {
+    let workspace = discover_workspace_unchecked()?;
+    ensure_current_protocol(&workspace)?;
+    Ok(workspace)
+}
+
+fn discover_workspace_unchecked() -> Result<Workspace, CliError> {
     let mut dir = env::current_dir()?;
 
     loop {
@@ -2653,6 +2711,69 @@ fn discover_workspace() -> Result<Workspace, CliError> {
     Err(CliError::user(
         "No Tandem workspace found. Run `tandem init` first.",
     ))
+}
+
+fn workspace_protocol_version(workspace: &Workspace) -> Result<String, CliError> {
+    let content = fs::read_to_string(&workspace.config_path)?;
+    let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
+        CliError::user(format!(
+            "Parse failure: {}: {message}",
+            display_path(&workspace.config_path)
+        ))
+    })?;
+    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "Parse failure: {} frontmatter YAML: {message}",
+            display_path(&workspace.config_path)
+        ))
+    })?;
+    fields.get("protocolVersion").cloned().ok_or_else(|| {
+        CliError::user(format!(
+            "Validation failed for {}: missing required field `protocolVersion`",
+            display_path(&workspace.config_path)
+        ))
+    })
+}
+
+fn ensure_current_protocol(workspace: &Workspace) -> Result<(), CliError> {
+    match workspace_protocol_version(workspace)?.as_str() {
+        PROTOCOL_VERSION => Ok(()),
+        LEGACY_PROTOCOL_VERSION => Err(CliError::user(format!(
+            "Protocol {LEGACY_PROTOCOL_VERSION} project detected. Run `tandem upgrade` explicitly before using project commands."
+        ))),
+        version => Err(CliError::user(format!(
+            "Unsupported protocol version `{version}`; this Tandem version supports {PROTOCOL_VERSION}."
+        ))),
+    }
+}
+
+fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
+    if !args.is_empty() {
+        return Err(CliError::usage("tandem upgrade does not accept options"));
+    }
+    let workspace = discover_workspace_unchecked()?;
+    match workspace_protocol_version(&workspace)?.as_str() {
+        PROTOCOL_VERSION => {
+            println!("Tandem project is already at protocol {PROTOCOL_VERSION}.");
+            Ok(())
+        }
+        LEGACY_PROTOCOL_VERSION => {
+            let (content, signature) = read_file_snapshot(&workspace.config_path)?;
+            let patched = patch_frontmatter_content(
+                &content,
+                &BTreeMap::from([("protocolVersion".to_string(), PROTOCOL_VERSION.to_string())]),
+                &[],
+            )?;
+            ensure_file_unchanged(&workspace.config_path, &signature)?;
+            write_atomic(&workspace.config_path, &patched)?;
+            println!("Upgraded Tandem project protocol: {LEGACY_PROTOCOL_VERSION} -> {PROTOCOL_VERSION}");
+            println!("Preserved existing documents, configuration, events, and logs without conversion.");
+            Ok(())
+        }
+        version => Err(CliError::user(format!(
+            "Cannot upgrade unsupported protocol version `{version}`; expected {LEGACY_PROTOCOL_VERSION} or {PROTOCOL_VERSION}."
+        ))),
+    }
 }
 
 fn read_documents(dir: &Path, location: DocumentLocation) -> Result<Vec<Document>, CliError> {
@@ -3305,6 +3426,13 @@ fn update_task_metadata(
         &mut updates,
         &mut changes,
         &doc,
+        "effort",
+        options.effort.as_deref(),
+    )?;
+    apply_scalar_update(
+        &mut updates,
+        &mut changes,
+        &doc,
         "assignee",
         options.assignee.as_deref(),
     )?;
@@ -3410,15 +3538,18 @@ fn validate_update_options(
         require_nonempty(Some(title), "update --title must not be empty")?;
     }
     validate_task_kind_option(options.kind.as_deref(), "update --kind")?;
-    if let Some(priority) = options.priority.as_deref() {
-        let priority = require_nonempty(Some(priority), "update --priority must not be empty")?;
-        if !PRIORITIES.contains(&priority) {
-            return Err(CliError::user(format!(
-                "Validation failed: invalid priority `{priority}`; expected one of: {}",
-                PRIORITIES.join(", ")
-            )));
-        }
-    }
+    validate_optional_vocabulary(
+        options.priority.as_deref(),
+        "update --priority",
+        PRIORITIES,
+        "priority",
+    )?;
+    validate_optional_vocabulary(
+        options.effort.as_deref(),
+        "update --effort",
+        EFFORTS,
+        "effort",
+    )?;
     if let Some(assignee) = options.assignee.as_deref() {
         require_nonempty(Some(assignee), "update --assignee must not be empty")?;
     }
@@ -3479,6 +3610,26 @@ fn validate_task_kind_value(kind: &str) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+fn validate_optional_vocabulary(
+    value: Option<&str>,
+    flag: &str,
+    allowed: &[&str],
+    label: &str,
+) -> Result<(), CliError> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let value = require_nonempty(Some(value), &format!("{flag} must not be empty"))?;
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(CliError::user(format!(
+            "Validation failed: invalid {label} `{value}`; expected one of: {}",
+            allowed.join(", ")
+        )))
+    }
 }
 
 fn apply_scalar_update(
@@ -3582,7 +3733,56 @@ fn accord_state_divergence_warning(doc: &Document) -> Option<String> {
 }
 
 fn document_warnings(doc: &Document) -> Vec<String> {
-    accord_state_divergence_warning(doc).into_iter().collect()
+    let mut warnings = accord_state_divergence_warning(doc)
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !matches!(doc.doc_type(), "task" | "decision") {
+        warnings.push(format!(
+            "{} is legacy custom type `{}`; custom-type documents are deprecated and read-only.",
+            doc.id(),
+            doc.doc_type()
+        ));
+    }
+    warnings
+}
+
+fn workspace_deprecation_warnings(workspace: &Workspace) -> Result<Vec<String>, CliError> {
+    let content = fs::read_to_string(&workspace.config_path)?;
+    let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
+        CliError::user(format!(
+            "Parse failure: {}: {message}",
+            display_path(&workspace.config_path)
+        ))
+    })?;
+    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "Parse failure: {} frontmatter YAML: {message}",
+            display_path(&workspace.config_path)
+        ))
+    })?;
+    let mut warnings = Vec::new();
+    let declares_types = fields
+        .keys()
+        .any(|key| key == "types" || key.starts_with("types."))
+        || frontmatter.lines().any(|line| line.trim() == "types:");
+    if declares_types {
+        warnings.push("custom type declarations are deprecated and read-only; Tandem preserves them but does not create or mutate custom-type documents.".to_string());
+    }
+    let declares_completion_policy = fields
+        .keys()
+        .any(|key| key == "completion" || key.starts_with("completion."))
+        || frontmatter.lines().any(|line| line.trim() == "completion:");
+    if declares_completion_policy {
+        warnings.push("project completion-policy settings are deprecated and ignored; Tandem always warns for missing review or accord acceptance and completes unless structural validation fails.".to_string());
+    }
+    Ok(warnings)
+}
+
+fn print_workspace_deprecation_warnings(workspace: &Workspace) -> Result<(), CliError> {
+    for warning in workspace_deprecation_warnings(workspace)? {
+        println!("Warning: {warning}");
+    }
+    Ok(())
 }
 
 fn state_matches_filter(actual: Option<&str>, requested: &str) -> bool {
@@ -5105,6 +5305,7 @@ fn document_summary_json(doc: &Document, relationship: Option<ParentRelationship
     push_json_field(&mut fields, "title", doc.title());
     push_optional_json_field(&mut fields, "state", doc.field("state"));
     push_optional_json_field(&mut fields, "priority", doc.field("priority"));
+    push_optional_json_field(&mut fields, "effort", doc.field("effort"));
     push_optional_json_field(&mut fields, "assignee", doc.field("assignee"));
     push_optional_json_field(&mut fields, "parentId", doc.field("parentId"));
     push_parent_relationship_json_field(&mut fields, relationship);
@@ -5131,6 +5332,7 @@ fn document_detail_json(doc: &Document) -> String {
     for key in [
         "state",
         "priority",
+        "effort",
         "assignee",
         "dueDate",
         "parentId",

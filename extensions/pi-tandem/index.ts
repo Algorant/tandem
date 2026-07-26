@@ -48,6 +48,7 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	description?: string;
 	body?: string;
 	priority?: string;
+	effort?: string;
 	type?: string;
 	kind?: "epic";
 	tags?: string[];
@@ -203,7 +204,7 @@ function rejectUnsupportedUpdateFields(params: TaskToolParams): void {
 	if (!unsupported.length) return;
 	throw new Error(
 		`tandem_task update does not support ${unsupported.join(", ")}. ` +
-			"Use tandem_task action=add for descriptions when creating tasks; use tandem_task action=update with body for complete Markdown body replacement; use tandem_accord for accord lifecycle changes; review metadata is managed by review/validation flows, not tandem update. Supported update fields are title, body, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles.",
+			"Use tandem_task action=add for descriptions when creating tasks; use tandem_task action=update with body for complete Markdown body replacement; use tandem_accord for accord lifecycle changes; review metadata is managed by review/validation flows, not tandem update. Supported update fields are title, body, kind, priority, effort, assignee, dueDate, parent, tags, blockers, references, and relatedFiles.",
 	);
 }
 
@@ -226,6 +227,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		addOptionalFlag(args, "--state", params.state);
 		addOptionalFlag(args, "--type", params.type);
 		addOptionalFlag(args, "--priority", params.priority);
+		addOptionalFlag(args, "--effort", params.effort);
 		addOptionalFlag(args, "--parent", params.parent);
 		addOptionalFlag(args, "--tag", params.tags?.[0]);
 		addOptionalFlag(args, "--assignee", params.assignee);
@@ -244,6 +246,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		addOptionalFlag(args, "--state", params.state);
 		addOptionalFlag(args, "--description", params.description);
 		addOptionalFlag(args, "--priority", params.priority);
+		addOptionalFlag(args, "--effort", params.effort);
 		addOptionalFlag(args, "--kind", params.kind);
 		addRepeatedFlag(args, "--tag", params.tags);
 		addOptionalFlag(args, "--assignee", params.assignee);
@@ -264,6 +267,7 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		addPresentStringFlag(args, "--body", params.body);
 		addOptionalFlag(args, "--kind", params.kind);
 		addOptionalFlag(args, "--priority", params.priority);
+		addOptionalFlag(args, "--effort", params.effort);
 		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--due-date", params.dueDate);
 		addOptionalFlag(args, "--parent", params.parent);
@@ -581,6 +585,7 @@ export const tandemTaskParameters = Type.Object({
 	description: Type.Optional(Type.String({ description: "Task description for action=add only; action=update rejects this field. Use body for exact update-time Markdown body replacement." })),
 	body: Type.Optional(Type.String({ description: "Exact complete Markdown body for action=update, including an empty string to clear it. Maps to `tandem update --body` without trimming." })),
 	priority: Type.Optional(Type.String()),
+	effort: Type.Optional(Type.String({ description: "Optional fixed effort: trivial, small, medium, or large." })),
 	kind: Type.Optional(StringEnum(["epic"] as const, { description: "Optional task classifier for add/update. Use kind=epic only for a root global task; Epics cannot have parentId and are not delegation roots." })),
 	tags: Type.Optional(Type.Array(Type.String())),
 	assignee: Type.Optional(Type.String()),

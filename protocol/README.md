@@ -49,10 +49,10 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 
 ## Locked v0 protocol decisions
 
-- Protocol version: `0.1.0` for the first v0 draft.
+- Protocol version: `0.2.0`. Tandem refuses ordinary project operations on discovered `0.1.0` workspaces until the user explicitly runs `tandem upgrade`; help and version remain available.
 - Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
 - New work items use `type: task`; the canonical shape is `task-10` Epic → `task-11` global Task → `task-11-1` parent-derived leaf Subtask. Epics and Tasks—including direct Epic Tasks—use global `task-N` IDs. Only a Subtask directly beneath a Task uses `task-N-M`.
-- First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only.
+- First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records and do not need a lifecycle field. Existing custom declarations/documents are deprecated read-only content: upgrade preserves them for list/show/search, but Tandem neither creates nor mutates them.
 - Epic, Task, and Subtask are derived roles over normal task documents. An Epic is `type: task` plus `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Classification resolves documents and never uses ID shape.
 - Direct Epic children use `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.
 - Strict validation rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and role-changing or ID-invalidating reparenting.
@@ -62,7 +62,7 @@ Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or
 - Epics retain normal task lifecycle and have no separate type, ID namespace, command family, or lifecycle. Epics are not delegated; a delegated Task's Subtask documents are Worker A's `pi-todos` execution checklist and are not independently delegated.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID.
-- Completion warns but allows completion in v0.
+- Completion always warns but allows completion unless structural validation blocks it. Legacy project-level completion-policy settings are preserved, deprecated, and ignored.
 - Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition.
-- Validation is built-in structural validation only, with strict structure/core refs, hierarchy roles, and ID grammar: unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, and role-changing reparenting are errors; unresolved related `references` are warnings.
+- Validation is built-in structural validation only, with strict structure/core refs, hierarchy roles, and ID grammar: unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, role-changing reparenting, and invalid optional `priority` (`low|medium|high|critical`) or `effort` (`trivial|small|medium|large`) values are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.

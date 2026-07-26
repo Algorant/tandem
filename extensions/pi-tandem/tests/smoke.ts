@@ -123,6 +123,8 @@ assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init build
 
 const epicArgs = buildTaskArgs({ action: "add", title: "Canonical Epic", kind: "epic" });
 assert(epicArgs.join(" ") === "add --title Canonical Epic --kind epic", "tandem_task add builder should map Epic kind directly");
+const effortArgs = buildTaskArgs({ action: "add", title: "Estimated task", priority: "high", effort: "small" });
+assert(effortArgs.join(" ") === "add --title Estimated task --priority high --effort small", "tandem_task should forward fixed effort metadata");
 
 const updateArgs = buildTaskArgs({ action: "update", id: "task-1", kind: "epic", priority: "high", parent: "task-2", tags: ["cli"] });
 assert(updateArgs.join(" ") === "update task-1 --kind epic --priority high --parent task-2 --tag cli", "tandem_task update builder should map kind, metadata, and parent flags");
@@ -179,6 +181,7 @@ try {
 		state: "todo",
 		description: "Created by pi-tandem smoke test.",
 		priority: "medium",
+		effort: "small",
 		tags: ["smoke"],
 	}), workspace);
 	const taskId = parseId(addOutput);
@@ -220,6 +223,7 @@ try {
 	const updated = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
 	assert(updated.data.document.title === "Updated smoke task", "update should change title");
 	assert(updated.data.document.priority === "high", "update should change priority");
+	assert(updated.data.document.effort === "small", "show should expose effort metadata");
 	assert(updated.data.document.tags.includes("metadata"), "update should append tags");
 	assert(updated.data.document.relatedFiles.includes("extensions/pi-tandem/index.ts"), "show JSON should expose relatedFiles");
 

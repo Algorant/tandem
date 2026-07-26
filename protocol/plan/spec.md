@@ -28,7 +28,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Default active states are `todo`, `in-progress`, and `validation`; existing `state: review` documents are tolerated as a legacy alias during the transition.
 - New task items use `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 - First-class document types are `task` and `decision`.
-- Custom document types are allowed in config only; v0 has no type-management CLI.
+- `task` and `decision` are the only first-class/creatable document types. Existing custom declarations and custom documents are deprecated read-only content: upgrade preserves them for list/show/search, while Tandem rejects their creation and mutation.
 - Epic, Task, and Subtask are derived roles over `type: task` documents; there is no separate task subtype or persisted role field. An Epic has `kind: epic`. A Task is normal and either root-level, parented by a non-task document, or directly parented by an Epic. A Subtask is normal and directly parented by a Task.
 - Resolve the referenced documents to classify hierarchy. Direct Epic children use relationship `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Never derive any role or relationship from ID shape.
 - The hierarchy and ID grammar are strict: Epics cannot have `parentId`; Subtasks cannot have children; Epics/Tasks require global `task-N`; Subtasks require `task-N-M`. Add/update/reparent operations reject invalid roles, IDs, and role-changing or ID-invalidating reparenting. Generic-parent Tasks may have Subtasks.
@@ -40,13 +40,13 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Rules are structured objects with stable IDs: `{ id, rule, source? }`.
 - `parentId`, `blockers`, and `references` may point to any Tandem document by ID. A task-to-task `parentId` is `epic-task` when the resolved parent is an Epic and `subtask` only when the resolved parent has the Task role; a non-task target is generic `parent`.
 - Completion warns about missing accepted review or accepted accord, but allows completion in v0.
-- Protocol version for the first v0 draft is `0.1.0`.
+- Protocol version is `0.2.0`. A discovered `0.1.0` project refuses every project operation except explicit `tandem upgrade`; help/version remain process-level operations, and upgrade is never implicit.
 - Events live in per-actor append logs under `.tandem/events/<actor_id>.jsonl`; legacy `.tandem/events.jsonl` remains a readable transition source, but new writes should not append to it by default.
 - Event payloads are minimal audit records in v0: require `ts`, `event`, `id`, `summary`, `actor`, and `seq`; event identity is `<actor>:<seq>`; defer typed per-event payload schemas.
 - Completed logs are archived Markdown documents in `.tandem/logs/`; those documents are the source of truth for completed history. Events enrich timeline and audit views.
 - Validation/lint is built-in structural validation only in v0.
 - Schemas and fixtures are not part of v0.
-- Validation severity is strict for structure, roles, IDs, and core references: invalid/missing required structure, unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, and role-changing or ID-invalidating reparenting are errors; unresolved related `references`/rule sources and completion-policy issues are warnings.
+- Validation severity is strict for structure, roles, IDs, core references, and optional fixed vocabularies: invalid/missing required structure, unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, role-changing or ID-invalidating reparenting, and invalid priority/effort values are errors; unresolved related `references`/rule sources are warnings. Legacy completion-policy settings are preserved, deprecated, ignored, and warned about.
 - Decision documents do not need a workflow lifecycle `state` field in v0. They may carry an ADR-style `status` such as `proposed` or `accepted`; this status is decision metadata, not task workflow state.
 
 ## Naming model
@@ -261,11 +261,11 @@ Workspace config lives in `.tandem/tandem.md` frontmatter.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
-| `protocolVersion` | yes | error | Must be `0.1.0` for this v0 draft. |
+| `protocolVersion` | yes | error | Must be `0.2.0`. A discovered `0.1.0` workspace may only run explicit `tandem upgrade`; no operation upgrades implicitly. |
 | `title` | yes | error | Human-readable workspace title. |
 | `states` | yes | error | Array of workflow states. `tandem init` writes `todo`, `in-progress`, `validation`. Duplicate IDs are errors. Missing defaults are warnings if no active task uses them. Existing `review` is a legacy alias for `validation` reads. |
-| `completion` | no | warning | Completion policy hints. V0 warns but does not block when review/accord acceptance is missing. |
-| `types` | no | error if malformed | Defines first-class and custom document type metadata. Custom types are config-only in v0. |
+| `completion` | no | warning | Legacy completion-policy settings are preserved but deprecated and ignored. Tandem warns but does not block when review/accord acceptance is missing. |
+| `types` | no | warning if present/malformed | Legacy custom-type declarations are preserved as deprecated read-only content; Tandem does not create custom types/documents. |
 | `rules` | no | error if malformed | Rule groups `always`, `never`, `prefer`, `context`; each entry is a rule object. |
 | `agent` | no | warning if malformed | Agent-facing instructions. Unknown nested fields should be preserved. |
 | `theme` | no | none | Protocol stores the value but CLI/TUI owns interpretation. |
@@ -282,8 +282,8 @@ Task documents live in `.tandem/board/` while active and `.tandem/logs/` after c
 | `kind` | no | error if unsupported | Optional task sub-kind/convention classifier. Omitted means a normal task; v0 defines `epic` for lightweight grouping/planning tasks without changing task identity, ID allocation, workflow, accord, review, or completion behavior. |
 | `title` | yes | error | Display title. |
 | `state` | yes in board | error | Must match a configured workspace state. Omitted in logs is allowed. |
-| `priority` | no | warning if unrecognized | Suggested values: `low`, `medium`, `high`, `critical`; projects may extend. |
-| `effort` | no | warning if unrecognized | Suggested values: `trivial`, `small`, `medium`, `large`, `xlarge`; projects may extend. |
+| `priority` | no | error if unrecognized | One of `low`, `medium`, `high`, `critical`. |
+| `effort` | no | error if unrecognized | One of `trivial`, `small`, `medium`, `large`. |
 | `tags` | no | error if malformed | Array of strings. |
 | `assignee` | no | none | Human or agent responsible. |
 | `parentId` | no | error if unresolved, role-invalid, or ID-invalid | Core reference to any Tandem document ID. Resolved Epic parents produce global-ID Tasks with `epic-task`, resolved Task parents produce matching `task-N-M` Subtasks with `subtask`, and non-task parents produce global-ID Tasks with generic `parent`. Epics cannot set it, and Subtasks cannot be parents. |
@@ -353,7 +353,7 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 
 ### Completion metadata fields
 
-Archived task documents in `.tandem/logs/` include `completedAt` and `completion` metadata. Missing required log metadata is an error because Logs are the terminal work-history source of truth. The field name `completedAt` remains the compatible archive timestamp for both successful completion and cancellation in protocol 0.1.0.
+Archived task documents in `.tandem/logs/` include `completedAt` and `completion` metadata. Missing required log metadata is an error because Logs are the terminal work-history source of truth. The field name `completedAt` remains the compatible archive timestamp for both successful completion and cancellation.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
@@ -393,7 +393,7 @@ Example:
 
 ```markdown
 ---
-protocolVersion: 0.1.0
+protocolVersion: 0.2.0
 title: My Project
 states:
   - id: todo
@@ -450,7 +450,7 @@ Human-readable project context goes here.
 | `title` | yes | Display name. |
 | `states` | yes | Human workflow states. |
 | `completion` | no | Completion/archive warning policy. |
-| `types` | no | First-class and custom document type configuration. Custom types are config-only in v0. |
+| `types` | no | Deprecated legacy custom-type declarations, preserved read-only after upgrade. |
 | `rules` | no | Structured project rules for humans and agents. |
 | `agent` | no | Agent-specific operating guidance. |
 | `theme` | no | Optional TUI theme preference. |
@@ -517,8 +517,8 @@ Freeform notes stay in Markdown and should not be destroyed by tools.
 | `kind` | no | Optional task sub-kind/convention classifier. Omit for normal tasks; use `epic` for lightweight planning/grouping tasks while preserving `type: task` and normal task semantics. |
 | `title` | yes | Display title. |
 | `state` | yes for active tasks | Human workflow state. Defaults are `todo`, `in-progress`, and `validation`; `review` is read as a legacy alias for validation. |
-| `priority` | no | `low`, `medium`, `high`, `critical`, or project-defined. |
-| `effort` | no | `trivial`, `small`, `medium`, `large`, `xlarge`, or project-defined. |
+| `priority` | no | `low`, `medium`, `high`, or `critical`. |
+| `effort` | no | `trivial`, `small`, `medium`, or `large`. |
 | `tags` | no | Filtering/grouping. |
 | `assignee` | no | Human or agent currently responsible. |
 | `parentId` | no | Canonical parent document ID. A resolved Epic target yields a global-ID Task with `epic-task`, a resolved Task target yields a matching `task-N-M` Subtask with `subtask`, and a non-task target yields a global-ID Task with generic `parent`. Epics cannot have this field, and a Subtask cannot be targeted as a parent. |
@@ -951,7 +951,7 @@ First-class v0 types:
 
 Epics use the `task` document type with the optional `kind: epic` convention. They are not a first-class v0 type and should not require custom type configuration.
 
-Custom types are allowed only through workspace config in v0:
+Custom-type declarations/documents from 0.1.0 are legacy compatibility content in 0.2.0:
 
 ```yaml
 types:
@@ -966,7 +966,7 @@ types:
     completable: true
 ```
 
-A custom type may define an `idPrefix` and whether documents of that type are completable. v0 does not include commands for creating, editing, or managing type definitions.
+Upgrade preserves declarations and documents byte-for-byte apart from the workspace `protocolVersion` patch. Tandem warns that they are deprecated, allows list/show/search access, and rejects creation or mutation; there are no type-management commands.
 
 ## Validation diagnostics
 
@@ -982,12 +982,12 @@ Errors fail validation and should block normal mutations.
 | --- | --- | --- |
 | `E001` | workspace config unreadable | `.tandem/tandem.md` is missing or frontmatter cannot be parsed. |
 | `E002` | workspace required field missing | Missing `protocolVersion`, `title`, or `states`. |
-| `E003` | unsupported protocol version | `protocolVersion` is not `0.1.0`. |
+| `E003` | unsupported protocol version | `protocolVersion` is not `0.2.0`; `0.1.0` is upgrade-only. |
 | `E010` | document frontmatter unreadable | A Markdown file in `board/` or `logs/` has invalid frontmatter. |
 | `E011` | document required field missing | A task is missing `id`, `type`, `title`, or active `state`. |
 | `E012` | duplicate document ID | The same ID appears in more than one board/log document. |
 | `E013` | invalid document ID shape or role | An Epic/Task is not global `task-N`, a Subtask is not `task-N-M` matching its resolved Task parent, a deeper task ID is used, or a decision ID is not `decision-N`. |
-| `E020` | unknown document type | `type` is neither `task`, `decision`, nor a configured custom type. |
+| `E020` | unsupported document type | Tandem only creates/mutates `task` and `decision`; preserved legacy custom documents are read-only. |
 | `E021` | unknown active state | A task has `state: blocked` but `blocked` is not in workspace `states`. |
 | `E030` | invalid accord object | `accord.status` is missing or not one of the canonical v0 values. |
 | `E031` | invalid review object | `review.status` is missing or not one of the documented review values. |
@@ -1011,7 +1011,7 @@ Warnings should be shown, but tools may proceed.
 | `W020` | completion review policy | A task is being completed without `review.status: accepted`. |
 | `W021` | completion accord policy | A task with an accord is being completed without `accord.status: accepted`. |
 | `W030` | missing default state | Workspace `states` omits one of the default states and no active task currently needs it. |
-| `W040` | malformed optional metadata | Optional timestamp, priority, effort, notes, evidence, or validation metadata is malformed but recoverable. |
+| `W040` | malformed optional metadata | Optional timestamp, notes, evidence, or validation metadata is malformed but recoverable; invalid priority/effort vocabulary is an error. |
 | `W050` | non-canonical preserved field | A field is unknown to v0 but can be preserved safely. |
 
 ### Reference validation
