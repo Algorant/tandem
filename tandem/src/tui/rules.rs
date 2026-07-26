@@ -301,11 +301,11 @@ impl TuiApp {
             .collect::<Vec<_>>();
         let content_width: u16 = tab_widths.iter().sum();
         let gaps = RULE_CATEGORIES.len().saturating_sub(1) as u16;
-        let gap_width = if gaps == 0 {
-            0
-        } else {
-            ((area.width.saturating_sub(content_width)) / gaps).clamp(4, 10)
-        };
+        let gap_width = area
+            .width
+            .saturating_sub(content_width)
+            .checked_div(gaps)
+            .map_or(0, |gap_width| gap_width.clamp(4, 10));
         let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
         let leading = area.width.saturating_sub(total_width) / 2;
 

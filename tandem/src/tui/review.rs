@@ -273,6 +273,10 @@ pub(super) fn detail_line_count(item: Option<&ReviewQueueItem>, theme: &TuiTheme
         .unwrap_or(1)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Review render seam; remove at the Stage 6 Review feature extraction checkpoint"
+)]
 pub(super) fn render_review(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -318,6 +322,10 @@ pub(super) fn render_review(
     );
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Review list render seam; remove at the Stage 6 Review feature extraction checkpoint"
+)]
 fn render_queue_list(
     frame: &mut Frame<'_>,
     area: Rect,

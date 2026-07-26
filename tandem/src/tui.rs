@@ -2436,9 +2436,11 @@ impl TuiApp {
                 &mut BTreeSet::from([doc.id().to_string()]),
             );
             let total = outstanding + completed;
-            if total > 0 {
+            if let Some(filled) = completed
+                .checked_mul(24usize)
+                .and_then(|value| value.checked_div(total))
+            {
                 let width = 24usize;
-                let filled = completed * width / total;
                 spans.push(Span::raw("  "));
                 spans.push(Span::styled(
                     "█".repeat(filled),
@@ -2521,11 +2523,10 @@ impl TuiApp {
             .collect::<Vec<_>>();
         let content_width: u16 = tab_widths.iter().sum();
         let gaps = TuiView::ALL.len().saturating_sub(1) as u16;
-        let gap_width = if gaps == 0 {
-            0
-        } else {
-            ((width.saturating_sub(content_width)) / gaps).clamp(3, 8)
-        };
+        let gap_width = width
+            .saturating_sub(content_width)
+            .checked_div(gaps)
+            .map_or(0, |gap_width| gap_width.clamp(3, 8));
         let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
         let leading = width.saturating_sub(total_width) / 2;
 
@@ -2584,11 +2585,11 @@ impl TuiApp {
             .collect::<Vec<_>>();
         let content_width: u16 = tab_widths.iter().sum();
         let gaps = TuiView::ALL.len().saturating_sub(1) as u16;
-        let gap_width = if gaps == 0 {
-            0
-        } else {
-            ((area.width.saturating_sub(content_width)) / gaps).clamp(3, 8)
-        };
+        let gap_width = area
+            .width
+            .saturating_sub(content_width)
+            .checked_div(gaps)
+            .map_or(0, |gap_width| gap_width.clamp(3, 8));
         let total_width = content_width.saturating_add(gap_width.saturating_mul(gaps));
         let mut x = area
             .x
@@ -3349,12 +3350,7 @@ impl TuiApp {
                 quick_add_status(input),
                 self.theme.status_style(StatusTone::Warning),
             ))
-        } else if self.log_search_input.is_some() {
-            Line::from(Span::styled(
-                self.status.clone(),
-                self.theme.status_style(StatusTone::Warning),
-            ))
-        } else if self.validation_prompt.is_some() {
+        } else if self.log_search_input.is_some() || self.validation_prompt.is_some() {
             Line::from(Span::styled(
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
@@ -4618,11 +4614,7 @@ fn plural_suffix(count: usize) -> &'static str {
 }
 
 fn display_state_label(state: &str) -> String {
-    state
-        .trim()
-        .replace('-', " ")
-        .replace('_', " ")
-        .to_uppercase()
+    state.trim().replace(['-', '_'], " ").to_uppercase()
 }
 
 fn validation_prompt_lines(prompt: &ValidationPrompt, theme: &TuiTheme) -> Vec<Line<'static>> {
@@ -4891,6 +4883,10 @@ fn mark_state_board_last_siblings(entries: &mut [StateBoardEntry<'_>]) {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Board projection seam; remove at the Stage 6 Board projection extraction checkpoint"
+)]
 fn collect_visible_state_descendants<'a>(
     parent_id: &str,
     depth: usize,
@@ -5170,6 +5166,10 @@ fn epic_board_entries_with_hierarchy<'a>(
     entries
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Epic Board projection seam; remove at the Stage 6 Board projection extraction checkpoint"
+)]
 fn collect_visible_epic_descendants<'a>(
     parent_id: &str,
     depth: usize,
@@ -5446,6 +5446,10 @@ fn board_item_lines_for_doc_with_context(
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Board rendering seam; remove at the Stage 6 Board rendering extraction checkpoint"
+)]
 fn board_item_lines_for_doc_with_context_and_limit(
     doc: &Document,
     theme: &TuiTheme,
@@ -5536,6 +5540,10 @@ fn board_scan_chips(
     chips
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Board rendering seam; remove at the Stage 6 Board rendering extraction checkpoint"
+)]
 fn state_list_item_for_entry(
     entry: &StateBoardEntry<'_>,
     relationship_context: &BoardRelationshipContext,
@@ -5558,6 +5566,10 @@ fn state_list_item_for_entry(
     ))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Board rendering seam; remove at the Stage 6 Board rendering extraction checkpoint"
+)]
 fn state_lines_for_entry(
     entry: &StateBoardEntry<'_>,
     relationship_context: &BoardRelationshipContext,
@@ -5832,6 +5844,10 @@ fn compact_relationship_meta(parent_id: &str, child_id: &str, width: usize) -> S
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "legacy Board rendering seam; remove at the Stage 6 Board rendering extraction checkpoint"
+)]
 fn board_row_line(
     doc: &Document,
     theme: &TuiTheme,
@@ -6229,8 +6245,7 @@ fn inline_preview_lines_for_doc_with_context(
             .saturating_add(trailing_sections.len());
         let summary_capacity = content_limit
             .saturating_sub(reserved)
-            .max(1)
-            .min(INLINE_PREVIEW_MAX_LINES);
+            .clamp(1, INLINE_PREVIEW_MAX_LINES);
         content_lines.push(inline_preview_heading(summary_label, theme));
         content_lines.extend(inline_preview_markdownish(
             &summary_text,

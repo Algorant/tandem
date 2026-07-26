@@ -697,15 +697,16 @@ fn text_width(value: &str) -> usize {
 }
 
 fn decision_detail_lines(doc: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    lines.push(Line::from(vec![
-        Span::styled("Title: ", theme.label_style()),
-        Span::styled(doc.title().to_string(), theme.text_style()),
-    ]));
-    lines.push(detail_field_line("ID", doc.id(), theme));
-    lines.push(detail_field_line("Type", doc.doc_type(), theme));
-    lines.push(Line::from(""));
-    lines.push(detail_section_heading("Decision metadata", theme));
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Title: ", theme.label_style()),
+            Span::styled(doc.title().to_string(), theme.text_style()),
+        ]),
+        detail_field_line("ID", doc.id(), theme),
+        detail_field_line("Type", doc.doc_type(), theme),
+        Line::from(""),
+        detail_section_heading("Decision metadata", theme),
+    ];
     push_optional_decision_scalar_line(&mut lines, "Status", doc, DECISION_STATUS_KEYS, theme);
     push_optional_decision_scalar_line(&mut lines, "Date", doc, DECISION_DATE_KEYS, theme);
     push_optional_decision_list_line(

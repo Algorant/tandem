@@ -3075,27 +3075,28 @@ fn unescape_double_quoted(value: &str) -> String {
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
     docs.into_iter()
         .filter(|doc| {
-            options.state.as_deref().map_or(true, |state| {
-                state_matches_filter(doc.field("state"), state)
-            })
+            options
+                .state
+                .as_deref()
+                .is_none_or(|state| state_matches_filter(doc.field("state"), state))
         })
         .filter(|doc| {
             options
                 .doc_type
                 .as_deref()
-                .map_or(true, |doc_type| doc.doc_type() == doc_type)
+                .is_none_or(|doc_type| doc.doc_type() == doc_type)
         })
         .filter(|doc| {
             options
                 .priority
                 .as_deref()
-                .map_or(true, |priority| doc.field("priority") == Some(priority))
+                .is_none_or(|priority| doc.field("priority") == Some(priority))
         })
         .filter(|doc| {
             options
                 .assignee
                 .as_deref()
-                .map_or(true, |assignee| doc.field("assignee") == Some(assignee))
+                .is_none_or(|assignee| doc.field("assignee") == Some(assignee))
         })
         .filter(|doc| {
             options
@@ -3107,19 +3108,19 @@ fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document>
             options
                 .tag
                 .as_deref()
-                .map_or(true, |tag| field_values_contain(doc.field("tags"), tag))
+                .is_none_or(|tag| field_values_contain(doc.field("tags"), tag))
         })
         .filter(|doc| {
             options
                 .accord
                 .as_deref()
-                .map_or(true, |accord| accord_status(doc) == Some(accord))
+                .is_none_or(|accord| accord_status(doc) == Some(accord))
         })
         .filter(|doc| {
             options
                 .review
                 .as_deref()
-                .map_or(true, |review| review_status(doc) == Some(review))
+                .is_none_or(|review| review_status(doc) == Some(review))
         })
         .collect()
 }
@@ -4190,15 +4191,16 @@ fn search_documents(docs: Vec<Document>, options: &SearchOptions) -> Vec<SearchR
             options
                 .doc_type
                 .as_deref()
-                .map_or(true, |doc_type| doc.doc_type() == doc_type)
+                .is_none_or(|doc_type| doc.doc_type() == doc_type)
         })
         .filter(|doc| {
             if doc.location == DocumentLocation::Logs {
                 options.state.is_none()
             } else {
-                options.state.as_deref().map_or(true, |state| {
-                    state_matches_filter(doc.field("state"), state)
-                })
+                options
+                    .state
+                    .as_deref()
+                    .is_none_or(|state| state_matches_filter(doc.field("state"), state))
             }
         })
         .filter(|doc| {
@@ -4247,7 +4249,7 @@ fn snippet_for_match(value: &str, query: &str) -> String {
     let chars = condensed.chars().collect::<Vec<_>>();
     let mut snippet = chars[start..end].iter().collect::<String>();
     if start > 0 {
-        snippet.insert_str(0, "…");
+        snippet.insert(0, '…');
     }
     if end < chars.len() {
         snippet.push('…');
@@ -5407,7 +5409,7 @@ fn patch_frontmatter_content(
         let raw_line = lines[index];
         let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
         if let Some(key) = frontmatter_line_key(line) {
-            if removes.iter().any(|remove| *remove == key) {
+            if removes.contains(&key) {
                 index += 1;
                 while index < lines.len() {
                     let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
@@ -5674,7 +5676,7 @@ fn yaml_double_quote(value: &str) -> String {
 fn field_values_contain(value: Option<&str>, needle: &str) -> bool {
     value
         .map(parse_field_values)
-        .map_or(false, |values| values.iter().any(|value| value == needle))
+        .is_some_and(|values| values.iter().any(|value| value == needle))
 }
 
 fn parse_field_values(value: &str) -> Vec<String> {

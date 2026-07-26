@@ -1187,7 +1187,7 @@ fn apply_theme_config_file(
                 TuiTheme::built_in_names().join(", "),
                 user_theme_dir
                     .map(|dir| format!(" in {}", display_path(dir)))
-                    .unwrap_or_else(|| "".to_string())
+                    .unwrap_or_default()
             )),
         }
     }
