@@ -3621,37 +3621,11 @@ fn workspace_title_from_root(root: Option<&Yaml>) -> Option<String> {
 }
 
 fn workspace_states_from_root(root: Option<&Yaml>) -> Vec<String> {
-    let mut states = Vec::new();
-    if let Some(states_yaml) = root.and_then(|root| yaml_mapping_value(root, "states")) {
-        match states_yaml {
-            Yaml::Array(items) => {
-                for item in items {
-                    if let Some(state) = yaml_scalar_to_string(item)
-                        .or_else(|| yaml_mapping_value(item, "id").and_then(yaml_scalar_to_string))
-                    {
-                        if !state.trim().is_empty() {
-                            states.push(state);
-                        }
-                    }
-                }
-            }
-            _ => {
-                if let Some(state) = yaml_scalar_to_string(states_yaml) {
-                    if !state.trim().is_empty() {
-                        states.push(state);
-                    }
-                }
-            }
-        }
-    }
-    if states.is_empty() {
-        states = default_workspace_states();
-    }
-    states
+    workflow_states(root)
 }
 
 fn default_workspace_states() -> Vec<String> {
-    DEFAULT_STATES
+    workflow::DEFAULT_STATES
         .iter()
         .map(|state| (*state).to_string())
         .collect()
@@ -3773,43 +3747,20 @@ fn validation_load_errors_with_hierarchy(
     warnings.extend(hierarchy.errors.iter().cloned());
 
     for doc in docs.iter().chain(logs.iter()) {
-        let mut errors = Vec::new();
-        if doc.id().trim().is_empty() {
-            errors.push("missing required field `id`".to_string());
-        }
-        if doc.title().trim().is_empty() {
-            errors.push("missing required field `title`".to_string());
-        }
-
-        match doc.field("type") {
-            Some(doc_type) if !doc_type.trim().is_empty() => {}
-            _ => errors.push("missing required field `type`".to_string()),
-        }
-
-        if doc.location == DocumentLocation::Board && doc.doc_type() == "task" {
-            match doc.field("state") {
-                Some(state) if configured_states.iter().any(|known| known == state) => {}
-                Some(state) if !state.trim().is_empty() => errors.push(format!(
-                    "unknown state `{state}`; known states: {}",
-                    configured_states.join(", ")
-                )),
-                _ => errors.push("missing required field `state`".to_string()),
-            }
-        }
-
-        if doc.location == DocumentLocation::Logs && doc.doc_type() == "task" {
-            if doc.field("completedAt").is_none() {
-                errors.push("missing required log field `completedAt`".to_string());
-            }
-            if completion_summary(doc).is_none() {
-                errors.push("missing required log field `completion.summary`".to_string());
-            }
-            let outcome = completion_outcome(doc);
-            if !COMPLETION_OUTCOMES.contains(&outcome) {
-                errors.push(format!(
-                    "invalid completion.outcome `{outcome}`; expected completed or canceled"
-                ));
-            }
+        let mut errors = crate::protocol::diagnostic::metadata_diagnostics(
+            doc,
+            doc.location == DocumentLocation::Logs,
+        )
+        .into_iter()
+        .filter(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)
+        .map(|diagnostic| diagnostic.message)
+        .collect::<Vec<_>>();
+        if let Some(diagnostic) = crate::protocol::diagnostic::workflow_state_diagnostic(
+            doc,
+            doc.location == DocumentLocation::Board && doc.doc_type() == "task",
+            configured_states,
+        ) {
+            errors.push(diagnostic.message);
         }
 
         if let Some(parent) = doc
@@ -3827,22 +3778,6 @@ fn validation_load_errors_with_hierarchy(
         {
             if !ids.contains(&blocker) {
                 errors.push(format!("unresolved blocker `{blocker}`"));
-            }
-        }
-        if has_metadata(doc, "accord") || doc.field("accordStatus").is_some() {
-            match accord_status(doc) {
-                Some(status) if ACCORD_STATUSES.contains(&status) => {}
-                Some(status) => errors.push(format!("invalid accord.status `{status}`")),
-                None => errors
-                    .push("accord.status is required when accord metadata is present".to_string()),
-            }
-        }
-        if has_metadata(doc, "review") || doc.field("reviewStatus").is_some() {
-            match review_status(doc) {
-                Some(status) if REVIEW_STATUSES.contains(&status) => {}
-                Some(status) => errors.push(format!("invalid review.status `{status}`")),
-                None => errors
-                    .push("review.status is required when review metadata is present".to_string()),
             }
         }
 
@@ -5063,13 +4998,13 @@ fn hierarchy_index_for(
     active_docs: &[Document],
     completed_logs: &[Document],
 ) -> Result<HierarchyIndex, CliError> {
-    HierarchyIndex::from_documents(
+    Ok(HierarchyIndex::from_documents(
         active_docs
             .iter()
             .chain(completed_logs.iter())
             .cloned()
             .collect(),
-    )
+    )?)
 }
 
 #[cfg(test)]
@@ -6682,7 +6617,7 @@ fn push_board_accord_detail_section(
         accord_detail_status_style(status, theme),
         theme,
     ));
-    if let Some(warning) = accord_state_divergence_warning(doc) {
+    if let Some(warning) = accord::state_divergence_warning(doc) {
         let warning_style = theme.status_style(StatusTone::Warning);
         lines.push(Line::from(vec![
             Span::styled("Warning: ", warning_style.add_modifier(Modifier::BOLD)),

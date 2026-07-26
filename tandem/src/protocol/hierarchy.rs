@@ -6,8 +6,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use crate::{display_path, CliError, Document};
+use crate::Document;
 
+use super::diagnostic::{display_path, Diagnostic};
 use super::document::{validate_task_kind, EFFORTS, PRIORITIES};
 use super::ids::{global_task_number, subtask_suffix};
 
@@ -60,18 +61,18 @@ pub(crate) struct HierarchyIndex {
 }
 
 impl HierarchyIndex {
-    pub(crate) fn from_documents(docs: Vec<Document>) -> Result<Self, CliError> {
+    pub(crate) fn from_documents(docs: Vec<Document>) -> Result<Self, Diagnostic> {
         let mut documents = HashMap::new();
         for doc in docs {
             let id = doc.id().to_string();
             if id.trim().is_empty() {
-                return Err(CliError::user(format!(
+                return Err(Diagnostic::error(format!(
                     "Validation failed for {}: missing required field `id`",
                     display_path(&doc.path)
                 )));
             }
             if let Some(existing) = documents.insert(id.clone(), doc.clone()) {
-                return Err(CliError::user(format!(
+                return Err(Diagnostic::error(format!(
                     "Validation failed: duplicate document ID `{id}` in {} and {}",
                     display_path(&existing.path),
                     display_path(&doc.path)
@@ -91,7 +92,7 @@ impl HierarchyIndex {
         self.documents.get(id)
     }
 
-    pub(crate) fn task_role(&self, doc: &Document) -> Result<Option<TaskRole>, CliError> {
+    pub(crate) fn task_role(&self, doc: &Document) -> Result<Option<TaskRole>, Diagnostic> {
         if doc.doc_type() != "task" {
             return Ok(None);
         }
@@ -106,32 +107,32 @@ impl HierarchyIndex {
         id: &str,
         roles: &mut HashMap<String, TaskRole>,
         stack: &mut Vec<String>,
-    ) -> Result<TaskRole, CliError> {
+    ) -> Result<TaskRole, Diagnostic> {
         if let Some(role) = roles.get(id) {
             return Ok(*role);
         }
         if let Some(cycle_start) = stack.iter().position(|entry| entry == id) {
             let mut cycle = stack[cycle_start..].to_vec();
             cycle.push(id.to_string());
-            return Err(CliError::user(format!(
+            return Err(Diagnostic::error(format!(
                 "Validation failed: task hierarchy cycle: {}",
                 cycle.join(" -> ")
             )));
         }
         let doc = self.document(id).ok_or_else(|| {
-            CliError::user(format!(
+            Diagnostic::error(format!(
                 "Validation failed: parent document not found: {id}"
             ))
         })?;
         if doc.doc_type() != "task" {
-            return Err(CliError::user(format!(
+            return Err(Diagnostic::error(format!(
                 "Validation failed: {id} is type {}, not task",
                 doc.doc_type()
             )));
         }
         if let Some(kind) = doc.field("kind") {
             validate_task_kind(kind).map_err(|message| {
-                CliError::user(format!(
+                Diagnostic::error(format!(
                     "Validation failed for {}: {message}",
                     display_path(&doc.path)
                 ))
@@ -147,7 +148,7 @@ impl HierarchyIndex {
             None => TaskRole::Task,
             Some(parent_id) => {
                 let parent = self.document(parent_id).ok_or_else(|| {
-                    CliError::user(format!(
+                    Diagnostic::error(format!(
                         "Validation failed for {}: unresolved parentId `{parent_id}`",
                         display_path(&doc.path)
                     ))
@@ -158,7 +159,7 @@ impl HierarchyIndex {
                     match self.task_role_by_id(parent_id, roles, stack)? {
                         TaskRole::Epic => TaskRole::Task,
                         TaskRole::Task => TaskRole::Subtask,
-                        TaskRole::Subtask => return Err(CliError::user(format!(
+                        TaskRole::Subtask => return Err(Diagnostic::error(format!(
                             "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}", display_path(&doc.path), doc.id()
                         ))),
                     }
@@ -173,12 +174,12 @@ impl HierarchyIndex {
     pub(crate) fn relationship(
         &self,
         doc: &Document,
-    ) -> Result<Option<ParentRelationship>, CliError> {
+    ) -> Result<Option<ParentRelationship>, Diagnostic> {
         let Some(parent_id) = doc.field("parentId") else {
             return Ok(None);
         };
         let parent = self.document(parent_id).ok_or_else(|| {
-            CliError::user(format!(
+            Diagnostic::error(format!(
                 "Validation failed for {}: unresolved parentId `{parent_id}`",
                 display_path(&doc.path)
             ))
@@ -190,7 +191,7 @@ impl HierarchyIndex {
             Some(TaskRole::Epic) => ParentRelationship::EpicTask,
             Some(TaskRole::Task) => ParentRelationship::Subtask,
             Some(TaskRole::Subtask) => {
-                return Err(CliError::user(format!(
+                return Err(Diagnostic::error(format!(
                     "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
                     display_path(&doc.path),
                     doc.id()
@@ -200,12 +201,12 @@ impl HierarchyIndex {
         }))
     }
 
-    pub(crate) fn validate_task_hierarchy(&self, doc: &Document) -> Result<TaskRole, CliError> {
+    pub(crate) fn validate_task_hierarchy(&self, doc: &Document) -> Result<TaskRole, Diagnostic> {
         let role = self.task_role(doc)?.ok_or_else(|| {
-            CliError::user(format!("Validation failed: {} is not a task", doc.id()))
+            Diagnostic::error(format!("Validation failed: {} is not a task", doc.id()))
         })?;
         if role == TaskRole::Epic && doc.field("parentId").is_some() {
-            return Err(CliError::user(format!(
+            return Err(Diagnostic::error(format!(
                 "Validation failed for {}: Epic {} cannot have parentId",
                 display_path(&doc.path),
                 doc.id()
@@ -225,7 +226,7 @@ impl HierarchyIndex {
                     doc.field("parentId").unwrap_or("task-N")
                 ),
             };
-            return Err(CliError::user(format!(
+            return Err(Diagnostic::error(format!(
                 "Validation failed for {}: {} {} has invalid ID `{}`; expected {expected}",
                 display_path(&doc.path),
                 role.as_str(),
@@ -239,7 +240,7 @@ impl HierarchyIndex {
                 .values()
                 .any(|child| child.field("parentId") == Some(doc.id()))
         {
-            return Err(CliError::user(format!(
+            return Err(Diagnostic::error(format!(
                 "Validation failed for {}: Subtask {} cannot have children",
                 display_path(&doc.path),
                 doc.id()
@@ -267,7 +268,7 @@ impl HierarchyIndex {
         errors.into_iter().collect()
     }
 
-    pub(crate) fn validate_document_metadata(&self) -> Result<(), CliError> {
+    pub(crate) fn validate_document_metadata(&self) -> Result<(), Diagnostic> {
         for doc in self
             .documents
             .values()
@@ -276,7 +277,7 @@ impl HierarchyIndex {
             for (field, allowed) in [("priority", PRIORITIES), ("effort", EFFORTS)] {
                 if let Some(value) = doc.field(field) {
                     if !allowed.contains(&value) {
-                        return Err(CliError::user(format!(
+                        return Err(Diagnostic::error(format!(
                             "Validation failed for {}: invalid {field} `{value}`; expected one of: {}", display_path(&doc.path), allowed.join(", ")
                         )));
                     }
@@ -286,14 +287,14 @@ impl HierarchyIndex {
         Ok(())
     }
 
-    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
+    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), Diagnostic> {
         let errors = self.task_hierarchy_errors();
         match errors.len() {
             0 => Ok(()),
-            1 => Err(CliError::user(
+            1 => Err(Diagnostic::error(
                 errors.into_iter().next().expect("one hierarchy error"),
             )),
-            count => Err(CliError::user(format!(
+            count => Err(Diagnostic::error(format!(
                 "Validation failed: hierarchy contains {count} structural errors:\n- {}",
                 errors.join("\n- ")
             ))),

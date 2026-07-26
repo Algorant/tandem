@@ -12,38 +12,22 @@ use yaml_rust2::{Yaml, YamlLoader};
 mod protocol;
 mod tui;
 
-use protocol::config::{
-    display_known_states, is_known_or_legacy_state, state_matches_filter, workflow_states,
-    DEFAULT_STATES, LEGACY_PROTOCOL_VERSION, LEGACY_REVIEW_STATE, PROTOCOL_VERSION,
-    VALIDATION_STATE,
-};
+use protocol::accord::{self, status as accord_status};
+use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use protocol::document::{
-    accord_status, completion_files_changed, completion_outcome, completion_reviewer,
-    completion_summary, completion_validation, has_metadata, parse_field_values, review_status,
-    validate_task_kind, Document as ProtocolDocument, COMPLETION_OUTCOME_CANCELED,
-    COMPLETION_OUTCOME_COMPLETED, EFFORTS, PRIORITIES,
+    parse_field_values, validate_task_kind, Document as ProtocolDocument, EFFORTS, PRIORITIES,
 };
+use protocol::event::{self, CanonicalEventEnvelope, EventEnvelope};
 use protocol::hierarchy::{HierarchyIndex, ParentRelationship, TaskRole};
 use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
+use protocol::review::status as review_status;
+use protocol::workflow::{
+    self, completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
+    completion_validation, display_known_states, is_known_or_legacy_state, state_matches_filter,
+    workflow_states, COMPLETION_OUTCOME_CANCELED, COMPLETION_OUTCOME_COMPLETED,
+};
 
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
-const ACCORD_STATUSES: &[&str] = &[
-    "claimed",
-    "delivered",
-    "accepted",
-    "rework",
-    "failed",
-    "blocked",
-];
-const LEGACY_ACCORD_STATUSES: &[&str] = &["ready"];
-const ACCORD_ACTIONS: &[&str] = &["claim", "deliver", "accept", "rework", "block", "fail"];
-const REVIEW_STATUSES: &[&str] = &[
-    "not-ready",
-    "pending",
-    "accepted",
-    "changes-requested",
-    "rejected",
-];
 const DECISION_STATUSES: &[&str] = &[
     "proposed",
     "accepted",
@@ -52,7 +36,6 @@ const DECISION_STATUSES: &[&str] = &[
     "superseded",
     "withdrawn",
 ];
-const COMPLETION_OUTCOMES: &[&str] = &[COMPLETION_OUTCOME_COMPLETED, COMPLETION_OUTCOME_CANCELED];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
 
@@ -84,6 +67,12 @@ impl CliError {
 impl From<io::Error> for CliError {
     fn from(error: io::Error) -> Self {
         CliError::user(error.to_string())
+    }
+}
+
+impl From<protocol::diagnostic::Diagnostic> for CliError {
+    fn from(diagnostic: protocol::diagnostic::Diagnostic) -> Self {
+        CliError::user(diagnostic.message)
     }
 }
 
@@ -1467,19 +1456,12 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
         )));
     }
 
-    let review_status = review_status(&doc).unwrap_or("missing");
-    let accord_status = accord_status(&doc).unwrap_or("missing");
-    if review_status != "accepted" {
-        println!("Warning: {} has review.status={review_status}.", doc.id());
-    }
-    if accord_status != "accepted" {
-        println!(
-            "Warning: {} has accord.status={accord_status}, not accepted.",
-            doc.id()
-        );
+    let completion_diagnostics = crate::protocol::diagnostic::completion_policy_diagnostics(&doc);
+    for diagnostic in &completion_diagnostics {
+        println!("Warning: {}", diagnostic.message);
     }
     print_workspace_deprecation_warnings(&workspace)?;
-    if review_status != "accepted" || accord_status != "accepted" {
+    if !completion_diagnostics.is_empty() {
         println!("Completing anyway under the canonical protocol policy.");
         println!();
     }
@@ -1738,11 +1720,11 @@ fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
 }
 
 fn accord_actions_help() -> String {
-    ACCORD_ACTIONS.join("|")
+    accord::ACTIONS.join("|")
 }
 
 fn accord_actions_usage() -> String {
-    let (last, leading) = ACCORD_ACTIONS
+    let (last, leading) = accord::ACTIONS
         .split_last()
         .expect("accord actions must not be empty");
     format!("{}, or {last}", leading.join(", "))
@@ -1755,20 +1737,12 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
             accord_actions_usage()
         )));
     };
-    let status = match action.as_str() {
-        "claim" => "claimed",
-        "deliver" => "delivered",
-        "accept" => "accepted",
-        "rework" => "rework",
-        "block" => "blocked",
-        "fail" => "failed",
-        other => {
-            return Err(CliError::usage(format!(
-                "unknown accord subcommand `{other}`; use {}",
-                accord_actions_usage()
-            )))
-        }
-    };
+    let status = accord::status_for_action(action).ok_or_else(|| {
+        CliError::usage(format!(
+            "unknown accord subcommand `{action}`; use {}",
+            accord_actions_usage()
+        ))
+    })?;
     let options = parse_accord_args(action, rest)?;
     cmd_accord_update(action, status, options)
 }
@@ -1793,7 +1767,7 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
 
     validate_accord_inputs(action, &options)?;
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
-    validate_accord_transition(action, &previous_status)?;
+    accord::validate_transition(action, &previous_status).map_err(CliError::user)?;
 
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
@@ -1803,7 +1777,7 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now);
     let previous_state = doc.field("state").unwrap_or("-").to_string();
-    let synced_state = accord_state_sync_target(status, &previous_state);
+    let synced_state = accord::state_sync_target(status, &previous_state);
     if let Some(state) = synced_state {
         validate_state(&workspace, state)?;
         updates.insert("state".to_string(), state.to_string());
@@ -1811,7 +1785,7 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
     let patched = patch_frontmatter_content(&patched, &updates, &[])?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
-    let event_name = accord_event_name(action);
+    let event_name = accord::event_name(action);
     append_event(
         &workspace,
         event_name,
@@ -3350,45 +3324,6 @@ fn display_change_value(value: &str) -> String {
     }
 }
 
-fn accord_state_sync_target<'a>(accord_status: &str, current_state: &'a str) -> Option<&'a str> {
-    match accord_status {
-        "claimed" if current_state == "todo" => Some("in-progress"),
-        "delivered" | "accepted"
-            if matches!(current_state, "todo" | "in-progress" | LEGACY_REVIEW_STATE) =>
-        {
-            Some(VALIDATION_STATE)
-        }
-        "rework" if matches!(current_state, VALIDATION_STATE | LEGACY_REVIEW_STATE) => {
-            Some("in-progress")
-        }
-        _ => None,
-    }
-}
-
-fn accord_state_divergence_warning(doc: &Document) -> Option<String> {
-    let status = accord_status(doc)?;
-    let state = doc.field("state")?;
-    let expected = accord_state_sync_target(status, state)?;
-    Some(format!(
-        "{} has workflow state `{state}` but accord.status `{status}` suggests `{expected}`; preserving recorded state until a mutation synchronizes it.",
-        doc.id()
-    ))
-}
-
-fn document_warnings(doc: &Document) -> Vec<String> {
-    let mut warnings = accord_state_divergence_warning(doc)
-        .into_iter()
-        .collect::<Vec<_>>();
-    if !doc.is_first_class_type() {
-        warnings.push(format!(
-            "{} is legacy custom type `{}`; custom-type documents are deprecated and read-only.",
-            doc.id(),
-            doc.doc_type()
-        ));
-    }
-    warnings
-}
-
 pub(crate) fn workspace_deprecation_warnings(
     workspace: &Workspace,
 ) -> Result<Vec<String>, CliError> {
@@ -3432,6 +3367,20 @@ fn print_workspace_deprecation_warnings(workspace: &Workspace) -> Result<(), Cli
 
 fn is_canceled_log(doc: &Document) -> bool {
     doc.location == DocumentLocation::Logs && completion_outcome(doc) == COMPLETION_OUTCOME_CANCELED
+}
+
+fn document_warnings(doc: &Document) -> Vec<String> {
+    let mut warnings = accord::state_divergence_warning(doc)
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !doc.is_first_class_type() {
+        warnings.push(format!(
+            "{} is legacy custom type `{}`; custom-type documents are deprecated and read-only.",
+            doc.id(),
+            doc.doc_type()
+        ));
+    }
+    warnings
 }
 
 fn decision_status(doc: &Document) -> Option<&str> {
@@ -3483,17 +3432,18 @@ fn validate_task_document_against_hierarchy(
     doc: &Document,
     hierarchy: &HierarchyIndex,
 ) -> Result<(), CliError> {
-    let mut errors = Vec::new();
-    if doc.id().trim().is_empty() {
-        errors.push("missing required field `id`".to_string());
-    }
-    if doc.title().trim().is_empty() {
-        errors.push("missing required field `title`".to_string());
-    }
+    let mut errors = crate::protocol::diagnostic::metadata_diagnostics(
+        doc,
+        doc.location == DocumentLocation::Logs,
+    )
+    .into_iter()
+    .filter(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)
+    .map(|diagnostic| diagnostic.message)
+    .collect::<Vec<_>>();
     match doc.field("type") {
         Some("task") => {}
         Some(other) => errors.push(format!("expected type `task`, found `{other}`")),
-        None => errors.push("missing required field `type`".to_string()),
+        None => {}
     }
     if let Some(kind) = doc.field("kind") {
         if let Err(message) = validate_task_kind(kind) {
@@ -3531,25 +3481,6 @@ fn validate_task_document_against_hierarchy(
             errors.push(format!("unresolved blocker `{blocker}`"));
         }
     }
-    if has_metadata(doc, "accord") || doc.field("accordStatus").is_some() {
-        match accord_status(doc) {
-            Some(status) if ACCORD_STATUSES.contains(&status) => {}
-            Some(status) if LEGACY_ACCORD_STATUSES.contains(&status) => {}
-            Some(status) => errors.push(format!("invalid accord.status `{status}`")),
-            None => {
-                errors.push("accord.status is required when accord metadata is present".to_string())
-            }
-        }
-    }
-    if has_metadata(doc, "review") || doc.field("reviewStatus").is_some() {
-        match review_status(doc) {
-            Some(status) if REVIEW_STATUSES.contains(&status) => {}
-            Some(status) => errors.push(format!("invalid review.status `{status}`")),
-            None => {
-                errors.push("review.status is required when review metadata is present".to_string())
-            }
-        }
-    }
 
     if !errors.is_empty() {
         return Err(CliError::user(format!(
@@ -3559,7 +3490,8 @@ fn validate_task_document_against_hierarchy(
         )));
     }
 
-    hierarchy.validate_all_task_hierarchies()
+    hierarchy.validate_all_task_hierarchies()?;
+    Ok(())
 }
 
 impl AccordRecord {
@@ -3629,27 +3561,6 @@ fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), C
         _ => {}
     }
     Ok(())
-}
-
-fn validate_accord_transition(action: &str, previous_status: &str) -> Result<(), CliError> {
-    match action {
-        "accept" if previous_status != "delivered" && previous_status != "accepted" => {
-            Err(CliError::user(format!(
-                "accord accept requires current accord.status=delivered; current status is {previous_status}"
-            )))
-        }
-        "rework" if previous_status != "delivered" && previous_status != "rework" => {
-            Err(CliError::user(format!(
-                "accord rework requires current accord.status=delivered; current status is {previous_status}"
-            )))
-        }
-        "claim" | "deliver" | "block" | "fail" if previous_status == "accepted" => Err(
-            CliError::user(format!(
-                "accepted accord cannot transition with `tandem accord {action}`"
-            )),
-        ),
-        _ => Ok(()),
-    }
 }
 
 fn apply_accord_action(
@@ -3738,18 +3649,6 @@ fn apply_accord_action(
         .filter(|value| !value.trim().is_empty())
     {
         accord.reason = Some(reason.to_string());
-    }
-}
-
-fn accord_event_name(action: &str) -> &'static str {
-    match action {
-        "claim" => "accord.claimed",
-        "deliver" => "accord.delivered",
-        "accept" => "accord.accepted",
-        "rework" => "accord.rework",
-        "block" => "accord.blocked",
-        "fail" => "accord.failed",
-        _ => "accord.updated",
     }
 }
 
@@ -5336,14 +5235,16 @@ fn append_event(
     id: &str,
     summary: &str,
 ) -> Result<(), CliError> {
+    debug_assert!(event::is_known_name(event_name));
+    debug_assert_eq!(CanonicalEventEnvelope::required_fields().len(), 6);
     let ts = current_timestamp();
-    let line = format!(
-        "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{}}}\n",
-        json_string(&ts),
-        json_string(event_name),
-        json_string(id),
-        json_string(summary)
-    );
+    let line = EventEnvelope {
+        ts: &ts,
+        event: event_name,
+        id,
+        summary,
+    }
+    .legacy_json_line(json_string);
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -5511,7 +5412,7 @@ mod tests {
     #[test]
     fn accord_usage_lists_only_current_actions() {
         assert_eq!(
-            ACCORD_ACTIONS,
+            accord::ACTIONS,
             ["claim", "deliver", "accept", "rework", "block", "fail"]
         );
         assert_eq!(
@@ -6341,7 +6242,7 @@ rules:
             )
             .unwrap(), String::new());
 
-        let warning = accord_state_divergence_warning(&doc).unwrap();
+        let warning = accord::state_divergence_warning(&doc).unwrap();
         assert!(warning.contains("workflow state `in-progress`"));
         assert!(warning.contains("accord.status `delivered` suggests `validation`"));
         assert_eq!(doc.field("state"), Some("in-progress"));

@@ -10,8 +10,6 @@ pub(crate) const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
 pub(crate) const EFFORTS: &[&str] = &["trivial", "small", "medium", "large"];
 pub(crate) const TASK_KINDS: &[&str] = &["epic"];
 pub(crate) const SUPPORTED_DOCUMENT_TYPES: &[&str] = &["task", "decision"];
-pub(crate) const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
-pub(crate) const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
 
 /// Parsed document meaning. Project code retains its source path and location
 /// separately so this value remains independent of concrete filesystem access.
@@ -52,38 +50,6 @@ impl Document {
         self.field("title").unwrap_or("")
     }
 
-    pub(crate) fn accord_status(&self) -> Option<&str> {
-        self.field("accord.status")
-            .or_else(|| self.field("accordStatus"))
-    }
-
-    pub(crate) fn review_status(&self) -> Option<&str> {
-        self.field("review.status")
-            .or_else(|| self.field("reviewStatus"))
-    }
-
-    pub(crate) fn completion_summary(&self) -> Option<&str> {
-        self.field("completion.summary")
-            .or_else(|| self.field("completionSummary"))
-    }
-
-    pub(crate) fn completion_outcome(&self) -> &str {
-        self.field("completion.outcome")
-            .unwrap_or(COMPLETION_OUTCOME_COMPLETED)
-    }
-
-    pub(crate) fn completion_validation(&self) -> Option<&str> {
-        self.field("completion.validation")
-            .or_else(|| self.field("completion.validation.summary"))
-            .or_else(|| self.field("completion.validation.status"))
-            .or_else(|| self.field("completionValidation"))
-    }
-
-    pub(crate) fn completion_reviewer(&self) -> Option<&str> {
-        self.field("completion.reviewer")
-            .or_else(|| self.field("completionReviewer"))
-    }
-
     pub(crate) fn has_metadata(&self, prefix: &str) -> bool {
         let nested_prefix = format!("{prefix}.");
         self.fields
@@ -94,38 +60,6 @@ impl Document {
     pub(crate) fn values(&self, key: &str) -> Vec<String> {
         self.field(key).map(parse_field_values).unwrap_or_default()
     }
-}
-
-pub(crate) fn accord_status(document: &Document) -> Option<&str> {
-    document.accord_status()
-}
-
-pub(crate) fn review_status(document: &Document) -> Option<&str> {
-    document.review_status()
-}
-
-pub(crate) fn completion_summary(document: &Document) -> Option<&str> {
-    document.completion_summary()
-}
-
-pub(crate) fn completion_outcome(document: &Document) -> &str {
-    document.completion_outcome()
-}
-
-pub(crate) fn completion_validation(document: &Document) -> Option<&str> {
-    document.completion_validation()
-}
-
-pub(crate) fn completion_reviewer(document: &Document) -> Option<&str> {
-    document.completion_reviewer()
-}
-
-pub(crate) fn completion_files_changed(document: &Document) -> Vec<String> {
-    document
-        .field("completion.filesChanged")
-        .or_else(|| document.field("filesChanged"))
-        .map(parse_field_values)
-        .unwrap_or_default()
 }
 
 pub(crate) fn has_metadata(document: &Document, prefix: &str) -> bool {
@@ -261,17 +195,16 @@ mod tests {
     }
 
     #[test]
-    fn reads_legacy_completion_aliases_without_losing_fixed_outcome_default() {
+    fn preserves_document_values_without_interpreting_lifecycle_metadata() {
         let document = Document::new(
             HashMap::from([
                 ("completionSummary".to_string(), "Done".to_string()),
-                ("completionValidation".to_string(), "passed".to_string()),
+                ("custom.lifecycle".to_string(), "passed".to_string()),
             ]),
             String::new(),
         );
 
-        assert_eq!(document.completion_summary(), Some("Done"));
-        assert_eq!(document.completion_validation(), Some("passed"));
-        assert_eq!(document.completion_outcome(), "completed");
+        assert_eq!(document.field("completionSummary"), Some("Done"));
+        assert_eq!(document.field("custom.lifecycle"), Some("passed"));
     }
 }

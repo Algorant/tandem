@@ -6,7 +6,12 @@
 //! discovery, filesystem access, and raw-source patching remain outside this
 //! boundary.
 
+pub(crate) mod accord;
 pub(crate) mod config;
+pub(crate) mod diagnostic;
 pub(crate) mod document;
+pub(crate) mod event;
 pub(crate) mod hierarchy;
 pub(crate) mod ids;
+pub(crate) mod review;
+pub(crate) mod workflow;
