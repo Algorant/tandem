@@ -1,8 +1,5 @@
 //! Canonical structural diagnostic severity and document-level checks.
 
-use std::env;
-use std::path::Path;
-
 use super::accord;
 use super::document::{has_metadata, Document};
 use super::review;
@@ -33,16 +30,6 @@ impl Diagnostic {
             severity: Severity::Warning,
             message: message.into(),
         }
-    }
-}
-
-pub(crate) fn display_path(path: &Path) -> String {
-    match env::current_dir() {
-        Ok(current_dir) => path
-            .strip_prefix(&current_dir)
-            .map(|path| path.display().to_string())
-            .unwrap_or_else(|_| path.display().to_string()),
-        Err(_) => path.display().to_string(),
     }
 }
 

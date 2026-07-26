@@ -113,6 +113,12 @@ impl StoredDocument {
     fn title(&self) -> &str {
         self.document.title()
     }
+
+    /// Temporary source-bearing seam for protocol diagnostics until project
+    /// owns concrete document locations.
+    pub(crate) fn diagnostic_source_label(&self) -> String {
+        display_path(&self.path)
+    }
 }
 
 impl Deref for StoredDocument {

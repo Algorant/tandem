@@ -8,7 +8,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::Document;
 
-use super::diagnostic::{display_path, Diagnostic};
+use super::diagnostic::Diagnostic;
 use super::document::{validate_task_kind, EFFORTS, PRIORITIES};
 use super::ids::{global_task_number, subtask_suffix};
 
@@ -68,14 +68,14 @@ impl HierarchyIndex {
             if id.trim().is_empty() {
                 return Err(Diagnostic::error(format!(
                     "Validation failed for {}: missing required field `id`",
-                    display_path(&doc.path)
+                    doc.diagnostic_source_label()
                 )));
             }
             if let Some(existing) = documents.insert(id.clone(), doc.clone()) {
                 return Err(Diagnostic::error(format!(
                     "Validation failed: duplicate document ID `{id}` in {} and {}",
-                    display_path(&existing.path),
-                    display_path(&doc.path)
+                    existing.diagnostic_source_label(),
+                    doc.diagnostic_source_label()
                 )));
             }
         }
@@ -134,7 +134,7 @@ impl HierarchyIndex {
             validate_task_kind(kind).map_err(|message| {
                 Diagnostic::error(format!(
                     "Validation failed for {}: {message}",
-                    display_path(&doc.path)
+                    doc.diagnostic_source_label()
                 ))
             })?;
         }
@@ -150,7 +150,7 @@ impl HierarchyIndex {
                 let parent = self.document(parent_id).ok_or_else(|| {
                     Diagnostic::error(format!(
                         "Validation failed for {}: unresolved parentId `{parent_id}`",
-                        display_path(&doc.path)
+                        doc.diagnostic_source_label()
                     ))
                 })?;
                 if parent.doc_type() != "task" {
@@ -160,7 +160,7 @@ impl HierarchyIndex {
                         TaskRole::Epic => TaskRole::Task,
                         TaskRole::Task => TaskRole::Subtask,
                         TaskRole::Subtask => return Err(Diagnostic::error(format!(
-                            "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}", display_path(&doc.path), doc.id()
+                            "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}", doc.diagnostic_source_label(), doc.id()
                         ))),
                     }
                 }
@@ -181,7 +181,7 @@ impl HierarchyIndex {
         let parent = self.document(parent_id).ok_or_else(|| {
             Diagnostic::error(format!(
                 "Validation failed for {}: unresolved parentId `{parent_id}`",
-                display_path(&doc.path)
+                doc.diagnostic_source_label()
             ))
         })?;
         if doc.doc_type() != "task" || parent.doc_type() != "task" {
@@ -193,7 +193,7 @@ impl HierarchyIndex {
             Some(TaskRole::Subtask) => {
                 return Err(Diagnostic::error(format!(
                     "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
-                    display_path(&doc.path),
+                    doc.diagnostic_source_label(),
                     doc.id()
                 )))
             }
@@ -208,7 +208,7 @@ impl HierarchyIndex {
         if role == TaskRole::Epic && doc.field("parentId").is_some() {
             return Err(Diagnostic::error(format!(
                 "Validation failed for {}: Epic {} cannot have parentId",
-                display_path(&doc.path),
+                doc.diagnostic_source_label(),
                 doc.id()
             )));
         }
@@ -228,7 +228,7 @@ impl HierarchyIndex {
             };
             return Err(Diagnostic::error(format!(
                 "Validation failed for {}: {} {} has invalid ID `{}`; expected {expected}",
-                display_path(&doc.path),
+                doc.diagnostic_source_label(),
                 role.as_str(),
                 doc.title(),
                 doc.id()
@@ -242,7 +242,7 @@ impl HierarchyIndex {
         {
             return Err(Diagnostic::error(format!(
                 "Validation failed for {}: Subtask {} cannot have children",
-                display_path(&doc.path),
+                doc.diagnostic_source_label(),
                 doc.id()
             )));
         }
@@ -278,7 +278,7 @@ impl HierarchyIndex {
                 if let Some(value) = doc.field(field) {
                     if !allowed.contains(&value) {
                         return Err(Diagnostic::error(format!(
-                            "Validation failed for {}: invalid {field} `{value}`; expected one of: {}", display_path(&doc.path), allowed.join(", ")
+                            "Validation failed for {}: invalid {field} `{value}`; expected one of: {}", doc.diagnostic_source_label(), allowed.join(", ")
                         )));
                     }
                 }
