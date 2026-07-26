@@ -1,6 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::path::Path;
 
 use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
@@ -9,10 +7,13 @@ use ratatui::widgets::ListItem;
 use crate::{
     accord_status, completion_files_changed, completion_outcome, completion_reviewer,
     completion_summary, completion_validation, display_path, is_canceled_log, parse_field_values,
-    read_document, review_status, Document, DocumentLocation, HierarchyIndex,
+    review_status, Document, HierarchyIndex, TandemProject,
 };
 
 use super::{markdownish_lines, StatusTone, TuiTheme};
+
+#[cfg(test)]
+use crate::{project::extract_json_string, DocumentLocation};
 
 #[derive(Debug, Clone)]
 pub(super) struct LogEvent {
@@ -29,49 +30,9 @@ pub(super) struct LogLoad {
     pub(super) warnings: Vec<String>,
 }
 
-pub(super) fn load_logs(logs_dir: &Path) -> LogLoad {
-    let mut docs = Vec::new();
+pub(super) fn load_logs(project: &TandemProject) -> LogLoad {
     let mut warnings = Vec::new();
-
-    if !logs_dir.exists() {
-        return LogLoad { docs, warnings };
-    }
-
-    let entries = match fs::read_dir(logs_dir) {
-        Ok(entries) => entries,
-        Err(error) => {
-            warnings.push(format!(
-                "Logs load failed: could not read {}: {error}",
-                display_path(logs_dir)
-            ));
-            return LogLoad { docs, warnings };
-        }
-    };
-
-    let mut paths = Vec::new();
-    for entry in entries {
-        match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                if path.extension().and_then(|value| value.to_str()) == Some("md") {
-                    paths.push(path);
-                }
-            }
-            Err(error) => warnings.push(format!(
-                "Logs load warning: could not inspect entry in {}: {error}",
-                display_path(logs_dir)
-            )),
-        }
-    }
-    paths.sort();
-
-    for path in paths {
-        match read_document(&path, DocumentLocation::Logs) {
-            Ok(doc) => docs.push(doc),
-            Err(error) => warnings.push(format!("Logs load warning: {}", error.message)),
-        }
-    }
-
+    let mut docs = project.read_log_documents_tolerant(&mut warnings);
     sort_logs_by_recency(&mut docs);
     LogLoad { docs, warnings }
 }
@@ -85,87 +46,20 @@ pub(super) fn sort_logs_by_recency(docs: &mut [Document]) {
     });
 }
 
-pub(super) fn load_log_events(events_path: &Path) -> (LogEventsById, Vec<String>) {
-    let mut events = LogEventsById::new();
+pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<String>) {
     let mut warnings = Vec::new();
-
-    if !events_path.exists() {
-        return (events, warnings);
+    let mut events = LogEventsById::new();
+    for event in project.read_events_tolerant(&mut warnings) {
+        events.entry(event.id).or_default().push(LogEvent {
+            ts: event.ts,
+            event: event.event,
+            summary: event.summary,
+        });
     }
-
-    let content = match fs::read_to_string(events_path) {
-        Ok(content) => content,
-        Err(error) => {
-            warnings.push(format!(
-                "Events load warning: could not read {}: {error}",
-                display_path(events_path)
-            ));
-            return (events, warnings);
-        }
-    };
-
-    for line in content.lines().filter(|line| !line.trim().is_empty()) {
-        let Some(id) = extract_json_string(line, "id") else {
-            continue;
-        };
-        let event = extract_json_string(line, "event").unwrap_or_else(|| "event".to_string());
-        let ts = extract_json_string(line, "ts").unwrap_or_default();
-        let summary = extract_json_string(line, "summary").unwrap_or_default();
-        events
-            .entry(id)
-            .or_default()
-            .push(LogEvent { ts, event, summary });
-    }
-
     for item_events in events.values_mut() {
         item_events.sort_by(|a, b| a.ts.cmp(&b.ts).then_with(|| a.event.cmp(&b.event)));
     }
-
     (events, warnings)
-}
-
-fn extract_json_string(line: &str, key: &str) -> Option<String> {
-    let key_pattern = format!("\"{key}\"");
-    let key_start = line.find(&key_pattern)?;
-    let after_key = key_start + key_pattern.len();
-    let colon_offset = line[after_key..].find(':')?;
-    let mut cursor = after_key + colon_offset + 1;
-    while let Some(ch) = line[cursor..].chars().next() {
-        if ch.is_whitespace() {
-            cursor += ch.len_utf8();
-        } else {
-            break;
-        }
-    }
-
-    if line[cursor..].chars().next()? != '"' {
-        return None;
-    }
-    cursor += 1;
-
-    let mut value = String::new();
-    let mut escaped = false;
-    for ch in line[cursor..].chars() {
-        if escaped {
-            match ch {
-                'n' => value.push('\n'),
-                'r' => value.push('\r'),
-                't' => value.push('\t'),
-                '"' => value.push('"'),
-                '\\' => value.push('\\'),
-                other => value.push(other),
-            }
-            escaped = false;
-        } else if ch == '\\' {
-            escaped = true;
-        } else if ch == '"' {
-            return Some(value);
-        } else {
-            value.push(ch);
-        }
-    }
-
-    None
 }
 
 pub(super) fn filter_logs<'a>(

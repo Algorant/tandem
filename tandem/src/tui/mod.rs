@@ -305,7 +305,7 @@ struct ReloadSelection {
 }
 
 struct TuiApp {
-    workspace: Workspace,
+    workspace: TandemProject,
     title: String,
     view: TuiView,
     states: Vec<String>,
@@ -346,7 +346,7 @@ struct TuiApp {
 }
 
 impl TuiApp {
-    fn load(workspace: Workspace) -> Result<Self, CliError> {
+    fn load(workspace: TandemProject) -> Result<Self, CliError> {
         let mut app = Self {
             workspace,
             title: String::new(),
@@ -407,45 +407,40 @@ impl TuiApp {
         };
         let selection = self.capture_reload_selection();
         let mut load_errors = Vec::new();
-        let mut docs = read_documents_tolerant(
-            &self.workspace.board_dir,
-            DocumentLocation::Board,
-            "Board",
-            &mut load_errors,
-        );
+        let mut docs = self
+            .workspace
+            .read_board_documents_tolerant(&mut load_errors);
         sort_documents(&mut docs);
 
-        let (title, configured_states, rules) =
-            match read_frontmatter_yaml_file(&self.workspace.config_path) {
-                Ok(root) => (
-                    workspace_title_from_root(root.as_ref())
-                        .unwrap_or_else(|| "Tandem".to_string()),
-                    workspace_states_from_root(root.as_ref()),
-                    parse_rules_from_yaml(root.as_ref()),
-                ),
-                Err(error) => {
-                    load_errors.push(format!("Config load failed: {}", error.message));
-                    (
-                        if self.title.is_empty() {
-                            "Tandem".to_string()
-                        } else {
-                            self.title.clone()
-                        },
-                        if self.configured_states.is_empty() {
-                            default_workspace_states()
-                        } else {
-                            self.configured_states.clone()
-                        },
-                        self.rules.clone(),
-                    )
-                }
-            };
+        let (title, configured_states, rules) = match self.workspace.read_config_yaml() {
+            Ok(root) => (
+                workspace_title_from_root(root.as_ref()).unwrap_or_else(|| "Tandem".to_string()),
+                workspace_states_from_root(root.as_ref()),
+                parse_rules_from_yaml(root.as_ref()),
+            ),
+            Err(error) => {
+                load_errors.push(format!("Config load failed: {}", error.message));
+                (
+                    if self.title.is_empty() {
+                        "Tandem".to_string()
+                    } else {
+                        self.title.clone()
+                    },
+                    if self.configured_states.is_empty() {
+                        default_workspace_states()
+                    } else {
+                        self.configured_states.clone()
+                    },
+                    self.rules.clone(),
+                )
+            }
+        };
 
         let theme_load = TuiTheme::load_for_workspace(&self.workspace);
-        let log_load = logs::load_logs(&self.workspace.logs_dir);
+        let log_load = logs::load_logs(&self.workspace);
         let hierarchy = TuiHierarchySnapshot::from_documents(&docs, &log_load.docs);
         load_errors.extend(log_load.warnings);
-        let (log_events, event_warnings) = logs::load_log_events(&self.workspace.events_path);
+        let (log_events, event_warnings) = logs::load_log_events(&self.workspace);
         load_errors.extend(event_warnings);
         load_errors.extend(validation_load_errors_with_hierarchy(
             &docs,
@@ -3659,54 +3654,6 @@ fn is_board_visible_doc(doc: &Document) -> bool {
     doc.location == DocumentLocation::Board && !is_decision_doc(doc)
 }
 
-fn read_documents_tolerant(
-    dir: &Path,
-    location: DocumentLocation,
-    label: &str,
-    load_errors: &mut Vec<String>,
-) -> Vec<Document> {
-    if !dir.exists() {
-        return Vec::new();
-    }
-
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(error) => {
-            load_errors.push(format!(
-                "{label} load failed: could not read {}: {error}",
-                display_path(dir)
-            ));
-            return Vec::new();
-        }
-    };
-
-    let mut paths = Vec::new();
-    for entry in entries {
-        match entry {
-            Ok(entry) => {
-                let path = entry.path();
-                if path.extension().and_then(|value| value.to_str()) == Some("md") {
-                    paths.push(path);
-                }
-            }
-            Err(error) => load_errors.push(format!(
-                "{label} load warning: could not inspect entry in {}: {error}",
-                display_path(dir)
-            )),
-        }
-    }
-    paths.sort();
-
-    let mut docs = Vec::new();
-    for path in paths {
-        match read_document(&path, location) {
-            Ok(doc) => docs.push(doc),
-            Err(error) => load_errors.push(format!("{label} load warning: {}", error.message)),
-        }
-    }
-    docs
-}
-
 #[cfg(test)]
 fn validation_load_errors(
     docs: &[Document],
@@ -3813,7 +3760,7 @@ fn runtime_warning_status_note(outcome: &ReloadOutcome) -> String {
     }
 }
 
-fn collect_reload_fingerprint(workspace: &Workspace) -> ReloadFingerprint {
+fn collect_reload_fingerprint(workspace: &TandemProject) -> ReloadFingerprint {
     let mut files = BTreeMap::new();
     insert_optional_fingerprint(&mut files, workspace.config_path.clone());
     insert_optional_fingerprint(&mut files, workspace.events_path.clone());
@@ -3948,7 +3895,7 @@ struct QuickAddOutcome {
 }
 
 fn create_basic_task(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     title: &str,
     state: &str,
 ) -> Result<QuickAddOutcome, CliError> {
@@ -3986,14 +3933,14 @@ struct ValidationActionOutcome {
 }
 
 fn apply_validation_accept(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     id: &str,
 ) -> Result<ValidationActionOutcome, CliError> {
     apply_validation_action(workspace, id, ValidationAction::Accept { note: None })
 }
 
 fn apply_validation_rework(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     id: &str,
     feedback: &str,
 ) -> Result<ValidationActionOutcome, CliError> {
@@ -4029,7 +3976,7 @@ fn accepted_validation_candidates(docs: &[Document]) -> Vec<ValidationApplyCandi
 }
 
 fn apply_accepted_validation_tasks(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     candidates: &[ValidationApplyCandidate],
 ) -> Result<ValidationApplyOutcome, CliError> {
     if candidates.is_empty() {
@@ -4045,7 +3992,7 @@ fn apply_accepted_validation_tasks(
     Ok(ValidationApplyOutcome { completed_ids })
 }
 
-fn complete_validation_candidate(workspace: &Workspace, id: &str) -> Result<(), CliError> {
+fn complete_validation_candidate(workspace: &TandemProject, id: &str) -> Result<(), CliError> {
     let doc = find_board_document(workspace, id)?
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
@@ -4126,7 +4073,7 @@ enum ValidationAction {
 }
 
 fn apply_validation_action(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     id: &str,
     action: ValidationAction,
 ) -> Result<ValidationActionOutcome, CliError> {
@@ -9090,9 +9037,9 @@ tone = "success"
         env::temp_dir().join(format!("{prefix}-{}-{nonce}", std::process::id()))
     }
 
-    fn temp_workspace(root: &Path) -> Workspace {
+    fn temp_workspace(root: &Path) -> TandemProject {
         let tandem_dir = root.join(".tandem");
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: tandem_dir.join("board"),
             logs_dir: tandem_dir.join("logs"),
             config_path: tandem_dir.join("tandem.md"),
@@ -9102,13 +9049,13 @@ tone = "success"
         fs::create_dir_all(&workspace.logs_dir).unwrap();
         fs::write(
             &workspace.config_path,
-            "---\nprotocolVersion: 0.1.0\ntitle: Test Workspace\nstates: [todo, in-progress, validation]\n---\n",
+            "---\nprotocolVersion: 0.1.0\ntitle: Test TandemProject\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
         workspace
     }
 
-    fn write_task_doc(workspace: &Workspace, id: &str, title: &str, state: &str) {
+    fn write_task_doc(workspace: &TandemProject, id: &str, title: &str, state: &str) {
         fs::write(
             workspace.board_dir.join(format!("{id}.md")),
             format!(
@@ -9118,7 +9065,7 @@ tone = "success"
         .unwrap();
     }
 
-    fn write_delivered_validation_task(workspace: &Workspace, id: &str) {
+    fn write_delivered_validation_task(workspace: &TandemProject, id: &str) {
         fs::write(
             workspace.board_dir.join(format!("{id}.md")),
             format!(
@@ -9128,7 +9075,7 @@ tone = "success"
         .unwrap();
     }
 
-    fn write_accepted_validation_task(workspace: &Workspace, id: &str, title: &str) {
+    fn write_accepted_validation_task(workspace: &TandemProject, id: &str, title: &str) {
         fs::write(
             workspace.board_dir.join(format!("{id}.md")),
             format!(
@@ -9149,7 +9096,7 @@ tone = "success"
             decision_doc("decision-1"),
         ];
         TuiApp {
-            workspace: Workspace {
+            workspace: TandemProject {
                 board_dir: PathBuf::from(".tandem/board"),
                 logs_dir: PathBuf::from(".tandem/logs"),
                 config_path: PathBuf::from(".tandem/tandem.md"),
@@ -9837,7 +9784,7 @@ tone = "success"
         let workspace = temp_workspace(&root);
         fs::write(
             &workspace.config_path,
-            "---\nprotocolVersion: 0.2.0\ntitle: Test Workspace\nstates: [todo, in-progress, validation]\ntypes:\n  note:\n    idPrefix: note\ncompletion:\n  requireReview: true\n---\n",
+            "---\nprotocolVersion: 0.2.0\ntitle: Test TandemProject\nstates: [todo, in-progress, validation]\ntypes:\n  note:\n    idPrefix: note\ncompletion:\n  requireReview: true\n---\n",
         )
         .unwrap();
         fs::write(

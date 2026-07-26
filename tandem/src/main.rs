@@ -1,22 +1,25 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
-use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use yaml_rust2::{Yaml, YamlLoader};
+use yaml_rust2::Yaml;
 
+mod project;
 mod protocol;
 mod tui;
 
+use project::{
+    parse_frontmatter_fields, parse_frontmatter_yaml, read_documents, read_frontmatter_yaml_file,
+    split_frontmatter, yaml_mapping_value, yaml_scalar_to_string, DocumentLocation,
+    StoredDocument as Document, TandemProject,
+};
 use protocol::accord::{self, status as accord_status};
 use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
-use protocol::document::{
-    parse_field_values, validate_task_kind, Document as ProtocolDocument, EFFORTS, PRIORITIES,
-};
+use protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
 use protocol::event::{self, CanonicalEventEnvelope, EventEnvelope};
 use protocol::hierarchy::{HierarchyIndex, ParentRelationship, TaskRole};
 use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
@@ -76,88 +79,13 @@ impl From<protocol::diagnostic::Diagnostic> for CliError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Workspace {
-    board_dir: PathBuf,
-    logs_dir: PathBuf,
-    config_path: PathBuf,
-    events_path: PathBuf,
-}
-
-/// Concrete project record pairing a logical protocol document with its source.
-/// Project ownership will move this filesystem-facing wrapper in a later stage.
-#[derive(Debug, Clone)]
-pub(crate) struct StoredDocument {
-    path: PathBuf,
-    location: DocumentLocation,
-    document: ProtocolDocument,
-}
-
-impl StoredDocument {
-    pub(crate) fn new(
-        path: PathBuf,
-        location: DocumentLocation,
-        fields: HashMap<String, String>,
-        body: String,
-    ) -> Self {
-        Self {
-            path,
-            location,
-            document: ProtocolDocument::new(fields, body),
-        }
-    }
-
-    fn id(&self) -> &str {
-        self.document.id()
-    }
-    fn title(&self) -> &str {
-        self.document.title()
-    }
-
-    /// Temporary source-bearing seam for protocol diagnostics until project
-    /// owns concrete document locations.
-    pub(crate) fn diagnostic_source_label(&self) -> String {
-        display_path(&self.path)
-    }
-}
-
-impl Deref for StoredDocument {
-    type Target = ProtocolDocument;
-    fn deref(&self) -> &Self::Target {
-        &self.document
-    }
-}
-
-impl DerefMut for StoredDocument {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.document
-    }
-}
-
-pub(crate) type Document = StoredDocument;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DocumentLocation {
-    Board,
-    Logs,
-}
-
-impl DocumentLocation {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Board => "board",
-            Self::Logs => "logs",
-        }
-    }
-}
-
 /// Serializes cooperative CLI hierarchy snapshots and mutations on the workspace config inode.
 pub(crate) struct HierarchyLock {
     file: File,
 }
 
 impl HierarchyLock {
-    pub(crate) fn acquire(workspace: &Workspace) -> Result<Self, CliError> {
+    pub(crate) fn acquire(workspace: &TandemProject) -> Result<Self, CliError> {
         let path = workspace.config_path.clone();
         let file = OpenOptions::new().read(true).open(&path).map_err(|error| {
             CliError::user(format!(
@@ -1273,7 +1201,7 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, CliError> {
+fn add_task(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     let title =
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
@@ -1540,7 +1468,11 @@ fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-fn cancel_task(workspace: &Workspace, id: &str, reason: &str) -> Result<CancelOutcome, CliError> {
+fn cancel_task(
+    workspace: &TandemProject,
+    id: &str,
+    reason: &str,
+) -> Result<CancelOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     let reason = require_nonempty(Some(reason), "cancel requires --reason <text>")?.to_string();
     let hierarchy = hierarchy_from_workspace(workspace)?;
@@ -2341,7 +2273,7 @@ fn validate_decision_status(status: &str) -> Result<(), CliError> {
 }
 
 fn decision_add_warnings(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     options: &DecisionAddOptions,
 ) -> Result<Vec<String>, CliError> {
     let mut warnings = Vec::new();
@@ -2360,7 +2292,7 @@ fn decision_add_warnings(
 }
 
 fn push_decision_reference_warning(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     warnings: &mut Vec<String>,
     field: &str,
     id: &str,
@@ -2386,72 +2318,47 @@ fn cmd_tui(args: &[String]) -> Result<(), CliError> {
     tui::run_tui()
 }
 
-fn discover_workspace() -> Result<Workspace, CliError> {
-    let workspace = discover_workspace_unchecked()?;
-    ensure_current_protocol(&workspace)?;
-    Ok(workspace)
+fn discover_workspace() -> Result<TandemProject, CliError> {
+    let project = discover_workspace_unchecked()?;
+    let _project_root = project.root();
+    ensure_current_protocol(&project)?;
+    Ok(project)
 }
 
-fn discover_workspace_unchecked() -> Result<Workspace, CliError> {
-    let mut dir = env::current_dir()?;
-
-    loop {
-        let tandem_dir = dir.join(".tandem");
-        let config_path = tandem_dir.join("tandem.md");
-        if config_path.is_file() {
-            return Ok(Workspace {
-                board_dir: tandem_dir.join("board"),
-                logs_dir: tandem_dir.join("logs"),
-                events_path: tandem_dir.join("events.jsonl"),
-                config_path,
-            });
-        }
-
-        if dir.join(".git").exists() {
-            break;
-        }
-
-        if !dir.pop() {
-            break;
-        }
-    }
-
-    Err(CliError::user(
-        "No Tandem workspace found. Run `tandem init` first.",
-    ))
+fn discover_workspace_unchecked() -> Result<TandemProject, CliError> {
+    TandemProject::discover()
 }
 
-fn workspace_protocol_version(workspace: &Workspace) -> Result<String, CliError> {
-    let content = fs::read_to_string(&workspace.config_path)?;
-    let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!(
-            "Parse failure: {}: {message}",
-            display_path(&workspace.config_path)
-        ))
-    })?;
-    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
+fn workspace_protocol_version(project: &TandemProject) -> Result<String, CliError> {
+    let fields = parse_frontmatter_fields(
+        &project::split_frontmatter(&fs::read_to_string(&project.config_path)?)
+            .map_err(|message| {
+                CliError::user(format!(
+                    "Parse failure: {}: {message}",
+                    display_path(&project.config_path)
+                ))
+            })?
+            .0,
+    )
+    .map_err(|message| {
         CliError::user(format!(
             "Parse failure: {} frontmatter YAML: {message}",
-            display_path(&workspace.config_path)
+            display_path(&project.config_path)
         ))
     })?;
     fields.get("protocolVersion").cloned().ok_or_else(|| {
         CliError::user(format!(
             "Validation failed for {}: missing required field `protocolVersion`",
-            display_path(&workspace.config_path)
+            display_path(&project.config_path)
         ))
     })
 }
 
-fn ensure_current_protocol(workspace: &Workspace) -> Result<(), CliError> {
-    match workspace_protocol_version(workspace)?.as_str() {
+fn ensure_current_protocol(project: &TandemProject) -> Result<(), CliError> {
+    match workspace_protocol_version(project)?.as_str() {
         PROTOCOL_VERSION => Ok(()),
-        LEGACY_PROTOCOL_VERSION => Err(CliError::user(format!(
-            "Protocol {LEGACY_PROTOCOL_VERSION} project detected. Run `tandem upgrade` explicitly before using project commands."
-        ))),
-        version => Err(CliError::user(format!(
-            "Unsupported protocol version `{version}`; this Tandem version supports {PROTOCOL_VERSION}."
-        ))),
+        LEGACY_PROTOCOL_VERSION => Err(CliError::user(format!("Protocol {LEGACY_PROTOCOL_VERSION} project detected. Run `tandem upgrade` explicitly before using project commands."))),
+        version => Err(CliError::user(format!("Unsupported protocol version `{version}`; this Tandem version supports {PROTOCOL_VERSION}."))),
     }
 }
 
@@ -2459,21 +2366,21 @@ fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
     if !args.is_empty() {
         return Err(CliError::usage("tandem upgrade does not accept options"));
     }
-    let workspace = discover_workspace_unchecked()?;
-    match workspace_protocol_version(&workspace)?.as_str() {
+    let project = discover_workspace_unchecked()?;
+    match workspace_protocol_version(&project)?.as_str() {
         PROTOCOL_VERSION => {
             println!("Tandem project is already at protocol {PROTOCOL_VERSION}.");
             Ok(())
         }
         LEGACY_PROTOCOL_VERSION => {
-            let (content, signature) = read_file_snapshot(&workspace.config_path)?;
+            let (content, signature) = read_file_snapshot(&project.config_path)?;
             let patched = patch_frontmatter_content(
                 &content,
                 &BTreeMap::from([("protocolVersion".to_string(), PROTOCOL_VERSION.to_string())]),
                 &[],
             )?;
-            ensure_file_unchanged(&workspace.config_path, &signature)?;
-            write_atomic(&workspace.config_path, &patched)?;
+            ensure_file_unchanged(&project.config_path, &signature)?;
+            write_atomic(&project.config_path, &patched)?;
             println!("Upgraded Tandem project protocol: {LEGACY_PROTOCOL_VERSION} -> {PROTOCOL_VERSION}");
             println!("Preserved existing documents, configuration, events, and logs without conversion.");
             Ok(())
@@ -2484,69 +2391,17 @@ fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
     }
 }
 
-fn read_documents(dir: &Path, location: DocumentLocation) -> Result<Vec<Document>, CliError> {
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) == Some("md") {
-            paths.push(path);
-        }
-    }
-    paths.sort();
-
-    let mut docs = Vec::new();
-    for path in paths {
-        docs.push(read_document(&path, location)?);
-    }
-    Ok(docs)
+fn find_document(project: &TandemProject, id: &str) -> Result<Option<Document>, CliError> {
+    project.find_document(id)
 }
 
-fn read_document(path: &Path, location: DocumentLocation) -> Result<Document, CliError> {
-    let content = fs::read_to_string(path).map_err(|error| {
-        CliError::user(format!("failed to read {}: {error}", display_path(path)))
-    })?;
-    let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
-    })?;
-    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
-        CliError::user(format!(
-            "Parse failure: {} frontmatter YAML: {message}",
-            display_path(path)
-        ))
-    })?;
-
-    Ok(Document::new(path.to_path_buf(), location, fields, body))
-}
-
-fn find_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
-    for location in [DocumentLocation::Board, DocumentLocation::Logs] {
-        let dir = match location {
-            DocumentLocation::Board => &workspace.board_dir,
-            DocumentLocation::Logs => &workspace.logs_dir,
-        };
-        for doc in read_documents(dir, location)? {
-            if doc.id() == id {
-                return Ok(Some(doc));
-            }
-        }
-    }
-    Ok(None)
-}
-
-fn read_workspace_documents(workspace: &Workspace) -> Result<Vec<Document>, CliError> {
-    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?;
-    docs.extend(read_documents(&workspace.logs_dir, DocumentLocation::Logs)?);
-    Ok(docs)
+fn read_workspace_documents(project: &TandemProject) -> Result<Vec<Document>, CliError> {
+    project.read_documents()
 }
 
 /// Filesystem adapter: load the coherent Board-and-Logs snapshot before the
 /// protocol hierarchy derives roles or validates it.
-fn hierarchy_from_workspace(workspace: &Workspace) -> Result<HierarchyIndex, CliError> {
+fn hierarchy_from_workspace(workspace: &TandemProject) -> Result<HierarchyIndex, CliError> {
     let index = HierarchyIndex::from_documents(read_workspace_documents(workspace)?)?;
     index.validate_document_metadata()?;
     Ok(index)
@@ -2616,15 +2471,11 @@ fn active_task_descendant_ids(hierarchy: &HierarchyIndex, root_id: &str) -> Vec<
     active.into_iter().collect()
 }
 
-fn find_board_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
-    Ok(
-        read_documents(&workspace.board_dir, DocumentLocation::Board)?
-            .into_iter()
-            .find(|doc| doc.id() == id),
-    )
+fn find_board_document(project: &TandemProject, id: &str) -> Result<Option<Document>, CliError> {
+    project.read_board_document(id)
 }
 
-fn document_exists(workspace: &Workspace, id: &str) -> Result<bool, CliError> {
+fn document_exists(workspace: &TandemProject, id: &str) -> Result<bool, CliError> {
     Ok(find_document(workspace, id)?.is_some())
 }
 
@@ -2652,7 +2503,7 @@ fn resolve_parent_relationship(
 }
 
 fn unresolved_blockers(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     blockers: Option<&str>,
 ) -> Result<Vec<String>, CliError> {
     let hierarchy = hierarchy_from_workspace(workspace)?;
@@ -2672,162 +2523,6 @@ fn unresolved_blockers_in_hierarchy(
         }
     }
     unresolved
-}
-
-fn split_frontmatter(content: &str) -> Result<(String, String), &'static str> {
-    let first_line_end = content.find('\n').ok_or("missing frontmatter delimiter")?;
-    let first_line = content[..first_line_end].trim_end_matches('\r');
-    if first_line != "---" {
-        return Err("missing opening frontmatter delimiter");
-    }
-
-    let frontmatter_start = first_line_end + 1;
-    let mut cursor = frontmatter_start;
-
-    while cursor <= content.len() {
-        let line_start = cursor;
-        let Some(relative_newline) = content[cursor..].find('\n') else {
-            break;
-        };
-        let line_end = cursor + relative_newline;
-        let line = content[line_start..line_end].trim_end_matches('\r');
-        if line.trim() == "---" {
-            let body_start = line_end + 1;
-            return Ok((
-                content[frontmatter_start..line_start].to_string(),
-                content[body_start..].to_string(),
-            ));
-        }
-        cursor = line_end + 1;
-    }
-
-    Err("missing closing frontmatter delimiter")
-}
-
-fn parse_frontmatter_fields(frontmatter: &str) -> Result<HashMap<String, String>, String> {
-    let Some(root) = parse_frontmatter_yaml(frontmatter)? else {
-        return Ok(HashMap::new());
-    };
-    let hash = root
-        .as_hash()
-        .ok_or_else(|| "frontmatter root must be a YAML mapping".to_string())?;
-    let mut fields = HashMap::new();
-    flatten_yaml_hash(hash, "", &mut fields);
-    add_status_aliases(&mut fields);
-    Ok(fields)
-}
-
-fn parse_frontmatter_yaml(frontmatter: &str) -> Result<Option<Yaml>, String> {
-    if frontmatter.trim().is_empty() {
-        return Ok(None);
-    }
-    let docs = YamlLoader::load_from_str(frontmatter).map_err(|error| error.to_string())?;
-    if docs.is_empty() {
-        return Ok(None);
-    }
-    if docs.len() > 1 {
-        return Err("frontmatter must contain exactly one YAML document".to_string());
-    }
-    let root = docs.into_iter().next().unwrap();
-    if root.is_badvalue() {
-        return Err("frontmatter root must be a YAML mapping".to_string());
-    }
-    Ok(Some(root))
-}
-
-fn flatten_yaml_hash(
-    hash: &yaml_rust2::yaml::Hash,
-    prefix: &str,
-    fields: &mut HashMap<String, String>,
-) {
-    for (key, value) in hash {
-        let Some(key) = yaml_scalar_to_string(key) else {
-            continue;
-        };
-        if key.is_empty() {
-            continue;
-        }
-        let field_key = if prefix.is_empty() {
-            key
-        } else {
-            format!("{prefix}.{key}")
-        };
-        flatten_yaml_value(&field_key, value, fields);
-    }
-}
-
-fn flatten_yaml_value(prefix: &str, value: &Yaml, fields: &mut HashMap<String, String>) {
-    match value {
-        Yaml::Hash(hash) => flatten_yaml_hash(hash, prefix, fields),
-        Yaml::Array(values) => {
-            if let Some(inline) = yaml_array_field_value(values) {
-                fields.insert(prefix.to_string(), inline);
-            } else {
-                for (index, item) in values.iter().enumerate() {
-                    flatten_yaml_value(&format!("{prefix}.{index}"), item, fields);
-                }
-            }
-        }
-        _ => {
-            if let Some(value) = yaml_scalar_to_string(value) {
-                if !value.is_empty() {
-                    fields.insert(prefix.to_string(), value);
-                }
-            }
-        }
-    }
-}
-
-fn yaml_array_field_value(values: &[Yaml]) -> Option<String> {
-    let mut scalars = Vec::new();
-    for value in values {
-        scalars.push(yaml_scalar_to_string(value)?);
-    }
-    Some(inline_array(&scalars))
-}
-
-fn yaml_scalar_to_string(value: &Yaml) -> Option<String> {
-    match value {
-        Yaml::String(value) | Yaml::Real(value) => Some(value.clone()),
-        Yaml::Integer(value) => Some(value.to_string()),
-        Yaml::Boolean(value) => Some(value.to_string()),
-        Yaml::Null | Yaml::BadValue | Yaml::Array(_) | Yaml::Hash(_) | Yaml::Alias(_) => None,
-    }
-}
-
-fn yaml_mapping_value<'a>(root: &'a Yaml, key: &str) -> Option<&'a Yaml> {
-    root.as_hash()?.iter().find_map(|(candidate, value)| {
-        (yaml_scalar_to_string(candidate).as_deref() == Some(key)).then_some(value)
-    })
-}
-
-fn add_status_aliases(fields: &mut HashMap<String, String>) {
-    copy_first_alias(fields, "accordStatus", &["accord.status"]);
-    copy_first_alias(fields, "reviewStatus", &["review.status"]);
-    copy_first_alias(fields, "completionSummary", &["completion.summary"]);
-    copy_first_alias(
-        fields,
-        "completionValidation",
-        &[
-            "completion.validation",
-            "completion.validation.summary",
-            "completion.validation.status",
-        ],
-    );
-    copy_first_alias(fields, "completionReviewer", &["completion.reviewer"]);
-    copy_first_alias(fields, "filesChanged", &["completion.filesChanged"]);
-}
-
-fn copy_first_alias(fields: &mut HashMap<String, String>, alias: &str, sources: &[&str]) {
-    if fields.contains_key(alias) {
-        return;
-    }
-    for source in sources {
-        if let Some(value) = fields.get(*source).cloned() {
-            fields.insert(alias.to_string(), value);
-            return;
-        }
-    }
 }
 
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
@@ -2894,7 +2589,7 @@ struct MoveTaskOutcome {
 }
 
 fn move_task_to_state(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     id: &str,
     state: &str,
 ) -> Result<MoveTaskOutcome, CliError> {
@@ -2975,7 +2670,7 @@ fn move_task_to_state(
 }
 
 fn update_task_metadata(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     options: UpdateOptions,
 ) -> Result<UpdateOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
@@ -3331,7 +3026,7 @@ fn display_change_value(value: &str) -> String {
 }
 
 pub(crate) fn workspace_deprecation_warnings(
-    workspace: &Workspace,
+    workspace: &TandemProject,
 ) -> Result<Vec<String>, CliError> {
     let content = fs::read_to_string(&workspace.config_path)?;
     let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
@@ -3364,7 +3059,7 @@ pub(crate) fn workspace_deprecation_warnings(
     Ok(warnings)
 }
 
-fn print_workspace_deprecation_warnings(workspace: &Workspace) -> Result<(), CliError> {
+fn print_workspace_deprecation_warnings(workspace: &TandemProject) -> Result<(), CliError> {
     for warning in workspace_deprecation_warnings(workspace)? {
         println!("Warning: {warning}");
     }
@@ -3426,7 +3121,7 @@ fn decision_values(doc: &Document, key: &str) -> Vec<String> {
 }
 
 fn validate_task_document_for_mutation(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     doc: &Document,
 ) -> Result<(), CliError> {
     let hierarchy = hierarchy_from_workspace(workspace)?.with_replacement(doc.clone());
@@ -3434,7 +3129,7 @@ fn validate_task_document_for_mutation(
 }
 
 fn validate_task_document_against_hierarchy(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     doc: &Document,
     hierarchy: &HierarchyIndex,
 ) -> Result<(), CliError> {
@@ -4067,19 +3762,6 @@ fn parse_rules_from_content(content: &str, path: &Path) -> Result<RulesByCategor
     Ok(parse_rules_from_yaml(root.as_ref()))
 }
 
-fn read_frontmatter_yaml_file(path: &Path) -> Result<Option<Yaml>, CliError> {
-    let content = fs::read_to_string(path)?;
-    let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
-    })?;
-    parse_frontmatter_yaml(&frontmatter).map_err(|message| {
-        CliError::user(format!(
-            "Parse failure: {} frontmatter YAML: {message}",
-            display_path(path)
-        ))
-    })
-}
-
 fn parse_rules_from_yaml(root: Option<&Yaml>) -> RulesByCategory {
     let mut rules = empty_rules();
     let Some(rules_yaml) = root.and_then(|root| yaml_mapping_value(root, "rules")) else {
@@ -4151,7 +3833,10 @@ fn validate_rule_category(category: &str) -> Result<(), CliError> {
     }
 }
 
-fn warn_missing_rule_source(workspace: &Workspace, source: Option<&str>) -> Result<(), CliError> {
+fn warn_missing_rule_source(
+    workspace: &TandemProject,
+    source: Option<&str>,
+) -> Result<(), CliError> {
     if let Some(source) = source {
         if !source.trim().is_empty() && !document_exists(workspace, source)? {
             println!("Warning: rule source not found: {source}");
@@ -4956,12 +4641,12 @@ fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str
     }
 }
 
-fn read_workspace_states(workspace: &Workspace) -> Result<Vec<String>, CliError> {
+fn read_workspace_states(workspace: &TandemProject) -> Result<Vec<String>, CliError> {
     let root = read_frontmatter_yaml_file(&workspace.config_path)?;
     Ok(workflow_states(root.as_ref()))
 }
 
-fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
+fn validate_state(workspace: &TandemProject, state: &str) -> Result<(), CliError> {
     if state.trim().is_empty() {
         return Err(CliError::usage("state must not be empty"));
     }
@@ -4983,7 +4668,7 @@ struct CreatedDocument {
 }
 
 fn create_new_sequential_document<F>(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     prefix: &str,
     content_for_id: F,
 ) -> Result<CreatedDocument, CliError>
@@ -4995,7 +4680,7 @@ where
 }
 
 fn create_new_sequential_document_after<F>(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     prefix: &str,
     last_allocated: usize,
     mut content_for_id: F,
@@ -5024,7 +4709,7 @@ where
     )))
 }
 
-fn next_sequential_number(workspace: &Workspace, prefix: &str) -> Result<usize, CliError> {
+fn next_sequential_number(workspace: &TandemProject, prefix: &str) -> Result<usize, CliError> {
     let hierarchy = hierarchy_from_workspace(workspace)?;
     Ok(next_sequential_number_for_ids(
         hierarchy.documents.values().map(|doc| doc.id()),
@@ -5236,7 +4921,7 @@ fn temporary_path_for(path: &Path) -> PathBuf {
 }
 
 fn append_event(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     event_name: &str,
     id: &str,
     summary: &str,
@@ -5388,9 +5073,10 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project::read_document;
 
-    fn test_workspace(root: &Path) -> Workspace {
-        let workspace = Workspace {
+    fn test_workspace(root: &Path) -> TandemProject {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -5468,7 +5154,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -5977,7 +5663,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6284,7 +5970,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6368,7 +6054,7 @@ rules:
             .unwrap(),
             String::new(),
         );
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
             config_path: PathBuf::from("missing-tandem.md"),
@@ -6389,7 +6075,7 @@ rules:
             .unwrap(),
             String::new(),
         );
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
             config_path: PathBuf::from("missing-tandem.md"),
@@ -6408,7 +6094,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6507,7 +6193,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6546,7 +6232,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6631,7 +6317,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6877,7 +6563,7 @@ rules:
                 .unwrap()
                 .as_nanos()
         ));
-        let workspace = Workspace {
+        let workspace = TandemProject {
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),

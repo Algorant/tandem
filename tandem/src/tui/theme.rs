@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::super::{display_path, Workspace};
+use super::super::{display_path, TandemProject};
 
 #[derive(Debug, Clone)]
 pub(super) struct ThemeLoad {
@@ -263,7 +263,7 @@ impl TuiTheme {
         &["default-dark", "verdigris"]
     }
 
-    pub(super) fn load_for_workspace(workspace: &Workspace) -> ThemeLoad {
+    pub(super) fn load_for_workspace(workspace: &TandemProject) -> ThemeLoad {
         let no_color =
             env::var_os("NO_COLOR").is_some() || env::var_os("TANDEM_NO_COLOR").is_some();
         Self::load_for_workspace_with_options(
@@ -275,7 +275,7 @@ impl TuiTheme {
     }
 
     fn load_for_workspace_with_options(
-        workspace: &Workspace,
+        workspace: &TandemProject,
         user_theme_dir: Option<PathBuf>,
         user_config_path: Option<PathBuf>,
         no_color: bool,
@@ -1018,12 +1018,12 @@ pub(super) fn user_config_path_from_env() -> Option<PathBuf> {
     user_config_dir_from_env().map(|dir| dir.join("config.toml"))
 }
 
-pub(super) fn workspace_theme_path(workspace: &Workspace) -> PathBuf {
-    workspace.config_path.with_file_name("theme.toml")
+pub(super) fn workspace_theme_path(project: &TandemProject) -> PathBuf {
+    project.data_dir().join("theme.toml")
 }
 
-pub(super) fn workspace_config_path(workspace: &Workspace) -> PathBuf {
-    workspace.config_path.with_file_name("config.toml")
+pub(super) fn workspace_config_path(project: &TandemProject) -> PathBuf {
+    project.data_dir().join("config.toml")
 }
 
 fn user_config_dir_from_env() -> Option<PathBuf> {
@@ -2066,7 +2066,7 @@ accent = "wat"
         path
     }
 
-    fn workspace_at(root: &Path) -> Workspace {
+    fn workspace_at(root: &Path) -> TandemProject {
         let tandem_dir = root.join(".tandem");
         std::fs::create_dir_all(&tandem_dir).unwrap();
         let config_path = tandem_dir.join("tandem.md");
@@ -2075,7 +2075,7 @@ accent = "wat"
             "---\ntitle: Test\nstates: [todo, in-progress, review]\n---\n",
         )
         .unwrap();
-        Workspace {
+        TandemProject {
             board_dir: tandem_dir.join("board"),
             logs_dir: tandem_dir.join("logs"),
             events_path: tandem_dir.join("events.jsonl"),

@@ -12,7 +12,7 @@ use super::{centered_rect, detail_field_line, TuiApp};
 use crate::{
     append_event, document_exists, ensure_file_unchanged, parse_rules_from_content,
     patch_rules_category_content, read_file_snapshot, validate_rule_category, write_atomic,
-    CliError, RuleItem, RulesByCategory, Workspace,
+    CliError, RuleItem, RulesByCategory, TandemProject,
 };
 
 const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
@@ -860,7 +860,7 @@ fn nearest_rule_position(positions: &[(usize, usize)], category_index: usize) ->
 }
 
 fn add_rule_to_workspace(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     category: &str,
     rule: &str,
     source: &str,
@@ -907,7 +907,7 @@ fn add_rule_to_workspace(
 }
 
 fn edit_rule_in_workspace(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     category: &str,
     id: usize,
     rule: &str,
@@ -946,7 +946,7 @@ fn edit_rule_in_workspace(
 }
 
 fn delete_rule_from_workspace(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     category: &str,
     id: usize,
 ) -> Result<RuleDeleteOutcome, CliError> {
@@ -990,7 +990,7 @@ fn optional_rule_source(value: &str) -> Option<String> {
 }
 
 fn missing_rule_source_warning(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     source: Option<&str>,
 ) -> Result<Option<String>, CliError> {
     if let Some(source) = source.filter(|source| !source.trim().is_empty()) {

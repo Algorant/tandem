@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
-    display_path, parse_field_values, yaml_double_quote, CliError, Document, Workspace,
+    display_path, parse_field_values, yaml_double_quote, CliError, Document, TandemProject,
 };
 
 #[derive(Debug, Default)]
@@ -891,7 +891,7 @@ fn clean_decision_summary_line(line: &str) -> String {
 }
 
 fn create_basic_decision(
-    workspace: &Workspace,
+    workspace: &TandemProject,
     title: &str,
     body: &str,
 ) -> Result<DecisionMutationOutcome, CliError> {
