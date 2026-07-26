@@ -2,7 +2,8 @@
 
 - Campaign Epic: `task-146`
 - Governance Task: `task-148`
-- Architecture decision: `decision-7` (accepted; campaign records reference it)
+- Architecture decision: `decision-8`, “Define canonical protocol, project, app, and peer CLI/TUI architecture” (accepted; campaign records reference it)
+- Retained hierarchy authority: `decision-7`
 - Governing specification: [`refactor_spec.md`](./refactor_spec.md)
 - Established: 2026-07-26
 
@@ -22,8 +23,9 @@ both checked worktrees were clean. `origin/HEAD` resolves to `origin/main`;
 integration branch, not a release branch. Do not push or release from it
 without separate authorization.
 
-Before implementation begins, the Epic, its direct Task records, this
-specification, and `decision-7` must continue to agree. Tandem records remain
+Before implementation begins, the Epic, its direct Task records,
+`decision-8`, and this specification must continue to agree. `decision-7`
+remains the retained authority for hierarchy semantics. Tandem records remain
 the authoritative source for Task relationships and workflow; this document
 does not replace them or authorize a Task to start.
 
