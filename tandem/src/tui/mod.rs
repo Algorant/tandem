@@ -1,41 +1,36 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
 use std::fs;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Stdio};
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use yaml_rust2::Yaml;
 
-use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
-        MouseButton, MouseEvent, MouseEventKind,
-    },
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::{
-    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Tabs, Wrap},
-    Frame, Terminal,
+    Frame,
 };
 
 use super::*;
 
 mod decisions;
+mod editor;
 mod logs;
 #[allow(dead_code)]
 mod review;
 mod rules;
+mod terminal;
 mod theme;
 
 use decisions::DecisionsState;
+use editor::{editor_command_from_env, editor_target_for_doc, run_editor_command, EditorTarget};
 use rules::RulesState;
+use terminal::TerminalSession;
 use theme::{StatusTone, TuiTheme};
 
 pub(crate) fn run_tui() -> Result<(), CliError> {
@@ -43,80 +38,6 @@ pub(crate) fn run_tui() -> Result<(), CliError> {
     let mut app = TuiApp::load(workspace)?;
     let mut session = TerminalSession::enter()?;
     app.run(&mut session)
-}
-
-struct TerminalSession {
-    terminal: Terminal<CrosstermBackend<io::Stdout>>,
-}
-
-impl TerminalSession {
-    fn enter() -> Result<Self, CliError> {
-        enable_raw_mode()?;
-        let mut stdout = io::stdout();
-        if let Err(error) = execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
-            let _ = disable_raw_mode();
-            return Err(error.into());
-        }
-
-        let backend = CrosstermBackend::new(stdout);
-        match Terminal::new(backend) {
-            Ok(mut terminal) => {
-                if let Err(error) = terminal.clear() {
-                    restore_terminal(terminal.backend_mut());
-                    return Err(error.into());
-                }
-                Ok(Self { terminal })
-            }
-            Err(error) => {
-                let _ = disable_raw_mode();
-                let mut stdout = io::stdout();
-                let _ = execute!(stdout, LeaveAlternateScreen, DisableMouseCapture);
-                Err(error.into())
-            }
-        }
-    }
-
-    fn terminal_mut(&mut self) -> &mut Terminal<CrosstermBackend<io::Stdout>> {
-        &mut self.terminal
-    }
-
-    fn suspend_for_editor(&mut self) -> Result<(), CliError> {
-        self.terminal.show_cursor()?;
-        self.terminal.backend_mut().flush()?;
-        disable_raw_mode()?;
-        execute!(
-            self.terminal.backend_mut(),
-            LeaveAlternateScreen,
-            DisableMouseCapture
-        )?;
-        Ok(())
-    }
-
-    fn resume_after_editor(&mut self) -> Result<(), CliError> {
-        enable_raw_mode()?;
-        if let Err(error) = execute!(
-            self.terminal.backend_mut(),
-            EnterAlternateScreen,
-            EnableMouseCapture
-        ) {
-            let _ = disable_raw_mode();
-            return Err(error.into());
-        }
-        self.terminal.clear()?;
-        Ok(())
-    }
-}
-
-impl Drop for TerminalSession {
-    fn drop(&mut self) {
-        restore_terminal(self.terminal.backend_mut());
-        let _ = self.terminal.show_cursor();
-    }
-}
-
-fn restore_terminal(backend: &mut CrosstermBackend<io::Stdout>) {
-    let _ = disable_raw_mode();
-    let _ = execute!(backend, LeaveAlternateScreen, DisableMouseCapture);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3691,153 +3612,6 @@ impl TuiApp {
             .wrap(Wrap { trim: true });
         frame.render_widget(help, popup);
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct EditorTarget {
-    id: String,
-    path: PathBuf,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct EditorCommand {
-    program: String,
-    args: Vec<String>,
-    source: &'static str,
-}
-
-impl EditorCommand {
-    fn from_value(value: &str, source: &'static str) -> Result<Self, CliError> {
-        let words = split_editor_command(value).map_err(|message| {
-            CliError::user(format!(
-                "could not parse {source} value `{value}`: {message}"
-            ))
-        })?;
-        let Some((program, args)) = words.split_first() else {
-            return Err(CliError::user(format!("{source} is empty")));
-        };
-        Ok(Self {
-            program: program.clone(),
-            args: args.to_vec(),
-            source,
-        })
-    }
-
-    fn display_label(&self) -> String {
-        if self.args.is_empty() {
-            self.program.clone()
-        } else {
-            format!("{} {}", self.program, self.args.join(" "))
-        }
-    }
-}
-
-fn editor_target_for_doc(doc: &Document) -> Result<EditorTarget, String> {
-    if doc.location != DocumentLocation::Board {
-        return Err("Only active board documents are editable in $EDITOR for now.".to_string());
-    }
-    if doc.doc_type() != "task" {
-        return Err(format!(
-            "Only active task documents open in $EDITOR for now; {} is type `{}` and is deferred.",
-            doc.id(),
-            doc.doc_type()
-        ));
-    }
-    Ok(EditorTarget {
-        id: doc.id().to_string(),
-        path: doc.path.clone(),
-    })
-}
-
-fn editor_command_from_env() -> Result<EditorCommand, CliError> {
-    for (name, source) in [("EDITOR", "$EDITOR"), ("VISUAL", "$VISUAL")] {
-        if let Ok(value) = env::var(name) {
-            if !value.trim().is_empty() {
-                return EditorCommand::from_value(&value, source);
-            }
-        }
-    }
-
-    EditorCommand::from_value(default_editor_program(), "default editor")
-}
-
-fn default_editor_program() -> &'static str {
-    if cfg!(windows) {
-        "notepad"
-    } else {
-        "vi"
-    }
-}
-
-fn run_editor_command(command: &EditorCommand, path: &Path) -> io::Result<ExitStatus> {
-    Command::new(&command.program)
-        .args(&command.args)
-        .arg(path)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-}
-
-fn split_editor_command(value: &str) -> Result<Vec<String>, String> {
-    let mut words = Vec::new();
-    let mut current = String::new();
-    let mut quote: Option<char> = None;
-    let mut escaped = false;
-    let mut word_started = false;
-
-    for ch in value.chars() {
-        if escaped {
-            current.push(ch);
-            word_started = true;
-            escaped = false;
-            continue;
-        }
-
-        if ch == '\\' && quote != Some('\'') {
-            escaped = true;
-            word_started = true;
-            continue;
-        }
-
-        if let Some(active_quote) = quote {
-            if ch == active_quote {
-                quote = None;
-            } else {
-                current.push(ch);
-            }
-            word_started = true;
-            continue;
-        }
-
-        if ch == '\'' || ch == '"' {
-            quote = Some(ch);
-            word_started = true;
-        } else if ch.is_whitespace() {
-            if word_started {
-                words.push(current.clone());
-                current.clear();
-                word_started = false;
-            }
-        } else {
-            current.push(ch);
-            word_started = true;
-        }
-    }
-
-    if escaped {
-        current.push('\\');
-    }
-    if let Some(active_quote) = quote {
-        return Err(format!("unterminated {active_quote} quote"));
-    }
-    if word_started {
-        words.push(current);
-    }
-    if words.first().map(|word| word.is_empty()).unwrap_or(false) {
-        return Err("editor command program is empty".to_string());
-    }
-    Ok(words)
 }
 
 fn workspace_title_from_root(root: Option<&Yaml>) -> Option<String> {
@@ -7417,11 +7191,10 @@ fn rect_contains(rect: Rect, x: u16, y: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::env;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use ratatui::backend::TestBackend;
+    use ratatui::{backend::TestBackend, Terminal};
 
     use super::*;
 
@@ -10056,21 +9829,6 @@ tone = "success"
     }
 
     #[test]
-    fn split_editor_command_supports_arguments_and_quotes() {
-        assert_eq!(
-            split_editor_command("code --wait 'two words.md'").unwrap(),
-            vec!["code", "--wait", "two words.md"]
-        );
-        assert_eq!(
-            split_editor_command("\"/tmp/my editor\" --flag").unwrap(),
-            vec!["/tmp/my editor", "--flag"]
-        );
-        assert!(split_editor_command("vim '")
-            .unwrap_err()
-            .contains("unterminated"));
-    }
-
-    #[test]
     fn reload_preserves_selected_document_by_id_after_external_state_change() {
         let root = unique_test_dir("tandem-reload-preserve");
         let workspace = temp_workspace(&root);
@@ -10135,38 +9893,6 @@ tone = "success"
 
         assert!(app.docs.iter().any(|doc| doc.id() == "task-2"));
         assert!(app.status.contains("External changes detected"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn run_editor_command_smoke_appends_to_document() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let root = unique_test_dir("tandem-editor-smoke");
-        fs::create_dir_all(&root).unwrap();
-        let script = root.join("editor-smoke.sh");
-        let doc = root.join("task-1.md");
-        fs::write(
-            &script,
-            "#!/bin/sh\nprintf '\\nsmoke editor touched %s\\n' \"$1\" >> \"$1\"\n",
-        )
-        .unwrap();
-        let mut permissions = fs::metadata(&script).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&script, permissions).unwrap();
-        fs::write(
-            &doc,
-            "---\nid: task-1\ntype: task\ntitle: Test\nstate: todo\n---\n",
-        )
-        .unwrap();
-
-        let command = EditorCommand::from_value(&script.to_string_lossy(), "test editor").unwrap();
-        let status = run_editor_command(&command, &doc).unwrap();
-        assert!(status.success());
-        assert!(fs::read_to_string(&doc)
-            .unwrap()
-            .contains("smoke editor touched"));
         fs::remove_dir_all(root).unwrap();
     }
 
