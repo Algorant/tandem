@@ -4022,7 +4022,7 @@ fn create_basic_task(
         return Err(CliError::usage("task title must not be empty"));
     }
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
+    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
     validate_state(workspace, state)?;
 
     let now = current_timestamp();
@@ -4101,7 +4101,7 @@ fn apply_accepted_validation_tasks(
         return Err(CliError::usage("no accepted Validation tasks to apply"));
     }
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
+    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
     let mut completed_ids = Vec::new();
     for candidate in candidates {
         complete_validation_candidate(workspace, &candidate.id)?;
@@ -4196,7 +4196,7 @@ fn apply_validation_action(
     action: ValidationAction,
 ) -> Result<ValidationActionOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    HierarchyIndex::from_workspace(workspace)?.validate_all_task_hierarchies()?;
+    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
     let doc = find_board_document(workspace, id)?
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {

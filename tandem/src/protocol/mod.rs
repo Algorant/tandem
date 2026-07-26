@@ -8,3 +8,5 @@
 
 pub(crate) mod config;
 pub(crate) mod document;
+pub(crate) mod hierarchy;
+pub(crate) mod ids;

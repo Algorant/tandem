@@ -23,6 +23,8 @@ use protocol::document::{
     validate_task_kind, Document as ProtocolDocument, COMPLETION_OUTCOME_CANCELED,
     COMPLETION_OUTCOME_COMPLETED, EFFORTS, PRIORITIES,
 };
+use protocol::hierarchy::{HierarchyIndex, ParentRelationship, TaskRole};
+use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const ACCORD_STATUSES: &[&str] = &[
@@ -103,7 +105,7 @@ pub(crate) struct StoredDocument {
 }
 
 impl StoredDocument {
-    fn new(
+    pub(crate) fn new(
         path: PathBuf,
         location: DocumentLocation,
         fields: HashMap<String, String>,
@@ -119,7 +121,6 @@ impl StoredDocument {
     fn id(&self) -> &str {
         self.document.id()
     }
-
     fn title(&self) -> &str {
         self.document.title()
     }
@@ -127,7 +128,6 @@ impl StoredDocument {
 
 impl Deref for StoredDocument {
     type Target = ProtocolDocument;
-
     fn deref(&self) -> &Self::Target {
         &self.document
     }
@@ -142,7 +142,7 @@ impl DerefMut for StoredDocument {
 pub(crate) type Document = StoredDocument;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DocumentLocation {
+pub(crate) enum DocumentLocation {
     Board,
     Logs,
 }
@@ -150,313 +150,9 @@ enum DocumentLocation {
 impl DocumentLocation {
     fn as_str(self) -> &'static str {
         match self {
-            DocumentLocation::Board => "board",
-            DocumentLocation::Logs => "logs",
+            Self::Board => "board",
+            Self::Logs => "logs",
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TaskRole {
-    Epic,
-    Task,
-    Subtask,
-}
-
-impl TaskRole {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            TaskRole::Epic => "epic",
-            TaskRole::Task => "task",
-            TaskRole::Subtask => "subtask",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ParentRelationship {
-    EpicTask,
-    Subtask,
-    Parent,
-}
-
-impl ParentRelationship {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            ParentRelationship::EpicTask => "epic-task",
-            ParentRelationship::Subtask => "subtask",
-            ParentRelationship::Parent => "parent",
-        }
-    }
-
-    pub(crate) fn human_label(self) -> &'static str {
-        match self {
-            ParentRelationship::EpicTask => "Task of Epic",
-            ParentRelationship::Subtask => "Subtask of",
-            ParentRelationship::Parent => "Parent",
-        }
-    }
-}
-
-/// Canonical board+logs graph used by CLI reads, allocation, and mutation validation.
-/// Kept crate-visible so the TUI can adopt the same decision-7 seam.
-#[derive(Debug, Clone)]
-pub(crate) struct HierarchyIndex {
-    pub(crate) documents: HashMap<String, Document>,
-}
-
-impl HierarchyIndex {
-    pub(crate) fn from_documents(docs: Vec<Document>) -> Result<Self, CliError> {
-        let mut documents = HashMap::new();
-        for doc in docs {
-            let id = doc.id().to_string();
-            if id.trim().is_empty() {
-                return Err(CliError::user(format!(
-                    "Validation failed for {}: missing required field `id`",
-                    display_path(&doc.path)
-                )));
-            }
-            if let Some(existing) = documents.insert(id.clone(), doc.clone()) {
-                return Err(CliError::user(format!(
-                    "Validation failed: duplicate document ID `{id}` in {} and {}",
-                    display_path(&existing.path),
-                    display_path(&doc.path)
-                )));
-            }
-        }
-        Ok(Self { documents })
-    }
-
-    pub(crate) fn from_workspace(workspace: &Workspace) -> Result<Self, CliError> {
-        let index = Self::from_documents(read_workspace_documents(workspace)?)?;
-        index.validate_document_metadata()?;
-        Ok(index)
-    }
-
-    fn with_replacement(&self, doc: Document) -> Self {
-        let mut documents = self.documents.clone();
-        documents.insert(doc.id().to_string(), doc);
-        Self { documents }
-    }
-
-    pub(crate) fn document(&self, id: &str) -> Option<&Document> {
-        self.documents.get(id)
-    }
-
-    pub(crate) fn task_role(&self, doc: &Document) -> Result<Option<TaskRole>, CliError> {
-        if doc.doc_type() != "task" {
-            return Ok(None);
-        }
-        let mut roles = HashMap::new();
-        let mut stack = Vec::new();
-        self.task_role_by_id(doc.id(), &mut roles, &mut stack)
-            .map(Some)
-    }
-
-    fn task_role_by_id(
-        &self,
-        id: &str,
-        roles: &mut HashMap<String, TaskRole>,
-        stack: &mut Vec<String>,
-    ) -> Result<TaskRole, CliError> {
-        if let Some(role) = roles.get(id) {
-            return Ok(*role);
-        }
-        if let Some(cycle_start) = stack.iter().position(|entry| entry == id) {
-            let mut cycle = stack[cycle_start..].to_vec();
-            cycle.push(id.to_string());
-            return Err(CliError::user(format!(
-                "Validation failed: task hierarchy cycle: {}",
-                cycle.join(" -> ")
-            )));
-        }
-        let doc = self.document(id).ok_or_else(|| {
-            CliError::user(format!(
-                "Validation failed: parent document not found: {id}"
-            ))
-        })?;
-        if doc.doc_type() != "task" {
-            return Err(CliError::user(format!(
-                "Validation failed: {id} is type {}, not task",
-                doc.doc_type()
-            )));
-        }
-        if let Some(kind) = doc.field("kind") {
-            validate_task_kind(kind).map_err(|message| {
-                CliError::user(format!(
-                    "Validation failed for {}: {message}",
-                    display_path(&doc.path)
-                ))
-            })?;
-        }
-        if doc.kind() == Some("epic") {
-            roles.insert(id.to_string(), TaskRole::Epic);
-            return Ok(TaskRole::Epic);
-        }
-
-        stack.push(id.to_string());
-        let role = match doc.field("parentId") {
-            None => TaskRole::Task,
-            Some(parent_id) => {
-                let parent = self.document(parent_id).ok_or_else(|| {
-                    CliError::user(format!(
-                        "Validation failed for {}: unresolved parentId `{parent_id}`",
-                        display_path(&doc.path)
-                    ))
-                })?;
-                if parent.doc_type() != "task" {
-                    TaskRole::Task
-                } else {
-                    match self.task_role_by_id(parent_id, roles, stack)? {
-                        TaskRole::Epic => TaskRole::Task,
-                        TaskRole::Task => TaskRole::Subtask,
-                        TaskRole::Subtask => {
-                            return Err(CliError::user(format!(
-                                "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
-                                display_path(&doc.path),
-                                doc.id()
-                            )))
-                        }
-                    }
-                }
-            }
-        };
-        stack.pop();
-        roles.insert(id.to_string(), role);
-        Ok(role)
-    }
-
-    pub(crate) fn relationship(
-        &self,
-        doc: &Document,
-    ) -> Result<Option<ParentRelationship>, CliError> {
-        let Some(parent_id) = doc.field("parentId") else {
-            return Ok(None);
-        };
-        let parent = self.document(parent_id).ok_or_else(|| {
-            CliError::user(format!(
-                "Validation failed for {}: unresolved parentId `{parent_id}`",
-                display_path(&doc.path)
-            ))
-        })?;
-        if doc.doc_type() != "task" || parent.doc_type() != "task" {
-            return Ok(Some(ParentRelationship::Parent));
-        }
-        Ok(Some(match self.task_role(parent)? {
-            Some(TaskRole::Epic) => ParentRelationship::EpicTask,
-            Some(TaskRole::Task) => ParentRelationship::Subtask,
-            Some(TaskRole::Subtask) => {
-                return Err(CliError::user(format!(
-                    "Validation failed for {}: task {} cannot be a child of Subtask {parent_id}",
-                    display_path(&doc.path),
-                    doc.id()
-                )))
-            }
-            None => ParentRelationship::Parent,
-        }))
-    }
-
-    pub(crate) fn validate_task_hierarchy(&self, doc: &Document) -> Result<TaskRole, CliError> {
-        let role = self.task_role(doc)?.ok_or_else(|| {
-            CliError::user(format!("Validation failed: {} is not a task", doc.id()))
-        })?;
-        if role == TaskRole::Epic && doc.field("parentId").is_some() {
-            return Err(CliError::user(format!(
-                "Validation failed for {}: Epic {} cannot have parentId",
-                display_path(&doc.path),
-                doc.id()
-            )));
-        }
-        let valid_id = match role {
-            TaskRole::Epic | TaskRole::Task => global_task_number(doc.id()).is_some(),
-            TaskRole::Subtask => doc
-                .field("parentId")
-                .is_some_and(|parent_id| subtask_suffix(doc.id(), parent_id).is_some()),
-        };
-        if !valid_id {
-            let expected = match role {
-                TaskRole::Epic | TaskRole::Task => "global `task-N`".to_string(),
-                TaskRole::Subtask => format!(
-                    "`{}-M` with a positive M",
-                    doc.field("parentId").unwrap_or("task-N")
-                ),
-            };
-            return Err(CliError::user(format!(
-                "Validation failed for {}: {} {} has invalid ID `{}`; expected {expected}",
-                display_path(&doc.path),
-                role.as_str(),
-                doc.title(),
-                doc.id()
-            )));
-        }
-        if role == TaskRole::Subtask
-            && self
-                .documents
-                .values()
-                .any(|child| child.field("parentId") == Some(doc.id()))
-        {
-            return Err(CliError::user(format!(
-                "Validation failed for {}: Subtask {} cannot have children",
-                display_path(&doc.path),
-                doc.id()
-            )));
-        }
-        Ok(role)
-    }
-
-    pub(crate) fn task_hierarchy_errors(&self) -> Vec<String> {
-        let mut ids = self
-            .documents
-            .values()
-            .filter(|doc| doc.doc_type() == "task")
-            .map(|doc| doc.id().to_string())
-            .collect::<Vec<_>>();
-        ids.sort();
-        let mut errors = BTreeSet::new();
-        for id in ids {
-            if let Err(error) =
-                self.validate_task_hierarchy(self.document(&id).expect("indexed task"))
-            {
-                errors.insert(error.message);
-            }
-        }
-        errors.into_iter().collect()
-    }
-
-    fn validate_document_metadata(&self) -> Result<(), CliError> {
-        for doc in self
-            .documents
-            .values()
-            .filter(|doc| doc.doc_type() == "task")
-        {
-            for (field, allowed) in [("priority", PRIORITIES), ("effort", EFFORTS)] {
-                if let Some(value) = doc.field(field) {
-                    if !allowed.contains(&value) {
-                        return Err(CliError::user(format!(
-                            "Validation failed for {}: invalid {field} `{value}`; expected one of: {}",
-                            display_path(&doc.path),
-                            allowed.join(", ")
-                        )));
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub(crate) fn validate_all_task_hierarchies(&self) -> Result<(), CliError> {
-        let errors = self.task_hierarchy_errors();
-        if errors.is_empty() {
-            return Ok(());
-        }
-        if errors.len() == 1 {
-            return Err(CliError::user(errors.into_iter().next().unwrap()));
-        }
-        let count = errors.len();
-        Err(CliError::user(format!(
-            "Validation failed: hierarchy contains {count} structural errors:\n- {}",
-            errors.join("\n- ")
-        )))
     }
 }
 
@@ -1501,7 +1197,7 @@ fn derive_workspace_title(root: &Path) -> String {
 fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let docs = hierarchy
         .documents
@@ -1526,7 +1222,7 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
 fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
         .document(&options.id)
@@ -1608,7 +1304,7 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
             "Validation failed: an Epic cannot have parentId; remove --parent or --kind epic",
         ));
     }
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let parent_relationship = options
         .parent
@@ -1635,7 +1331,10 @@ fn add_task(workspace: &Workspace, options: AddOptions) -> Result<AddOutcome, Cl
         _ => "task",
     };
     let now = current_timestamp();
-    let last_allocated = next_sequential_number_in_hierarchy(&hierarchy, allocation_prefix);
+    let last_allocated = next_sequential_number_for_ids(
+        hierarchy.documents.values().map(|doc| doc.id()),
+        allocation_prefix,
+    );
     let created = create_new_sequential_document_after(
         workspace,
         allocation_prefix,
@@ -1745,7 +1444,7 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
         options.summary.as_deref(),
         "complete requires --summary <text>",
     )?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -1856,7 +1555,7 @@ fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
 fn cancel_task(workspace: &Workspace, id: &str, reason: &str) -> Result<CancelOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     let reason = require_nonempty(Some(reason), "cancel requires --reason <text>")?.to_string();
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
         .document(id)
@@ -1935,7 +1634,7 @@ fn cancel_task(workspace: &Workspace, id: &str, reason: &str) -> Result<CancelOu
 fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let docs = hierarchy.documents.values().cloned().collect::<Vec<_>>();
     let results = search_documents(docs, &options);
@@ -1972,7 +1671,7 @@ fn cmd_log(args: &[String]) -> Result<(), CliError> {
 fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let mut docs = hierarchy
         .documents
@@ -2001,7 +1700,7 @@ fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
 fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
         .document(&options.id)
@@ -2020,7 +1719,7 @@ fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
 fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let mut results = hierarchy
         .documents
@@ -2077,7 +1776,7 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
 fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -2416,7 +2115,7 @@ fn cmd_decision_list(json: bool) -> Result<(), CliError> {
 fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
         .document(&options.id)
@@ -2865,6 +2564,14 @@ fn read_workspace_documents(workspace: &Workspace) -> Result<Vec<Document>, CliE
     Ok(docs)
 }
 
+/// Filesystem adapter: load the coherent Board-and-Logs snapshot before the
+/// protocol hierarchy derives roles or validates it.
+fn hierarchy_from_workspace(workspace: &Workspace) -> Result<HierarchyIndex, CliError> {
+    let index = HierarchyIndex::from_documents(read_workspace_documents(workspace)?)?;
+    index.validate_document_metadata()?;
+    Ok(index)
+}
+
 fn find_hierarchy_children(
     hierarchy: &HierarchyIndex,
     parent: &Document,
@@ -2964,33 +2671,11 @@ fn resolve_parent_relationship(
     }
 }
 
-fn positive_canonical_number(value: &str) -> Option<usize> {
-    let number = value.parse::<usize>().ok()?;
-    (number > 0 && number.to_string() == value).then_some(number)
-}
-
-fn global_task_number(id: &str) -> Option<usize> {
-    let suffix = id.strip_prefix("task-")?;
-    if suffix.contains('-') {
-        return None;
-    }
-    positive_canonical_number(suffix)
-}
-
-fn subtask_suffix(id: &str, parent_id: &str) -> Option<usize> {
-    global_task_number(parent_id)?;
-    let suffix = id.strip_prefix(&format!("{parent_id}-"))?;
-    if suffix.contains('-') {
-        return None;
-    }
-    positive_canonical_number(suffix)
-}
-
 fn unresolved_blockers(
     workspace: &Workspace,
     blockers: Option<&str>,
 ) -> Result<Vec<String>, CliError> {
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     Ok(unresolved_blockers_in_hierarchy(&hierarchy, blockers))
 }
 
@@ -3236,7 +2921,7 @@ fn move_task_to_state(
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
     validate_state(workspace, state)?;
 
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -3314,7 +2999,7 @@ fn update_task_metadata(
     options: UpdateOptions,
 ) -> Result<UpdateOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -3789,7 +3474,7 @@ fn validate_task_document_for_mutation(
     workspace: &Workspace,
     doc: &Document,
 ) -> Result<(), CliError> {
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?.with_replacement(doc.clone());
+    let hierarchy = hierarchy_from_workspace(workspace)?.with_replacement(doc.clone());
     validate_task_document_against_hierarchy(workspace, doc, &hierarchy)
 }
 
@@ -5435,19 +5120,11 @@ where
 }
 
 fn next_sequential_number(workspace: &Workspace, prefix: &str) -> Result<usize, CliError> {
-    let hierarchy = HierarchyIndex::from_workspace(workspace)?;
-    Ok(next_sequential_number_in_hierarchy(&hierarchy, prefix))
-}
-
-fn next_sequential_number_in_hierarchy(hierarchy: &HierarchyIndex, prefix: &str) -> usize {
-    let needle = format!("{prefix}-");
-    hierarchy
-        .documents
-        .values()
-        .filter_map(|doc| doc.id().strip_prefix(&needle))
-        .filter_map(positive_canonical_number)
-        .max()
-        .unwrap_or(0)
+    let hierarchy = hierarchy_from_workspace(workspace)?;
+    Ok(next_sequential_number_for_ids(
+        hierarchy.documents.values().map(|doc| doc.id()),
+        prefix,
+    ))
 }
 
 fn replace_markdown_body(content: &str, body: &str) -> Result<String, CliError> {
@@ -6020,7 +5697,7 @@ mod tests {
             Some(ParentRelationship::Parent)
         );
 
-        let hierarchy = HierarchyIndex::from_workspace(&workspace).unwrap();
+        let hierarchy = hierarchy_from_workspace(&workspace).unwrap();
         hierarchy.validate_all_task_hierarchies().unwrap();
         let task_doc = hierarchy.document(&task.id).unwrap();
         assert_eq!(hierarchy.task_role(task_doc).unwrap(), Some(TaskRole::Task));
@@ -6116,7 +5793,7 @@ mod tests {
             second_subtask.parent_relationship,
             Some(ParentRelationship::Subtask)
         );
-        let hierarchy = HierarchyIndex::from_workspace(&workspace).unwrap();
+        let hierarchy = hierarchy_from_workspace(&workspace).unwrap();
         hierarchy.validate_all_task_hierarchies().unwrap();
         let logged_parent = hierarchy.document("task-103").unwrap();
         assert_eq!(
