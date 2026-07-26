@@ -646,12 +646,12 @@ mod tests {
         fields.insert("title".to_string(), title.to_string());
         fields.insert("completedAt".to_string(), completed_at.to_string());
         fields.insert("completion.summary".to_string(), summary.to_string());
-        Document {
-            path: PathBuf::from(format!("{id}.md")),
-            location: DocumentLocation::Logs,
+        Document::new(
+            PathBuf::from(format!("{id}.md")),
+            DocumentLocation::Logs,
             fields,
-            body: body.to_string(),
-        }
+            body.to_string(),
+        )
     }
 
     #[test]

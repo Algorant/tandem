@@ -7206,12 +7206,12 @@ mod tests {
         if let Some(state) = state {
             fields.insert("state".to_string(), state.to_string());
         }
-        Document {
-            path: PathBuf::from(format!("{id}.md")),
-            location: DocumentLocation::Board,
+        Document::new(
+            PathBuf::from(format!("{id}.md")),
+            DocumentLocation::Board,
             fields,
-            body: String::new(),
-        }
+            String::new(),
+        )
     }
 
     fn line_text(line: &Line<'_>) -> String {

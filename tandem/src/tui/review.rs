@@ -887,12 +887,12 @@ mod tests {
         for (key, value) in fields {
             map.insert((*key).to_string(), (*value).to_string());
         }
-        Document {
-            path: PathBuf::from(format!("{id}.md")),
-            location: DocumentLocation::Board,
-            fields: map,
-            body: String::new(),
-        }
+        Document::new(
+            PathBuf::from(format!("{id}.md")),
+            DocumentLocation::Board,
+            map,
+            String::new(),
+        )
     }
 
     fn reason_labels(doc: &Document) -> Vec<String> {

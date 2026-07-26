@@ -967,12 +967,12 @@ mod tests {
         fields.insert("state".to_string(), "todo".to_string());
         fields.insert("createdAt".to_string(), "2026-07-01T10:00:00Z".to_string());
         fields.insert("updatedAt".to_string(), "2026-07-01T11:00:00Z".to_string());
-        Document {
-            path: PathBuf::from(".tandem/board/decision-42.md"),
-            location: DocumentLocation::Board,
+        Document::new(
+            PathBuf::from(".tandem/board/decision-42.md"),
+            DocumentLocation::Board,
             fields,
-            body: "## Context\n\nThe Board is noisy when decisions are mixed into task state buckets.\n\n## Decision\n\nRender decisions in their own pane.".to_string(),
-        }
+            "## Context\n\nThe Board is noisy when decisions are mixed into task state buckets.\n\n## Decision\n\nRender decisions in their own pane.".to_string(),
+        )
     }
 
     #[test]

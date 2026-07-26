@@ -2,20 +2,29 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
+use std::ops::{Deref, DerefMut};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::{Yaml, YamlLoader};
 
+mod protocol;
 mod tui;
 
+use protocol::config::{
+    display_known_states, is_known_or_legacy_state, state_matches_filter, workflow_states,
+    DEFAULT_STATES, LEGACY_PROTOCOL_VERSION, LEGACY_REVIEW_STATE, PROTOCOL_VERSION,
+    VALIDATION_STATE,
+};
+use protocol::document::{
+    accord_status, completion_files_changed, completion_outcome, completion_reviewer,
+    completion_summary, completion_validation, has_metadata, parse_field_values, review_status,
+    validate_task_kind, Document as ProtocolDocument, COMPLETION_OUTCOME_CANCELED,
+    COMPLETION_OUTCOME_COMPLETED, EFFORTS, PRIORITIES,
+};
+
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
-const PROTOCOL_VERSION: &str = "0.2.0";
-const LEGACY_PROTOCOL_VERSION: &str = "0.1.0";
-const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
-const LEGACY_REVIEW_STATE: &str = "review";
-const VALIDATION_STATE: &str = "validation";
 const ACCORD_STATUSES: &[&str] = &[
     "claimed",
     "delivered",
@@ -41,11 +50,6 @@ const DECISION_STATUSES: &[&str] = &[
     "superseded",
     "withdrawn",
 ];
-const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
-const EFFORTS: &[&str] = &["trivial", "small", "medium", "large"];
-const TASK_KINDS: &[&str] = &["epic"];
-const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
-const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
 const COMPLETION_OUTCOMES: &[&str] = &[COMPLETION_OUTCOME_COMPLETED, COMPLETION_OUTCOME_CANCELED];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
@@ -89,13 +93,53 @@ pub(crate) struct Workspace {
     events_path: PathBuf,
 }
 
+/// Concrete project record pairing a logical protocol document with its source.
+/// Project ownership will move this filesystem-facing wrapper in a later stage.
 #[derive(Debug, Clone)]
-pub(crate) struct Document {
+pub(crate) struct StoredDocument {
     path: PathBuf,
     location: DocumentLocation,
-    fields: HashMap<String, String>,
-    body: String,
+    document: ProtocolDocument,
 }
+
+impl StoredDocument {
+    fn new(
+        path: PathBuf,
+        location: DocumentLocation,
+        fields: HashMap<String, String>,
+        body: String,
+    ) -> Self {
+        Self {
+            path,
+            location,
+            document: ProtocolDocument::new(fields, body),
+        }
+    }
+
+    fn id(&self) -> &str {
+        self.document.id()
+    }
+
+    fn title(&self) -> &str {
+        self.document.title()
+    }
+}
+
+impl Deref for StoredDocument {
+    type Target = ProtocolDocument;
+
+    fn deref(&self) -> &Self::Target {
+        &self.document
+    }
+}
+
+impl DerefMut for StoredDocument {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.document
+    }
+}
+
+pub(crate) type Document = StoredDocument;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DocumentLocation {
@@ -238,7 +282,7 @@ impl HierarchyIndex {
             )));
         }
         if let Some(kind) = doc.field("kind") {
-            validate_task_kind_value(kind).map_err(|message| {
+            validate_task_kind(kind).map_err(|message| {
                 CliError::user(format!(
                     "Validation failed for {}: {message}",
                     display_path(&doc.path)
@@ -443,30 +487,6 @@ impl HierarchyLock {
 impl Drop for HierarchyLock {
     fn drop(&mut self) {
         let _ = self.file.unlock();
-    }
-}
-
-impl Document {
-    fn field(&self, key: &str) -> Option<&str> {
-        self.fields.get(key).map(String::as_str)
-    }
-
-    fn id(&self) -> &str {
-        self.field("id").unwrap_or("")
-    }
-
-    fn doc_type(&self) -> &str {
-        self.field("type").unwrap_or("task")
-    }
-
-    fn kind(&self) -> Option<&str> {
-        self.field("kind")
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-    }
-
-    fn title(&self) -> &str {
-        self.field("title").unwrap_or("")
     }
 }
 
@@ -2821,12 +2841,7 @@ fn read_document(path: &Path, location: DocumentLocation) -> Result<Document, Cl
         ))
     })?;
 
-    Ok(Document {
-        path: path.to_path_buf(),
-        location,
-        fields,
-        body,
-    })
+    Ok(Document::new(path.to_path_buf(), location, fields, body))
 }
 
 fn find_document(workspace: &Workspace, id: &str) -> Result<Option<Document>, CliError> {
@@ -3148,58 +3163,6 @@ fn copy_first_alias(fields: &mut HashMap<String, String>, alias: &str, sources: 
             return;
         }
     }
-}
-
-fn parse_scalar_value(value: &str) -> String {
-    if value.is_empty() {
-        return String::new();
-    }
-
-    let without_comment = if value.starts_with('"') || value.starts_with('\'') {
-        value
-    } else {
-        value.split(" #").next().unwrap_or(value).trim_end()
-    };
-
-    if let Some(stripped) = without_comment
-        .strip_prefix('"')
-        .and_then(|value| value.strip_suffix('"'))
-    {
-        return unescape_double_quoted(stripped);
-    }
-
-    if let Some(stripped) = without_comment
-        .strip_prefix('\'')
-        .and_then(|value| value.strip_suffix('\''))
-    {
-        return stripped.replace("''", "'");
-    }
-
-    without_comment.trim().to_string()
-}
-
-fn unescape_double_quoted(value: &str) -> String {
-    let mut output = String::new();
-    let mut chars = value.chars();
-    while let Some(ch) = chars.next() {
-        if ch == '\\' {
-            match chars.next() {
-                Some('n') => output.push('\n'),
-                Some('r') => output.push('\r'),
-                Some('t') => output.push('\t'),
-                Some('"') => output.push('"'),
-                Some('\\') => output.push('\\'),
-                Some(other) => {
-                    output.push('\\');
-                    output.push(other);
-                }
-                None => output.push('\\'),
-            }
-        } else {
-            output.push(ch);
-        }
-    }
-    output
 }
 
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
@@ -3603,22 +3566,8 @@ fn validate_task_kind_option(kind: Option<&str>, flag: &str) -> Result<(), CliEr
         return Ok(());
     };
     let kind = require_nonempty(Some(kind), &format!("{flag} must not be empty"))?;
-    validate_task_kind_value(kind)
+    validate_task_kind(kind)
         .map_err(|message| CliError::user(format!("Validation failed: {message}")))
-}
-
-fn validate_task_kind_value(kind: &str) -> Result<(), String> {
-    let kind = kind.trim();
-    if kind.is_empty() {
-        return Err("kind must not be empty when present".to_string());
-    }
-    if !TASK_KINDS.contains(&kind) {
-        return Err(format!(
-            "invalid kind `{kind}`; expected one of: {}",
-            TASK_KINDS.join(", ")
-        ));
-    }
-    Ok(())
 }
 
 fn validate_optional_vocabulary(
@@ -3745,7 +3694,7 @@ fn document_warnings(doc: &Document) -> Vec<String> {
     let mut warnings = accord_state_divergence_warning(doc)
         .into_iter()
         .collect::<Vec<_>>();
-    if !matches!(doc.doc_type(), "task" | "decision") {
+    if !doc.is_first_class_type() {
         warnings.push(format!(
             "{} is legacy custom type `{}`; custom-type documents are deprecated and read-only.",
             doc.id(),
@@ -3796,73 +3745,8 @@ fn print_workspace_deprecation_warnings(workspace: &Workspace) -> Result<(), Cli
     Ok(())
 }
 
-fn state_matches_filter(actual: Option<&str>, requested: &str) -> bool {
-    actual == Some(requested)
-        || (requested == VALIDATION_STATE && actual == Some(LEGACY_REVIEW_STATE))
-        || (requested == LEGACY_REVIEW_STATE && actual == Some(VALIDATION_STATE))
-}
-
-fn is_known_or_legacy_state(states: &[String], state: &str) -> bool {
-    states.iter().any(|known| known == state)
-        || (state == LEGACY_REVIEW_STATE && states.iter().any(|known| known == VALIDATION_STATE))
-        || (state == VALIDATION_STATE && states.iter().any(|known| known == LEGACY_REVIEW_STATE))
-}
-
-fn display_known_states(states: &[String]) -> String {
-    let mut display = states.to_vec();
-    if states.iter().any(|state| state == VALIDATION_STATE)
-        && !states.iter().any(|state| state == LEGACY_REVIEW_STATE)
-    {
-        display.push(format!("{LEGACY_REVIEW_STATE} (legacy alias)"));
-    } else if states.iter().any(|state| state == LEGACY_REVIEW_STATE)
-        && !states.iter().any(|state| state == VALIDATION_STATE)
-    {
-        display.push(format!("{VALIDATION_STATE} (preferred alias)"));
-    }
-    display.join(", ")
-}
-
-fn accord_status(doc: &Document) -> Option<&str> {
-    doc.field("accord.status")
-        .or_else(|| doc.field("accordStatus"))
-}
-
-fn review_status(doc: &Document) -> Option<&str> {
-    doc.field("review.status")
-        .or_else(|| doc.field("reviewStatus"))
-}
-
-fn completion_summary(doc: &Document) -> Option<&str> {
-    doc.field("completion.summary")
-        .or_else(|| doc.field("completionSummary"))
-}
-
-fn completion_outcome(doc: &Document) -> &str {
-    doc.field("completion.outcome")
-        .unwrap_or(COMPLETION_OUTCOME_COMPLETED)
-}
-
 fn is_canceled_log(doc: &Document) -> bool {
     doc.location == DocumentLocation::Logs && completion_outcome(doc) == COMPLETION_OUTCOME_CANCELED
-}
-
-fn completion_validation(doc: &Document) -> Option<&str> {
-    doc.field("completion.validation")
-        .or_else(|| doc.field("completion.validation.summary"))
-        .or_else(|| doc.field("completion.validation.status"))
-        .or_else(|| doc.field("completionValidation"))
-}
-
-fn completion_reviewer(doc: &Document) -> Option<&str> {
-    doc.field("completion.reviewer")
-        .or_else(|| doc.field("completionReviewer"))
-}
-
-fn completion_files_changed(doc: &Document) -> Vec<String> {
-    doc.field("completion.filesChanged")
-        .or_else(|| doc.field("filesChanged"))
-        .map(parse_field_values)
-        .unwrap_or_default()
 }
 
 fn decision_status(doc: &Document) -> Option<&str> {
@@ -3898,7 +3782,7 @@ fn decision_superseded_by(doc: &Document) -> Vec<String> {
 }
 
 fn decision_values(doc: &Document, key: &str) -> Vec<String> {
-    doc.field(key).map(parse_field_values).unwrap_or_default()
+    doc.values(key)
 }
 
 fn validate_task_document_for_mutation(
@@ -3927,7 +3811,7 @@ fn validate_task_document_against_hierarchy(
         None => errors.push("missing required field `type`".to_string()),
     }
     if let Some(kind) = doc.field("kind") {
-        if let Err(message) = validate_task_kind_value(kind) {
+        if let Err(message) = validate_task_kind(kind) {
             errors.push(message);
         }
     }
@@ -3991,13 +3875,6 @@ fn validate_task_document_against_hierarchy(
     }
 
     hierarchy.validate_all_task_hierarchies()
-}
-
-fn has_metadata(doc: &Document, prefix: &str) -> bool {
-    let nested_prefix = format!("{prefix}.");
-    doc.fields
-        .keys()
-        .any(|key| key == prefix || key.starts_with(&nested_prefix))
 }
 
 impl AccordRecord {
@@ -5491,36 +5368,7 @@ fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str
 
 fn read_workspace_states(workspace: &Workspace) -> Result<Vec<String>, CliError> {
     let root = read_frontmatter_yaml_file(&workspace.config_path)?;
-    let mut states = Vec::new();
-    if let Some(states_yaml) = root
-        .as_ref()
-        .and_then(|root| yaml_mapping_value(root, "states"))
-    {
-        match states_yaml {
-            Yaml::Array(items) => {
-                for item in items {
-                    if let Some(state) = yaml_scalar_to_string(item)
-                        .or_else(|| yaml_mapping_value(item, "id").and_then(yaml_scalar_to_string))
-                    {
-                        if !state.trim().is_empty() {
-                            states.push(state);
-                        }
-                    }
-                }
-            }
-            _ => {
-                if let Some(state) = yaml_scalar_to_string(states_yaml) {
-                    if !state.trim().is_empty() {
-                        states.push(state);
-                    }
-                }
-            }
-        }
-    }
-    if states.is_empty() {
-        states.extend(DEFAULT_STATES.iter().map(|state| (*state).to_string()));
-    }
-    Ok(states)
+    Ok(workflow_states(root.as_ref()))
 }
 
 fn validate_state(workspace: &Workspace, state: &str) -> Result<(), CliError> {
@@ -5892,33 +5740,6 @@ fn field_values_contain(value: Option<&str>, needle: &str) -> bool {
         .is_some_and(|values| values.iter().any(|value| value == needle))
 }
 
-fn parse_field_values(value: &str) -> Vec<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() || trimmed == "[]" {
-        return Vec::new();
-    }
-    if trimmed.starts_with('[') && trimmed.ends_with(']') {
-        if let Ok(docs) = YamlLoader::load_from_str(trimmed) {
-            if let Some(Yaml::Array(values)) = docs.first() {
-                return values
-                    .iter()
-                    .filter_map(yaml_scalar_to_string)
-                    .filter(|item| !item.is_empty())
-                    .collect();
-            }
-        }
-        return trimmed[1..trimmed.len() - 1]
-            .split(',')
-            .map(|item| parse_scalar_value(item.trim()))
-            .filter(|item| !item.is_empty())
-            .collect();
-    }
-    vec![parse_scalar_value(trimmed)]
-        .into_iter()
-        .filter(|item| !item.is_empty())
-        .collect()
-}
-
 fn current_timestamp() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -6230,7 +6051,7 @@ mod tests {
             },
         );
         assert_eq!(
-            filtered.iter().map(Document::id).collect::<Vec<_>>(),
+            filtered.iter().map(|doc| doc.id()).collect::<Vec<_>>(),
             ["task-2"]
         );
         let results = search_documents(
@@ -6312,11 +6133,13 @@ mod tests {
 
     #[test]
     fn resolved_graph_rejects_duplicates_unresolved_parents_cycles_and_invalid_depth() {
-        let make_doc = |path: &str, frontmatter: &str| Document {
-            path: PathBuf::from(path),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(frontmatter).unwrap(),
-            body: String::new(),
+        let make_doc = |path: &str, frontmatter: &str| {
+            Document::new(
+                PathBuf::from(path),
+                DocumentLocation::Board,
+                parse_frontmatter_fields(frontmatter).unwrap(),
+                String::new(),
+            )
         };
 
         let duplicate = HierarchyIndex::from_documents(vec![
@@ -6836,15 +6659,10 @@ rules:
 
     #[test]
     fn divergence_warning_reports_sync_candidate_without_collapsing_state() {
-        let doc = Document {
-            path: PathBuf::from("task-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(PathBuf::from("task-1.md"), DocumentLocation::Board, parse_frontmatter_fields(
                 "id: task-1\ntype: task\ntitle: Demo\nstate: in-progress\naccord:\n  status: delivered\nreview:\n  status: pending\n",
             )
-            .unwrap(),
-            body: String::new(),
-        };
+            .unwrap(), String::new());
 
         let warning = accord_state_divergence_warning(&doc).unwrap();
         assert!(warning.contains("workflow state `in-progress`"));
@@ -6855,15 +6673,15 @@ rules:
 
     #[test]
     fn show_and_list_json_include_divergence_warnings() {
-        let doc = Document {
-            path: PathBuf::from("task-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(
+            PathBuf::from("task-1.md"),
+            DocumentLocation::Board,
+            parse_frontmatter_fields(
                 "id: task-1\ntype: task\ntitle: Demo\nstate: todo\naccord:\n  status: claimed\n",
             )
             .unwrap(),
-            body: String::new(),
-        };
+            String::new(),
+        );
 
         let hierarchy = HierarchyIndex::from_documents(vec![doc.clone()]).unwrap();
         assert!(show_json(&doc, &[], Some(TaskRole::Task), None)
@@ -6936,29 +6754,19 @@ rules:
 
     #[test]
     fn completion_helpers_read_nested_and_legacy_flat_metadata() {
-        let nested = Document {
-            path: PathBuf::from("task-1.md"),
-            location: DocumentLocation::Logs,
-            fields: parse_frontmatter_fields(
+        let nested = Document::new(PathBuf::from("task-1.md"), DocumentLocation::Logs, parse_frontmatter_fields(
                 "completion:\n  summary: Done\n  validation: passed\n  reviewer: Algorant\n  filesChanged: [src/main.rs]\n",
             )
-            .unwrap(),
-            body: String::new(),
-        };
+            .unwrap(), String::new());
         assert_eq!(completion_summary(&nested), Some("Done"));
         assert_eq!(completion_validation(&nested), Some("passed"));
         assert_eq!(completion_reviewer(&nested), Some("Algorant"));
         assert_eq!(completion_files_changed(&nested), vec!["src/main.rs"]);
 
-        let legacy = Document {
-            path: PathBuf::from("task-2.md"),
-            location: DocumentLocation::Logs,
-            fields: parse_frontmatter_fields(
+        let legacy = Document::new(PathBuf::from("task-2.md"), DocumentLocation::Logs, parse_frontmatter_fields(
                 "completionSummary: Done\ncompletionValidation: passed\ncompletionReviewer: Algorant\nfilesChanged: [src/lib.rs]\n",
             )
-            .unwrap(),
-            body: String::new(),
-        };
+            .unwrap(), String::new());
         assert_eq!(completion_summary(&legacy), Some("Done"));
         assert_eq!(completion_validation(&legacy), Some("passed"));
         assert_eq!(completion_reviewer(&legacy), Some("Algorant"));
@@ -6967,15 +6775,15 @@ rules:
 
     #[test]
     fn validation_reports_invalid_review_status() {
-        let doc = Document {
-            path: PathBuf::from(".tandem/board/task-1.md"),
-            location: DocumentLocation::Logs,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(
+            PathBuf::from(".tandem/board/task-1.md"),
+            DocumentLocation::Logs,
+            parse_frontmatter_fields(
                 "id: task-1\ntype: task\ntitle: Demo\nstate: todo\nreview:\n  status: maybe\n",
             )
             .unwrap(),
-            body: String::new(),
-        };
+            String::new(),
+        );
         let workspace = Workspace {
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
@@ -6988,15 +6796,15 @@ rules:
 
     #[test]
     fn validation_reports_invalid_task_kind() {
-        let doc = Document {
-            path: PathBuf::from(".tandem/logs/task-1.md"),
-            location: DocumentLocation::Logs,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(
+            PathBuf::from(".tandem/logs/task-1.md"),
+            DocumentLocation::Logs,
+            parse_frontmatter_fields(
                 "id: task-1\ntype: task\nkind: feature\ntitle: Demo\nstate: todo\n",
             )
             .unwrap(),
-            body: String::new(),
-        };
+            String::new(),
+        );
         let workspace = Workspace {
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
@@ -7323,15 +7131,10 @@ rules:
             .unwrap()
             .is_empty());
 
-        let legacy_completed = Document {
-            path: PathBuf::from(".tandem/logs/task-99.md"),
-            location: DocumentLocation::Logs,
-            fields: parse_frontmatter_fields(
+        let legacy_completed = Document::new(PathBuf::from(".tandem/logs/task-99.md"), DocumentLocation::Logs, parse_frontmatter_fields(
                 "id: task-99\ntype: task\ntitle: Legacy\ncompletedAt: now\ncompletion:\n  summary: Done\n",
             )
-            .unwrap(),
-            body: String::new(),
-        };
+            .unwrap(), String::new());
         assert_eq!(
             completion_outcome(&legacy_completed),
             COMPLETION_OUTCOME_COMPLETED
@@ -7358,24 +7161,22 @@ rules:
 
     #[test]
     fn show_json_includes_parent_id_only_when_present() {
-        let child = Document {
-            path: PathBuf::from("task-1-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
+        let child = Document::new(
+            PathBuf::from("task-1-1.md"),
+            DocumentLocation::Board,
+            parse_frontmatter_fields(
                 "id: task-1-1\ntype: task\ntitle: Child\nstate: todo\nparentId: task-1\n",
             )
             .unwrap(),
-            body: String::new(),
-        };
-        let parent = Document {
-            path: PathBuf::from("task-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
-                "id: task-1\ntype: task\ntitle: Parent\nstate: todo\n",
-            )
-            .unwrap(),
-            body: String::new(),
-        };
+            String::new(),
+        );
+        let parent = Document::new(
+            PathBuf::from("task-1.md"),
+            DocumentLocation::Board,
+            parse_frontmatter_fields("id: task-1\ntype: task\ntitle: Parent\nstate: todo\n")
+                .unwrap(),
+            String::new(),
+        );
 
         let parent_json = show_json(
             &parent,
@@ -7396,15 +7197,10 @@ rules:
 
     #[test]
     fn update_rejects_invalid_priority_and_kind_while_json_exposes_metadata() {
-        let doc = Document {
-            path: PathBuf::from("task-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(PathBuf::from("task-1.md"), DocumentLocation::Board, parse_frontmatter_fields(
                 "id: task-1\ntype: task\nkind: epic\ntitle: Demo\nstate: todo\npriority: high\nblockers: [task-2]\nreferences: [decision-1]\nrelatedFiles: [src/main.rs]\n",
             )
-            .unwrap(),
-            body: String::new(),
-        };
+            .unwrap(), String::new());
         assert!(document_summary_json(&doc, None).contains("\"kind\":\"epic\""));
         assert!(document_detail_json(&doc).contains("\"kind\":\"epic\""));
         let hierarchy = HierarchyIndex::from_documents(vec![doc.clone()]).unwrap();
@@ -7458,15 +7254,10 @@ rules:
 
     #[test]
     fn decision_metadata_is_status_not_workflow_state() {
-        let doc = Document {
-            path: PathBuf::from("decision-1.md"),
-            location: DocumentLocation::Board,
-            fields: parse_frontmatter_fields(
+        let doc = Document::new(PathBuf::from("decision-1.md"), DocumentLocation::Board, parse_frontmatter_fields(
                 "id: decision-1\ntype: decision\ntitle: Choose cache\nstatus: accepted\ndate: 2026-07-01\ndeciders: [Algorant, pi]\ncontext: Need a cache policy\nconsequences: [Faster reads]\nalternatives: [No cache]\nsupersedes: [decision-0]\nsupersededBy: [decision-2]\n",
             )
-            .unwrap(),
-            body: "## Decision\nUse the small cache.\n".to_string(),
-        };
+            .unwrap(), "## Decision\nUse the small cache.\n".to_string());
 
         let detail = document_detail_json(&doc);
         assert!(detail.contains("\"status\":\"accepted\""));
