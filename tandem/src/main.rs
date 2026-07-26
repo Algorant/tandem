@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
@@ -13,15 +13,15 @@ mod protocol;
 mod tui;
 
 use project::{
-    parse_frontmatter_fields, parse_frontmatter_yaml, read_documents, read_frontmatter_yaml_file,
-    split_frontmatter, yaml_mapping_value, yaml_scalar_to_string, DocumentLocation,
-    StoredDocument as Document, TandemProject,
+    parse_frontmatter_fields as parse_raw_frontmatter_fields, parse_frontmatter_yaml,
+    read_frontmatter_yaml_file, split_frontmatter, yaml_mapping_value, yaml_scalar_to_string,
+    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use protocol::accord::{self, status as accord_status};
 use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
 use protocol::event::{self, CanonicalEventEnvelope, EventEnvelope};
-use protocol::hierarchy::{HierarchyIndex, ParentRelationship, TaskRole};
+use protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use protocol::review::status as review_status;
 use protocol::workflow::{
@@ -2011,7 +2011,8 @@ fn parse_decision_add_args(args: &[String]) -> Result<DecisionAddOptions, CliErr
 
 fn cmd_decision_list(json: bool) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let mut docs = read_documents(&workspace.board_dir, DocumentLocation::Board)?
+    let mut docs = workspace
+        .read_board_documents()?
         .into_iter()
         .filter(|doc| doc.doc_type() == "decision")
         .collect::<Vec<_>>();
@@ -2329,9 +2330,15 @@ fn discover_workspace_unchecked() -> Result<TandemProject, CliError> {
     TandemProject::discover()
 }
 
+fn parse_frontmatter_fields(frontmatter: &str) -> Result<HashMap<String, String>, String> {
+    let mut fields = parse_raw_frontmatter_fields(frontmatter)?;
+    protocol::document::normalize_fields(&mut fields);
+    Ok(fields)
+}
+
 fn workspace_protocol_version(project: &TandemProject) -> Result<String, CliError> {
     let fields = parse_frontmatter_fields(
-        &project::split_frontmatter(&fs::read_to_string(&project.config_path)?)
+        &project::split_frontmatter(&project.read_config_raw()?)
             .map_err(|message| {
                 CliError::user(format!(
                     "Parse failure: {}: {message}",
@@ -3028,7 +3035,7 @@ fn display_change_value(value: &str) -> String {
 pub(crate) fn workspace_deprecation_warnings(
     workspace: &TandemProject,
 ) -> Result<Vec<String>, CliError> {
-    let content = fs::read_to_string(&workspace.config_path)?;
+    let content = workspace.read_config_raw()?;
     let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
         CliError::user(format!(
             "Parse failure: {}: {message}",
@@ -5073,10 +5080,12 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::project::read_document;
+    use crate::project::{read_document, read_documents};
 
     fn test_workspace(root: &Path) -> TandemProject {
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -5155,6 +5164,8 @@ mod tests {
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -5664,6 +5675,8 @@ mod tests {
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -5971,6 +5984,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6055,6 +6070,8 @@ rules:
             String::new(),
         );
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
             config_path: PathBuf::from("missing-tandem.md"),
@@ -6076,6 +6093,8 @@ rules:
             String::new(),
         );
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: PathBuf::from(".tandem/board"),
             logs_dir: PathBuf::from(".tandem/logs"),
             config_path: PathBuf::from("missing-tandem.md"),
@@ -6095,6 +6114,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6194,6 +6215,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6233,6 +6256,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6318,6 +6343,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),
@@ -6564,6 +6591,8 @@ rules:
                 .as_nanos()
         ));
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: root.join(".tandem/board"),
             logs_dir: root.join(".tandem/logs"),
             config_path: root.join(".tandem/tandem.md"),

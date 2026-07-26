@@ -13,10 +13,16 @@ use std::path::{Path, PathBuf};
 use yaml_rust2::{Yaml, YamlLoader};
 
 use crate::protocol::document::Document as ProtocolDocument;
+use crate::protocol::hierarchy::{
+    DocumentLocation, HierarchyDocument, HierarchyIndex as ProtocolHierarchyIndex,
+    ParentRelationship, TaskRole,
+};
 use crate::CliError;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TandemProject {
+    pub(crate) root: PathBuf,
+    pub(crate) data_dir: PathBuf,
     pub(crate) board_dir: PathBuf,
     pub(crate) logs_dir: PathBuf,
     pub(crate) config_path: PathBuf,
@@ -56,8 +62,10 @@ impl TandemProject {
         ))
     }
 
-    fn with_paths(_root: PathBuf, data_dir: PathBuf, config_path: PathBuf) -> Self {
+    fn with_paths(root: PathBuf, data_dir: PathBuf, config_path: PathBuf) -> Self {
         Self {
+            root,
+            data_dir: data_dir.clone(),
             board_dir: data_dir.join("board"),
             logs_dir: data_dir.join("logs"),
             events_path: data_dir.join("events.jsonl"),
@@ -66,22 +74,33 @@ impl TandemProject {
     }
 
     /// The resolved project root for standard and compatibility discovery.
-    pub(crate) fn root(&self) -> PathBuf {
-        let parent = self.config_path.parent().unwrap_or_else(|| Path::new("."));
-        if parent.file_name().is_some_and(|name| name == ".tandem") {
-            parent.parent().unwrap_or(parent).to_path_buf()
+    pub(crate) fn root(&self) -> &Path {
+        if self.root.as_os_str().is_empty() {
+            let parent = self.config_path.parent().unwrap_or_else(|| Path::new("."));
+            if parent.file_name().is_some_and(|name| name == ".tandem") {
+                parent.parent().unwrap_or(parent)
+            } else {
+                parent
+            }
         } else {
-            parent.to_path_buf()
+            &self.root
         }
     }
 
     /// The resolved project-local data directory. Compatibility projects keep
     /// their config at the root but retain this conventional data location.
-    pub(crate) fn data_dir(&self) -> PathBuf {
-        self.board_dir
-            .parent()
-            .unwrap_or_else(|| Path::new(".tandem"))
-            .to_path_buf()
+    pub(crate) fn data_dir(&self) -> &Path {
+        if self.data_dir.as_os_str().is_empty() {
+            self.board_dir
+                .parent()
+                .unwrap_or_else(|| Path::new(".tandem"))
+        } else {
+            &self.data_dir
+        }
+    }
+
+    pub(crate) fn read_config_raw(&self) -> Result<String, CliError> {
+        fs::read_to_string(&self.config_path).map_err(Into::into)
     }
 
     pub(crate) fn read_board_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
@@ -149,6 +168,98 @@ impl TandemProject {
             .filter(|line| !line.trim().is_empty())
             .filter_map(ProjectEvent::parse)
             .collect()
+    }
+}
+
+/// Concrete project snapshot adapter over the protocol-only hierarchy index.
+#[derive(Debug, Clone)]
+pub(crate) struct ProjectHierarchy {
+    pub(crate) documents: HashMap<String, StoredDocument>,
+    logical: ProtocolHierarchyIndex,
+}
+
+impl ProjectHierarchy {
+    pub(crate) fn from_documents(
+        documents: Vec<StoredDocument>,
+    ) -> Result<Self, crate::protocol::diagnostic::Diagnostic> {
+        let logical = ProtocolHierarchyIndex::from_documents(documents.clone())?;
+        let documents = documents
+            .into_iter()
+            .map(|document| (document.id().to_string(), document))
+            .collect();
+        Ok(Self { documents, logical })
+    }
+
+    pub(crate) fn with_replacement(&self, document: StoredDocument) -> Self {
+        let mut documents = self.documents.clone();
+        documents.insert(document.id().to_string(), document);
+        Self::from_documents(documents.into_values().collect())
+            .expect("replacement preserves indexed documents")
+    }
+
+    pub(crate) fn document(&self, id: &str) -> Option<&StoredDocument> {
+        self.documents.get(id)
+    }
+    fn index_for(
+        &self,
+        document: &StoredDocument,
+    ) -> Result<ProtocolHierarchyIndex, crate::protocol::diagnostic::Diagnostic> {
+        if self
+            .documents
+            .get(document.id())
+            .is_some_and(|indexed| indexed.path == document.path)
+        {
+            return Ok(self.logical.clone());
+        }
+        let mut documents = self.documents.clone();
+        documents.insert(document.id().to_string(), document.clone());
+        ProtocolHierarchyIndex::from_documents(documents.into_values().collect())
+    }
+    pub(crate) fn task_role(
+        &self,
+        document: &StoredDocument,
+    ) -> Result<Option<TaskRole>, crate::protocol::diagnostic::Diagnostic> {
+        let logical = self.index_for(document)?;
+        logical.task_role(
+            logical
+                .document(document.id())
+                .expect("fresh logical document"),
+        )
+    }
+    pub(crate) fn relationship(
+        &self,
+        document: &StoredDocument,
+    ) -> Result<Option<ParentRelationship>, crate::protocol::diagnostic::Diagnostic> {
+        let logical = self.index_for(document)?;
+        logical.relationship(
+            logical
+                .document(document.id())
+                .expect("fresh logical document"),
+        )
+    }
+    pub(crate) fn validate_task_hierarchy(
+        &self,
+        document: &StoredDocument,
+    ) -> Result<TaskRole, crate::protocol::diagnostic::Diagnostic> {
+        let logical = self.index_for(document)?;
+        logical.validate_task_hierarchy(
+            logical
+                .document(document.id())
+                .expect("fresh logical document"),
+        )
+    }
+    pub(crate) fn task_hierarchy_errors(&self) -> Vec<String> {
+        self.logical.task_hierarchy_errors()
+    }
+    pub(crate) fn validate_document_metadata(
+        &self,
+    ) -> Result<(), crate::protocol::diagnostic::Diagnostic> {
+        self.logical.validate_document_metadata()
+    }
+    pub(crate) fn validate_all_task_hierarchies(
+        &self,
+    ) -> Result<(), crate::protocol::diagnostic::Diagnostic> {
+        self.logical.validate_all_task_hierarchies()
     }
 }
 
@@ -241,8 +352,14 @@ impl StoredDocument {
         }
     }
 
-    pub(crate) fn diagnostic_source_label(&self) -> String {
-        display_path(&self.path)
+    pub(crate) fn hierarchy_input(&self) -> HierarchyDocument {
+        HierarchyDocument::new(self.document.clone(), display_path(&self.path))
+    }
+}
+
+impl From<StoredDocument> for HierarchyDocument {
+    fn from(document: StoredDocument) -> Self {
+        document.hierarchy_input()
     }
 }
 
@@ -259,21 +376,6 @@ impl DerefMut for StoredDocument {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DocumentLocation {
-    Board,
-    Logs,
-}
-
-impl DocumentLocation {
-    pub(crate) fn as_str(self) -> &'static str {
-        match self {
-            Self::Board => "board",
-            Self::Logs => "logs",
-        }
-    }
-}
-
 pub(crate) fn read_documents(
     dir: &Path,
     location: DocumentLocation,
@@ -282,8 +384,9 @@ pub(crate) fn read_documents(
         return Ok(Vec::new());
     }
     let mut paths = fs::read_dir(dir)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
         .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
         .collect::<Vec<_>>();
     paths.sort();
@@ -399,7 +502,6 @@ pub(crate) fn parse_frontmatter_fields(
         .ok_or_else(|| "frontmatter root must be a YAML mapping".to_string())?;
     let mut fields = HashMap::new();
     flatten_yaml_hash(hash, "", &mut fields);
-    add_status_aliases(&mut fields);
     Ok(fields)
 }
 
@@ -515,34 +617,6 @@ fn yaml_double_quote(value: &str) -> String {
             .replace('\t', "\\t")
     )
 }
-fn add_status_aliases(fields: &mut HashMap<String, String>) {
-    copy_first_alias(fields, "accordStatus", &["accord.status"]);
-    copy_first_alias(fields, "reviewStatus", &["review.status"]);
-    copy_first_alias(fields, "completionSummary", &["completion.summary"]);
-    copy_first_alias(
-        fields,
-        "completionValidation",
-        &[
-            "completion.validation",
-            "completion.validation.summary",
-            "completion.validation.status",
-        ],
-    );
-    copy_first_alias(fields, "completionReviewer", &["completion.reviewer"]);
-    copy_first_alias(fields, "filesChanged", &["completion.filesChanged"]);
-}
-fn copy_first_alias(fields: &mut HashMap<String, String>, alias: &str, sources: &[&str]) {
-    if fields.contains_key(alias) {
-        return;
-    }
-    for source in sources {
-        if let Some(value) = fields.get(*source).cloned() {
-            fields.insert(alias.to_string(), value);
-            return;
-        }
-    }
-}
-
 pub(crate) fn display_path(path: &Path) -> String {
     match env::current_dir() {
         Ok(current_dir) => path
@@ -567,6 +641,38 @@ mod tests {
         assert_eq!(project.config_path, data.join("tandem.md"));
         fs::remove_dir_all(root).unwrap();
     }
+    #[test]
+    fn discovers_root_compatibility_with_resolved_data_paths() {
+        let root = env::temp_dir().join(format!("tandem-project-compat-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("tandem.md"), "---\nprotocolVersion: 0.2.0\n---\n").unwrap();
+        let data_dir = root.join(".tandem");
+        let project = TandemProject::discover_from(&root).unwrap();
+        assert_eq!(project.root(), root.as_path());
+        assert_eq!(project.data_dir(), data_dir.as_path());
+        assert_eq!(project.config_path, root.join("tandem.md"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn strict_reads_fail_while_tolerant_reads_warn() {
+        let root = env::temp_dir().join(format!("tandem-project-read-{}", std::process::id()));
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
+        fs::create_dir_all(&project.board_dir).unwrap();
+        fs::write(project.board_dir.join("task-1.md"), "not frontmatter").unwrap();
+        assert!(project.read_board_documents().is_err());
+        let mut warnings = Vec::new();
+        assert!(project
+            .read_board_documents_tolerant(&mut warnings)
+            .is_empty());
+        assert_eq!(warnings.len(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn preserves_unknown_fields_and_body_with_source_location() {
         let document = read_document_from(

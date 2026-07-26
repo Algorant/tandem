@@ -6,10 +6,10 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use crate::Document;
+use std::ops::Deref;
 
 use super::diagnostic::Diagnostic;
-use super::document::{validate_task_kind, EFFORTS, PRIORITIES};
+use super::document::{validate_task_kind, Document, EFFORTS, PRIORITIES};
 use super::ids::{global_task_number, subtask_suffix};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,16 +54,62 @@ impl ParentRelationship {
     }
 }
 
+/// Logical origin supplied by the project boundary for hierarchy diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DocumentLocation {
+    Board,
+    Logs,
+}
+
+impl DocumentLocation {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Board => "board",
+            Self::Logs => "logs",
+        }
+    }
+}
+
+/// Protocol-owned hierarchy input. It carries no filesystem path; project turns
+/// concrete source paths into a stable display label before validation.
+#[derive(Debug, Clone)]
+pub(crate) struct HierarchyDocument {
+    document: Document,
+    source_label: String,
+}
+
+impl HierarchyDocument {
+    pub(crate) fn new(document: Document, source_label: String) -> Self {
+        Self {
+            document,
+            source_label,
+        }
+    }
+
+    pub(crate) fn diagnostic_source_label(&self) -> &str {
+        &self.source_label
+    }
+}
+
+impl Deref for HierarchyDocument {
+    type Target = Document;
+    fn deref(&self) -> &Self::Target {
+        &self.document
+    }
+}
+
 /// Canonical Board-and-Logs graph for role, relationship, and validation queries.
 #[derive(Debug, Clone)]
 pub(crate) struct HierarchyIndex {
-    pub(crate) documents: HashMap<String, Document>,
+    pub(crate) documents: HashMap<String, HierarchyDocument>,
 }
 
 impl HierarchyIndex {
-    pub(crate) fn from_documents(docs: Vec<Document>) -> Result<Self, Diagnostic> {
+    pub(crate) fn from_documents<D: Into<HierarchyDocument>>(
+        docs: Vec<D>,
+    ) -> Result<Self, Diagnostic> {
         let mut documents = HashMap::new();
-        for doc in docs {
+        for doc in docs.into_iter().map(Into::into) {
             let id = doc.id().to_string();
             if id.trim().is_empty() {
                 return Err(Diagnostic::error(format!(
@@ -82,17 +128,14 @@ impl HierarchyIndex {
         Ok(Self { documents })
     }
 
-    pub(crate) fn with_replacement(&self, doc: Document) -> Self {
-        let mut documents = self.documents.clone();
-        documents.insert(doc.id().to_string(), doc);
-        Self { documents }
-    }
-
-    pub(crate) fn document(&self, id: &str) -> Option<&Document> {
+    pub(crate) fn document(&self, id: &str) -> Option<&HierarchyDocument> {
         self.documents.get(id)
     }
 
-    pub(crate) fn task_role(&self, doc: &Document) -> Result<Option<TaskRole>, Diagnostic> {
+    pub(crate) fn task_role(
+        &self,
+        doc: &HierarchyDocument,
+    ) -> Result<Option<TaskRole>, Diagnostic> {
         if doc.doc_type() != "task" {
             return Ok(None);
         }
@@ -173,7 +216,7 @@ impl HierarchyIndex {
 
     pub(crate) fn relationship(
         &self,
-        doc: &Document,
+        doc: &HierarchyDocument,
     ) -> Result<Option<ParentRelationship>, Diagnostic> {
         let Some(parent_id) = doc.field("parentId") else {
             return Ok(None);
@@ -201,7 +244,10 @@ impl HierarchyIndex {
         }))
     }
 
-    pub(crate) fn validate_task_hierarchy(&self, doc: &Document) -> Result<TaskRole, Diagnostic> {
+    pub(crate) fn validate_task_hierarchy(
+        &self,
+        doc: &HierarchyDocument,
+    ) -> Result<TaskRole, Diagnostic> {
         let role = self.task_role(doc)?.ok_or_else(|| {
             Diagnostic::error(format!("Validation failed: {} is not a task", doc.id()))
         })?;
@@ -304,13 +350,10 @@ impl HierarchyIndex {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::path::PathBuf;
-
     use super::*;
-    use crate::DocumentLocation;
+    use std::collections::HashMap;
 
-    fn document(id: &str, parent_id: Option<&str>, kind: Option<&str>) -> Document {
+    fn document(id: &str, parent_id: Option<&str>, kind: Option<&str>) -> HierarchyDocument {
         let mut fields = HashMap::from([
             ("id".to_string(), id.to_string()),
             ("type".to_string(), "task".to_string()),
@@ -322,12 +365,7 @@ mod tests {
         if let Some(kind) = kind {
             fields.insert("kind".to_string(), kind.to_string());
         }
-        Document::new(
-            PathBuf::from(format!("{id}.md")),
-            DocumentLocation::Board,
-            fields,
-            String::new(),
-        )
+        HierarchyDocument::new(Document::new(fields, String::new()), format!("{id}.md"))
     }
 
     #[test]

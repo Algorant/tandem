@@ -7079,6 +7079,7 @@ mod tests {
     use ratatui::{backend::TestBackend, Terminal};
 
     use super::*;
+    use crate::project::read_documents;
 
     fn doc_with_state(id: &str, state: Option<&str>) -> Document {
         let mut fields = HashMap::new();
@@ -9040,6 +9041,8 @@ tone = "success"
     fn temp_workspace(root: &Path) -> TandemProject {
         let tandem_dir = root.join(".tandem");
         let workspace = TandemProject {
+            root: PathBuf::new(),
+            data_dir: PathBuf::new(),
             board_dir: tandem_dir.join("board"),
             logs_dir: tandem_dir.join("logs"),
             config_path: tandem_dir.join("tandem.md"),
@@ -9097,6 +9100,8 @@ tone = "success"
         ];
         TuiApp {
             workspace: TandemProject {
+                root: PathBuf::new(),
+                data_dir: PathBuf::new(),
                 board_dir: PathBuf::from(".tandem/board"),
                 logs_dir: PathBuf::from(".tandem/logs"),
                 config_path: PathBuf::from(".tandem/tandem.md"),

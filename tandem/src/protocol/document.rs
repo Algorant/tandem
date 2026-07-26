@@ -20,7 +20,8 @@ pub(crate) struct Document {
 }
 
 impl Document {
-    pub(crate) fn new(fields: HashMap<String, String>, body: String) -> Self {
+    pub(crate) fn new(mut fields: HashMap<String, String>, body: String) -> Self {
+        normalize_fields(&mut fields);
         Self { fields, body }
     }
 
@@ -146,6 +147,37 @@ fn parse_scalar_value(value: &str) -> String {
     }
 
     without_comment.trim().to_string()
+}
+
+/// Canonical compatibility normalization for legacy flat metadata aliases.
+/// Project parsing retains representation; protocol defines these field meanings.
+pub(crate) fn normalize_fields(fields: &mut HashMap<String, String>) {
+    copy_first_alias(fields, "accordStatus", &["accord.status"]);
+    copy_first_alias(fields, "reviewStatus", &["review.status"]);
+    copy_first_alias(fields, "completionSummary", &["completion.summary"]);
+    copy_first_alias(
+        fields,
+        "completionValidation",
+        &[
+            "completion.validation",
+            "completion.validation.summary",
+            "completion.validation.status",
+        ],
+    );
+    copy_first_alias(fields, "completionReviewer", &["completion.reviewer"]);
+    copy_first_alias(fields, "filesChanged", &["completion.filesChanged"]);
+}
+
+fn copy_first_alias(fields: &mut HashMap<String, String>, alias: &str, sources: &[&str]) {
+    if fields.contains_key(alias) {
+        return;
+    }
+    for source in sources {
+        if let Some(value) = fields.get(*source).cloned() {
+            fields.insert(alias.to_string(), value);
+            return;
+        }
+    }
 }
 
 fn unescape_double_quoted(value: &str) -> String {
