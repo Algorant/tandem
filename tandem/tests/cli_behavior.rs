@@ -144,7 +144,7 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     fs::write(&config_path, legacy_config.clone()).expect("seed legacy protocol config");
     fs::write(
         project.path(".tandem/board/note-1.md"),
-        "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\nunknownField: preserve\n---\n\nLegacy custom body.\n",
+        "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n",
     )
     .expect("seed legacy custom document");
     let event_before = "{\"event\":\"legacy.event\",\"id\":\"note-1\"}\n";
@@ -158,7 +158,14 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     assert!(refused.stderr.contains("Protocol 0.1.0 project detected"));
     assert!(refused.stderr.contains("tandem upgrade"));
     project.run(&["--help"]).assert_success();
+    project.run(&["help"]).assert_success();
     project.run(&["--version"]).assert_success();
+    project.run(&["version"]).assert_success();
+    let refused_init = project.run(&["init"]);
+    refused_init.assert_exit(1);
+    assert!(refused_init
+        .stderr
+        .contains("Protocol 0.1.0 project detected"));
 
     let upgrade = project.run(&["upgrade"]);
     upgrade.assert_success();
@@ -168,7 +175,7 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     assert!(upgraded_config.contains("protocolVersion: \"0.2.0\""));
     assert!(upgraded_config.contains("idPrefix: note"));
     assert!(upgraded_config.contains("requireReview: true"));
-    assert_eq!(project.read(".tandem/board/note-1.md"), "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\nunknownField: preserve\n---\n\nLegacy custom body.\n");
+    assert_eq!(project.read(".tandem/board/note-1.md"), "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n");
     assert_eq!(project.read(".tandem/events.jsonl"), event_before);
     assert_eq!(project.read(".tandem/logs/task-99.md"), log_before);
 
@@ -182,6 +189,7 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     let shown = project.run(&["show", "note-1", "--json"]);
     shown.assert_success();
     assert!(shown.stdout.contains("\"type\":\"note\""));
+    assert!(shown.stdout.contains("\"effort\":\"xlarge\""));
     let searched = project.run(&["search", "Legacy"]);
     searched.assert_success();
     assert!(searched.stdout.contains("note-1"));

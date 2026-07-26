@@ -532,6 +532,13 @@ impl TuiApp {
             &configured_states,
             &hierarchy,
         ));
+        match workspace_deprecation_warnings(&self.workspace) {
+            Ok(warnings) => load_errors.extend(warnings),
+            Err(error) => load_errors.push(format!(
+                "Compatibility diagnostics unavailable: {}",
+                error.message
+            )),
+        }
 
         self.title = title;
         self.states = states_with_board_docs(configured_states.clone(), &docs);
@@ -6835,6 +6842,7 @@ fn detail_lines_for_doc_with_context(
     }
     push_optional_detail_line(&mut lines, "State", doc.field("state"), theme);
     push_optional_detail_line(&mut lines, "Priority", doc.field("priority"), theme);
+    push_optional_detail_line(&mut lines, "Effort", doc.field("effort"), theme);
     push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
     push_optional_detail_line(&mut lines, "Due", doc.field("dueDate"), theme);
     push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
@@ -10163,6 +10171,33 @@ tone = "success"
     }
 
     #[test]
+    fn tui_load_surfaces_workspace_compatibility_warnings() {
+        let root = unique_test_dir("tandem-tui-compatibility");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            &workspace.config_path,
+            "---\nprotocolVersion: 0.2.0\ntitle: Test Workspace\nstates: [todo, in-progress, validation]\ntypes:\n  note:\n    idPrefix: note\ncompletion:\n  requireReview: true\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.board_dir.join("note-1.md"),
+            "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\n---\n\nLegacy body.\n",
+        )
+        .unwrap();
+
+        let app = TuiApp::load(workspace).unwrap();
+        let warnings = app.runtime_warnings();
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("custom type declarations are deprecated")));
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("completion-policy settings are deprecated")));
+        assert_eq!(app.docs[0].id(), "note-1");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn review_attention_reason_covers_delivered_and_pending_items() {
         let mut delivered = doc_with_state("task-1", Some("review"));
         delivered
@@ -10204,6 +10239,7 @@ tone = "success"
         let mut doc = doc_with_state("task-1", Some("validation"));
         doc.fields
             .insert("accord.status".to_string(), "delivered".to_string());
+        doc.fields.insert("effort".to_string(), "small".to_string());
         doc.fields
             .insert("accord.assignee".to_string(), "pi".to_string());
         doc.fields.insert(
@@ -10243,6 +10279,7 @@ tone = "success"
         let accord_index = texts.iter().position(|text| text == "Accord").unwrap();
         let body_index = texts.iter().position(|text| text == "Body").unwrap();
         assert!(accord_index < body_index);
+        assert!(texts.contains(&"Effort: small".to_string()));
         assert!(texts.contains(&"Status: delivered".to_string()));
         assert!(texts.iter().any(|text| text.contains(
             "Signal: Delivered: inspect summary/evidence, then accept or request rework."

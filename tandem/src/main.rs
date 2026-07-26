@@ -380,7 +380,11 @@ impl HierarchyIndex {
     }
 
     fn validate_document_metadata(&self) -> Result<(), CliError> {
-        for doc in self.documents.values() {
+        for doc in self
+            .documents
+            .values()
+            .filter(|doc| doc.doc_type() == "task")
+        {
             for (field, allowed) in [("priority", PRIORITIES), ("effort", EFFORTS)] {
                 if let Some(value) = doc.field(field) {
                     if !allowed.contains(&value) {
@@ -1412,6 +1416,11 @@ fn set_single_positional(target: &mut String, value: &str, command: &str) -> Res
 }
 
 fn cmd_init(options: InitOptions) -> Result<(), CliError> {
+    if let Ok(workspace) = discover_workspace_unchecked() {
+        if workspace_protocol_version(&workspace)? == LEGACY_PROTOCOL_VERSION {
+            ensure_current_protocol(&workspace)?;
+        }
+    }
     let root = env::current_dir()?;
     let title = match options.title.as_deref() {
         Some(title) => {
@@ -3746,7 +3755,9 @@ fn document_warnings(doc: &Document) -> Vec<String> {
     warnings
 }
 
-fn workspace_deprecation_warnings(workspace: &Workspace) -> Result<Vec<String>, CliError> {
+pub(crate) fn workspace_deprecation_warnings(
+    workspace: &Workspace,
+) -> Result<Vec<String>, CliError> {
     let content = fs::read_to_string(&workspace.config_path)?;
     let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
         CliError::user(format!(
