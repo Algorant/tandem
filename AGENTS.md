@@ -194,6 +194,33 @@ Extensions:
 - Do not duplicate Tandem protocol parsing or mutation behavior in TypeScript; call `tandem` and keep behavior in the CLI/protocol.
 - Test project-local extension behavior first; promote to canonical global Pi config only in an explicit later task.
 
+## Protocol architecture refactor campaign
+
+While the `refactor/protocol-architecture` campaign is active, follow
+[`plan/refactor_campaign_baseline.md`](plan/refactor_campaign_baseline.md) and
+[`plan/refactor_spec.md`](plan/refactor_spec.md). The campaign targets five
+ownership boundaries: `protocol`, `project`, `app`, `cli`, and `tui`; they are
+target boundaries and do not assert that every corresponding Rust module exists
+yet.
+
+- Keep Rust CLI/TUI implementation work frozen on `main`. Unrelated
+  documentation, planning, extension, and non-Rust work may continue only when
+  it does not alter the frozen architecture.
+- Delegate only independently reviewable Tasks. Work occurs in isolated Task
+  worktrees/branches and must be reviewed before integration into the campaign
+  branch.
+- Keep behavior-changing protocol work separate from move-only extraction.
+  Every module checkpoint needs its required formatting, tests, strict Clippy,
+  and dependency-direction evidence.
+- Visible TUI changes additionally require human terminal validation; automated
+  tests do not replace it.
+- Synchronize eligible `main` changes at explicit module checkpoints. A
+  critical Rust fix that lands on `main` must be integrated immediately into
+  the campaign branch and revalidated.
+
+Do not pre-create empty module trees, change dependencies or package shape, or
+release from the campaign branch under this guidance.
+
 ## Agent workflow
 
 Before making changes:
