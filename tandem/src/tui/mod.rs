@@ -4046,22 +4046,8 @@ fn complete_validation_candidate(workspace: &TandemProject, id: &str) -> Result<
         Some("Accepted by Validation apply-accepted workflow"),
         Some("tui"),
     )?;
-    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
-    if log_path.exists() {
-        return Err(CliError::user(format!(
-            "Validation failed: log document already exists: {}",
-            display_path(&log_path)
-        )));
-    }
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&log_path, &patched)?;
-    fs::remove_file(&doc.path).map_err(|error| {
-        CliError::user(format!(
-            "Write failure: could not remove active document {} after writing log {}: {error}",
-            display_path(&doc.path),
-            display_path(&log_path)
-        ))
-    })?;
+    let _log_path =
+        archive_board_document(workspace, &doc.path, &signature, &patched, "completed")?;
     append_event(workspace, "task.completed", doc.id(), &summary)?;
     Ok(())
 }

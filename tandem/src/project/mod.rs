@@ -19,6 +19,15 @@ use crate::protocol::hierarchy::{
 };
 use crate::CliError;
 
+pub(crate) mod events;
+pub(crate) mod frontmatter;
+pub(crate) mod write;
+pub(crate) use frontmatter::{
+    frontmatter_line_key, is_top_level_frontmatter_boundary, patch_frontmatter_content,
+    replace_markdown_body,
+};
+pub(crate) use write::{read_file_snapshot, write_atomic};
+
 #[derive(Debug, Clone)]
 pub(crate) struct TandemProject {
     pub(crate) root: PathBuf,
@@ -97,6 +106,18 @@ impl TandemProject {
         } else {
             &self.data_dir
         }
+    }
+
+    /// Materializes a newly validated project layout using caller-supplied
+    /// config bytes; interpretation of those bytes remains outside project.
+    pub(crate) fn initialize(root: &Path, config: &str) -> Result<Self, CliError> {
+        let data_dir = root.join(".tandem");
+        fs::create_dir_all(data_dir.join("board"))?;
+        fs::create_dir_all(data_dir.join("logs"))?;
+        let config_path = data_dir.join("tandem.md");
+        fs::write(&config_path, config)?;
+        fs::File::create(data_dir.join("events.jsonl"))?;
+        Ok(Self::with_paths(root.to_path_buf(), data_dir, config_path))
     }
 
     pub(crate) fn read_config_raw(&self) -> Result<String, CliError> {
@@ -606,7 +627,7 @@ pub(crate) fn yaml_mapping_value<'a>(root: &'a Yaml, key: &str) -> Option<&'a Ya
         (yaml_scalar_to_string(candidate).as_deref() == Some(key)).then_some(value)
     })
 }
-fn yaml_double_quote(value: &str) -> String {
+pub(crate) fn yaml_double_quote(value: &str) -> String {
     format!(
         "\"{}\"",
         value

@@ -1,9 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Write};
+use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::Yaml;
@@ -12,15 +10,20 @@ mod project;
 mod protocol;
 mod tui;
 
+pub(crate) use project::write::{
+    archive_board_document, ensure_file_unchanged, file_signature, FileSignature, HierarchyLock,
+};
 use project::{
+    frontmatter_line_key, is_top_level_frontmatter_boundary,
     parse_frontmatter_fields as parse_raw_frontmatter_fields, parse_frontmatter_yaml,
-    read_frontmatter_yaml_file, split_frontmatter, yaml_mapping_value, yaml_scalar_to_string,
-    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
+    patch_frontmatter_content, read_file_snapshot, read_frontmatter_yaml_file,
+    replace_markdown_body, split_frontmatter, write_atomic, yaml_mapping_value,
+    yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex, StoredDocument as Document,
+    TandemProject,
 };
 use protocol::accord::{self, status as accord_status};
 use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
-use protocol::event::{self, CanonicalEventEnvelope, EventEnvelope};
 use protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use protocol::review::status as review_status;
@@ -40,10 +43,6 @@ const DECISION_STATUSES: &[&str] = &[
     "withdrawn",
 ];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
-const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
-
-static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
 pub(crate) struct CliError {
@@ -79,34 +78,13 @@ impl From<protocol::diagnostic::Diagnostic> for CliError {
     }
 }
 
-/// Serializes cooperative CLI hierarchy snapshots and mutations on the workspace config inode.
-pub(crate) struct HierarchyLock {
-    file: File,
-}
-
-impl HierarchyLock {
-    pub(crate) fn acquire(workspace: &TandemProject) -> Result<Self, CliError> {
-        let path = workspace.config_path.clone();
-        let file = OpenOptions::new().read(true).open(&path).map_err(|error| {
-            CliError::user(format!(
-                "Write failure: could not open hierarchy lock {}: {error}",
-                display_path(&path)
-            ))
-        })?;
-        file.lock().map_err(|error| {
-            CliError::user(format!(
-                "Write failure: could not lock hierarchy snapshot {}: {error}",
-                display_path(&path)
-            ))
-        })?;
-        Ok(Self { file })
-    }
-}
-
-impl Drop for HierarchyLock {
-    fn drop(&mut self) {
-        let _ = self.file.unlock();
-    }
+pub(crate) fn append_event(
+    project: &TandemProject,
+    event_name: &str,
+    id: &str,
+    summary: &str,
+) -> Result<(), CliError> {
+    project::events::append_event(project, event_name, id, summary, &current_timestamp())
 }
 
 #[derive(Debug, Default)]
@@ -1086,24 +1064,20 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
         )));
     }
 
-    fs::create_dir_all(tandem_dir.join("board"))?;
-    fs::create_dir_all(tandem_dir.join("logs"))?;
-
     let workspace_type = "workspace";
     let config = format!(
         "---\nprotocolVersion: {PROTOCOL_VERSION}\ntype: {workspace_type}\ntitle: {}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: validation\n    title: Validation\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {}\n",
         yaml_double_quote(&title),
         title
     );
-    fs::write(&config_path, config)?;
-    File::create(tandem_dir.join("events.jsonl"))?;
+    let workspace = TandemProject::initialize(&root, &config)?;
 
     println!("Created Tandem workspace");
     println!("Title: {title}");
-    println!("Config: {}", display_path(&config_path));
-    println!("Board:  {}", display_path(&tandem_dir.join("board")));
-    println!("Logs:   {}", display_path(&tandem_dir.join("logs")));
-    println!("Events: {}", display_path(&tandem_dir.join("events.jsonl")));
+    println!("Config: {}", display_path(&workspace.config_path));
+    println!("Board:  {}", display_path(&workspace.board_dir));
+    println!("Logs:   {}", display_path(&workspace.logs_dir));
+    println!("Events: {}", display_path(&workspace.events_path));
     println!("States: todo, in-progress, validation");
 
     Ok(())
@@ -1119,7 +1093,7 @@ fn derive_workspace_title(root: &Path) -> String {
 
 fn cmd_list(options: ListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let docs = hierarchy
@@ -1144,7 +1118,7 @@ fn cmd_list(options: ListOptions) -> Result<(), CliError> {
 
 fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
@@ -1202,7 +1176,7 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
 }
 
 fn add_task(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let title =
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
     let state = options.state.as_deref().unwrap_or("todo").to_string();
@@ -1258,7 +1232,7 @@ fn add_task(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome
         hierarchy.documents.values().map(|doc| doc.id()),
         allocation_prefix,
     );
-    let created = create_new_sequential_document_after(
+    let created = project::write::create_new_sequential_document_after(
         workspace,
         allocation_prefix,
         last_allocated,
@@ -1362,7 +1336,7 @@ fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
 
 fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let summary = require_nonempty(
         options.summary.as_deref(),
         "complete requires --summary <text>",
@@ -1424,22 +1398,13 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
         options.validation.as_deref(),
         options.reviewer.as_deref(),
     )?;
-    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
-    if log_path.exists() {
-        return Err(CliError::user(format!(
-            "Validation failed: log document already exists: {}",
-            display_path(&log_path)
-        )));
-    }
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&log_path, &patched)?;
-    fs::remove_file(&doc.path).map_err(|error| {
-        CliError::user(format!(
-            "Write failure: could not remove active document {} after writing log {}: {error}",
-            display_path(&doc.path),
-            display_path(&log_path)
-        ))
-    })?;
+    let log_path = project::write::archive_board_document(
+        &workspace,
+        &doc.path,
+        &signature,
+        &patched,
+        "completed",
+    )?;
     append_event(&workspace, "task.completed", doc.id(), summary)?;
 
     println!("Completed {}", doc.id());
@@ -1473,7 +1438,7 @@ fn cancel_task(
     id: &str,
     reason: &str,
 ) -> Result<CancelOutcome, CliError> {
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let reason = require_nonempty(Some(reason), "cancel requires --reason <text>")?.to_string();
     let hierarchy = hierarchy_from_workspace(workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
@@ -1525,22 +1490,9 @@ fn cancel_task(
         None,
         None,
     )?;
-    let log_path = workspace.logs_dir.join(file_name_for_path(&doc.path)?);
-    if log_path.exists() {
-        return Err(CliError::user(format!(
-            "Validation failed: log document already exists: {}",
-            display_path(&log_path)
-        )));
-    }
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&log_path, &patched)?;
-    fs::remove_file(&doc.path).map_err(|error| {
-        CliError::user(format!(
-            "Write failure: could not remove active document {} after writing canceled log {}: {error}",
-            display_path(&doc.path),
-            display_path(&log_path)
-        ))
-    })?;
+    let log_path = project::write::archive_board_document(
+        workspace, &doc.path, &signature, &patched, "canceled",
+    )?;
     append_event(workspace, "task.canceled", doc.id(), &summary)?;
 
     Ok(CancelOutcome {
@@ -1553,7 +1505,7 @@ fn cancel_task(
 
 fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let docs = hierarchy.documents.values().cloned().collect::<Vec<_>>();
@@ -1590,7 +1542,7 @@ fn cmd_log(args: &[String]) -> Result<(), CliError> {
 
 fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let mut docs = hierarchy
@@ -1619,7 +1571,7 @@ fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
 
 fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
@@ -1638,7 +1590,7 @@ fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
 
 fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let mut results = hierarchy
@@ -1687,7 +1639,7 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
 
 fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     let doc = hierarchy
         .document(&options.id)
@@ -2027,7 +1979,7 @@ fn cmd_decision_list(json: bool) -> Result<(), CliError> {
 
 fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = HierarchyLock::acquire(&workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
     let hierarchy = hierarchy_from_workspace(&workspace)?;
     hierarchy.validate_all_task_hierarchies()?;
     let doc = hierarchy
@@ -2600,7 +2552,7 @@ fn move_task_to_state(
     id: &str,
     state: &str,
 ) -> Result<MoveTaskOutcome, CliError> {
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     validate_state(workspace, state)?;
 
     let hierarchy = hierarchy_from_workspace(workspace)?;
@@ -2680,7 +2632,7 @@ fn update_task_metadata(
     workspace: &TandemProject,
     options: UpdateOptions,
 ) -> Result<UpdateOutcome, CliError> {
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
@@ -4668,52 +4620,20 @@ fn validate_state(workspace: &TandemProject, state: &str) -> Result<(), CliError
     }
 }
 
-#[derive(Debug)]
-struct CreatedDocument {
-    id: String,
-    path: PathBuf,
-}
-
 fn create_new_sequential_document<F>(
     workspace: &TandemProject,
     prefix: &str,
     content_for_id: F,
-) -> Result<CreatedDocument, CliError>
+) -> Result<project::write::CreatedDocument, CliError>
 where
     F: FnMut(&str) -> String,
 {
-    let last_allocated = next_sequential_number(workspace, prefix)?;
-    create_new_sequential_document_after(workspace, prefix, last_allocated, content_for_id)
-}
-
-fn create_new_sequential_document_after<F>(
-    workspace: &TandemProject,
-    prefix: &str,
-    last_allocated: usize,
-    mut content_for_id: F,
-) -> Result<CreatedDocument, CliError>
-where
-    F: FnMut(&str) -> String,
-{
-    let mut next_number = last_allocated.checked_add(1).ok_or_else(|| {
-        CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
-    })?;
-
-    for _ in 0..MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS {
-        let id = format!("{prefix}-{next_number}");
-        let path = workspace.board_dir.join(format!("{id}.md"));
-        let content = content_for_id(&id);
-        if write_new_atomic(&path, &content)? {
-            return Ok(CreatedDocument { id, path });
-        }
-        next_number = next_number.checked_add(1).ok_or_else(|| {
-            CliError::user(format!("ID allocation failure: {prefix} sequence overflow"))
-        })?;
-    }
-
-    Err(CliError::user(format!(
-        "ID allocation failure: could not reserve a new {prefix} document after {MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS} attempts; concurrent writers may be too active, rerun the command"
-    )))
+    project::write::create_new_sequential_document_after(
+        workspace,
+        prefix,
+        next_sequential_number(workspace, prefix)?,
+        content_for_id,
+    )
 }
 
 fn next_sequential_number(workspace: &TandemProject, prefix: &str) -> Result<usize, CliError> {
@@ -4722,249 +4642,6 @@ fn next_sequential_number(workspace: &TandemProject, prefix: &str) -> Result<usi
         hierarchy.documents.values().map(|doc| doc.id()),
         prefix,
     ))
-}
-
-fn replace_markdown_body(content: &str, body: &str) -> Result<String, CliError> {
-    let (frontmatter, _) = split_frontmatter(content).map_err(CliError::user)?;
-    Ok(format!("---\n{}---\n{}", frontmatter, body))
-}
-
-fn patch_frontmatter_content(
-    content: &str,
-    updates: &BTreeMap<String, String>,
-    removes: &[&str],
-) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let mut seen = BTreeMap::<String, bool>::new();
-    let mut output_frontmatter = String::new();
-    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
-    let mut index = 0;
-
-    while index < lines.len() {
-        let raw_line = lines[index];
-        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
-        if let Some(key) = frontmatter_line_key(line) {
-            if removes.contains(&key) {
-                index += 1;
-                while index < lines.len() {
-                    let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                    if is_top_level_frontmatter_boundary(next) {
-                        break;
-                    }
-                    index += 1;
-                }
-                continue;
-            }
-            if let Some(value) = updates.get(key) {
-                output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
-                seen.insert(key.to_string(), true);
-                index += 1;
-                while index < lines.len() {
-                    let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                    if is_top_level_frontmatter_boundary(next) {
-                        break;
-                    }
-                    index += 1;
-                }
-                continue;
-            }
-        }
-        output_frontmatter.push_str(raw_line);
-        index += 1;
-    }
-
-    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-        output_frontmatter.push('\n');
-    }
-    for (key, value) in updates {
-        if !seen.contains_key(key) {
-            output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
-        }
-    }
-
-    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
-}
-
-fn frontmatter_line_key(line: &str) -> Option<&str> {
-    if line.starts_with(' ') || line.starts_with('\t') || line.trim_start().starts_with('-') {
-        return None;
-    }
-    let (key, _) = line.split_once(':')?;
-    let key = key.trim();
-    if key.is_empty() {
-        None
-    } else {
-        Some(key)
-    }
-}
-
-fn is_top_level_frontmatter_boundary(line: &str) -> bool {
-    !line.starts_with(' ')
-        && !line.starts_with('\t')
-        && !line.trim().is_empty()
-        && (frontmatter_line_key(line).is_some() || line.trim_start().starts_with('#'))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FileSignature {
-    len: u64,
-    modified: Option<SystemTime>,
-}
-
-fn read_file_snapshot(path: &Path) -> Result<(String, FileSignature), CliError> {
-    let before = file_signature(path)?;
-    let content = fs::read_to_string(path)?;
-    let after = file_signature(path)?;
-    if before != after {
-        return Err(CliError::user(format!(
-            "Write conflict: {} changed while the command was reading it. No files were updated; rerun the command.",
-            display_path(path)
-        )));
-    }
-    Ok((content, after))
-}
-
-fn ensure_file_unchanged(path: &Path, expected: &FileSignature) -> Result<(), CliError> {
-    let current = file_signature(path)?;
-    if &current == expected {
-        Ok(())
-    } else {
-        Err(CliError::user(format!(
-            "Write conflict: {} changed while the command was preparing its update. No files were updated; rerun the command.",
-            display_path(path)
-        )))
-    }
-}
-
-fn file_signature(path: &Path) -> Result<FileSignature, CliError> {
-    let metadata = fs::metadata(path)?;
-    Ok(FileSignature {
-        len: metadata.len(),
-        modified: metadata.modified().ok(),
-    })
-}
-
-fn write_atomic(path: &Path, content: &str) -> Result<(), CliError> {
-    let temp_path = write_temp_file_for(path, content)?;
-    if let Err(error) = fs::rename(&temp_path, path) {
-        let _ = fs::remove_file(&temp_path);
-        return Err(CliError::user(format!(
-            "Write failure: could not replace {}: {error}",
-            display_path(path)
-        )));
-    }
-    Ok(())
-}
-
-fn write_new_atomic(path: &Path, content: &str) -> Result<bool, CliError> {
-    // Hard-linking the fully written temp file reserves `path` without replacing
-    // an existing document, letting concurrent adders retry with the next ID.
-    let temp_path = write_temp_file_for(path, content)?;
-    match fs::hard_link(&temp_path, path) {
-        Ok(()) => {
-            let _ = fs::remove_file(&temp_path);
-            Ok(true)
-        }
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-            let _ = fs::remove_file(&temp_path);
-            Ok(false)
-        }
-        Err(error) => {
-            let _ = fs::remove_file(&temp_path);
-            Err(CliError::user(format!(
-                "Write failure: could not create {}: {error}",
-                display_path(path)
-            )))
-        }
-    }
-}
-
-fn write_temp_file_for(path: &Path, content: &str) -> Result<PathBuf, CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let temp_path = temporary_path_for(path);
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temp_path)
-        .map_err(|error| {
-            CliError::user(format!(
-                "Write failure: could not create temp file {} for {}: {error}",
-                display_path(&temp_path),
-                display_path(path)
-            ))
-        })?;
-    if let Err(error) = file
-        .write_all(content.as_bytes())
-        .and_then(|_| file.sync_all())
-    {
-        let _ = fs::remove_file(&temp_path);
-        return Err(CliError::user(format!(
-            "Write failure: could not write {}: {error}",
-            display_path(path)
-        )));
-    }
-    drop(file);
-    Ok(temp_path)
-}
-
-fn temporary_path_for(path: &Path) -> PathBuf {
-    let file_name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("document.md");
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    let counter = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-    path.with_file_name(format!(
-        ".{file_name}.tmp.{}.{}.{}",
-        std::process::id(),
-        nanos,
-        counter
-    ))
-}
-
-fn append_event(
-    workspace: &TandemProject,
-    event_name: &str,
-    id: &str,
-    summary: &str,
-) -> Result<(), CliError> {
-    debug_assert!(event::is_known_name(event_name));
-    debug_assert_eq!(CanonicalEventEnvelope::required_fields().len(), 6);
-    let ts = current_timestamp();
-    let line = EventEnvelope {
-        ts: &ts,
-        event: event_name,
-        id,
-        summary,
-    }
-    .legacy_json_line(json_string);
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&workspace.events_path)
-        .map_err(|error| {
-            CliError::user(format!(
-                "Event append failure: could not open {} while recording `{event_name}` for `{id}`: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
-                display_path(&workspace.events_path)
-            ))
-        })?;
-    file.write_all(line.as_bytes()).map_err(|error| {
-        CliError::user(format!(
-            "Event append failure: could not append `{event_name}` for `{id}` to {}: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
-            display_path(&workspace.events_path)
-        ))
-    })
-}
-
-fn file_name_for_path(path: &Path) -> Result<PathBuf, CliError> {
-    path.file_name()
-        .map(PathBuf::from)
-        .ok_or_else(|| CliError::user(format!("cannot determine file name for {}", path.display())))
 }
 
 fn push_optional_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
@@ -4990,14 +4667,6 @@ fn inline_array(values: &[String]) -> String {
             .collect::<Vec<_>>()
             .join(", ")
     )
-}
-
-fn yaml_value_for_update(value: &str) -> String {
-    if value.starts_with('[') && value.ends_with(']') {
-        value.to_string()
-    } else {
-        yaml_double_quote(value)
-    }
 }
 
 fn yaml_double_quote(value: &str) -> String {
@@ -5079,6 +4748,8 @@ fn display_path(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use super::*;
     use crate::project::{read_document, read_documents};
 
