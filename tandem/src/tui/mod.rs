@@ -1282,7 +1282,7 @@ impl TuiApp {
         let Some(ValidationPrompt::Accept { id, .. }) = self.validation_prompt.take() else {
             return;
         };
-        match app::accord::accept_validation(&self.workspace, &id) {
+        match app::accord::accept_validation(&self.workspace, &id, "tui") {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -1300,7 +1300,7 @@ impl TuiApp {
         else {
             return;
         };
-        match app::accord::apply_accepted_validation(&self.workspace, &candidates) {
+        match app::accord::apply_accepted_validation(&self.workspace, &candidates, "tui") {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.status = format!(
@@ -1332,7 +1332,7 @@ impl TuiApp {
         }
         let id = id.clone();
         self.validation_prompt = None;
-        match app::accord::request_validation_rework(&self.workspace, &id, &feedback) {
+        match app::accord::request_validation_rework(&self.workspace, &id, "tui", &feedback) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -9255,7 +9255,7 @@ tone = "success"
         let workspace = temp_workspace(&root);
         write_delivered_validation_task(&workspace, "task-1");
 
-        let outcome = app::accord::accept_validation(&workspace, "task-1").unwrap();
+        let outcome = app::accord::accept_validation(&workspace, "task-1", "tui").unwrap();
         assert_eq!(outcome.state, "validation");
         let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
         assert!(content.contains("status: \"accepted\""));
@@ -9273,6 +9273,7 @@ tone = "success"
         let outcome = app::accord::request_validation_rework(
             &workspace,
             "task-1",
+            "tui",
             "Please fix the contrast.",
         )
         .unwrap();
@@ -9368,7 +9369,8 @@ tone = "success"
             &read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap(),
         );
 
-        let outcome = app::accord::apply_accepted_validation(&workspace, &candidates).unwrap();
+        let outcome =
+            app::accord::apply_accepted_validation(&workspace, &candidates, "tui").unwrap();
 
         assert_eq!(outcome.completed_ids, vec!["task-1"]);
         assert!(!workspace.board_dir.join("task-1.md").exists());
@@ -9413,7 +9415,7 @@ tone = "success"
             title: "Accepted candidate".to_string(),
         }];
         let apply_error =
-            app::accord::apply_accepted_validation(&workspace, &candidates).unwrap_err();
+            app::accord::apply_accepted_validation(&workspace, &candidates, "tui").unwrap_err();
         assert!(apply_error.message.contains("expected global `task-N`"));
         assert!(workspace.board_dir.join("task-20.md").exists());
         assert!(!workspace.logs_dir.join("task-20.md").exists());
