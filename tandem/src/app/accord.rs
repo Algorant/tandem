@@ -431,4 +431,41 @@ mod tests {
             "changes-requested"
         );
     }
+
+    #[test]
+    fn validation_rework_uses_supplied_actor_in_document_and_event() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-validation-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let path = project.board_dir.join("task-1.md");
+        fs::write(
+            &path,
+            "---\nid: task-1\ntype: task\ntitle: Delivered\nstate: validation\naccord:\n  status: delivered\n---\n# Body\n",
+        )
+        .unwrap();
+
+        let outcome =
+            request_validation_rework(&project, "task-1", "review-bot", "Fix contrast").unwrap();
+        assert_eq!(outcome.state, "in-progress");
+        let changed = fs::read_to_string(path).unwrap();
+        assert!(changed.contains("reviewer: \"review-bot\""));
+        assert!(changed.contains("(review-bot): Fix contrast"));
+        let events = project.read_events_tolerant(&mut Vec::new());
+        assert!(events
+            .iter()
+            .any(|event| event.event == "validation.rework"));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
 }

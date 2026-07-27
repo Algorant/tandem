@@ -822,3 +822,59 @@ pub(crate) fn cancel(
         log_path,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    #[test]
+    fn completion_preserves_unknown_source_and_returns_policy_warning() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-complete-warning-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let created = add(
+            &project,
+            AddOptions {
+                title: Some("Keep source".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap();
+        let source = fs::read_to_string(&created.path).unwrap();
+        fs::write(
+            &created.path,
+            source.replacen("title:", "unknown: retain\ntitle:", 1),
+        )
+        .unwrap();
+        let outcome = complete(
+            &project,
+            CompleteOptions {
+                id: created.id,
+                summary: Some("Done".to_string()),
+                ..CompleteOptions::default()
+            },
+        )
+        .unwrap();
+        assert!(outcome.has_completion_warnings);
+        assert!(outcome
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("review.status")));
+        let archived = fs::read_to_string(&outcome.log_path).unwrap();
+        assert!(archived.contains("unknown: retain"));
+        assert!(archived.contains("summary: \"Done\""));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+}
