@@ -64,10 +64,11 @@ fn append_event_for_actor(
 
 pub(crate) fn actor_id() -> Result<String, CliError> {
     let configured = std::env::var("TANDEM_ACTOR_ID").ok();
-    let candidate = configured.unwrap_or_else(|| {
-        let user = std::env::var("USER").unwrap_or_else(|_| "local".to_string());
-        format!("local-{user}")
-    });
+    // Without an explicit durable identity, isolate independent CLI processes
+    // rather than letting them race on a shared user-name ledger. A process
+    // may create a fresh opaque actor ledger; callers needing cross-process
+    // identity set the filename-safe TANDEM_ACTOR_ID override.
+    let candidate = configured.unwrap_or_else(fallback_actor_id);
     if is_safe_actor_id(&candidate) {
         Ok(candidate)
     } else {
@@ -75,6 +76,10 @@ pub(crate) fn actor_id() -> Result<String, CliError> {
             "Event append failure: TANDEM_ACTOR_ID must be a filename-safe actor ID containing only ASCII letters, digits, `_`, `-`, or `.`",
         ))
     }
+}
+
+fn fallback_actor_id() -> String {
+    format!("local-{}", std::process::id())
 }
 
 pub(crate) fn is_safe_actor_id(actor: &str) -> bool {
@@ -203,6 +208,13 @@ mod tests {
         assert!(!is_safe_actor_id("../escape"));
         assert!(!is_safe_actor_id(""));
         assert!(is_safe_actor_id("actor_01-ABC.def"));
+    }
+
+    #[test]
+    fn fallback_actor_is_filename_safe_and_process_isolated() {
+        let actor = fallback_actor_id();
+        assert!(is_safe_actor_id(&actor));
+        assert_eq!(actor, format!("local-{}", std::process::id()));
     }
 
     #[test]

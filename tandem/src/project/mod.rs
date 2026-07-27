@@ -203,14 +203,25 @@ impl TandemProject {
                 return events;
             }
         };
-        let mut paths = entries
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
-            .collect::<Vec<_>>();
+        let mut paths = Vec::new();
+        for entry in entries {
+            match entry {
+                Ok(entry)
+                    if entry.path().extension().and_then(|value| value.to_str())
+                        == Some("jsonl") =>
+                {
+                    paths.push(entry.path());
+                }
+                Ok(_) => {}
+                Err(error) => warnings.push(format!(
+                    "Events load warning: could not inspect entry in {}: {error}",
+                    display_path(&events_dir)
+                )),
+            }
+        }
         paths.sort();
         for path in paths {
-            events.extend(read_event_file_tolerant(&path, warnings));
+            events.extend(read_actor_event_file_tolerant(&path, warnings));
         }
         events
     }
@@ -309,24 +320,72 @@ impl ProjectHierarchy {
 }
 
 fn read_event_file_tolerant(path: &Path, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
-    if !path.exists() {
+    read_event_content(path, warnings)
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(ProjectEvent::parse_legacy)
+        .collect()
+}
+
+fn read_actor_event_file_tolerant(path: &Path, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
+    let Some(actor) = path.file_stem().and_then(|stem| stem.to_str()) else {
+        warnings.push(format!(
+            "Events load warning: invalid actor event filename {}",
+            display_path(path)
+        ));
+        return Vec::new();
+    };
+    if !events::is_safe_actor_id(actor) {
+        warnings.push(format!(
+            "Events load warning: unsafe actor event filename {}",
+            display_path(path)
+        ));
         return Vec::new();
     }
-    let content = match fs::read_to_string(path) {
-        Ok(content) => content,
+    let Some(content) = read_event_content(path, warnings) else {
+        return Vec::new();
+    };
+    let mut events = Vec::new();
+    let mut previous_seq = 0;
+    for (line_number, line) in content.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match ProjectEvent::parse_canonical(line, actor) {
+            Ok(event) if event.seq.is_some_and(|seq| seq > previous_seq) => {
+                previous_seq = event.seq.expect("checked sequence");
+                events.push(event);
+            }
+            Ok(_) => warnings.push(format!(
+                "Events load warning: non-monotonic or duplicate sequence in {} at line {}",
+                display_path(path),
+                line_number + 1
+            )),
+            Err(message) => warnings.push(format!(
+                "Events load warning: malformed canonical event in {} at line {}: {message}",
+                display_path(path),
+                line_number + 1
+            )),
+        }
+    }
+    events
+}
+
+fn read_event_content(path: &Path, warnings: &mut Vec<String>) -> Option<String> {
+    if !path.exists() {
+        return None;
+    }
+    match fs::read_to_string(path) {
+        Ok(content) => Some(content),
         Err(error) => {
             warnings.push(format!(
                 "Events load warning: could not read {}: {error}",
                 display_path(path)
             ));
-            return Vec::new();
+            None
         }
-    };
-    content
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .filter_map(ProjectEvent::parse)
-        .collect()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -340,7 +399,7 @@ pub(crate) struct ProjectEvent {
 }
 
 impl ProjectEvent {
-    fn parse(line: &str) -> Option<Self> {
+    fn parse_legacy(line: &str) -> Option<Self> {
         Some(Self {
             id: extract_json_string(line, "id")?,
             event: extract_json_string(line, "event").unwrap_or_else(|| "event".to_string()),
@@ -348,6 +407,29 @@ impl ProjectEvent {
             summary: extract_json_string(line, "summary").unwrap_or_default(),
             actor: extract_json_string(line, "actor"),
             seq: extract_json_u64(line, "seq"),
+        })
+    }
+
+    fn parse_canonical(line: &str, expected_actor: &str) -> Result<Self, &'static str> {
+        let required = |key| extract_json_string(line, key).filter(|value| !value.is_empty());
+        let id = required("id").ok_or("missing required id")?;
+        let event = required("event").ok_or("missing required event")?;
+        let ts = required("ts").ok_or("missing required ts")?;
+        let summary = required("summary").ok_or("missing required summary")?;
+        let actor = required("actor").ok_or("missing required actor")?;
+        if actor != expected_actor {
+            return Err("actor does not match filename");
+        }
+        let seq = extract_json_u64(line, "seq")
+            .filter(|seq| *seq > 0)
+            .ok_or("missing required seq")?;
+        Ok(Self {
+            id,
+            event,
+            ts,
+            summary,
+            actor: Some(actor),
+            seq: Some(seq),
         })
     }
 }
@@ -784,6 +866,36 @@ mod tests {
         assert_eq!(events[1].actor.as_deref(), Some("actor-1"));
         assert_eq!(events[1].seq, Some(1));
         assert!(warnings.is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn warns_and_skips_corrupt_canonical_actor_events() {
+        let root = env::temp_dir().join(format!(
+            "tandem-project-events-corrupt-{}",
+            std::process::id()
+        ));
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
+        fs::create_dir_all(project.events_dir()).unwrap();
+        fs::write(
+            project.actor_events_path("actor-1"),
+            "{\"ts\":\"now\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"ok\",\"actor\":\"actor-1\",\"seq\":1}\n{\"id\":\"task-1\",\"actor\":\"wrong\",\"seq\":1}\n{\"ts\":\"later\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"duplicate\",\"actor\":\"actor-1\",\"seq\":1}\n",
+        )
+        .unwrap();
+        let mut warnings = Vec::new();
+        let events = project.read_events_tolerant(&mut warnings);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].seq, Some(1));
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("malformed canonical event")));
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("non-monotonic or duplicate")));
         fs::remove_dir_all(root).unwrap();
     }
 
