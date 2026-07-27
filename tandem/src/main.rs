@@ -57,14 +57,14 @@ pub(crate) struct CliError {
 }
 
 impl CliError {
-    fn usage(message: impl Into<String>) -> Self {
+    pub(crate) fn usage(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             code: 2,
         }
     }
 
-    fn user(message: impl Into<String>) -> Self {
+    pub(crate) fn user(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             code: 1,
