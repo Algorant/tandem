@@ -410,3 +410,25 @@ pub(crate) fn transition(
         path: doc.path,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn feedback_entry_preserves_caller_actor_and_body() {
+        let content = "---\nid: task-1\n---\n# Delivery\n";
+        let patched = append_feedback_entry(content, "now", "review-bot", "Fix\ncontrast").unwrap();
+        assert!(patched.contains("# Delivery"));
+        assert!(patched.contains("- now (review-bot): Fix contrast"));
+    }
+
+    #[test]
+    fn accord_status_normalization_remains_protocol_shaped() {
+        assert_eq!(normalize_accord_status(" Delivered "), "delivered");
+        assert_eq!(
+            normalize_accord_status("changes_requested"),
+            "changes-requested"
+        );
+    }
+}
