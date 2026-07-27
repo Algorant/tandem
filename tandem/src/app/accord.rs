@@ -12,9 +12,42 @@ use crate::{
     ensure_file_unchanged, find_board_document, hierarchy_from_workspace, patch_accord_content,
     patch_completion_content, patch_frontmatter_content, read_file_snapshot, split_frontmatter,
     unresolved_blockers, validate_accord_inputs, validate_state,
-    validate_task_document_against_hierarchy, validate_task_document_for_mutation, AccordOptions,
-    AccordRecord, CliError, Document, HierarchyLock, TandemProject,
+    validate_task_document_against_hierarchy, validate_task_document_for_mutation, CliError,
+    Document, HierarchyLock, TandemProject,
 };
+
+#[derive(Debug, Default)]
+pub(crate) struct AccordOptions {
+    pub(crate) id: String,
+    pub(crate) assignee: Option<String>,
+    pub(crate) summary: Option<String>,
+    pub(crate) reviewer: Option<String>,
+    pub(crate) note: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) deliverables: Vec<String>,
+    pub(crate) validations: Vec<String>,
+    pub(crate) constraints: Vec<String>,
+    pub(crate) evidence: Vec<String>,
+    pub(crate) files_changed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AccordRecord {
+    pub(crate) status: String,
+    pub(crate) assignee: Option<String>,
+    pub(crate) claimed_at: Option<String>,
+    pub(crate) delivered_at: Option<String>,
+    pub(crate) deliverables: Vec<String>,
+    pub(crate) validations: Vec<String>,
+    pub(crate) constraints: Vec<String>,
+    pub(crate) summary: Option<String>,
+    pub(crate) evidence: Vec<String>,
+    pub(crate) files_changed: Vec<String>,
+    pub(crate) reviewer: Option<String>,
+    pub(crate) note: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) updated_at: String,
+}
 
 /// Apply one canonical accord transition and synchronize workflow state.
 

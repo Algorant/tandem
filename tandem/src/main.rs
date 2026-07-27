@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::env;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::Yaml;
@@ -10,6 +10,11 @@ mod app;
 mod project;
 mod protocol;
 mod tui;
+
+use app::accord::{AccordOptions, AccordRecord};
+use app::tasks::{
+    AddOptions, AddOutcome, CancelOptions, CompleteOptions, MoveOptions, UpdateOptions,
+};
 
 pub(crate) use project::write::{
     archive_board_document, ensure_file_unchanged, file_signature, FileSignature, HierarchyLock,
@@ -114,98 +119,6 @@ struct ShowOptions {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct AddOptions {
-    title: Option<String>,
-    state: Option<String>,
-    json: bool,
-    description: Option<String>,
-    kind: Option<String>,
-    priority: Option<String>,
-    effort: Option<String>,
-    tags: Vec<String>,
-    assignee: Option<String>,
-    due_date: Option<String>,
-    parent: Option<String>,
-    blockers: Vec<String>,
-    references: Vec<String>,
-    related_files: Vec<String>,
-}
-
-#[derive(Debug)]
-pub(crate) struct AddOutcome {
-    id: String,
-    state: String,
-    title: String,
-    kind: Option<String>,
-    parent: Option<String>,
-    parent_relationship: Option<ParentRelationship>,
-    path: PathBuf,
-    warnings: Vec<String>,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct MoveOptions {
-    id: String,
-    state: Option<String>,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct UpdateOptions {
-    id: String,
-    title: Option<String>,
-    body: Option<String>,
-    kind: Option<String>,
-    priority: Option<String>,
-    effort: Option<String>,
-    assignee: Option<String>,
-    due_date: Option<String>,
-    parent: Option<String>,
-    tags: Vec<String>,
-    blockers: Vec<String>,
-    references: Vec<String>,
-    related_files: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct UpdateChange {
-    field: String,
-    old: String,
-    new: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct UpdateOutcome {
-    id: String,
-    path: PathBuf,
-    changes: Vec<UpdateChange>,
-    warnings: Vec<String>,
-    parent_relationship: Option<ParentRelationship>,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct CompleteOptions {
-    id: String,
-    summary: Option<String>,
-    files_changed: Vec<String>,
-    validation: Option<String>,
-    reviewer: Option<String>,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct CancelOptions {
-    id: String,
-    reason: Option<String>,
-}
-
-#[derive(Debug)]
-pub(crate) struct CancelOutcome {
-    id: String,
-    reason: String,
-    board_path: PathBuf,
-    log_path: PathBuf,
-}
-
-#[derive(Debug, Default)]
 struct SearchOptions {
     query: String,
     state: Option<String>,
@@ -245,39 +158,6 @@ struct RuleEditOptions {
 struct RuleDeleteOptions {
     category: Option<String>,
     id: Option<usize>,
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct AccordOptions {
-    id: String,
-    assignee: Option<String>,
-    summary: Option<String>,
-    reviewer: Option<String>,
-    note: Option<String>,
-    reason: Option<String>,
-    deliverables: Vec<String>,
-    validations: Vec<String>,
-    constraints: Vec<String>,
-    evidence: Vec<String>,
-    files_changed: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub(crate) struct AccordRecord {
-    status: String,
-    assignee: Option<String>,
-    claimed_at: Option<String>,
-    delivered_at: Option<String>,
-    deliverables: Vec<String>,
-    validations: Vec<String>,
-    constraints: Vec<String>,
-    summary: Option<String>,
-    evidence: Vec<String>,
-    files_changed: Vec<String>,
-    reviewer: Option<String>,
-    note: Option<String>,
-    reason: Option<String>,
-    updated_at: String,
 }
 
 fn main() {
@@ -1246,15 +1126,6 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     );
     println!("Event: task.completed");
     Ok(())
-}
-
-#[derive(Debug)]
-pub(crate) struct CompleteOutcome {
-    id: String,
-    board_path: PathBuf,
-    log_path: PathBuf,
-    warnings: Vec<String>,
-    has_completion_warnings: bool,
 }
 
 fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
@@ -4035,6 +3906,7 @@ fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::PathBuf;
 
     use super::*;
     use crate::app::tasks::{

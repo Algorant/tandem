@@ -17,10 +17,109 @@ use crate::{
     patch_completion_content, patch_frontmatter_content, push_array_line, push_optional_line,
     read_file_snapshot, require_nonempty, resolve_parent_relationship,
     unresolved_blockers_in_hierarchy, validate_state, validate_task_document_against_hierarchy,
-    workspace_deprecation_warnings, AccordRecord, AddOptions, AddOutcome, CancelOutcome, CliError,
-    CompleteOptions, CompleteOutcome, Document, TandemProject, UpdateChange, UpdateOptions,
-    UpdateOutcome,
+    workspace_deprecation_warnings, AccordRecord, CliError, Document, TandemProject,
 };
+
+#[derive(Debug, Default)]
+pub(crate) struct AddOptions {
+    pub(crate) title: Option<String>,
+    pub(crate) state: Option<String>,
+    pub(crate) json: bool,
+    pub(crate) description: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) priority: Option<String>,
+    pub(crate) effort: Option<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) assignee: Option<String>,
+    pub(crate) due_date: Option<String>,
+    pub(crate) parent: Option<String>,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) references: Vec<String>,
+    pub(crate) related_files: Vec<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct AddOutcome {
+    pub(crate) id: String,
+    pub(crate) state: String,
+    pub(crate) title: String,
+    pub(crate) kind: Option<String>,
+    pub(crate) parent: Option<String>,
+    pub(crate) parent_relationship: Option<ParentRelationship>,
+    pub(crate) path: PathBuf,
+    pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct MoveOptions {
+    pub(crate) id: String,
+    pub(crate) state: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UpdateOptions {
+    pub(crate) id: String,
+    pub(crate) title: Option<String>,
+    pub(crate) body: Option<String>,
+    pub(crate) kind: Option<String>,
+    pub(crate) priority: Option<String>,
+    pub(crate) effort: Option<String>,
+    pub(crate) assignee: Option<String>,
+    pub(crate) due_date: Option<String>,
+    pub(crate) parent: Option<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) blockers: Vec<String>,
+    pub(crate) references: Vec<String>,
+    pub(crate) related_files: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct UpdateChange {
+    pub(crate) field: String,
+    pub(crate) old: String,
+    pub(crate) new: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct UpdateOutcome {
+    pub(crate) id: String,
+    pub(crate) path: PathBuf,
+    pub(crate) changes: Vec<UpdateChange>,
+    pub(crate) warnings: Vec<String>,
+    pub(crate) parent_relationship: Option<ParentRelationship>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct CompleteOptions {
+    pub(crate) id: String,
+    pub(crate) summary: Option<String>,
+    pub(crate) files_changed: Vec<String>,
+    pub(crate) validation: Option<String>,
+    pub(crate) reviewer: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct CompleteOutcome {
+    pub(crate) id: String,
+    pub(crate) board_path: PathBuf,
+    pub(crate) log_path: PathBuf,
+    pub(crate) warnings: Vec<String>,
+    pub(crate) has_completion_warnings: bool,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct CancelOptions {
+    pub(crate) id: String,
+    pub(crate) reason: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct CancelOutcome {
+    pub(crate) id: String,
+    pub(crate) reason: String,
+    pub(crate) board_path: PathBuf,
+    pub(crate) log_path: PathBuf,
+}
 
 /// Create a Task, Epic, or Subtask after canonical hierarchy validation.
 pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
