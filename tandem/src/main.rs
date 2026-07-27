@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use yaml_rust2::Yaml;
 
+mod app;
 mod project;
 mod protocol;
 mod tui;
@@ -113,7 +114,7 @@ struct ShowOptions {
 }
 
 #[derive(Debug, Default)]
-struct AddOptions {
+pub(crate) struct AddOptions {
     title: Option<String>,
     state: Option<String>,
     json: bool,
@@ -131,7 +132,7 @@ struct AddOptions {
 }
 
 #[derive(Debug)]
-struct AddOutcome {
+pub(crate) struct AddOutcome {
     id: String,
     state: String,
     title: String,
@@ -143,13 +144,13 @@ struct AddOutcome {
 }
 
 #[derive(Debug, Default)]
-struct MoveOptions {
+pub(crate) struct MoveOptions {
     id: String,
     state: Option<String>,
 }
 
 #[derive(Debug, Default)]
-struct UpdateOptions {
+pub(crate) struct UpdateOptions {
     id: String,
     title: Option<String>,
     body: Option<String>,
@@ -166,14 +167,14 @@ struct UpdateOptions {
 }
 
 #[derive(Debug, Clone)]
-struct UpdateChange {
+pub(crate) struct UpdateChange {
     field: String,
     old: String,
     new: String,
 }
 
 #[derive(Debug)]
-struct UpdateOutcome {
+pub(crate) struct UpdateOutcome {
     id: String,
     path: PathBuf,
     changes: Vec<UpdateChange>,
@@ -182,7 +183,7 @@ struct UpdateOutcome {
 }
 
 #[derive(Debug, Default)]
-struct CompleteOptions {
+pub(crate) struct CompleteOptions {
     id: String,
     summary: Option<String>,
     files_changed: Vec<String>,
@@ -191,13 +192,13 @@ struct CompleteOptions {
 }
 
 #[derive(Debug, Default)]
-struct CancelOptions {
+pub(crate) struct CancelOptions {
     id: String,
     reason: Option<String>,
 }
 
 #[derive(Debug)]
-struct CancelOutcome {
+pub(crate) struct CancelOutcome {
     id: String,
     reason: String,
     board_path: PathBuf,
@@ -247,7 +248,7 @@ struct RuleDeleteOptions {
 }
 
 #[derive(Debug, Default)]
-struct AccordOptions {
+pub(crate) struct AccordOptions {
     id: String,
     assignee: Option<String>,
     summary: Option<String>,
@@ -262,7 +263,7 @@ struct AccordOptions {
 }
 
 #[derive(Debug, Clone, Default)]
-struct AccordRecord {
+pub(crate) struct AccordRecord {
     status: String,
     assignee: Option<String>,
     claimed_at: Option<String>,
@@ -1143,7 +1144,7 @@ fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
 fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let json = options.json;
-    let outcome = add_task(&workspace, options)?;
+    let outcome = app::tasks::add(&workspace, options)?;
 
     if json {
         println!("{}", add_outcome_json(&outcome));
@@ -1175,7 +1176,10 @@ fn cmd_add(options: AddOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-fn add_task(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
+pub(crate) fn add_task(
+    workspace: &TandemProject,
+    options: AddOptions,
+) -> Result<AddOutcome, CliError> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let title =
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
@@ -1287,7 +1291,7 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
         .state
         .as_deref()
         .ok_or_else(|| CliError::usage("move requires --state <state>"))?;
-    let outcome = move_task_to_state(&workspace, &options.id, state)?;
+    let outcome = app::tasks::move_to_state(&workspace, &options.id, state)?;
 
     if !outcome.changed {
         println!("{} is already in state {state}", outcome.id);
@@ -1306,7 +1310,7 @@ fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
 
 fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let outcome = update_task_metadata(&workspace, options)?;
+    let outcome = app::tasks::update(&workspace, options)?;
 
     for warning in outcome.warnings {
         println!("Warning: {warning}");
@@ -1336,12 +1340,42 @@ fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
 
 fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
+    let outcome = app::tasks::complete(&workspace, options)?;
+    for warning in &outcome.warnings {
+        println!("Warning: {warning}");
+    }
+    if outcome.has_completion_warnings {
+        println!("Completing anyway under the canonical protocol policy.\n");
+    }
+    println!("Completed {}", outcome.id);
+    println!(
+        "Moved: {} -> {}",
+        display_path(&outcome.board_path),
+        display_path(&outcome.log_path)
+    );
+    println!("Event: task.completed");
+    Ok(())
+}
+
+#[derive(Debug)]
+pub(crate) struct CompleteOutcome {
+    id: String,
+    board_path: PathBuf,
+    log_path: PathBuf,
+    warnings: Vec<String>,
+    has_completion_warnings: bool,
+}
+
+pub(crate) fn complete_task(
+    workspace: &TandemProject,
+    options: CompleteOptions,
+) -> Result<CompleteOutcome, CliError> {
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let summary = require_nonempty(
         options.summary.as_deref(),
         "complete requires --summary <text>",
     )?;
-    let hierarchy = hierarchy_from_workspace(&workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -1354,7 +1388,7 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
             doc.doc_type()
         )));
     }
-    validate_task_document_against_hierarchy(&workspace, &doc, &hierarchy)?;
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
     let unresolved = unresolved_blockers_in_hierarchy(&hierarchy, doc.field("blockers"));
     if !unresolved.is_empty() {
         return Err(CliError::user(format!(
@@ -1363,17 +1397,12 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
             unresolved.join(", ")
         )));
     }
-
-    let completion_diagnostics = crate::protocol::diagnostic::completion_policy_diagnostics(&doc);
-    for diagnostic in &completion_diagnostics {
-        println!("Warning: {}", diagnostic.message);
-    }
-    print_workspace_deprecation_warnings(&workspace)?;
-    if !completion_diagnostics.is_empty() {
-        println!("Completing anyway under the canonical protocol policy.");
-        println!();
-    }
-
+    let mut warnings = crate::protocol::diagnostic::completion_policy_diagnostics(&doc)
+        .into_iter()
+        .map(|diagnostic| diagnostic.message)
+        .collect::<Vec<_>>();
+    let has_completion_warnings = !warnings.is_empty();
+    warnings.extend(workspace_deprecation_warnings(workspace)?);
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::new();
@@ -1399,28 +1428,26 @@ fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
         options.reviewer.as_deref(),
     )?;
     let log_path = project::write::archive_board_document(
-        &workspace,
+        workspace,
         &doc.path,
         &signature,
         &patched,
         "completed",
     )?;
-    append_event(&workspace, "task.completed", doc.id(), summary)?;
-
-    println!("Completed {}", doc.id());
-    println!(
-        "Moved: {} -> {}",
-        display_path(&doc.path),
-        display_path(&log_path)
-    );
-    println!("Event: task.completed");
-    Ok(())
+    append_event(workspace, "task.completed", doc.id(), summary)?;
+    Ok(CompleteOutcome {
+        id: doc.id().to_string(),
+        board_path: doc.path,
+        log_path,
+        warnings,
+        has_completion_warnings,
+    })
 }
 
 fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let reason = require_nonempty(options.reason.as_deref(), "cancel requires --reason <text>")?;
-    let outcome = cancel_task(&workspace, &options.id, reason)?;
+    let outcome = app::tasks::cancel(&workspace, &options.id, reason)?;
 
     println!("Canceled {}", outcome.id);
     println!("Reason: {}", outcome.reason);
@@ -1433,7 +1460,7 @@ fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-fn cancel_task(
+pub(crate) fn cancel_task(
     workspace: &TandemProject,
     id: &str,
     reason: &str,
@@ -1637,10 +1664,42 @@ fn cmd_accord(args: &[String]) -> Result<(), CliError> {
     cmd_accord_update(action, status, options)
 }
 
-fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Result<(), CliError> {
+fn cmd_accord_update(action: &str, _status: &str, options: AccordOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let _hierarchy_lock = project::write::HierarchyLock::acquire(&workspace)?;
-    let hierarchy = hierarchy_from_workspace(&workspace)?;
+    let outcome = app::accord::transition(&workspace, action, options)?;
+    print_accord_update(
+        &outcome.id,
+        &outcome.previous_status,
+        &outcome.status,
+        &outcome.event_name,
+        &outcome.path,
+    );
+    if let Some(state) = outcome.synced_state.as_deref() {
+        println!("State:  {} -> {state}", outcome.previous_state);
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+pub(crate) struct AccordTransitionOutcome {
+    id: String,
+    previous_status: String,
+    status: String,
+    previous_state: String,
+    synced_state: Option<String>,
+    event_name: String,
+    path: PathBuf,
+}
+
+pub(crate) fn transition_accord(
+    workspace: &TandemProject,
+    action: &str,
+    options: AccordOptions,
+) -> Result<AccordTransitionOutcome, CliError> {
+    let status = accord::status_for_action(action)
+        .ok_or_else(|| CliError::usage(format!("unknown accord action `{action}`")))?;
+    let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
+    let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
@@ -1653,12 +1712,10 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
             doc.doc_type()
         )));
     }
-    validate_task_document_against_hierarchy(&workspace, &doc, &hierarchy)?;
-
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
     validate_accord_inputs(action, &options)?;
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
     accord::validate_transition(action, &previous_status).map_err(CliError::user)?;
-
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
     let mut accord = AccordRecord::from_document(&doc, &now);
@@ -1667,27 +1724,30 @@ fn cmd_accord_update(action: &str, status: &str, options: AccordOptions) -> Resu
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now);
     let previous_state = doc.field("state").unwrap_or("-").to_string();
-    let synced_state = accord::state_sync_target(status, &previous_state);
-    if let Some(state) = synced_state {
-        validate_state(&workspace, state)?;
+    let synced_state = accord::state_sync_target(status, &previous_state).map(str::to_string);
+    if let Some(state) = synced_state.as_deref() {
+        validate_state(workspace, state)?;
         updates.insert("state".to_string(), state.to_string());
     }
     let patched = patch_frontmatter_content(&patched, &updates, &[])?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
-    let event_name = accord::event_name(action);
+    let event_name = accord::event_name(action).to_string();
     append_event(
-        &workspace,
-        event_name,
+        workspace,
+        &event_name,
         doc.id(),
         &format!("Accord {action} for {}", doc.id()),
     )?;
-
-    print_accord_update(doc.id(), &previous_status, status, event_name, &doc.path);
-    if let Some(state) = synced_state {
-        println!("State:  {previous_state} -> {state}");
-    }
-    Ok(())
+    Ok(AccordTransitionOutcome {
+        id: doc.id().to_string(),
+        previous_status,
+        status: status.to_string(),
+        previous_state,
+        synced_state,
+        event_name,
+        path: doc.path,
+    })
 }
 
 fn cmd_rules(args: &[String]) -> Result<(), CliError> {
@@ -2538,7 +2598,7 @@ fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document>
 }
 
 #[derive(Debug)]
-struct MoveTaskOutcome {
+pub(crate) struct MoveTaskOutcome {
     id: String,
     from: String,
     to: String,
@@ -2547,7 +2607,7 @@ struct MoveTaskOutcome {
     accord_sync: Option<String>,
 }
 
-fn move_task_to_state(
+pub(crate) fn move_task_to_state(
     workspace: &TandemProject,
     id: &str,
     state: &str,
@@ -2628,7 +2688,7 @@ fn move_task_to_state(
     })
 }
 
-fn update_task_metadata(
+pub(crate) fn update_task_metadata(
     workspace: &TandemProject,
     options: UpdateOptions,
 ) -> Result<UpdateOutcome, CliError> {

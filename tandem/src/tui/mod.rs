@@ -17,6 +17,7 @@ use ratatui::{
 };
 
 use super::*;
+use crate::app::accord::ValidationApplyCandidate;
 
 mod decisions;
 mod editor;
@@ -148,12 +149,6 @@ enum ValidationPrompt {
     ApplyAccepted {
         candidates: Vec<ValidationApplyCandidate>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ValidationApplyCandidate {
-    id: String,
-    title: String,
 }
 
 impl ValidationPrompt {
@@ -1032,7 +1027,14 @@ impl TuiApp {
         let state = input.state.clone();
         self.quick_add = None;
 
-        match create_basic_task(&self.workspace, &title, &state) {
+        match app::tasks::add(
+            &self.workspace,
+            AddOptions {
+                title: Some(title.clone()),
+                state: Some(state.clone()),
+                ..AddOptions::default()
+            },
+        ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -1156,7 +1158,7 @@ impl TuiApp {
                 .to_string();
             return;
         }
-        let candidates = accepted_validation_candidates(&self.docs);
+        let candidates = app::accord::accepted_validation_candidates(&self.docs);
         if candidates.is_empty() {
             self.status = "No accepted Validation tasks are ready to apply/archive.".to_string();
             return;
@@ -1280,7 +1282,7 @@ impl TuiApp {
         let Some(ValidationPrompt::Accept { id, .. }) = self.validation_prompt.take() else {
             return;
         };
-        match apply_validation_accept(&self.workspace, &id) {
+        match app::accord::accept_validation(&self.workspace, &id) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -1298,7 +1300,7 @@ impl TuiApp {
         else {
             return;
         };
-        match apply_accepted_validation_tasks(&self.workspace, &candidates) {
+        match app::accord::apply_accepted_validation(&self.workspace, &candidates) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.status = format!(
@@ -1330,7 +1332,7 @@ impl TuiApp {
         }
         let id = id.clone();
         self.validation_prompt = None;
-        match apply_validation_rework(&self.workspace, &id, &feedback) {
+        match app::accord::request_validation_rework(&self.workspace, &id, &feedback) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -1371,7 +1373,7 @@ impl TuiApp {
     }
 
     fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
-        match move_task_to_state(&self.workspace, doc_id, target_state) {
+        match app::tasks::move_to_state(&self.workspace, doc_id, target_state) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
@@ -3886,304 +3888,6 @@ fn quick_add_status(input: &QuickAddInput) -> String {
         "Add task in {}{}: {} · Enter create · Esc cancel",
         input.state, fallback, title
     )
-}
-
-#[derive(Debug)]
-struct QuickAddOutcome {
-    id: String,
-    state: String,
-    title: String,
-}
-
-fn create_basic_task(
-    workspace: &TandemProject,
-    title: &str,
-    state: &str,
-) -> Result<QuickAddOutcome, CliError> {
-    let title = title.trim();
-    if title.is_empty() {
-        return Err(CliError::usage("task title must not be empty"));
-    }
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
-    validate_state(workspace, state)?;
-
-    let now = current_timestamp();
-    let created = create_new_sequential_document(workspace, "task", |task_id| {
-        format!(
-            "---\nid: {task_id}\ntype: task\ntitle: {}\nstate: {}\ncreatedAt: {}\nupdatedAt: {}\n---\n\n",
-            yaml_double_quote(title),
-            yaml_double_quote(state),
-            yaml_double_quote(&now),
-            yaml_double_quote(&now)
-        )
-    })?;
-    append_event(workspace, "task.created", &created.id, title)?;
-
-    Ok(QuickAddOutcome {
-        id: created.id,
-        state: state.to_string(),
-        title: title.to_string(),
-    })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ValidationActionOutcome {
-    id: String,
-    state: String,
-}
-
-fn apply_validation_accept(
-    workspace: &TandemProject,
-    id: &str,
-) -> Result<ValidationActionOutcome, CliError> {
-    apply_validation_action(workspace, id, ValidationAction::Accept { note: None })
-}
-
-fn apply_validation_rework(
-    workspace: &TandemProject,
-    id: &str,
-    feedback: &str,
-) -> Result<ValidationActionOutcome, CliError> {
-    let feedback = feedback.trim();
-    if feedback.is_empty() {
-        return Err(CliError::usage("rework feedback must not be empty"));
-    }
-    apply_validation_action(
-        workspace,
-        id,
-        ValidationAction::Rework {
-            feedback: feedback.to_string(),
-        },
-    )
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ValidationApplyOutcome {
-    completed_ids: Vec<String>,
-}
-
-fn accepted_validation_candidates(docs: &[Document]) -> Vec<ValidationApplyCandidate> {
-    docs.iter()
-        .filter(|doc| doc.doc_type() == "task")
-        .filter(|doc| document_state_label(doc) == "validation")
-        .filter(|doc| normalized_accord_status(accord_status(doc).unwrap_or("")) == "accepted")
-        .filter(|doc| review_status(doc).unwrap_or("") == "accepted")
-        .map(|doc| ValidationApplyCandidate {
-            id: doc.id().to_string(),
-            title: doc.title().to_string(),
-        })
-        .collect()
-}
-
-fn apply_accepted_validation_tasks(
-    workspace: &TandemProject,
-    candidates: &[ValidationApplyCandidate],
-) -> Result<ValidationApplyOutcome, CliError> {
-    if candidates.is_empty() {
-        return Err(CliError::usage("no accepted Validation tasks to apply"));
-    }
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
-    let mut completed_ids = Vec::new();
-    for candidate in candidates {
-        complete_validation_candidate(workspace, &candidate.id)?;
-        completed_ids.push(candidate.id.clone());
-    }
-    Ok(ValidationApplyOutcome { completed_ids })
-}
-
-fn complete_validation_candidate(workspace: &TandemProject, id: &str) -> Result<(), CliError> {
-    let doc = find_board_document(workspace, id)?
-        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
-    if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
-            "Validation failed: only task documents can be applied/logged in v0: {} is type {}",
-            doc.id(),
-            doc.doc_type()
-        )));
-    }
-    if document_state_label(&doc) != "validation"
-        || normalized_accord_status(accord_status(&doc).unwrap_or("")) != "accepted"
-        || review_status(&doc).unwrap_or("") != "accepted"
-    {
-        return Err(CliError::user(format!(
-            "{} is not an accepted Validation candidate",
-            doc.id()
-        )));
-    }
-    validate_task_document_for_mutation(workspace, &doc)?;
-    let unresolved = unresolved_blockers(workspace, doc.field("blockers"))?;
-    if !unresolved.is_empty() {
-        return Err(CliError::user(format!(
-            "Validation failed: {} has unresolved blockers: {}",
-            doc.id(),
-            unresolved.join(", ")
-        )));
-    }
-
-    let (content, signature) = read_file_snapshot(&doc.path)?;
-    let now = current_timestamp();
-    let summary = format!("Applied accepted Validation sign-off for {}", doc.id());
-    let mut updates = BTreeMap::new();
-    updates.insert("completedAt".to_string(), now.clone());
-    updates.insert("updatedAt".to_string(), now);
-    let patched = patch_frontmatter_content(
-        &content,
-        &updates,
-        &[
-            "state",
-            "completionSummary",
-            "completionValidation",
-            "completionReviewer",
-            "filesChanged",
-        ],
-    )?;
-    let patched = patch_completion_content(
-        &patched,
-        &summary,
-        None,
-        &[],
-        Some("Accepted by Validation apply-accepted workflow"),
-        Some("tui"),
-    )?;
-    let _log_path =
-        archive_board_document(workspace, &doc.path, &signature, &patched, "completed")?;
-    append_event(workspace, "task.completed", doc.id(), &summary)?;
-    Ok(())
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ValidationAction {
-    Accept { note: Option<String> },
-    Rework { feedback: String },
-}
-
-fn apply_validation_action(
-    workspace: &TandemProject,
-    id: &str,
-    action: ValidationAction,
-) -> Result<ValidationActionOutcome, CliError> {
-    let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
-    let doc = find_board_document(workspace, id)?
-        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
-    if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
-            "Validation failed: only task documents can use Validation actions in v0: {} is type {}",
-            doc.id(),
-            doc.doc_type()
-        )));
-    }
-    if document_state_label(&doc) != "validation" {
-        return Err(CliError::user(format!(
-            "{} is in `{}`; Validation actions require state `validation`",
-            doc.id(),
-            document_state_label(&doc)
-        )));
-    }
-    validate_task_document_for_mutation(workspace, &doc)?;
-
-    let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
-    if normalized_accord_status(&previous_status) != "delivered" {
-        return Err(CliError::user(format!(
-            "{} has accord.status={previous_status}; Validation sign-off actions require delivered",
-            doc.id()
-        )));
-    }
-
-    let (content, signature) = read_file_snapshot(&doc.path)?;
-    let now = current_timestamp();
-    let mut accord = AccordRecord::from_document(&doc, &now);
-    let (
-        accord_action,
-        status,
-        note,
-        review_status_value,
-        event_name,
-        event_summary,
-        next_state,
-        append_feedback,
-    ) = match action {
-        ValidationAction::Accept { note } => (
-            "accept",
-            "accepted",
-            note,
-            "accepted",
-            "validation.accepted",
-            format!("Accepted sign-off for {}", doc.id()),
-            "validation".to_string(),
-            false,
-        ),
-        ValidationAction::Rework { feedback } => (
-            "rework",
-            "rework",
-            Some(feedback),
-            "changes-requested",
-            "validation.rework",
-            format!("Requested rework for {}", doc.id()),
-            "in-progress".to_string(),
-            true,
-        ),
-    };
-    let options = AccordOptions {
-        id: doc.id().to_string(),
-        note: note.clone(),
-        reviewer: Some("tui".to_string()),
-        ..AccordOptions::default()
-    };
-    apply_accord_action(&mut accord, accord_action, status, &options);
-    let patched = patch_accord_content(&content, &accord)?;
-    validate_state(workspace, &next_state)?;
-    let mut updates = BTreeMap::new();
-    updates.insert("updatedAt".to_string(), now.clone());
-    updates.insert("state".to_string(), next_state.clone());
-    updates.insert("review.status".to_string(), review_status_value.to_string());
-    updates.insert("review.decidedAt".to_string(), now.clone());
-    updates.insert("review.reviewer".to_string(), "tui".to_string());
-    if let Some(note) = note.as_deref().filter(|value| !value.trim().is_empty()) {
-        updates.insert("review.note".to_string(), note.to_string());
-    }
-    let patched = patch_frontmatter_content(&patched, &updates, &[])?;
-    let patched = if append_feedback {
-        append_feedback_entry(&patched, &now, "tui", note.as_deref().unwrap_or(""))?
-    } else {
-        patched
-    };
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(workspace, event_name, doc.id(), &event_summary)?;
-
-    Ok(ValidationActionOutcome {
-        id: doc.id().to_string(),
-        state: next_state,
-    })
-}
-
-fn append_feedback_entry(
-    content: &str,
-    timestamp: &str,
-    source: &str,
-    feedback: &str,
-) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let mut body = body.to_string();
-    if !body.ends_with('\n') {
-        body.push('\n');
-    }
-    if !body.contains("\n## Feedback\n") && !body.trim_start().starts_with("## Feedback\n") {
-        if !body.trim().is_empty() {
-            body.push('\n');
-        }
-        body.push_str("## Feedback\n\n");
-    } else if !body.ends_with("\n\n") {
-        body.push('\n');
-    }
-    body.push_str(&format!(
-        "- {timestamp} ({source}): {}\n",
-        feedback.replace('\n', " ").trim()
-    ));
-    Ok(format!("---\n{}---\n{}", frontmatter, body))
 }
 
 fn adjacent_configured_state(
@@ -9551,7 +9255,7 @@ tone = "success"
         let workspace = temp_workspace(&root);
         write_delivered_validation_task(&workspace, "task-1");
 
-        let outcome = apply_validation_accept(&workspace, "task-1").unwrap();
+        let outcome = app::accord::accept_validation(&workspace, "task-1").unwrap();
         assert_eq!(outcome.state, "validation");
         let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
         assert!(content.contains("status: \"accepted\""));
@@ -9566,8 +9270,12 @@ tone = "success"
         let workspace = temp_workspace(&root);
         write_delivered_validation_task(&workspace, "task-1");
 
-        let outcome =
-            apply_validation_rework(&workspace, "task-1", "Please fix the contrast.").unwrap();
+        let outcome = app::accord::request_validation_rework(
+            &workspace,
+            "task-1",
+            "Please fix the contrast.",
+        )
+        .unwrap();
         assert_eq!(outcome.state, "in-progress");
         let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
         assert!(content.contains("state: \"in-progress\""));
@@ -9615,7 +9323,8 @@ tone = "success"
             .fields
             .insert("accord.status".to_string(), "rework".to_string());
 
-        let candidates = accepted_validation_candidates(&[accepted, delivered, rework]);
+        let candidates =
+            app::accord::accepted_validation_candidates(&[accepted, delivered, rework]);
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].id, "task-1");
@@ -9655,11 +9364,11 @@ tone = "success"
         let workspace = temp_workspace(&root);
         write_accepted_validation_task(&workspace, "task-1", "Accepted one");
         write_delivered_validation_task(&workspace, "task-2");
-        let candidates = accepted_validation_candidates(
+        let candidates = app::accord::accepted_validation_candidates(
             &read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap(),
         );
 
-        let outcome = apply_accepted_validation_tasks(&workspace, &candidates).unwrap();
+        let outcome = app::accord::apply_accepted_validation(&workspace, &candidates).unwrap();
 
         assert_eq!(outcome.completed_ids, vec!["task-1"]);
         assert!(!workspace.board_dir.join("task-1.md").exists());
@@ -9686,7 +9395,15 @@ tone = "success"
         )
         .unwrap();
 
-        let add_error = create_basic_task(&workspace, "Must not be created", "todo").unwrap_err();
+        let add_error = app::tasks::add(
+            &workspace,
+            AddOptions {
+                title: Some("Must not be created".to_string()),
+                state: Some("todo".to_string()),
+                ..AddOptions::default()
+            },
+        )
+        .unwrap_err();
         assert!(add_error.message.contains("expected global `task-N`"));
         assert!(!workspace.board_dir.join("task-11.md").exists());
 
@@ -9695,7 +9412,8 @@ tone = "success"
             id: "task-20".to_string(),
             title: "Accepted candidate".to_string(),
         }];
-        let apply_error = apply_accepted_validation_tasks(&workspace, &candidates).unwrap_err();
+        let apply_error =
+            app::accord::apply_accepted_validation(&workspace, &candidates).unwrap_err();
         assert!(apply_error.message.contains("expected global `task-N`"));
         assert!(workspace.board_dir.join("task-20.md").exists());
         assert!(!workspace.logs_dir.join("task-20.md").exists());
