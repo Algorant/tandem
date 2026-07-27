@@ -434,56 +434,122 @@ impl ProjectEvent {
     }
 }
 
-fn extract_json_u64(line: &str, key: &str) -> Option<u64> {
-    let key_pattern = format!("\"{key}\"");
-    let after_key = line.find(&key_pattern)? + key_pattern.len();
-    let colon_offset = line[after_key..].find(':')?;
-    line[after_key + colon_offset + 1..]
-        .trim_start()
-        .split(|ch: char| !ch.is_ascii_digit())
-        .next()?
-        .parse()
-        .ok()
+pub(crate) fn extract_json_string(line: &str, key: &str) -> Option<String> {
+    let start = top_level_value_start(line, key)?;
+    parse_json_string(line, start).map(|(value, _)| value)
 }
 
-pub(crate) fn extract_json_string(line: &str, key: &str) -> Option<String> {
-    let key_pattern = format!("\"{key}\"");
-    let after_key = line.find(&key_pattern)? + key_pattern.len();
-    let colon_offset = line[after_key..].find(':')?;
-    let mut cursor = after_key + colon_offset + 1;
-    while let Some(ch) = line[cursor..].chars().next() {
-        if ch.is_whitespace() {
-            cursor += ch.len_utf8();
-        } else {
-            break;
-        }
-    }
-    if line[cursor..].chars().next()? != '"' {
+pub(crate) fn extract_json_u64(line: &str, key: &str) -> Option<u64> {
+    let start = top_level_value_start(line, key)?;
+    let digits = line[start..]
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .collect::<Vec<_>>();
+    (!digits.is_empty())
+        .then(|| std::str::from_utf8(&digits).ok()?.parse().ok())
+        .flatten()
+}
+
+fn top_level_value_start(line: &str, wanted_key: &str) -> Option<usize> {
+    let mut cursor = skip_json_whitespace(line, 0);
+    if line.as_bytes().get(cursor)? != &b'{' {
         return None;
     }
     cursor += 1;
+    loop {
+        cursor = skip_json_whitespace(line, cursor);
+        if line.as_bytes().get(cursor) == Some(&b'}') {
+            return None;
+        }
+        let (key, after_key) = parse_json_string(line, cursor)?;
+        cursor = skip_json_whitespace(line, after_key);
+        if line.as_bytes().get(cursor)? != &b':' {
+            return None;
+        }
+        let value_start = skip_json_whitespace(line, cursor + 1);
+        if key == wanted_key {
+            return Some(value_start);
+        }
+        cursor = skip_json_value(line, value_start)?;
+        cursor = skip_json_whitespace(line, cursor);
+        match line.as_bytes().get(cursor)? {
+            b',' => cursor += 1,
+            b'}' => return None,
+            _ => return None,
+        }
+    }
+}
+
+fn parse_json_string(line: &str, start: usize) -> Option<(String, usize)> {
+    if line.as_bytes().get(start)? != &b'"' {
+        return None;
+    }
+    let mut cursor = start + 1;
     let mut value = String::new();
     let mut escaped = false;
-    for ch in line[cursor..].chars() {
+    while let Some(&byte) = line.as_bytes().get(cursor) {
+        cursor += 1;
         if escaped {
-            value.push(match ch {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                '"' => '"',
-                '\\' => '\\',
-                other => other,
+            value.push(match byte {
+                b'n' => '\n',
+                b'r' => '\r',
+                b't' => '\t',
+                b'"' => '"',
+                b'\\' => '\\',
+                other => other as char,
             });
             escaped = false;
-        } else if ch == '\\' {
+        } else if byte == b'\\' {
             escaped = true;
-        } else if ch == '"' {
-            return Some(value);
+        } else if byte == b'"' {
+            return Some((value, cursor));
         } else {
-            value.push(ch);
+            value.push(byte as char);
         }
     }
     None
+}
+
+fn skip_json_value(line: &str, start: usize) -> Option<usize> {
+    if line.as_bytes().get(start) == Some(&b'"') {
+        return parse_json_string(line, start).map(|(_, cursor)| cursor);
+    }
+    let mut cursor = start;
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    while let Some(&byte) = line.as_bytes().get(cursor) {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+        } else {
+            match byte {
+                b'"' => in_string = true,
+                b'{' | b'[' => depth += 1,
+                b'}' | b']' if depth > 0 => depth -= 1,
+                b',' | b'}' if depth == 0 => return Some(cursor),
+                _ => {}
+            }
+        }
+        cursor += 1;
+    }
+    Some(cursor)
+}
+
+fn skip_json_whitespace(line: &str, mut cursor: usize) -> usize {
+    while line
+        .as_bytes()
+        .get(cursor)
+        .is_some_and(u8::is_ascii_whitespace)
+    {
+        cursor += 1;
+    }
+    cursor
 }
 
 /// Raw project source paired with its protocol-level document value.

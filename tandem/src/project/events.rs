@@ -2,8 +2,10 @@
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::project::{display_path, extract_json_string, TandemProject};
+use crate::project::{display_path, extract_json_string, extract_json_u64, TandemProject};
 use crate::protocol::event::{self, CanonicalEventEnvelope};
 use crate::CliError;
 
@@ -79,7 +81,16 @@ pub(crate) fn actor_id() -> Result<String, CliError> {
 }
 
 fn fallback_actor_id() -> String {
-    format!("local-{}", std::process::id())
+    static FALLBACK_ACTOR_ID: OnceLock<String> = OnceLock::new();
+    FALLBACK_ACTOR_ID
+        .get_or_init(|| {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or(0);
+            format!("local-{}-{nanos}", std::process::id())
+        })
+        .clone()
 }
 
 pub(crate) fn is_safe_actor_id(actor: &str) -> bool {
@@ -121,18 +132,6 @@ fn next_sequence(content: &str, actor: &str) -> Result<u64, CliError> {
             "Event append failure: sequence overflow for actor `{actor}`"
         ))
     })
-}
-
-fn extract_json_u64(line: &str, key: &str) -> Option<u64> {
-    let key_pattern = format!("\"{key}\"");
-    let after_key = line.find(&key_pattern)? + key_pattern.len();
-    let colon_offset = line[after_key..].find(':')?;
-    line[after_key + colon_offset + 1..]
-        .trim_start()
-        .split(|ch: char| !ch.is_ascii_digit())
-        .next()?
-        .parse()
-        .ok()
 }
 
 fn canonical_json_line(event: CanonicalEventEnvelope<'_>) -> String {
@@ -214,7 +213,8 @@ mod tests {
     fn fallback_actor_is_filename_safe_and_process_isolated() {
         let actor = fallback_actor_id();
         assert!(is_safe_actor_id(&actor));
-        assert_eq!(actor, format!("local-{}", std::process::id()));
+        assert!(actor.starts_with(&format!("local-{}-", std::process::id())));
+        assert_eq!(actor, fallback_actor_id());
     }
 
     #[test]
@@ -246,6 +246,38 @@ mod tests {
             Some("tester".to_string())
         );
         assert_eq!(extract_json_u64(&line, "seq"), Some(5));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn escaped_json_looking_summary_does_not_confuse_next_sequence() {
+        let (project, root) = project();
+        append_event_for_actor(
+            &project,
+            "task.updated",
+            "task-1",
+            "mentioned \"actor\":\"other\" and \"seq\":999",
+            "now",
+            "tester",
+        )
+        .unwrap();
+        append_event_for_actor(
+            &project,
+            "task.updated",
+            "task-1",
+            "next",
+            "later",
+            "tester",
+        )
+        .unwrap();
+        let content = fs::read_to_string(project.actor_events_path("tester")).unwrap();
+        let lines = content.lines().collect::<Vec<_>>();
+        assert_eq!(
+            extract_json_string(lines[0], "actor"),
+            Some("tester".to_string())
+        );
+        assert_eq!(extract_json_u64(lines[0], "seq"), Some(1));
+        assert_eq!(extract_json_u64(lines[1], "seq"), Some(2));
         fs::remove_dir_all(root).unwrap();
     }
 
