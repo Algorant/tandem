@@ -17,7 +17,7 @@ use app::tasks::{
 };
 
 pub(crate) use project::write::{
-    archive_board_document, ensure_file_unchanged, file_signature, FileSignature, HierarchyLock,
+    ensure_file_unchanged, file_signature, FileSignature, HierarchyLock,
 };
 use project::{
     frontmatter_line_key, is_top_level_frontmatter_boundary,

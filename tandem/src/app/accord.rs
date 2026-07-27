@@ -4,16 +4,20 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{append_event, current_timestamp};
-use crate::project::{self, write_atomic};
+use crate::project::write::{
+    archive_board_document, ensure_file_unchanged, read_file_snapshot, HierarchyLock,
+};
+use crate::project::{
+    self, patch_frontmatter_content, split_frontmatter, write_atomic, StoredDocument as Document,
+    TandemProject,
+};
 use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::review::status as review_status;
 use crate::{
-    apply_accord_action, archive_board_document, ensure_file_unchanged, find_board_document,
-    hierarchy_from_workspace, patch_accord_content, patch_completion_content,
-    patch_frontmatter_content, read_file_snapshot, split_frontmatter, unresolved_blockers,
-    validate_accord_inputs, validate_state, validate_task_document_against_hierarchy,
-    validate_task_document_for_mutation, CliError, Document, HierarchyLock, TandemProject,
+    apply_accord_action, find_board_document, hierarchy_from_workspace, patch_accord_content,
+    patch_completion_content, unresolved_blockers, validate_accord_inputs, validate_state,
+    validate_task_document_against_hierarchy, validate_task_document_for_mutation, CliError,
 };
 
 #[derive(Debug, Default)]

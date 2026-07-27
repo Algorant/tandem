@@ -3,22 +3,23 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::app::accord::AccordRecord;
 use crate::app::support::{append_event, current_timestamp, require_nonempty};
+use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
-    self, replace_markdown_body, write_atomic, yaml_double_quote,
-    ProjectHierarchy as HierarchyIndex,
+    self, patch_frontmatter_content, replace_markdown_body, write_atomic, yaml_double_quote,
+    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::status as accord_status;
 use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
+use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use crate::protocol::workflow::COMPLETION_OUTCOME_CANCELED;
 use crate::{
-    active_task_descendant_ids, ensure_file_unchanged, hierarchy_from_workspace, inline_array,
-    next_sequential_number_for_ids, patch_accord_content, patch_completion_content,
-    patch_frontmatter_content, push_array_line, push_optional_line, read_file_snapshot,
-    resolve_parent_relationship, unresolved_blockers_in_hierarchy, validate_state,
-    validate_task_document_against_hierarchy, workspace_deprecation_warnings, AccordRecord,
-    CliError, Document, TandemProject,
+    active_task_descendant_ids, hierarchy_from_workspace, inline_array, patch_accord_content,
+    patch_completion_content, push_array_line, push_optional_line, resolve_parent_relationship,
+    unresolved_blockers_in_hierarchy, validate_state, validate_task_document_against_hierarchy,
+    workspace_deprecation_warnings, CliError,
 };
 
 #[derive(Debug, Default)]
