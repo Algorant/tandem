@@ -50,6 +50,7 @@ pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<St
     let mut warnings = Vec::new();
     let mut events = LogEventsById::new();
     for event in project.read_events_tolerant(&mut warnings) {
+        let _identity = event.actor.as_deref().zip(event.seq);
         events.entry(event.id).or_default().push(LogEvent {
             ts: event.ts,
             event: event.event,

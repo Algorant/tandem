@@ -21,27 +21,6 @@ impl CanonicalEventEnvelope<'_> {
     }
 }
 
-/// Legacy global-log shape retained while project event I/O is extracted.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct EventEnvelope<'a> {
-    pub(crate) ts: &'a str,
-    pub(crate) event: &'a str,
-    pub(crate) id: &'a str,
-    pub(crate) summary: &'a str,
-}
-
-impl<'a> EventEnvelope<'a> {
-    pub(crate) fn legacy_json_line(&self, json_string: impl Fn(&str) -> String) -> String {
-        format!(
-            "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{}}}\n",
-            json_string(self.ts),
-            json_string(self.event),
-            json_string(self.id),
-            json_string(self.summary)
-        )
-    }
-}
-
 pub(crate) const TASK_CREATED: &str = "task.created";
 pub(crate) const TASK_MOVED: &str = "task.moved";
 pub(crate) const TASK_UPDATED: &str = "task.updated";

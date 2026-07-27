@@ -1077,7 +1077,7 @@ fn cmd_init(options: InitOptions) -> Result<(), CliError> {
     println!("Config: {}", display_path(&workspace.config_path));
     println!("Board:  {}", display_path(&workspace.board_dir));
     println!("Logs:   {}", display_path(&workspace.logs_dir));
-    println!("Events: {}", display_path(&workspace.events_path));
+    println!("Events: {}", display_path(&workspace.events_dir()));
     println!("States: todo, in-progress, validation");
 
     Ok(())
@@ -4773,6 +4773,18 @@ mod tests {
         workspace
     }
 
+    fn canonical_event_content(workspace: &TandemProject) -> String {
+        let mut paths = fs::read_dir(workspace.events_dir())
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        paths
+            .into_iter()
+            .map(|path| fs::read_to_string(path).unwrap())
+            .collect()
+    }
+
     #[test]
     fn cli_version_uses_cargo_package_version() {
         assert_eq!(
@@ -5852,9 +5864,7 @@ rules:
         assert!(output.contains("relatedFiles: [\"src/main.rs\"]\n"));
         assert!(output.contains("custom: keep\n"));
         assert!(output.ends_with("\nBody\n"));
-        assert!(fs::read_to_string(&workspace.events_path)
-            .unwrap()
-            .contains("task.updated"));
+        assert!(canonical_event_content(&workspace).contains("task.updated"));
 
         let epic_parent_outcome = update_task_metadata(
             &workspace,
@@ -5960,7 +5970,7 @@ rules:
         let after_change = fs::read_to_string(&task_path).unwrap();
         assert!(after_change.contains("custom: keep\n"));
         assert_eq!(split_frontmatter(&after_change).unwrap().1, replacement);
-        let events_after_change = fs::read_to_string(&workspace.events_path).unwrap();
+        let events_after_change = canonical_event_content(&workspace);
         assert!(events_after_change.contains("task.updated"));
         assert!(!events_after_change.contains("Unicode"));
         assert!(!events_after_change.contains("first item"));
@@ -5976,10 +5986,7 @@ rules:
         .unwrap();
         assert!(noop.changes.is_empty());
         assert_eq!(fs::read_to_string(&task_path).unwrap(), after_change);
-        assert_eq!(
-            fs::read_to_string(&workspace.events_path).unwrap(),
-            events_after_change
-        );
+        assert_eq!(canonical_event_content(&workspace), events_after_change);
 
         let cleared = update_task_metadata(
             &workspace,
@@ -5995,8 +6002,7 @@ rules:
         assert!(after_clear.contains("custom: keep\n"));
         assert_eq!(split_frontmatter(&after_clear).unwrap().1, "");
         assert_eq!(
-            fs::read_to_string(&workspace.events_path)
-                .unwrap()
+            canonical_event_content(&workspace)
                 .matches("task.updated")
                 .count(),
             2
@@ -6079,9 +6085,7 @@ rules:
         assert!(canceled_content.contains("accord:\n  status: delivered\n"));
         assert!(log_summary_json(&canceled_doc).contains("\"outcome\":\"canceled\""));
         assert!(document_detail_json(&canceled_doc).contains("\"completionOutcome\":\"canceled\""));
-        assert!(fs::read_to_string(&workspace.events_path)
-            .unwrap()
-            .contains("task.canceled"));
+        assert!(canonical_event_content(&workspace).contains("task.canceled"));
 
         let next_child = add_task(
             &workspace,

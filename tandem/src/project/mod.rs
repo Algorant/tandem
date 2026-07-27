@@ -112,12 +112,31 @@ impl TandemProject {
     /// config bytes; interpretation of those bytes remains outside project.
     pub(crate) fn initialize(root: &Path, config: &str) -> Result<Self, CliError> {
         let data_dir = root.join(".tandem");
-        fs::create_dir_all(data_dir.join("board"))?;
-        fs::create_dir_all(data_dir.join("logs"))?;
-        let config_path = data_dir.join("tandem.md");
-        fs::write(&config_path, config)?;
-        fs::File::create(data_dir.join("events.jsonl"))?;
-        Ok(Self::with_paths(root.to_path_buf(), data_dir, config_path))
+        let created_data_dir = !data_dir.exists();
+        let result = (|| {
+            fs::create_dir_all(data_dir.join("board"))?;
+            fs::create_dir_all(data_dir.join("logs"))?;
+            fs::create_dir_all(data_dir.join("events"))?;
+            let config_path = data_dir.join("tandem.md");
+            fs::write(&config_path, config)?;
+            Ok(Self::with_paths(
+                root.to_path_buf(),
+                data_dir.clone(),
+                config_path,
+            ))
+        })();
+        if result.is_err() && created_data_dir {
+            let _ = fs::remove_dir_all(&data_dir);
+        }
+        result
+    }
+
+    pub(crate) fn events_dir(&self) -> PathBuf {
+        self.data_dir().join("events")
+    }
+
+    pub(crate) fn actor_events_path(&self, actor: &str) -> PathBuf {
+        self.events_dir().join(format!("{actor}.jsonl"))
     }
 
     pub(crate) fn read_config_raw(&self) -> Result<String, CliError> {
@@ -171,24 +190,29 @@ impl TandemProject {
     }
 
     pub(crate) fn read_events_tolerant(&self, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
-        if !self.events_path.exists() {
-            return Vec::new();
-        }
-        let content = match fs::read_to_string(&self.events_path) {
-            Ok(content) => content,
+        let mut events = read_event_file_tolerant(&self.events_path, warnings);
+        let events_dir = self.events_dir();
+        let entries = match fs::read_dir(&events_dir) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return events,
             Err(error) => {
                 warnings.push(format!(
                     "Events load warning: could not read {}: {error}",
-                    display_path(&self.events_path)
+                    display_path(&events_dir)
                 ));
-                return Vec::new();
+                return events;
             }
         };
-        content
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .filter_map(ProjectEvent::parse)
-            .collect()
+        let mut paths = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("jsonl"))
+            .collect::<Vec<_>>();
+        paths.sort();
+        for path in paths {
+            events.extend(read_event_file_tolerant(&path, warnings));
+        }
+        events
     }
 }
 
@@ -284,12 +308,35 @@ impl ProjectHierarchy {
     }
 }
 
+fn read_event_file_tolerant(path: &Path, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
+    if !path.exists() {
+        return Vec::new();
+    }
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(error) => {
+            warnings.push(format!(
+                "Events load warning: could not read {}: {error}",
+                display_path(path)
+            ));
+            return Vec::new();
+        }
+    };
+    content
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(ProjectEvent::parse)
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct ProjectEvent {
     pub(crate) id: String,
     pub(crate) ts: String,
     pub(crate) event: String,
     pub(crate) summary: String,
+    pub(crate) actor: Option<String>,
+    pub(crate) seq: Option<u64>,
 }
 
 impl ProjectEvent {
@@ -299,8 +346,22 @@ impl ProjectEvent {
             event: extract_json_string(line, "event").unwrap_or_else(|| "event".to_string()),
             ts: extract_json_string(line, "ts").unwrap_or_default(),
             summary: extract_json_string(line, "summary").unwrap_or_default(),
+            actor: extract_json_string(line, "actor"),
+            seq: extract_json_u64(line, "seq"),
         })
     }
+}
+
+fn extract_json_u64(line: &str, key: &str) -> Option<u64> {
+    let key_pattern = format!("\"{key}\"");
+    let after_key = line.find(&key_pattern)? + key_pattern.len();
+    let colon_offset = line[after_key..].find(':')?;
+    line[after_key + colon_offset + 1..]
+        .trim_start()
+        .split(|ch: char| !ch.is_ascii_digit())
+        .next()?
+        .parse()
+        .ok()
 }
 
 pub(crate) fn extract_json_string(line: &str, key: &str) -> Option<String> {
@@ -676,6 +737,16 @@ mod tests {
     }
 
     #[test]
+    fn initialization_creates_actor_event_directory_not_a_new_legacy_log() {
+        let root = env::temp_dir().join(format!("tandem-project-init-{}", std::process::id()));
+        let project =
+            TandemProject::initialize(&root, "---\nprotocolVersion: 0.2.0\n---\n").unwrap();
+        assert!(project.events_dir().is_dir());
+        assert!(!project.events_path.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn strict_reads_fail_while_tolerant_reads_warn() {
         let root = env::temp_dir().join(format!("tandem-project-read-{}", std::process::id()));
         let project = TandemProject::with_paths(
@@ -691,6 +762,28 @@ mod tests {
             .read_board_documents_tolerant(&mut warnings)
             .is_empty());
         assert_eq!(warnings.len(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn aggregates_legacy_and_actor_event_logs_tolerantly() {
+        let root =
+            env::temp_dir().join(format!("tandem-project-events-read-{}", std::process::id()));
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
+        fs::create_dir_all(project.events_dir()).unwrap();
+        fs::write(&project.events_path, "{\"ts\":\"old\",\"event\":\"task.created\",\"id\":\"task-1\",\"summary\":\"legacy\"}\n").unwrap();
+        fs::write(project.actor_events_path("actor-1"), "{\"ts\":\"new\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"actor\",\"actor\":\"actor-1\",\"seq\":1}\n").unwrap();
+        let mut warnings = Vec::new();
+        let events = project.read_events_tolerant(&mut warnings);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].actor, None);
+        assert_eq!(events[1].actor.as_deref(), Some("actor-1"));
+        assert_eq!(events[1].seq, Some(1));
+        assert!(warnings.is_empty());
         fs::remove_dir_all(root).unwrap();
     }
 

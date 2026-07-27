@@ -165,13 +165,20 @@ pub(crate) fn archive_board_document(
     }
     ensure_file_unchanged(board_path, snapshot)?;
     write_atomic(&log_path, content)?;
-    fs::remove_file(board_path).map_err(|error| {
-        CliError::user(format!(
-            "Write failure: could not remove active document {} after writing {action} log {}: {error}",
+    if let Err(error) = fs::remove_file(board_path) {
+        let rollback = fs::remove_file(&log_path);
+        let rollback_detail = match rollback {
+            Ok(()) => "the new log was rolled back".to_string(),
+            Err(rollback_error) => format!(
+                "the new log could not be rolled back ({rollback_error}); inspect both files"
+            ),
+        };
+        return Err(CliError::user(format!(
+            "Write failure: could not remove active document {} after writing {action} log {}: {error}; {rollback_detail}",
             display_path(board_path),
             display_path(&log_path)
-        ))
-    })?;
+        )));
+    }
     Ok(log_path)
 }
 

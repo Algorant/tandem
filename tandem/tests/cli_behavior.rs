@@ -42,6 +42,18 @@ impl TempProject {
     fn read(&self, relative: impl AsRef<Path>) -> String {
         fs::read_to_string(self.path(relative)).expect("read temporary project file")
     }
+
+    fn actor_events(&self) -> String {
+        let mut paths = fs::read_dir(self.path(".tandem/events"))
+            .expect("read actor event directory")
+            .map(|entry| entry.expect("read actor event entry").path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        paths
+            .into_iter()
+            .map(|path| fs::read_to_string(path).expect("read actor event file"))
+            .collect()
+    }
 }
 
 impl Drop for TempProject {
@@ -319,7 +331,7 @@ fn reads_mutations_accords_events_and_preservation_use_the_real_command() {
     assert!(json_read.stdout.contains("\"id\":\"task-1\""));
     assert!(json_read.stdout.contains("\"state\":\"validation\""));
 
-    let events = project.read(".tandem/events.jsonl");
+    let events = project.actor_events();
     assert!(events.contains("\"event\":\"task.created\""));
     assert!(events.contains("\"event\":\"task.moved\""));
     assert!(events.contains("\"event\":\"accord.claimed\""));
@@ -391,6 +403,6 @@ fn hierarchy_validation_completion_and_logs_remain_observable_at_the_process_bou
     assert!(logs.stdout.contains("\"id\":\"task-2-1\""));
     assert!(logs.stdout.contains("\"outcome\":\"completed\""));
 
-    let events = project.read(".tandem/events.jsonl");
+    let events = project.actor_events();
     assert!(events.contains("\"event\":\"task.completed\""));
 }
