@@ -278,7 +278,7 @@ pub(super) fn detail_line_count(item: Option<&ReviewQueueItem>, theme: &TuiTheme
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "legacy Review render seam; remove at the Stage 6 Review feature extraction checkpoint"
+    reason = "retained Review renderer remains compiled pending a separate product decision"
 )]
 pub(super) fn render_review(
     frame: &mut Frame<'_>,
@@ -327,7 +327,7 @@ pub(super) fn render_review(
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "legacy Review list render seam; remove at the Stage 6 Review feature extraction checkpoint"
+    reason = "retained Review list renderer remains compiled pending a separate product decision"
 )]
 fn render_queue_list(
     frame: &mut Frame<'_>,
