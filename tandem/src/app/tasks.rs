@@ -4,7 +4,12 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::accord::AccordRecord;
-use crate::app::support::{append_event, current_timestamp, require_nonempty};
+use crate::app::support::{
+    active_task_descendant_ids, append_event, current_timestamp,
+    hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
+    resolve_parent_relationship, unresolved_blockers_in_hierarchy, validate_state,
+    validate_task_document_against_hierarchy, workspace_deprecation_warnings,
+};
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
     self, patch_frontmatter_content, replace_markdown_body, write_atomic, yaml_double_quote,
@@ -15,12 +20,30 @@ use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS,
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
 use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use crate::protocol::workflow::COMPLETION_OUTCOME_CANCELED;
-use crate::{
-    active_task_descendant_ids, hierarchy_from_workspace, inline_array, patch_accord_content,
-    patch_completion_content, push_array_line, push_optional_line, resolve_parent_relationship,
-    unresolved_blockers_in_hierarchy, validate_state, validate_task_document_against_hierarchy,
-    workspace_deprecation_warnings, CliError,
-};
+use crate::{patch_accord_content, patch_completion_content, CliError};
+
+fn inline_array(values: &[String]) -> String {
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|value| yaml_double_quote(value))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+fn push_optional_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
+    if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
+        lines.push(format!("{key}: {}", yaml_double_quote(value.trim())));
+    }
+}
+
+fn push_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
+    if !values.is_empty() {
+        lines.push(format!("{key}: {}", inline_array(values)));
+    }
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct AddOptions {

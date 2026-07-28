@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::io;
 use std::path::Path;
@@ -2009,60 +2009,12 @@ fn find_hierarchy_children(
     Ok(children)
 }
 
-fn active_task_descendant_ids(hierarchy: &HierarchyIndex, root_id: &str) -> Vec<String> {
-    let mut visited = BTreeSet::from([root_id.to_string()]);
-    let mut pending = vec![root_id.to_string()];
-    let mut active = BTreeSet::new();
-
-    while let Some(parent_id) = pending.pop() {
-        for doc in hierarchy
-            .documents
-            .values()
-            .filter(|doc| doc.doc_type() == "task")
-            .filter(|doc| doc.field("parentId") == Some(parent_id.as_str()))
-        {
-            if !visited.insert(doc.id().to_string()) {
-                continue;
-            }
-            if doc.location == DocumentLocation::Board {
-                active.insert(doc.id().to_string());
-            }
-            pending.push(doc.id().to_string());
-        }
-    }
-
-    active.into_iter().collect()
-}
-
 fn find_board_document(project: &TandemProject, id: &str) -> Result<Option<Document>, CliError> {
     project.read_board_document(id)
 }
 
 fn document_exists(workspace: &TandemProject, id: &str) -> Result<bool, CliError> {
     Ok(find_document(workspace, id)?.is_some())
-}
-
-fn resolve_parent_relationship(
-    hierarchy: &HierarchyIndex,
-    child_type: &str,
-    parent_id: &str,
-) -> Result<ParentRelationship, CliError> {
-    let parent = hierarchy.document(parent_id).ok_or_else(|| {
-        CliError::user(format!(
-            "Validation failed: parent document not found: {parent_id}"
-        ))
-    })?;
-    if child_type != "task" || parent.doc_type() != "task" {
-        return Ok(ParentRelationship::Parent);
-    }
-    match hierarchy.task_role(parent)? {
-        Some(TaskRole::Epic) => Ok(ParentRelationship::EpicTask),
-        Some(TaskRole::Task) => Ok(ParentRelationship::Subtask),
-        Some(TaskRole::Subtask) => Err(CliError::user(format!(
-            "Validation failed: cannot attach a child beneath Subtask {parent_id}"
-        ))),
-        None => Ok(ParentRelationship::Parent),
-    }
 }
 
 fn unresolved_blockers(
@@ -3760,21 +3712,6 @@ fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str
 fn read_workspace_states(workspace: &TandemProject) -> Result<Vec<String>, CliError> {
     let root = read_frontmatter_yaml_file(&workspace.config_path)?;
     Ok(workflow_states(root.as_ref()))
-}
-
-fn validate_state(workspace: &TandemProject, state: &str) -> Result<(), CliError> {
-    if state.trim().is_empty() {
-        return Err(CliError::usage("state must not be empty"));
-    }
-    let states = read_workspace_states(workspace)?;
-    if is_known_or_legacy_state(&states, state) {
-        Ok(())
-    } else {
-        Err(CliError::user(format!(
-            "Validation failed: unknown state `{state}`; known states: {}",
-            display_known_states(&states)
-        )))
-    }
 }
 
 fn create_new_sequential_document<F>(
