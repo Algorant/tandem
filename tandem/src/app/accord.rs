@@ -5,22 +5,20 @@ use std::path::PathBuf;
 
 use crate::app::support::{
     append_event, current_timestamp, hierarchy_from_project as hierarchy_from_workspace,
-    validate_state, validate_task_document_against_hierarchy,
+    require_nonempty, validate_state, validate_task_document_against_hierarchy,
 };
 use crate::project::write::{
     archive_board_document, ensure_file_unchanged, read_file_snapshot, HierarchyLock,
 };
 use crate::project::{
-    self, patch_frontmatter_content, split_frontmatter, write_atomic, StoredDocument as Document,
-    TandemProject,
+    self, patch_accord_content, patch_completion_content, patch_frontmatter_content,
+    split_frontmatter, write_atomic, StoredDocument as Document, TandemProject,
 };
-use crate::protocol::accord::{self, status as accord_status};
+use crate::protocol::accord::{self, status as accord_status, AccordRecord};
 use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::review::status as review_status;
-use crate::{
-    apply_accord_action, find_board_document, patch_accord_content, patch_completion_content,
-    unresolved_blockers, validate_accord_inputs, validate_task_document_for_mutation, CliError,
-};
+use crate::protocol::workflow::CompletionRecord;
+use crate::CliError;
 
 #[derive(Debug, Default)]
 pub(crate) struct AccordOptions {
@@ -37,22 +35,97 @@ pub(crate) struct AccordOptions {
     pub(crate) files_changed: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct AccordRecord {
-    pub(crate) status: String,
-    pub(crate) assignee: Option<String>,
-    pub(crate) claimed_at: Option<String>,
-    pub(crate) delivered_at: Option<String>,
-    pub(crate) deliverables: Vec<String>,
-    pub(crate) validations: Vec<String>,
-    pub(crate) constraints: Vec<String>,
-    pub(crate) summary: Option<String>,
-    pub(crate) evidence: Vec<String>,
-    pub(crate) files_changed: Vec<String>,
-    pub(crate) reviewer: Option<String>,
-    pub(crate) note: Option<String>,
-    pub(crate) reason: Option<String>,
-    pub(crate) updated_at: String,
+fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), CliError> {
+    let requirement = match action {
+        "claim" => Some((
+            options.assignee.as_deref(),
+            "accord claim requires --assignee <name>".to_string(),
+        )),
+        "deliver" => Some((
+            options.summary.as_deref(),
+            "accord deliver requires --summary <text>".to_string(),
+        )),
+        "rework" => Some((
+            options.note.as_deref(),
+            "accord rework requires --note <text>".to_string(),
+        )),
+        "block" | "fail" => Some((
+            options.reason.as_deref(),
+            format!("accord {action} requires --reason <text>"),
+        )),
+        _ => None,
+    };
+    if let Some((value, message)) = requirement {
+        require_nonempty(value, &message)?;
+    }
+    Ok(())
+}
+
+fn apply_accord_action(
+    accord: &mut AccordRecord,
+    action: &str,
+    status: &str,
+    options: &AccordOptions,
+) {
+    accord.status = status.to_string();
+    match action {
+        "claim" => {
+            accord.claimed_at = Some(accord.updated_at.clone());
+            accord.delivered_at = None;
+            accord.summary = None;
+            accord.evidence.clear();
+            accord.files_changed.clear();
+            accord.reviewer = None;
+            accord.note = None;
+            accord.reason = None;
+        }
+        "deliver" => {
+            accord.delivered_at = Some(accord.updated_at.clone());
+            accord.reviewer = None;
+            accord.note = None;
+            accord.reason = None;
+        }
+        "accept" => accord.reason = None,
+        "rework" => {
+            accord.reviewer = None;
+            accord.reason = None;
+        }
+        "block" | "fail" => {
+            accord.reviewer = None;
+            accord.note = None;
+        }
+        _ => {}
+    }
+    if let Some(value) = options.assignee.as_deref().filter(|v| !v.trim().is_empty()) {
+        accord.assignee = Some(value.to_string());
+    }
+    if !options.deliverables.is_empty() {
+        accord.deliverables.clone_from(&options.deliverables);
+    }
+    if !options.validations.is_empty() {
+        accord.validations.clone_from(&options.validations);
+    }
+    if !options.constraints.is_empty() {
+        accord.constraints.clone_from(&options.constraints);
+    }
+    if let Some(value) = options.summary.as_deref().filter(|v| !v.trim().is_empty()) {
+        accord.summary = Some(value.to_string());
+    }
+    if !options.evidence.is_empty() {
+        accord.evidence.clone_from(&options.evidence);
+    }
+    if !options.files_changed.is_empty() {
+        accord.files_changed.clone_from(&options.files_changed);
+    }
+    if let Some(value) = options.reviewer.as_deref().filter(|v| !v.trim().is_empty()) {
+        accord.reviewer = Some(value.to_string());
+    }
+    if let Some(value) = options.note.as_deref().filter(|v| !v.trim().is_empty()) {
+        accord.note = Some(value.to_string());
+    }
+    if let Some(value) = options.reason.as_deref().filter(|v| !v.trim().is_empty()) {
+        accord.reason = Some(value.to_string());
+    }
 }
 
 /// Apply one canonical accord transition and synchronize workflow state.
@@ -143,7 +216,11 @@ fn complete_validation_candidate(
     id: &str,
     actor: &str,
 ) -> Result<(), CliError> {
-    let doc = find_board_document(workspace, id)?
+    let hierarchy = hierarchy_from_workspace(workspace)?;
+    let doc = hierarchy
+        .document(id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -161,8 +238,9 @@ fn complete_validation_candidate(
             doc.id()
         )));
     }
-    validate_task_document_for_mutation(workspace, &doc)?;
-    let unresolved = unresolved_blockers(workspace, doc.field("blockers"))?;
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
+    let unresolved =
+        crate::app::support::unresolved_blockers_in_hierarchy(&hierarchy, doc.field("blockers"));
     if !unresolved.is_empty() {
         return Err(CliError::user(format!(
             "Validation failed: {} has unresolved blockers: {}",
@@ -190,11 +268,12 @@ fn complete_validation_candidate(
     )?;
     let patched = patch_completion_content(
         &patched,
-        &summary,
-        None,
-        &[],
-        Some("Accepted by Validation apply-accepted workflow"),
-        Some(actor),
+        &CompletionRecord {
+            summary: summary.clone(),
+            validation: Some("Accepted by Validation apply-accepted workflow".to_string()),
+            reviewer: Some(actor.to_string()),
+            ..CompletionRecord::default()
+        },
     )?;
     let _log_path =
         archive_board_document(workspace, &doc.path, &signature, &patched, "completed")?;
@@ -215,8 +294,12 @@ fn apply_validation_action(
     action: ValidationAction,
 ) -> Result<ValidationActionOutcome, CliError> {
     let _hierarchy_lock = HierarchyLock::acquire(workspace)?;
-    hierarchy_from_workspace(workspace)?.validate_all_task_hierarchies()?;
-    let doc = find_board_document(workspace, id)?
+    let hierarchy = hierarchy_from_workspace(workspace)?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let doc = hierarchy
+        .document(id)
+        .filter(|doc| doc.location == DocumentLocation::Board)
+        .cloned()
         .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
         return Err(CliError::user(format!(
@@ -232,7 +315,7 @@ fn apply_validation_action(
             task_state_label(&doc)
         )));
     }
-    validate_task_document_for_mutation(workspace, &doc)?;
+    validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
 
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
     if normalize_accord_status(&previous_status) != "delivered" {
@@ -436,6 +519,113 @@ mod tests {
             normalize_accord_status("changes_requested"),
             "changes-requested"
         );
+    }
+
+    #[test]
+    fn accord_transition_preserves_metadata_syncs_state_and_appends_events() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-accord-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let path = project.board_dir.join("task-1.md");
+        fs::write(
+            &path,
+            "---\nid: task-1\ntype: task\ntitle: Accord task\nstate: todo\nunknown: keep\n---\n# Body\n",
+        )
+        .unwrap();
+
+        let claimed = transition(
+            &project,
+            "claim",
+            AccordOptions {
+                id: "task-1".to_string(),
+                assignee: Some("worker-a".to_string()),
+                ..AccordOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(claimed.previous_status, "missing");
+        assert_eq!(claimed.synced_state.as_deref(), Some("in-progress"));
+
+        let delivered = transition(
+            &project,
+            "deliver",
+            AccordOptions {
+                id: "task-1".to_string(),
+                summary: Some("Ready".to_string()),
+                evidence: vec!["tests pass".to_string()],
+                ..AccordOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(delivered.previous_status, "claimed");
+        assert_eq!(delivered.synced_state.as_deref(), Some("validation"));
+
+        let changed = fs::read_to_string(path).unwrap();
+        assert!(changed.contains("unknown: keep"));
+        assert!(changed.contains("# Body"));
+        assert!(changed.contains("status: \"delivered\""));
+        assert!(changed.contains("assignee: \"worker-a\""));
+        assert!(changed.contains("summary: \"Ready\""));
+        let events = project.read_events_tolerant(&mut Vec::new());
+        assert!(events.iter().any(|event| event.event == "accord.claimed"));
+        assert!(events.iter().any(|event| event.event == "accord.delivered"));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn apply_accepted_validation_archives_with_actor_unknown_fields_and_event() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-validation-apply-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Accepted\nstate: validation\ncustom: keep\naccord:\n  status: accepted\nreview:\n  status: accepted\n---\n# Body\n",
+        )
+        .unwrap();
+
+        let outcome = apply_accepted_validation(
+            &project,
+            &[ValidationApplyCandidate {
+                id: "task-1".to_string(),
+                title: "Accepted".to_string(),
+            }],
+            "human-reviewer",
+        )
+        .unwrap();
+        assert_eq!(outcome.completed_ids, vec!["task-1"]);
+        assert!(!project.board_dir.join("task-1.md").exists());
+        let archived = fs::read_to_string(project.logs_dir.join("task-1.md")).unwrap();
+        assert!(archived.contains("custom: keep"));
+        assert!(archived.contains("# Body"));
+        assert!(archived.contains("reviewer: \"human-reviewer\""));
+        assert!(archived.contains("validation: \"Accepted by Validation apply-accepted workflow\""));
+        let events = project.read_events_tolerant(&mut Vec::new());
+        assert!(events.iter().any(|event| event.event == "task.completed"));
+        fs::remove_dir_all(project.root()).unwrap();
     }
 
     #[test]

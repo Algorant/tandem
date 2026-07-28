@@ -11,7 +11,7 @@ mod project;
 mod protocol;
 mod tui;
 
-use app::accord::{AccordOptions, AccordRecord};
+use app::accord::AccordOptions;
 use app::tasks::{
     AddOptions, AddOutcome, CancelOptions, CompleteOptions, MoveOptions, UpdateOptions,
 };
@@ -29,14 +29,14 @@ use project::{
 };
 use protocol::accord::{self, status as accord_status};
 use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
-use protocol::document::{parse_field_values, validate_task_kind};
+use protocol::document::parse_field_values;
 use protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use protocol::review::status as review_status;
 use protocol::workflow::{
     self, completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
-    completion_validation, display_known_states, is_known_or_legacy_state, state_matches_filter,
-    workflow_states, COMPLETION_OUTCOME_CANCELED, COMPLETION_OUTCOME_COMPLETED,
+    completion_validation, state_matches_filter, workflow_states, COMPLETION_OUTCOME_CANCELED,
+    COMPLETION_OUTCOME_COMPLETED,
 };
 
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -1607,7 +1607,8 @@ fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
 
 fn cmd_decision_update(options: DecisionUpdateOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_board_document(&workspace, &options.id)?
+    let doc = workspace
+        .read_board_document(&options.id)?
         .filter(|doc| doc.doc_type() == "decision")
         .ok_or_else(|| CliError::user(format!("active decision not found: {}", options.id)))?;
     let (content, signature) = read_file_snapshot(&doc.path)?;
@@ -1643,7 +1644,8 @@ fn cmd_decision_update(options: DecisionUpdateOptions) -> Result<(), CliError> {
 
 fn cmd_decision_withdraw(options: DecisionWithdrawOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let doc = find_board_document(&workspace, &options.id)?
+    let doc = workspace
+        .read_board_document(&options.id)?
         .filter(|doc| doc.doc_type() == "decision")
         .ok_or_else(|| CliError::user(format!("active decision not found: {}", options.id)))?;
     let (content, signature) = read_file_snapshot(&doc.path)?;
@@ -2009,35 +2011,8 @@ fn find_hierarchy_children(
     Ok(children)
 }
 
-fn find_board_document(project: &TandemProject, id: &str) -> Result<Option<Document>, CliError> {
-    project.read_board_document(id)
-}
-
 fn document_exists(workspace: &TandemProject, id: &str) -> Result<bool, CliError> {
     Ok(find_document(workspace, id)?.is_some())
-}
-
-fn unresolved_blockers(
-    workspace: &TandemProject,
-    blockers: Option<&str>,
-) -> Result<Vec<String>, CliError> {
-    let hierarchy = hierarchy_from_workspace(workspace)?;
-    Ok(unresolved_blockers_in_hierarchy(&hierarchy, blockers))
-}
-
-fn unresolved_blockers_in_hierarchy(
-    hierarchy: &HierarchyIndex,
-    blockers: Option<&str>,
-) -> Vec<String> {
-    let mut unresolved = Vec::new();
-    for blocker in blockers.map(parse_field_values).unwrap_or_default() {
-        match hierarchy.document(&blocker) {
-            Some(doc) if doc.location == DocumentLocation::Board => unresolved.push(blocker),
-            Some(_) => {}
-            None => unresolved.push(format!("{blocker} (missing)")),
-        }
-    }
-    unresolved
 }
 
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
@@ -2186,239 +2161,6 @@ fn decision_superseded_by(doc: &Document) -> Vec<String> {
 
 fn decision_values(doc: &Document, key: &str) -> Vec<String> {
     doc.values(key)
-}
-
-fn validate_task_document_for_mutation(
-    workspace: &TandemProject,
-    doc: &Document,
-) -> Result<(), CliError> {
-    let hierarchy = hierarchy_from_workspace(workspace)?.with_replacement(doc.clone());
-    validate_task_document_against_hierarchy(workspace, doc, &hierarchy)
-}
-
-fn validate_task_document_against_hierarchy(
-    workspace: &TandemProject,
-    doc: &Document,
-    hierarchy: &HierarchyIndex,
-) -> Result<(), CliError> {
-    let mut errors = crate::protocol::diagnostic::metadata_diagnostics(
-        doc,
-        doc.location == DocumentLocation::Logs,
-    )
-    .into_iter()
-    .filter(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)
-    .map(|diagnostic| diagnostic.message)
-    .collect::<Vec<_>>();
-    match doc.field("type") {
-        Some("task") => {}
-        Some(other) => errors.push(format!("expected type `task`, found `{other}`")),
-        None => {}
-    }
-    if let Some(kind) = doc.field("kind") {
-        if let Err(message) = validate_task_kind(kind) {
-            errors.push(message);
-        }
-    }
-    if doc.location == DocumentLocation::Board {
-        match doc.field("state") {
-            Some(state) if !state.trim().is_empty() => {
-                let states = read_workspace_states(workspace)?;
-                if !is_known_or_legacy_state(&states, state) {
-                    errors.push(format!(
-                        "unknown state `{state}`; known states: {}",
-                        display_known_states(&states)
-                    ));
-                }
-            }
-            _ => errors.push("missing required field `state`".to_string()),
-        }
-    }
-    if let Some(parent) = doc
-        .field("parentId")
-        .filter(|value| !value.trim().is_empty())
-    {
-        if hierarchy.document(parent).is_none() {
-            errors.push(format!("unresolved parentId `{parent}`"));
-        }
-    }
-    for blocker in doc
-        .field("blockers")
-        .map(parse_field_values)
-        .unwrap_or_default()
-    {
-        if hierarchy.document(&blocker).is_none() {
-            errors.push(format!("unresolved blocker `{blocker}`"));
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(CliError::user(format!(
-            "Validation failed for {}: {}",
-            display_path(&doc.path),
-            errors.join("; ")
-        )));
-    }
-
-    hierarchy.validate_all_task_hierarchies()?;
-    Ok(())
-}
-
-impl AccordRecord {
-    fn from_document(doc: &Document, updated_at: &str) -> Self {
-        Self {
-            status: accord_status(doc).unwrap_or("missing").to_string(),
-            assignee: doc.field("accord.assignee").map(str::to_string),
-            claimed_at: doc.field("accord.claimedAt").map(str::to_string),
-            delivered_at: doc.field("accord.deliveredAt").map(str::to_string),
-            deliverables: doc
-                .field("accord.deliverables")
-                .map(parse_field_values)
-                .unwrap_or_default(),
-            validations: doc
-                .field("accord.validation.commands")
-                .or_else(|| doc.field("accord.validation"))
-                .or_else(|| doc.field("accord.validations"))
-                .map(parse_field_values)
-                .unwrap_or_default(),
-            constraints: doc
-                .field("accord.constraints")
-                .map(parse_field_values)
-                .unwrap_or_default(),
-            summary: doc.field("accord.summary").map(str::to_string),
-            evidence: doc
-                .field("accord.evidence")
-                .map(parse_field_values)
-                .unwrap_or_default(),
-            files_changed: doc
-                .field("accord.filesChanged")
-                .map(parse_field_values)
-                .unwrap_or_default(),
-            reviewer: doc.field("accord.reviewer").map(str::to_string),
-            note: doc.field("accord.note").map(str::to_string),
-            reason: doc.field("accord.reason").map(str::to_string),
-            updated_at: updated_at.to_string(),
-        }
-    }
-}
-
-fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), CliError> {
-    match action {
-        "claim" => {
-            require_nonempty(
-                options.assignee.as_deref(),
-                "accord claim requires --assignee <name>",
-            )?;
-        }
-        "deliver" => {
-            require_nonempty(
-                options.summary.as_deref(),
-                "accord deliver requires --summary <text>",
-            )?;
-        }
-        "rework" => {
-            require_nonempty(
-                options.note.as_deref(),
-                "accord rework requires --note <text>",
-            )?;
-        }
-        "block" | "fail" => {
-            require_nonempty(
-                options.reason.as_deref(),
-                &format!("accord {action} requires --reason <text>"),
-            )?;
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn apply_accord_action(
-    accord: &mut AccordRecord,
-    action: &str,
-    status: &str,
-    options: &AccordOptions,
-) {
-    accord.status = status.to_string();
-    match action {
-        "claim" => {
-            accord.claimed_at = Some(accord.updated_at.clone());
-            accord.delivered_at = None;
-            accord.summary = None;
-            accord.evidence.clear();
-            accord.files_changed.clear();
-            accord.reviewer = None;
-            accord.note = None;
-            accord.reason = None;
-        }
-        "deliver" => {
-            accord.delivered_at = Some(accord.updated_at.clone());
-            accord.reviewer = None;
-            accord.note = None;
-            accord.reason = None;
-        }
-        "accept" => {
-            accord.reason = None;
-        }
-        "rework" => {
-            accord.reviewer = None;
-            accord.reason = None;
-        }
-        "block" | "fail" => {
-            accord.reviewer = None;
-            accord.note = None;
-        }
-        _ => {}
-    }
-    if let Some(assignee) = options
-        .assignee
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        accord.assignee = Some(assignee.to_string());
-    }
-    if !options.deliverables.is_empty() {
-        accord.deliverables = options.deliverables.clone();
-    }
-    if !options.validations.is_empty() {
-        accord.validations = options.validations.clone();
-    }
-    if !options.constraints.is_empty() {
-        accord.constraints = options.constraints.clone();
-    }
-    if let Some(summary) = options
-        .summary
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        accord.summary = Some(summary.to_string());
-    }
-    if !options.evidence.is_empty() {
-        accord.evidence = options.evidence.clone();
-    }
-    if !options.files_changed.is_empty() {
-        accord.files_changed = options.files_changed.clone();
-    }
-    if let Some(reviewer) = options
-        .reviewer
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        accord.reviewer = Some(reviewer.to_string());
-    }
-    if let Some(note) = options
-        .note
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        accord.note = Some(note.to_string());
-    }
-    if let Some(reason) = options
-        .reason
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        accord.reason = Some(reason.to_string());
-    }
 }
 
 fn print_accord_update(
@@ -2911,185 +2653,6 @@ fn warn_missing_rule_source(
         }
     }
     Ok(())
-}
-
-fn patch_completion_content(
-    content: &str,
-    summary: &str,
-    outcome: Option<&str>,
-    files_changed: &[String],
-    validation: Option<&str>,
-    reviewer: Option<&str>,
-) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let completion_block =
-        render_completion_block(summary, outcome, files_changed, validation, reviewer);
-    let mut output_frontmatter = String::new();
-    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
-    let mut index = 0usize;
-    let mut replaced = false;
-
-    while index < lines.len() {
-        let raw_line = lines[index];
-        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
-        if matches!(
-            frontmatter_line_key(line),
-            Some("completionSummary")
-                | Some("completionValidation")
-                | Some("completionReviewer")
-                | Some("filesChanged")
-        ) {
-            index += 1;
-            continue;
-        }
-        if frontmatter_line_key(line) == Some("completion") {
-            output_frontmatter.push_str(&completion_block);
-            replaced = true;
-            index += 1;
-            while index < lines.len() {
-                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                if is_top_level_frontmatter_boundary(skip_line) {
-                    break;
-                }
-                index += 1;
-            }
-            continue;
-        }
-        output_frontmatter.push_str(raw_line);
-        index += 1;
-    }
-
-    if !replaced {
-        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-            output_frontmatter.push('\n');
-        }
-        output_frontmatter.push_str(&completion_block);
-    }
-
-    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-        output_frontmatter.push('\n');
-    }
-
-    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
-}
-
-fn render_completion_block(
-    summary: &str,
-    outcome: Option<&str>,
-    files_changed: &[String],
-    validation: Option<&str>,
-    reviewer: Option<&str>,
-) -> String {
-    let mut lines = Vec::new();
-    lines.push("completion:".to_string());
-    if let Some(outcome) = outcome {
-        lines.push(format!("  outcome: {}", yaml_double_quote(outcome)));
-    }
-    lines.push(format!("  summary: {}", yaml_double_quote(summary)));
-    if !files_changed.is_empty() {
-        lines.push(format!("  filesChanged: {}", inline_array(files_changed)));
-    }
-    if let Some(validation) = validation.filter(|value| !value.trim().is_empty()) {
-        lines.push(format!(
-            "  validation: {}",
-            yaml_double_quote(validation.trim())
-        ));
-    }
-    if let Some(reviewer) = reviewer.filter(|value| !value.trim().is_empty()) {
-        lines.push(format!(
-            "  reviewer: {}",
-            yaml_double_quote(reviewer.trim())
-        ));
-    }
-    lines.push(String::new());
-    lines.join("\n")
-}
-
-fn patch_accord_content(content: &str, accord: &AccordRecord) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let accord_block = render_accord_block(accord);
-    let mut output_frontmatter = String::new();
-    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
-    let mut index = 0usize;
-    let mut replaced = false;
-
-    while index < lines.len() {
-        let raw_line = lines[index];
-        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
-        if frontmatter_line_key(line) == Some("accord") {
-            output_frontmatter.push_str(&accord_block);
-            replaced = true;
-            index += 1;
-            while index < lines.len() {
-                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                if is_top_level_frontmatter_boundary(skip_line) {
-                    break;
-                }
-                index += 1;
-            }
-            continue;
-        }
-        output_frontmatter.push_str(raw_line);
-        index += 1;
-    }
-
-    if !replaced {
-        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-            output_frontmatter.push('\n');
-        }
-        output_frontmatter.push_str(&accord_block);
-    }
-
-    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-        output_frontmatter.push('\n');
-    }
-
-    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
-}
-
-fn render_accord_block(accord: &AccordRecord) -> String {
-    let mut lines = Vec::new();
-    lines.push("accord:".to_string());
-    lines.push(format!("  status: {}", yaml_double_quote(&accord.status)));
-    push_optional_nested_line(&mut lines, "assignee", accord.assignee.as_deref());
-    push_optional_nested_line(&mut lines, "claimedAt", accord.claimed_at.as_deref());
-    push_optional_nested_line(&mut lines, "deliveredAt", accord.delivered_at.as_deref());
-    push_nested_array_line(&mut lines, "deliverables", &accord.deliverables);
-    push_nested_validation_commands(&mut lines, &accord.validations);
-    push_nested_array_line(&mut lines, "constraints", &accord.constraints);
-    push_optional_nested_line(&mut lines, "summary", accord.summary.as_deref());
-    push_nested_array_line(&mut lines, "evidence", &accord.evidence);
-    push_nested_array_line(&mut lines, "filesChanged", &accord.files_changed);
-    push_optional_nested_line(&mut lines, "reviewer", accord.reviewer.as_deref());
-    push_optional_nested_line(&mut lines, "note", accord.note.as_deref());
-    push_optional_nested_line(&mut lines, "reason", accord.reason.as_deref());
-    lines.push(format!(
-        "  updatedAt: {}",
-        yaml_double_quote(&accord.updated_at)
-    ));
-    lines.push(String::new());
-    lines.join("\n")
-}
-
-fn push_optional_nested_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        if !value.trim().is_empty() {
-            lines.push(format!("  {key}: {}", yaml_double_quote(value.trim())));
-        }
-    }
-}
-
-fn push_nested_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
-    if !values.is_empty() {
-        lines.push(format!("  {key}: {}", inline_array(values)));
-    }
-}
-
-fn push_nested_validation_commands(lines: &mut Vec<String>, values: &[String]) {
-    if !values.is_empty() {
-        lines.push("  validation:".to_string());
-        lines.push(format!("    commands: {}", inline_array(values)));
-    }
 }
 
 fn patch_rules_category_content(
@@ -3707,11 +3270,6 @@ fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str
     } else {
         Ok(value)
     }
-}
-
-fn read_workspace_states(workspace: &TandemProject) -> Result<Vec<String>, CliError> {
-    let root = read_frontmatter_yaml_file(&workspace.config_path)?;
-    Ok(workflow_states(root.as_ref()))
 }
 
 fn create_new_sequential_document<F>(
@@ -4700,30 +4258,6 @@ rules:
     }
 
     #[test]
-    fn patches_accord_without_touching_body_or_other_fields() {
-        let input = "---\nid: task-1\ntitle: Demo\naccord:\n  status: ready\n  assignee: pi\nreview:\n  status: pending\n---\n\nBody\n";
-        let accord = AccordRecord {
-            status: "delivered".to_string(),
-            assignee: Some("pi".to_string()),
-            delivered_at: Some("2026-06-26T00:00:00Z".to_string()),
-            summary: Some("Done".to_string()),
-            validations: vec!["cargo test".to_string()],
-            evidence: vec!["cargo test passed".to_string()],
-            updated_at: "2026-06-26T00:00:00Z".to_string(),
-            ..AccordRecord::default()
-        };
-        let output = patch_accord_content(input, &accord).unwrap();
-        assert!(output.contains("accord:\n  status: \"delivered\"\n"));
-        assert!(output.contains("  assignee: \"pi\"\n"));
-        assert!(output.contains("  deliveredAt: \"2026-06-26T00:00:00Z\"\n"));
-        assert!(output.contains("  validation:\n    commands: [\"cargo test\"]\n"));
-        assert!(output.contains("  summary: \"Done\"\n"));
-        assert!(output.contains("  evidence: [\"cargo test passed\"]\n"));
-        assert!(output.contains("review:\n  status: pending\n"));
-        assert!(output.ends_with("\nBody\n"));
-    }
-
-    #[test]
     fn divergence_warning_reports_sync_candidate_without_collapsing_state() {
         let doc = Document::new(PathBuf::from("task-1.md"), DocumentLocation::Board, parse_frontmatter_fields(
                 "id: task-1\ntype: task\ntitle: Demo\nstate: in-progress\naccord:\n  status: delivered\nreview:\n  status: pending\n",
@@ -4800,27 +4334,6 @@ rules:
     }
 
     #[test]
-    fn patches_completion_as_nested_metadata_and_preserves_body() {
-        let input = "---\nid: task-1\ntype: task\ntitle: Demo\ncompletionSummary: old\nfilesChanged: [old.rs]\n---\n\nBody\n";
-        let output = patch_completion_content(
-            input,
-            "Done",
-            None,
-            &["src/main.rs".to_string()],
-            Some("cargo test passed"),
-            Some("Algorant"),
-        )
-        .unwrap();
-        assert!(!output.contains("completionSummary:"));
-        assert!(!output.contains("filesChanged: [old.rs]"));
-        assert!(output.contains("completion:\n  summary: \"Done\"\n"));
-        assert!(output.contains("  filesChanged: [\"src/main.rs\"]\n"));
-        assert!(output.contains("  validation: \"cargo test passed\"\n"));
-        assert!(output.contains("  reviewer: \"Algorant\"\n"));
-        assert!(output.ends_with("\nBody\n"));
-    }
-
-    #[test]
     fn completion_helpers_read_nested_and_legacy_flat_metadata() {
         let nested = Document::new(PathBuf::from("task-1.md"), DocumentLocation::Logs, parse_frontmatter_fields(
                 "completion:\n  summary: Done\n  validation: passed\n  reviewer: Algorant\n  filesChanged: [src/main.rs]\n",
@@ -4852,16 +4365,13 @@ rules:
             .unwrap(),
             String::new(),
         );
-        let workspace = TandemProject {
-            root: PathBuf::new(),
-            data_dir: PathBuf::new(),
-            board_dir: PathBuf::from(".tandem/board"),
-            logs_dir: PathBuf::from(".tandem/logs"),
-            config_path: PathBuf::from("missing-tandem.md"),
-            events_path: PathBuf::from(".tandem/events.jsonl"),
-        };
-        let error = validate_task_document_for_mutation(&workspace, &doc).unwrap_err();
-        assert!(error.message.contains("invalid review.status `maybe`"));
+        let messages = protocol::diagnostic::metadata_diagnostics(&doc, true)
+            .into_iter()
+            .map(|diagnostic| diagnostic.message)
+            .collect::<Vec<_>>();
+        assert!(messages
+            .iter()
+            .any(|message| message.contains("invalid review.status `maybe`")));
     }
 
     #[test]
@@ -4875,16 +4385,8 @@ rules:
             .unwrap(),
             String::new(),
         );
-        let workspace = TandemProject {
-            root: PathBuf::new(),
-            data_dir: PathBuf::new(),
-            board_dir: PathBuf::from(".tandem/board"),
-            logs_dir: PathBuf::from(".tandem/logs"),
-            config_path: PathBuf::from("missing-tandem.md"),
-            events_path: PathBuf::from(".tandem/events.jsonl"),
-        };
-        let error = validate_task_document_for_mutation(&workspace, &doc).unwrap_err();
-        assert!(error.message.contains("invalid kind `feature`"));
+        let error = protocol::document::validate_task_kind(doc.field("kind").unwrap()).unwrap_err();
+        assert!(error.contains("invalid kind `feature`"));
     }
 
     #[test]
@@ -5199,9 +4701,10 @@ rules:
         assert_eq!(next_child.id, "task-1-2");
 
         cancel_task(&workspace, "task-2", "Dependency intentionally waived").unwrap();
-        assert!(unresolved_blockers(&workspace, Some("[task-2]"))
-            .unwrap()
-            .is_empty());
+        let hierarchy = hierarchy_from_workspace(&workspace).unwrap();
+        assert!(
+            app::support::unresolved_blockers_in_hierarchy(&hierarchy, Some("[task-2]")).is_empty()
+        );
 
         let legacy_completed = Document::new(PathBuf::from(".tandem/logs/task-99.md"), DocumentLocation::Logs, parse_frontmatter_fields(
                 "id: task-99\ntype: task\ntitle: Legacy\ncompletedAt: now\ncompletion:\n  summary: Done\n",
@@ -5442,16 +4945,24 @@ rules:
             "in-progress".to_string(),
             "review".to_string(),
         ];
-        assert!(is_known_or_legacy_state(&legacy_states, "validation"));
-        assert!(display_known_states(&legacy_states).contains("validation (preferred alias)"));
+        assert!(workflow::is_known_or_legacy_state(
+            &legacy_states,
+            "validation"
+        ));
+        assert!(
+            workflow::display_known_states(&legacy_states).contains("validation (preferred alias)")
+        );
 
         let current_states = vec![
             "todo".to_string(),
             "in-progress".to_string(),
             "validation".to_string(),
         ];
-        assert!(is_known_or_legacy_state(&current_states, "review"));
-        assert!(display_known_states(&current_states).contains("review (legacy alias)"));
+        assert!(workflow::is_known_or_legacy_state(
+            &current_states,
+            "review"
+        ));
+        assert!(workflow::display_known_states(&current_states).contains("review (legacy alias)"));
     }
 
     #[test]

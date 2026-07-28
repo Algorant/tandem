@@ -23,8 +23,8 @@ pub(crate) mod events;
 pub(crate) mod frontmatter;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
-    frontmatter_line_key, is_top_level_frontmatter_boundary, patch_frontmatter_content,
-    replace_markdown_body,
+    frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,
+    patch_completion_content, patch_frontmatter_content, replace_markdown_body,
 };
 pub(crate) use write::{read_file_snapshot, write_atomic};
 

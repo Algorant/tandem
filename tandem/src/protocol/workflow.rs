@@ -12,6 +12,15 @@ pub(crate) const LEGACY_REVIEW_STATE: &str = "review";
 pub(crate) const VALIDATION_STATE: &str = "validation";
 pub(crate) const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
 pub(crate) const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CompletionRecord {
+    pub(crate) summary: String,
+    pub(crate) outcome: Option<String>,
+    pub(crate) files_changed: Vec<String>,
+    pub(crate) validation: Option<String>,
+    pub(crate) reviewer: Option<String>,
+}
 pub(crate) const COMPLETION_OUTCOMES: &[&str] =
     &[COMPLETION_OUTCOME_COMPLETED, COMPLETION_OUTCOME_CANCELED];
 

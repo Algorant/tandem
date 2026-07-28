@@ -1,7 +1,63 @@
 //! Canonical accord vocabulary, transitions, and workflow alignment.
 
-use super::document::Document;
+use super::document::{parse_field_values, Document};
 use super::workflow::{LEGACY_REVIEW_STATE, VALIDATION_STATE};
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AccordRecord {
+    pub(crate) status: String,
+    pub(crate) assignee: Option<String>,
+    pub(crate) claimed_at: Option<String>,
+    pub(crate) delivered_at: Option<String>,
+    pub(crate) deliverables: Vec<String>,
+    pub(crate) validations: Vec<String>,
+    pub(crate) constraints: Vec<String>,
+    pub(crate) summary: Option<String>,
+    pub(crate) evidence: Vec<String>,
+    pub(crate) files_changed: Vec<String>,
+    pub(crate) reviewer: Option<String>,
+    pub(crate) note: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) updated_at: String,
+}
+
+impl AccordRecord {
+    pub(crate) fn from_document(doc: &Document, updated_at: &str) -> Self {
+        Self {
+            status: status(doc).unwrap_or("missing").to_string(),
+            assignee: doc.field("accord.assignee").map(str::to_string),
+            claimed_at: doc.field("accord.claimedAt").map(str::to_string),
+            delivered_at: doc.field("accord.deliveredAt").map(str::to_string),
+            deliverables: doc
+                .field("accord.deliverables")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            validations: doc
+                .field("accord.validation.commands")
+                .or_else(|| doc.field("accord.validation"))
+                .or_else(|| doc.field("accord.validations"))
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            constraints: doc
+                .field("accord.constraints")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            summary: doc.field("accord.summary").map(str::to_string),
+            evidence: doc
+                .field("accord.evidence")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            files_changed: doc
+                .field("accord.filesChanged")
+                .map(parse_field_values)
+                .unwrap_or_default(),
+            reviewer: doc.field("accord.reviewer").map(str::to_string),
+            note: doc.field("accord.note").map(str::to_string),
+            reason: doc.field("accord.reason").map(str::to_string),
+            updated_at: updated_at.to_string(),
+        }
+    }
+}
 
 pub(crate) const STATUSES: &[&str] = &[
     "claimed",

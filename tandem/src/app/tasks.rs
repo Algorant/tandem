@@ -3,7 +3,6 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::app::accord::AccordRecord;
 use crate::app::support::{
     active_task_descendant_ids, append_event, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
@@ -12,15 +11,16 @@ use crate::app::support::{
 };
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
-    self, patch_frontmatter_content, replace_markdown_body, write_atomic, yaml_double_quote,
-    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
+    self, patch_accord_content, patch_completion_content, patch_frontmatter_content,
+    replace_markdown_body, write_atomic, yaml_double_quote, ProjectHierarchy as HierarchyIndex,
+    StoredDocument as Document, TandemProject,
 };
-use crate::protocol::accord::status as accord_status;
+use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
 use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
-use crate::protocol::workflow::COMPLETION_OUTCOME_CANCELED;
-use crate::{patch_accord_content, patch_completion_content, CliError};
+use crate::protocol::workflow::{CompletionRecord, COMPLETION_OUTCOME_CANCELED};
+use crate::CliError;
 
 fn inline_array(values: &[String]) -> String {
     format!(
@@ -708,7 +708,8 @@ pub(crate) fn complete(
     let summary = require_nonempty(
         options.summary.as_deref(),
         "complete requires --summary <text>",
-    )?;
+    )?
+    .to_string();
     let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
@@ -755,11 +756,13 @@ pub(crate) fn complete(
     )?;
     let patched = patch_completion_content(
         &patched,
-        summary,
-        None,
-        &options.files_changed,
-        options.validation.as_deref(),
-        options.reviewer.as_deref(),
+        &CompletionRecord {
+            summary: summary.clone(),
+            files_changed: options.files_changed,
+            validation: options.validation,
+            reviewer: options.reviewer,
+            ..CompletionRecord::default()
+        },
     )?;
     let log_path = project::write::archive_board_document(
         workspace,
@@ -768,7 +771,7 @@ pub(crate) fn complete(
         &patched,
         "completed",
     )?;
-    append_event(workspace, "task.completed", doc.id(), summary)?;
+    append_event(workspace, "task.completed", doc.id(), &summary)?;
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
         board_path: doc.path,
@@ -829,11 +832,11 @@ pub(crate) fn cancel(
     let summary = format!("Canceled: {reason}");
     let patched = patch_completion_content(
         &patched,
-        &summary,
-        Some(COMPLETION_OUTCOME_CANCELED),
-        &[],
-        None,
-        None,
+        &CompletionRecord {
+            summary: summary.clone(),
+            outcome: Some(COMPLETION_OUTCOME_CANCELED.to_string()),
+            ..CompletionRecord::default()
+        },
     )?;
     let log_path = project::write::archive_board_document(
         workspace, &doc.path, &signature, &patched, "canceled",
