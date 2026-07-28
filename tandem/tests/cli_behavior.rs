@@ -106,8 +106,30 @@ fn process_help_version_usage_and_missing_project_contracts() {
 
     let help = project.run(&["--help"]);
     help.assert_success();
-    assert!(help.stdout.contains("tandem - Tandem CLI"));
-    assert!(help.stdout.contains("tandem accord claim|deliver|accept"));
+    assert_eq!(
+        help.stdout,
+        concat!(
+            "tandem - Tandem CLI\n\n",
+            "Usage:\n",
+            "  tandem init [--title <title>]\n",
+            "  tandem upgrade\n",
+            "  tandem list [--state <state>] [--type <type>] [--parent <id>] [--json]\n",
+            "  tandem show <id> [--json]\n",
+            "  tandem add --title <title> [--state <state>] [--kind epic] [--parent <id>] [--description <text>] [--priority <priority>] [--effort <effort>] [--json]\n",
+            "  tandem move <id> --state <state>\n",
+            "  tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--parent <id>] [--priority <priority>] [--effort <effort>] ...\n",
+            "  tandem complete <id> --summary <text>\n",
+            "  tandem cancel <id> --reason <text>\n",
+            "  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]\n",
+            "  tandem log list|show|search ...\n",
+            "  tandem accord claim|deliver|accept|rework|block|fail ...\n",
+            "  tandem rules list|add|edit|delete ...\n",
+            "  tandem decision list|show|add ... [--status <status>] [--date <date>]\n",
+            "  tandem tui\n",
+            "  tandem version\n",
+            "  tandem --version\n",
+        )
+    );
     assert!(help.stderr.is_empty());
 
     let version = project.run(&["--version"]);
@@ -121,23 +143,86 @@ fn process_help_version_usage_and_missing_project_contracts() {
     let unknown_command = project.run(&["unknown-command"]);
     unknown_command.assert_exit(2);
     assert!(unknown_command.stdout.is_empty());
-    assert!(unknown_command
-        .stderr
-        .contains("unknown command `unknown-command`"));
+    assert_eq!(unknown_command.stderr, "Error: unknown command `unknown-command`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version\n");
 
     let unknown_flag = project.run(&["list", "--unknown"]);
     unknown_flag.assert_exit(2);
     assert!(unknown_flag.stdout.is_empty());
-    assert!(unknown_flag
-        .stderr
-        .contains("unknown list flag `--unknown`"));
+    assert_eq!(
+        unknown_flag.stderr,
+        "Error: unknown list flag `--unknown`\n"
+    );
 
     let missing_project = project.run(&["list"]);
     missing_project.assert_exit(1);
     assert!(missing_project.stdout.is_empty());
-    assert!(missing_project
-        .stderr
-        .contains("No Tandem workspace found. Run `tandem init` first."));
+    assert_eq!(
+        missing_project.stderr,
+        "Error: No Tandem workspace found. Run `tandem init` first.\n"
+    );
+
+    let invalid_tui = project.run(&["tui", "--json"]);
+    invalid_tui.assert_exit(2);
+    assert!(invalid_tui.stdout.is_empty());
+    assert_eq!(invalid_tui.stderr, "Error: tui does not accept arguments\n");
+}
+
+#[test]
+fn command_families_preserve_exact_success_output() {
+    let project = TempProject::new("exact-output");
+
+    let init = project.run(&["init", "--title", "Exact"]);
+    init.assert_success();
+    assert_eq!(init.stdout, "Created Tandem workspace\nTitle: Exact\nConfig: .tandem/tandem.md\nBoard:  .tandem/board\nLogs:   .tandem/logs\nEvents: .tandem/events\nStates: todo, in-progress, validation\n");
+    assert!(init.stderr.is_empty());
+
+    let add = project.run(&["add", "--title", "First", "--json"]);
+    add.assert_success();
+    assert_eq!(add.stdout, "{\"ok\":true,\"data\":{\"document\":{\"id\":\"task-1\",\"type\":\"task\",\"state\":\"todo\",\"title\":\"First\",\"path\":\".tandem/board/task-1.md\"}},\"warnings\":[]}\n");
+    assert!(add.stderr.is_empty());
+
+    let list = project.run(&["list", "--json"]);
+    list.assert_success();
+    assert_eq!(list.stdout, "{\"ok\":true,\"data\":{\"items\":[{\"id\":\"task-1\",\"type\":\"task\",\"title\":\"First\",\"state\":\"todo\"}],\"counts\":{\"total\":1,\"byState\":{\"todo\":1}}},\"warnings\":[]}\n");
+
+    let moved = project.run(&["move", "task-1", "--state", "in-progress"]);
+    moved.assert_success();
+    assert_eq!(
+        moved.stdout,
+        "Moved task-1\nFrom: todo\nTo:   in-progress\nPath: .tandem/board/task-1.md\n"
+    );
+
+    let accord = project.run(&["accord", "claim", "task-1", "--assignee", "worker"]);
+    accord.assert_success();
+    assert_eq!(accord.stdout, "Updated accord\nID:     task-1\nFrom:   missing\nTo:     claimed\nPath:   .tandem/board/task-1.md\nEvent:  accord.claimed\n");
+
+    let rule = project.run(&["rules", "add", "--category", "always", "--rule", "Test"]);
+    rule.assert_success();
+    assert_eq!(
+        rule.stdout,
+        "Added rule\nCategory: always\nID:       1\nRule:     Test\n"
+    );
+    let rules = project.run(&["rules", "list", "--json"]);
+    rules.assert_success();
+    assert_eq!(rules.stdout, "{\"ok\":true,\"data\":{\"rules\":{\"always\":[{\"id\":1,\"rule\":\"Test\"}],\"never\":[],\"prefer\":[],\"context\":[]},\"counts\":{\"always\":1,\"never\":0,\"prefer\":0,\"context\":0,\"total\":1}},\"warnings\":[]}\n");
+
+    let decision = project.run(&[
+        "decision",
+        "add",
+        "--title",
+        "Choice",
+        "--date",
+        "2026-01-02",
+    ]);
+    decision.assert_success();
+    assert_eq!(decision.stdout, "Created decision\nID:     decision-1\nStatus: proposed\nDate:   2026-01-02\nTitle:  Choice\nPath:   .tandem/board/decision-1.md\n");
+    let decisions = project.run(&["decision", "list", "--json"]);
+    decisions.assert_success();
+    assert_eq!(decisions.stdout, "{\"ok\":true,\"data\":{\"items\":[{\"id\":\"decision-1\",\"type\":\"decision\",\"title\":\"Choice\",\"status\":\"proposed\",\"date\":\"2026-01-02\",\"references\":[],\"summary\":\"\"}],\"count\":1},\"warnings\":[]}\n");
+
+    let search = project.run(&["search", "First", "--json"]);
+    search.assert_success();
+    assert_eq!(search.stdout, "{\"ok\":true,\"data\":{\"query\":\"First\",\"results\":[{\"id\":\"task-1\",\"type\":\"task\",\"title\":\"First\",\"location\":\"board\",\"state\":\"in-progress\",\"snippet\":\"First\"}]},\"warnings\":[]}\n");
 }
 
 #[test]

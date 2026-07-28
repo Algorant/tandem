@@ -1,12 +1,17 @@
 //! Shared Decision creation and diagnostic orchestration.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
     append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
     document_exists,
 };
-use crate::project::{yaml_double_quote, TandemProject};
+use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
+use crate::project::{
+    patch_frontmatter_content, replace_markdown_body, write_atomic, yaml_double_quote,
+    TandemProject,
+};
 use crate::protocol::config::DECISION_STATUSES;
 use crate::CliError;
 
@@ -34,6 +39,27 @@ pub(crate) struct AddOutcome {
     pub(crate) date: String,
     pub(crate) path: PathBuf,
     pub(crate) warnings: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct UpdateOptions {
+    pub(crate) id: String,
+    pub(crate) title: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) body: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct UpdateOutcome {
+    pub(crate) id: String,
+    pub(crate) path: PathBuf,
+}
+
+#[derive(Debug)]
+pub(crate) struct WithdrawOutcome {
+    pub(crate) id: String,
+    pub(crate) reason: String,
+    pub(crate) path: PathBuf,
 }
 
 pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
@@ -89,6 +115,83 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
         path: created.path,
         warnings,
     })
+}
+
+pub(crate) fn update(
+    project: &TandemProject,
+    options: UpdateOptions,
+) -> Result<UpdateOutcome, CliError> {
+    let doc = active_decision(project, &options.id)?;
+    if let Some(status) = options.status.as_deref() {
+        validate_status(status)?;
+    }
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let mut updates = BTreeMap::new();
+    if let Some(title) = options.title {
+        updates.insert("title".to_string(), title);
+    }
+    if let Some(status) = options.status {
+        updates.insert("status".to_string(), status);
+    }
+    updates.insert("updatedAt".to_string(), current_timestamp());
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let patched = if let Some(body) = options.body.as_deref() {
+        replace_markdown_body(&patched, body)?
+    } else {
+        patched
+    };
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        project,
+        "decision.updated",
+        doc.id(),
+        &format!("Updated decision {}", doc.id()),
+    )?;
+    Ok(UpdateOutcome {
+        id: doc.id().to_string(),
+        path: doc.path,
+    })
+}
+
+pub(crate) fn withdraw(
+    project: &TandemProject,
+    id: &str,
+    reason: String,
+) -> Result<WithdrawOutcome, CliError> {
+    let doc = active_decision(project, id)?;
+    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let now = current_timestamp();
+    let updates = BTreeMap::from([
+        ("status".to_string(), "withdrawn".to_string()),
+        ("withdrawnAt".to_string(), now.clone()),
+        ("withdrawalReason".to_string(), reason.clone()),
+        ("updatedAt".to_string(), now),
+    ]);
+    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    append_event(
+        project,
+        "decision.withdrawn",
+        doc.id(),
+        &format!("Withdrew decision {}: {reason}", doc.id()),
+    )?;
+    Ok(WithdrawOutcome {
+        id: doc.id().to_string(),
+        reason,
+        path: doc.path,
+    })
+}
+
+fn active_decision(
+    project: &TandemProject,
+    id: &str,
+) -> Result<crate::project::StoredDocument, CliError> {
+    project
+        .read_board_document(id)?
+        .filter(|doc| doc.doc_type() == "decision")
+        .ok_or_else(|| CliError::user(format!("active decision not found: {id}")))
 }
 
 fn validate_options(options: &AddOptions) -> Result<(), CliError> {

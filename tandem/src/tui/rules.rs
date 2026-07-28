@@ -209,7 +209,7 @@ impl TuiApp {
                         format!(
                             "{category} #{}: {}{source}",
                             rule.id,
-                            crate::truncate(&rule.rule, 140)
+                            super::truncate(&rule.rule, 140)
                         )
                     })
                     .unwrap_or_else(|| {
@@ -466,7 +466,7 @@ impl TuiApp {
                         format!("#{}  ", item.id),
                         self.theme.status_style(StatusTone::Accent),
                     ),
-                    Span::styled(crate::truncate(&item.rule, 96), self.theme.text_style()),
+                    Span::styled(super::truncate(&item.rule, 96), self.theme.text_style()),
                     Span::styled(source, self.theme.muted_style()),
                 ]),
             });

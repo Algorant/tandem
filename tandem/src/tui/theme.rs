@@ -4,7 +4,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use super::super::{display_path, TandemProject};
+use crate::project::{display_path, TandemProject};
 
 #[derive(Debug, Clone)]
 pub(super) struct ThemeLoad {

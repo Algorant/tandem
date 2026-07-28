@@ -6,13 +6,16 @@ use ratatui::{
     Frame,
 };
 
-use super::super::{
-    accord_status, display_path, parse_field_values, review_status, Document, HierarchyIndex,
-};
 use super::{
     document_state_label, hierarchy_index_for, markdownish_lines, rect_contains, FocusPane,
     HitAction, HitRegion, StatusTone, TuiTheme,
 };
+use crate::project::{
+    display_path, ProjectHierarchy as HierarchyIndex, StoredDocument as Document,
+};
+use crate::protocol::accord::status as accord_status;
+use crate::protocol::document::parse_field_values;
+use crate::protocol::review::status as review_status;
 
 const QUEUE_ROW_HEIGHT: u16 = 3;
 
@@ -877,7 +880,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::DocumentLocation;
+    use crate::protocol::hierarchy::DocumentLocation;
 
     fn doc_with_fields(id: &str, fields: &[(&str, &str)]) -> Document {
         let mut map = HashMap::new();

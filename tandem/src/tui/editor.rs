@@ -3,7 +3,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
 
-use crate::{CliError, Document, DocumentLocation};
+use crate::project::StoredDocument as Document;
+use crate::protocol::hierarchy::DocumentLocation;
+use crate::CliError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct EditorTarget {

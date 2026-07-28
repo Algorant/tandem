@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
+use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use yaml_rust2::Yaml;
@@ -16,8 +18,25 @@ use ratatui::{
     Frame,
 };
 
-use super::*;
+use crate::app;
 use crate::app::accord::ValidationApplyCandidate;
+use crate::app::tasks::AddOptions;
+use crate::project::rules::{empty_rules, parse_rules_from_yaml};
+use crate::project::write::{file_signature, FileSignature, HierarchyLock};
+use crate::project::{
+    display_path, yaml_mapping_value, yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex,
+    StoredDocument as Document, TandemProject,
+};
+use crate::protocol::accord::{self, status as accord_status};
+use crate::protocol::config::RulesByCategory;
+use crate::protocol::document::parse_field_values;
+use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
+use crate::protocol::review::status as review_status;
+use crate::protocol::workflow::{
+    self, completion_outcome, workflow_states, COMPLETION_OUTCOME_CANCELED,
+    COMPLETION_OUTCOME_COMPLETED,
+};
+use crate::CliError;
 
 mod decisions;
 mod editor;
@@ -34,11 +53,38 @@ use rules::RulesState;
 use terminal::TerminalSession;
 use theme::{StatusTone, TuiTheme};
 
-pub(crate) fn run_tui() -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
+pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
     let mut app = TuiApp::load(workspace)?;
     let mut session = TerminalSession::enter()?;
     app.run(&mut session)
+}
+
+fn sort_documents(docs: &mut [Document]) {
+    docs.sort_by(|a, b| {
+        a.field("state")
+            .unwrap_or("")
+            .cmp(b.field("state").unwrap_or(""))
+            .then_with(|| a.id().cmp(b.id()))
+    });
+}
+
+fn is_canceled_log(doc: &Document) -> bool {
+    doc.location == DocumentLocation::Logs && completion_outcome(doc) == COMPLETION_OUTCOME_CANCELED
+}
+
+fn truncate(value: &str, max_chars: usize) -> String {
+    let chars = value.chars().collect::<Vec<_>>();
+    if chars.len() <= max_chars {
+        return value.to_string();
+    }
+    if max_chars == 0 {
+        return String::new();
+    }
+    let mut truncated = chars[..max_chars.saturating_sub(1)]
+        .iter()
+        .collect::<String>();
+    truncated.push('…');
+    truncated
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -443,7 +489,7 @@ impl TuiApp {
             &configured_states,
             &hierarchy,
         ));
-        match workspace_deprecation_warnings(&self.workspace) {
+        match app::project::warnings(&self.workspace) {
             Ok(warnings) => load_errors.extend(warnings),
             Err(error) => load_errors.push(format!(
                 "Compatibility diagnostics unavailable: {}",

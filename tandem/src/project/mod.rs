@@ -27,7 +27,7 @@ pub(crate) use frontmatter::{
     frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,
     patch_completion_content, patch_frontmatter_content, replace_markdown_body,
 };
-pub(crate) use write::{read_file_snapshot, write_atomic};
+pub(crate) use write::write_atomic;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TandemProject {

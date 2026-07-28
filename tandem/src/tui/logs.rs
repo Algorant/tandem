@@ -4,16 +4,25 @@ use ratatui::style::Modifier;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::ListItem;
 
-use crate::{
-    accord_status, completion_files_changed, completion_outcome, completion_reviewer,
-    completion_summary, completion_validation, display_path, is_canceled_log, parse_field_values,
-    review_status, Document, HierarchyIndex, TandemProject,
+use crate::project::{
+    display_path, ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
+};
+use crate::protocol::accord::status as accord_status;
+use crate::protocol::document::parse_field_values;
+use crate::protocol::review::status as review_status;
+use crate::protocol::workflow::{
+    completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
+    completion_validation,
 };
 
-use super::{markdownish_lines, StatusTone, TuiTheme};
+use super::{is_canceled_log, markdownish_lines, StatusTone, TuiTheme};
 
 #[cfg(test)]
-use crate::{project::extract_json_string, DocumentLocation};
+use crate::project::extract_json_string;
+#[cfg(test)]
+use crate::protocol::hierarchy::DocumentLocation;
+#[cfg(test)]
+use crate::protocol::workflow::COMPLETION_OUTCOME_CANCELED;
 
 #[derive(Debug, Clone)]
 pub(super) struct LogEvent {
@@ -663,7 +672,7 @@ mod tests {
         );
         doc.fields.insert(
             "completion.outcome".to_string(),
-            crate::COMPLETION_OUTCOME_CANCELED.to_string(),
+            COMPLETION_OUTCOME_CANCELED.to_string(),
         );
         let hierarchy = test_hierarchy(&[], std::slice::from_ref(&doc));
 

@@ -12,7 +12,9 @@ use super::{
     centered_rect, detail_field_line, detail_section_heading, is_decision_doc, markdownish_lines,
     FocusPane, TuiApp,
 };
-use crate::{app, display_path, parse_field_values, Document};
+use crate::app;
+use crate::project::{display_path, StoredDocument as Document};
+use crate::protocol::document::parse_field_values;
 
 #[derive(Debug, Default)]
 pub(super) struct DecisionsState {
@@ -604,7 +606,7 @@ fn decision_list_lines(
         .saturating_sub(text_width(cursor))
         .saturating_sub(text_width(doc.id()).saturating_add(1))
         .max(12);
-    let title = crate::truncate(doc.title(), title_width);
+    let title = super::truncate(doc.title(), title_width);
     let title_style = if selected {
         theme.text_style().add_modifier(Modifier::BOLD)
     } else {
@@ -646,7 +648,7 @@ fn decision_list_metadata_text(doc: &Document, max_width: usize) -> String {
         .unwrap_or_else(|| "date -".to_string());
     let tags =
         formatted_decision_values(doc, &["tags"], "#", " ").unwrap_or_else(|| "tags -".to_string());
-    crate::truncate(&format!("{status} · {date} · {tags}"), max_width)
+    super::truncate(&format!("{status} · {date} · {tags}"), max_width)
 }
 
 fn decision_list_expanded_lines(
@@ -676,7 +678,7 @@ fn decision_list_expanded_lines(
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    crate::truncate(&detail, content_width.saturating_sub(2).max(12)),
+                    super::truncate(&detail, content_width.saturating_sub(2).max(12)),
                     theme.muted_style(),
                 ),
             ])
@@ -898,7 +900,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::*;
-    use crate::DocumentLocation;
+    use crate::protocol::hierarchy::DocumentLocation;
 
     fn line_text(line: &Line<'_>) -> String {
         line.spans
