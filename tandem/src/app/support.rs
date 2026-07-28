@@ -25,6 +25,14 @@ pub(crate) fn require_nonempty<'a>(
         .ok_or_else(|| CliError::usage(message))
 }
 
+pub(crate) fn date_from_timestamp(timestamp: &str) -> String {
+    timestamp.chars().take(10).collect()
+}
+
+pub(crate) fn document_exists(project: &TandemProject, id: &str) -> Result<bool, CliError> {
+    Ok(project.find_document(id)?.is_some())
+}
+
 pub(crate) fn current_timestamp() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -64,6 +72,27 @@ fn civil_from_days(days_since_epoch: i64) -> (i64, i64, i64) {
     let day = doy - (153 * mp + 2).div_euclid(5) + 1;
     let month = mp + if mp < 10 { 3 } else { -9 };
     (year + i64::from(month <= 2), month, day)
+}
+
+pub(crate) fn create_new_sequential_document<F>(
+    project: &TandemProject,
+    prefix: &str,
+    content_for_id: F,
+) -> Result<project::write::CreatedDocument, CliError>
+where
+    F: FnMut(&str) -> String,
+{
+    let hierarchy = hierarchy_from_project(project)?;
+    let last_allocated = crate::protocol::ids::next_sequential_number(
+        hierarchy.documents.values().map(|document| document.id()),
+        prefix,
+    );
+    project::write::create_new_sequential_document_after(
+        project,
+        prefix,
+        last_allocated,
+        content_for_id,
+    )
 }
 
 pub(crate) fn hierarchy_from_project(

@@ -12,10 +12,7 @@ use super::{
     centered_rect, detail_field_line, detail_section_heading, is_decision_doc, markdownish_lines,
     FocusPane, TuiApp,
 };
-use crate::{
-    append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
-    display_path, parse_field_values, yaml_double_quote, CliError, Document, TandemProject,
-};
+use crate::{app, display_path, parse_field_values, Document};
 
 #[derive(Debug, Default)]
 pub(super) struct DecisionsState {
@@ -401,7 +398,14 @@ impl TuiApp {
     }
 
     fn finish_decision_add(&mut self, title: String, body: String) {
-        match create_basic_decision(&self.workspace, &title, &body) {
+        match app::decisions::add(
+            &self.workspace,
+            app::decisions::AddOptions {
+                title: Some(title),
+                body: normalized_decision_body(&body),
+                ..Default::default()
+            },
+        ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_decision_by_id(&outcome.id);
@@ -543,10 +547,8 @@ impl DecisionPrompt {
     }
 }
 
-#[derive(Debug)]
-struct DecisionMutationOutcome {
-    id: String,
-    title: String,
+fn normalized_decision_body(body: &str) -> Option<String> {
+    (!body.trim().is_empty()).then(|| body.trim().to_string())
 }
 
 fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -> Line<'static> {
@@ -890,50 +892,6 @@ fn clean_decision_summary_line(line: &str) -> String {
         .to_string()
 }
 
-fn create_basic_decision(
-    workspace: &TandemProject,
-    title: &str,
-    body: &str,
-) -> Result<DecisionMutationOutcome, CliError> {
-    let title = require_decision_title(title)?;
-    let now = current_timestamp();
-    let date = date_from_timestamp(&now);
-    let created = create_new_sequential_document(workspace, "decision", |decision_id| {
-        let mut lines = vec![
-            "---".to_string(),
-            format!("id: {decision_id}"),
-            "type: decision".to_string(),
-            format!("title: {}", yaml_double_quote(title)),
-            "status: \"proposed\"".to_string(),
-            format!("date: {}", yaml_double_quote(&date)),
-            format!("createdAt: {}", yaml_double_quote(&now)),
-            format!("updatedAt: {}", yaml_double_quote(&now)),
-            "---".to_string(),
-            String::new(),
-        ];
-        if !body.trim().is_empty() {
-            lines.push(body.trim().to_string());
-        }
-        lines.push(String::new());
-        lines.join("\n")
-    })?;
-    append_event(workspace, "decision.created", &created.id, title)?;
-
-    Ok(DecisionMutationOutcome {
-        id: created.id,
-        title: title.to_string(),
-    })
-}
-
-fn require_decision_title(value: &str) -> Result<&str, CliError> {
-    let value = value.trim();
-    if value.is_empty() {
-        Err(CliError::usage("decision add requires --title <title>"))
-    } else {
-        Ok(value)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -973,6 +931,15 @@ mod tests {
             fields,
             "## Context\n\nThe Board is noisy when decisions are mixed into task state buckets.\n\n## Decision\n\nRender decisions in their own pane.".to_string(),
         )
+    }
+
+    #[test]
+    fn tui_decision_body_trims_nonempty_and_omits_blank_input() {
+        assert_eq!(
+            normalized_decision_body("  ## Decision\nKeep this.  "),
+            Some("## Decision\nKeep this.".to_string())
+        );
+        assert_eq!(normalized_decision_body("  \n "), None);
     }
 
     #[test]

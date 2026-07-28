@@ -406,3 +406,70 @@ fn hierarchy_validation_completion_and_logs_remain_observable_at_the_process_bou
     let events = project.actor_events();
     assert!(events.contains("\"event\":\"task.completed\""));
 }
+
+#[test]
+fn rules_and_decisions_share_durable_command_behavior() {
+    let project = TempProject::new("rules-decisions");
+    project.init();
+
+    let added_rule = project.run(&[
+        "rules",
+        "add",
+        "--category",
+        "always",
+        "--rule",
+        "Preserve bytes",
+        "--source",
+        " missing-decision ",
+    ]);
+    added_rule.assert_success();
+    assert!(added_rule
+        .stdout
+        .contains("Warning: rule source not found:  missing-decision "));
+    assert!(added_rule.stdout.contains("ID:       1"));
+    assert!(project
+        .read(".tandem/tandem.md")
+        .contains("source: \" missing-decision \""));
+
+    project
+        .run(&[
+            "rules",
+            "edit",
+            "--category",
+            "always",
+            "--id",
+            "1",
+            "--rule",
+            "Preserve exact bytes",
+            "--source",
+            "",
+        ])
+        .assert_success();
+
+    let decision = project.run(&[
+        "decision",
+        "add",
+        "--title",
+        "Shared application seam",
+        "--body",
+        "  ## Decision\nUse one operation.  ",
+        "--reference",
+        "missing-task",
+    ]);
+    decision.assert_success();
+    assert!(decision
+        .stdout
+        .contains("Warning: reference not found: missing-task"));
+    assert!(decision.stdout.contains("ID:     decision-1"));
+
+    let config = project.read(".tandem/tandem.md");
+    assert!(config.contains("Preserve exact bytes"));
+    assert!(!config.contains("source: \"\""));
+    let record = project.read(".tandem/board/decision-1.md");
+    assert!(record.contains("status: \"proposed\""));
+    assert!(record.contains("references: [\"missing-task\"]"));
+    assert!(record.contains("  ## Decision\nUse one operation.  \n"));
+    let events = project.actor_events();
+    assert!(events.contains("\"event\":\"rules.updated\""));
+    assert!(events.contains("\"event\":\"decision.created\""));
+}

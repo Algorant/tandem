@@ -21,6 +21,7 @@ use crate::CliError;
 
 pub(crate) mod events;
 pub(crate) mod frontmatter;
+pub(crate) mod rules;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
     frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,

@@ -5,5 +5,7 @@
 //! CLI output and transient Ratatui state remain in their peer interfaces.
 
 pub(crate) mod accord;
+pub(crate) mod decisions;
+pub(crate) mod rules;
 pub(crate) mod support;
 pub(crate) mod tasks;

@@ -4,8 +4,6 @@ use std::io;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use yaml_rust2::Yaml;
-
 mod app;
 mod project;
 mod protocol;
@@ -16,22 +14,20 @@ use app::tasks::{
     AddOptions, AddOutcome, CancelOptions, CompleteOptions, MoveOptions, UpdateOptions,
 };
 
+use project::rules::{empty_rules, parse_rules_from_yaml, read_rules};
 pub(crate) use project::write::{
     ensure_file_unchanged, file_signature, FileSignature, HierarchyLock,
 };
 use project::{
-    frontmatter_line_key, is_top_level_frontmatter_boundary,
-    parse_frontmatter_fields as parse_raw_frontmatter_fields, parse_frontmatter_yaml,
-    patch_frontmatter_content, read_file_snapshot, read_frontmatter_yaml_file,
-    replace_markdown_body, split_frontmatter, write_atomic, yaml_mapping_value,
+    parse_frontmatter_fields as parse_raw_frontmatter_fields, patch_frontmatter_content,
+    read_file_snapshot, replace_markdown_body, split_frontmatter, write_atomic, yaml_mapping_value,
     yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex, StoredDocument as Document,
     TandemProject,
 };
 use protocol::accord::{self, status as accord_status};
-use protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
+use protocol::config::{RulesByCategory, LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use protocol::document::parse_field_values;
 use protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
-use protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use protocol::review::status as review_status;
 use protocol::workflow::{
     self, completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
@@ -40,14 +36,6 @@ use protocol::workflow::{
 };
 
 const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
-const DECISION_STATUSES: &[&str] = &[
-    "proposed",
-    "accepted",
-    "rejected",
-    "deprecated",
-    "superseded",
-    "withdrawn",
-];
 const DEFAULT_WORKSPACE_TITLE: &str = "Tandem Workspace";
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
@@ -1314,7 +1302,7 @@ fn cmd_rules(args: &[String]) -> Result<(), CliError> {
 fn cmd_rules_list(options: CategoryListOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     if let Some(category) = options.category.as_deref() {
-        validate_rule_category(category)?;
+        app::rules::validate_rule_category(category)?;
     }
     let rules = read_rules(&workspace.config_path)?;
     if options.json {
@@ -1329,40 +1317,14 @@ fn cmd_rules_add(options: RuleAddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let category = require_rule_category(options.category.as_deref())?;
     let rule = require_nonempty(options.rule.as_deref(), "rules add requires --rule <text>")?;
-    warn_missing_rule_source(&workspace, options.source.as_deref())?;
-
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let next_id = rules
-        .get(category)
-        .into_iter()
-        .flatten()
-        .map(|item| item.id)
-        .max()
-        .unwrap_or(0)
-        + 1;
-    rules
-        .entry(category.to_string())
-        .or_default()
-        .push(RuleItem {
-            id: next_id,
-            rule: rule.to_string(),
-            source: options.source.filter(|source| !source.trim().is_empty()),
-        });
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        &workspace,
-        "rules.updated",
-        "rules",
-        &format!("Added rule {next_id} to {category}"),
-    )?;
-
+    let outcome = app::rules::add(&workspace, category, rule, options.source)?;
+    if let Some(warning) = outcome.warning {
+        println!("Warning: {warning}");
+    }
     println!("Added rule");
-    println!("Category: {category}");
-    println!("ID:       {next_id}");
-    println!("Rule:     {rule}");
+    println!("Category: {}", outcome.category);
+    println!("ID:       {}", outcome.id);
+    println!("Rule:     {}", outcome.rule);
     Ok(())
 }
 
@@ -1373,33 +1335,14 @@ fn cmd_rules_edit(options: RuleEditOptions) -> Result<(), CliError> {
         .id
         .ok_or_else(|| CliError::usage("rules edit requires --id <rule-id>"))?;
     let rule = require_nonempty(options.rule.as_deref(), "rules edit requires --rule <text>")?;
-    warn_missing_rule_source(&workspace, options.source.as_deref())?;
-
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let items = rules.entry(category.to_string()).or_default();
-    let item = items
-        .iter_mut()
-        .find(|item| item.id == id)
-        .ok_or_else(|| CliError::user(format!("rule not found: {category} #{id}")))?;
-    item.rule = rule.to_string();
-    if let Some(source) = options.source {
-        item.source = (!source.trim().is_empty()).then_some(source);
+    let outcome = app::rules::edit(&workspace, category, id, rule, options.source)?;
+    if let Some(warning) = outcome.warning {
+        println!("Warning: {warning}");
     }
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        &workspace,
-        "rules.updated",
-        "rules",
-        &format!("Edited rule {id} in {category}"),
-    )?;
-
     println!("Edited rule");
-    println!("Category: {category}");
-    println!("ID:       {id}");
-    println!("Rule:     {rule}");
+    println!("Category: {}", outcome.category);
+    println!("ID:       {}", outcome.id);
+    println!("Rule:     {}", outcome.rule);
     Ok(())
 }
 
@@ -1410,27 +1353,10 @@ fn cmd_rules_delete(options: RuleDeleteOptions) -> Result<(), CliError> {
         .id
         .ok_or_else(|| CliError::usage("rules delete requires --id <rule-id>"))?;
 
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let items = rules.entry(category.to_string()).or_default();
-    let before_len = items.len();
-    items.retain(|item| item.id != id);
-    if items.len() == before_len {
-        return Err(CliError::user(format!("rule not found: {category} #{id}")));
-    }
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        &workspace,
-        "rules.updated",
-        "rules",
-        &format!("Deleted rule {id} from {category}"),
-    )?;
-
+    let outcome = app::rules::delete(&workspace, category, id)?;
     println!("Deleted rule");
-    println!("Category: {category}");
-    println!("ID:       {id}");
+    println!("Category: {}", outcome.category);
+    println!("ID:       {}", outcome.id);
     Ok(())
 }
 
@@ -1466,21 +1392,7 @@ struct DecisionWithdrawOptions {
     reason: String,
 }
 
-#[derive(Debug, Default)]
-struct DecisionAddOptions {
-    title: Option<String>,
-    body: Option<String>,
-    status: Option<String>,
-    date: Option<String>,
-    deciders: Vec<String>,
-    context: Option<String>,
-    consequences: Vec<String>,
-    alternatives: Vec<String>,
-    supersedes: Vec<String>,
-    superseded_by: Vec<String>,
-    references: Vec<String>,
-    tags: Vec<String>,
-}
+type DecisionAddOptions = app::decisions::AddOptions;
 
 fn parse_decision_add_args(args: &[String]) -> Result<DecisionAddOptions, CliError> {
     let mut options = DecisionAddOptions::default();
@@ -1676,60 +1588,16 @@ fn cmd_decision_withdraw(options: DecisionWithdrawOptions) -> Result<(), CliErro
 
 fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
-    let title = require_nonempty(
-        options.title.as_deref(),
-        "decision add requires --title <title>",
-    )?;
-    let status = options.status.as_deref().unwrap_or("proposed");
-    validate_decision_status(status)?;
-    validate_decision_add_options(&options)?;
-    let warnings = decision_add_warnings(&workspace, &options)?;
-
-    let now = current_timestamp();
-    let date = match options.date.as_deref() {
-        Some(date) => {
-            require_nonempty(Some(date), "decision add --date must not be empty")?.to_string()
-        }
-        None => date_from_timestamp(&now),
-    };
-    let created = create_new_sequential_document(&workspace, "decision", |decision_id| {
-        let mut lines = vec![
-            "---".to_string(),
-            format!("id: {decision_id}"),
-            "type: decision".to_string(),
-            format!("title: {}", yaml_double_quote(title)),
-            format!("status: {}", yaml_double_quote(status)),
-            format!("date: {}", yaml_double_quote(&date)),
-        ];
-        push_array_line(&mut lines, "deciders", &options.deciders);
-        push_optional_line(&mut lines, "context", options.context.as_deref());
-        push_array_line(&mut lines, "consequences", &options.consequences);
-        push_array_line(&mut lines, "alternatives", &options.alternatives);
-        push_array_line(&mut lines, "supersedes", &options.supersedes);
-        push_array_line(&mut lines, "supersededBy", &options.superseded_by);
-        push_array_line(&mut lines, "references", &options.references);
-        push_array_line(&mut lines, "tags", &options.tags);
-        lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
-        lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-        lines.push("---".to_string());
-        lines.push(String::new());
-        if let Some(body) = options.body.as_deref() {
-            lines.push(body.to_string());
-        }
-        lines.push(String::new());
-        lines.join("\n")
-    })?;
-    append_event(&workspace, "decision.created", &created.id, title)?;
-
-    for warning in warnings {
+    let outcome = app::decisions::add(&workspace, options)?;
+    for warning in outcome.warnings {
         println!("Warning: {warning}");
     }
     println!("Created decision");
-    println!("ID:     {}", created.id);
-    println!("Status: {status}");
-    println!("Date:   {date}");
-    println!("Title:  {title}");
-    println!("Path:   {}", display_path(&created.path));
+    println!("ID:     {}", outcome.id);
+    println!("Status: {}", outcome.status);
+    println!("Date:   {}", outcome.date);
+    println!("Title:  {}", outcome.title);
+    println!("Path:   {}", display_path(&outcome.path));
     Ok(())
 }
 
@@ -1770,7 +1638,7 @@ fn parse_decision_update_args(args: &[String]) -> Result<DecisionUpdateOptions, 
         ));
     }
     if let Some(status) = options.status.as_deref() {
-        validate_decision_status(status)?;
+        app::decisions::validate_status(status)?;
     }
     Ok(options)
 }
@@ -1794,77 +1662,6 @@ fn parse_decision_withdraw_args(args: &[String]) -> Result<DecisionWithdrawOptio
         )?
         .to_string(),
     })
-}
-
-fn validate_decision_add_options(options: &DecisionAddOptions) -> Result<(), CliError> {
-    if let Some(context) = options.context.as_deref() {
-        require_nonempty(Some(context), "decision add --context must not be empty")?;
-    }
-    for (flag, values) in [
-        ("--decider", &options.deciders),
-        ("--consequence", &options.consequences),
-        ("--alternative", &options.alternatives),
-        ("--supersedes", &options.supersedes),
-        ("--superseded-by", &options.superseded_by),
-        ("--reference", &options.references),
-        ("--tag", &options.tags),
-    ] {
-        for value in values {
-            require_nonempty(
-                Some(value),
-                &format!("decision add {flag} must not be empty"),
-            )?;
-        }
-    }
-    Ok(())
-}
-
-fn validate_decision_status(status: &str) -> Result<(), CliError> {
-    let status = require_nonempty(Some(status), "decision add --status must not be empty")?;
-    if DECISION_STATUSES.contains(&status) {
-        Ok(())
-    } else {
-        Err(CliError::user(format!(
-            "Validation failed: invalid decision status `{status}`; expected one of: {}",
-            DECISION_STATUSES.join(", ")
-        )))
-    }
-}
-
-fn decision_add_warnings(
-    workspace: &TandemProject,
-    options: &DecisionAddOptions,
-) -> Result<Vec<String>, CliError> {
-    let mut warnings = Vec::new();
-    for reference in &options.references {
-        if !document_exists(workspace, reference)? {
-            warnings.push(format!("reference not found: {reference}"));
-        }
-    }
-    for target in &options.supersedes {
-        push_decision_reference_warning(workspace, &mut warnings, "supersedes", target)?;
-    }
-    for target in &options.superseded_by {
-        push_decision_reference_warning(workspace, &mut warnings, "supersededBy", target)?;
-    }
-    Ok(warnings)
-}
-
-fn push_decision_reference_warning(
-    workspace: &TandemProject,
-    warnings: &mut Vec<String>,
-    field: &str,
-    id: &str,
-) -> Result<(), CliError> {
-    match find_document(workspace, id)? {
-        Some(doc) if doc.doc_type() == "decision" => {}
-        Some(doc) => warnings.push(format!(
-            "{field} target {id} is type {}, not decision",
-            doc.doc_type()
-        )),
-        None => warnings.push(format!("{field} decision not found: {id}")),
-    }
-    Ok(())
 }
 
 fn cmd_tui(args: &[String]) -> Result<(), CliError> {
@@ -1956,10 +1753,6 @@ fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
     }
 }
 
-fn find_document(project: &TandemProject, id: &str) -> Result<Option<Document>, CliError> {
-    project.find_document(id)
-}
-
 fn read_workspace_documents(project: &TandemProject) -> Result<Vec<Document>, CliError> {
     project.read_documents()
 }
@@ -2009,10 +1802,6 @@ fn find_hierarchy_children(
             .then_with(|| a.id().cmp(b.id()))
     });
     Ok(children)
-}
-
-fn document_exists(workspace: &TandemProject, id: &str) -> Result<bool, CliError> {
-    Ok(find_document(workspace, id)?.is_some())
 }
 
 fn filter_documents(docs: Vec<Document>, options: &ListOptions) -> Vec<Document> {
@@ -2537,253 +2326,11 @@ fn print_decision_table(docs: &[Document]) {
     }
 }
 
-#[derive(Debug, Clone)]
-struct RuleItem {
-    id: usize,
-    rule: String,
-    source: Option<String>,
-}
-
-type RulesByCategory = BTreeMap<String, Vec<RuleItem>>;
-
-fn empty_rules() -> RulesByCategory {
-    let mut rules = BTreeMap::new();
-    for category in ["always", "never", "prefer", "context"] {
-        rules.insert(category.to_string(), Vec::new());
-    }
-    rules
-}
-
-fn read_rules(config_path: &Path) -> Result<RulesByCategory, CliError> {
-    let root = read_frontmatter_yaml_file(config_path)?;
-    Ok(parse_rules_from_yaml(root.as_ref()))
-}
-
-fn parse_rules_from_content(content: &str, path: &Path) -> Result<RulesByCategory, CliError> {
-    let (frontmatter, _) = split_frontmatter(content).map_err(|message| {
-        CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
-    })?;
-    let root = parse_frontmatter_yaml(&frontmatter).map_err(|message| {
-        CliError::user(format!(
-            "Parse failure: {} frontmatter YAML: {message}",
-            display_path(path)
-        ))
-    })?;
-    Ok(parse_rules_from_yaml(root.as_ref()))
-}
-
-fn parse_rules_from_yaml(root: Option<&Yaml>) -> RulesByCategory {
-    let mut rules = empty_rules();
-    let Some(rules_yaml) = root.and_then(|root| yaml_mapping_value(root, "rules")) else {
-        return rules;
-    };
-    for category in ["always", "never", "prefer", "context"] {
-        let Some(category_yaml) = yaml_mapping_value(rules_yaml, category) else {
-            continue;
-        };
-        let parsed = parse_rule_category_items(category_yaml);
-        rules.insert(category.to_string(), parsed);
-    }
-    rules
-}
-
-fn parse_rule_category_items(value: &Yaml) -> Vec<RuleItem> {
-    match value {
-        Yaml::Array(items) => items
-            .iter()
-            .enumerate()
-            .filter_map(|(index, item)| parse_rule_item(item, index + 1))
-            .collect(),
-        _ => parse_rule_item(value, 1).into_iter().collect(),
-    }
-}
-
-fn parse_rule_item(value: &Yaml, fallback_id: usize) -> Option<RuleItem> {
-    match value {
-        Yaml::Hash(_) => {
-            let id = yaml_mapping_value(value, "id")
-                .and_then(yaml_scalar_to_string)
-                .and_then(|value| value.parse::<usize>().ok())
-                .unwrap_or(fallback_id);
-            let rule = yaml_mapping_value(value, "rule")
-                .and_then(yaml_scalar_to_string)
-                .unwrap_or_default();
-            if rule.trim().is_empty() {
-                return None;
-            }
-            let source = yaml_mapping_value(value, "source")
-                .and_then(yaml_scalar_to_string)
-                .filter(|source| !source.trim().is_empty());
-            Some(RuleItem { id, rule, source })
-        }
-        _ => yaml_scalar_to_string(value)
-            .filter(|rule| !rule.trim().is_empty())
-            .map(|rule| RuleItem {
-                id: fallback_id,
-                rule,
-                source: None,
-            }),
-    }
-}
-
 fn require_rule_category(category: Option<&str>) -> Result<&str, CliError> {
     let category =
         category.ok_or_else(|| CliError::usage("rules mutation requires --category <category>"))?;
-    validate_rule_category(category)?;
+    app::rules::validate_rule_category(category)?;
     Ok(category)
-}
-
-fn validate_rule_category(category: &str) -> Result<(), CliError> {
-    if ["always", "never", "prefer", "context"].contains(&category) {
-        Ok(())
-    } else {
-        Err(CliError::usage(format!(
-            "unknown rule category `{category}`; use always, never, prefer, or context"
-        )))
-    }
-}
-
-fn warn_missing_rule_source(
-    workspace: &TandemProject,
-    source: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(source) = source {
-        if !source.trim().is_empty() && !document_exists(workspace, source)? {
-            println!("Warning: rule source not found: {source}");
-        }
-    }
-    Ok(())
-}
-
-fn patch_rules_category_content(
-    content: &str,
-    category: &str,
-    rules: &RulesByCategory,
-) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let category_block = render_rule_category_block(
-        category,
-        rules.get(category).map(Vec::as_slice).unwrap_or(&[]),
-    );
-    let mut output_frontmatter = String::new();
-    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
-    let mut index = 0usize;
-    let mut in_rules = false;
-    let mut saw_rules = false;
-    let mut replaced_category = false;
-
-    while index < lines.len() {
-        let raw_line = lines[index];
-        let line = raw_line.trim_end_matches('\n').trim_end_matches('\r');
-
-        if !in_rules {
-            if frontmatter_line_key(line) == Some("rules") {
-                let inline_value = line
-                    .split_once(':')
-                    .map(|(_, value)| value.trim())
-                    .unwrap_or("");
-                if inline_value.is_empty() {
-                    output_frontmatter.push_str(raw_line);
-                } else {
-                    output_frontmatter.push_str("rules:\n");
-                }
-                in_rules = true;
-                saw_rules = true;
-            } else {
-                output_frontmatter.push_str(raw_line);
-            }
-            index += 1;
-            continue;
-        }
-
-        if is_top_level_frontmatter_boundary(line) {
-            if !replaced_category {
-                output_frontmatter.push_str(&category_block);
-                replaced_category = true;
-            }
-            in_rules = false;
-            output_frontmatter.push_str(raw_line);
-            index += 1;
-            continue;
-        }
-
-        if rule_category_key(line) == Some(category) {
-            output_frontmatter.push_str(&category_block);
-            replaced_category = true;
-            index += 1;
-            while index < lines.len() {
-                let skip_line = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                if is_top_level_frontmatter_boundary(skip_line)
-                    || rule_category_key(skip_line).is_some()
-                {
-                    break;
-                }
-                index += 1;
-            }
-            continue;
-        }
-
-        output_frontmatter.push_str(raw_line);
-        index += 1;
-    }
-
-    if in_rules && !replaced_category {
-        output_frontmatter.push_str(&category_block);
-    }
-
-    if !saw_rules {
-        if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-            output_frontmatter.push('\n');
-        }
-        output_frontmatter.push_str(&render_rules_block(rules));
-    }
-
-    if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-        output_frontmatter.push('\n');
-    }
-
-    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
-}
-
-fn render_rules_block(rules: &RulesByCategory) -> String {
-    let mut output = String::from("rules:\n");
-    for category in ["always", "never", "prefer", "context"] {
-        output.push_str(&render_rule_category_block(
-            category,
-            rules.get(category).map(Vec::as_slice).unwrap_or(&[]),
-        ));
-    }
-    output
-}
-
-fn render_rule_category_block(category: &str, items: &[RuleItem]) -> String {
-    let mut lines = Vec::new();
-    if items.is_empty() {
-        lines.push(format!("  {category}: []"));
-    } else {
-        lines.push(format!("  {category}:"));
-        for item in items {
-            lines.push(format!("    - id: {}", item.id));
-            lines.push(format!("      rule: {}", yaml_double_quote(&item.rule)));
-            if let Some(source) = item.source.as_deref() {
-                lines.push(format!("      source: {}", yaml_double_quote(source)));
-            }
-        }
-    }
-    lines.push(String::new());
-    lines.join("\n")
-}
-
-fn rule_category_key(line: &str) -> Option<&str> {
-    let indentation = line.chars().take_while(|ch| *ch == ' ').count();
-    if indentation != 2 || line.starts_with('\t') {
-        return None;
-    }
-    let trimmed = line.trim();
-    let (key, _) = trimmed.split_once(':')?;
-    ["always", "never", "prefer", "context"]
-        .contains(&key)
-        .then_some(key)
 }
 
 fn print_rules(rules: &RulesByCategory, category_filter: Option<&str>) {
@@ -3272,55 +2819,6 @@ fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str
     }
 }
 
-fn create_new_sequential_document<F>(
-    workspace: &TandemProject,
-    prefix: &str,
-    content_for_id: F,
-) -> Result<project::write::CreatedDocument, CliError>
-where
-    F: FnMut(&str) -> String,
-{
-    project::write::create_new_sequential_document_after(
-        workspace,
-        prefix,
-        next_sequential_number(workspace, prefix)?,
-        content_for_id,
-    )
-}
-
-fn next_sequential_number(workspace: &TandemProject, prefix: &str) -> Result<usize, CliError> {
-    let hierarchy = hierarchy_from_workspace(workspace)?;
-    Ok(next_sequential_number_for_ids(
-        hierarchy.documents.values().map(|doc| doc.id()),
-        prefix,
-    ))
-}
-
-fn push_optional_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
-    if let Some(value) = value {
-        if !value.trim().is_empty() {
-            lines.push(format!("{key}: {}", yaml_double_quote(value.trim())));
-        }
-    }
-}
-
-fn push_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
-    if !values.is_empty() {
-        lines.push(format!("{key}: {}", inline_array(values)));
-    }
-}
-
-fn inline_array(values: &[String]) -> String {
-    format!(
-        "[{}]",
-        values
-            .iter()
-            .map(|value| yaml_double_quote(value))
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
-}
-
 fn yaml_double_quote(value: &str) -> String {
     let escaped = value
         .replace('\\', "\\\\")
@@ -3343,10 +2841,6 @@ fn current_timestamp() -> String {
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0);
     format_unix_seconds(seconds)
-}
-
-fn date_from_timestamp(timestamp: &str) -> String {
-    timestamp.chars().take(10).collect()
 }
 
 fn format_unix_seconds(seconds: i64) -> String {
@@ -4220,7 +3714,7 @@ blockers: [task-1, "task-2"]
 
     #[test]
     fn parses_structured_rules_with_sources() {
-        let root = parse_frontmatter_yaml(
+        let root = project::parse_frontmatter_yaml(
             r#"
 rules:
   always:
@@ -4244,12 +3738,15 @@ rules:
     fn patches_rules_category_without_touching_other_categories_or_body() {
         let input = "---\ntitle: Demo\nrules:\n  always: []\n  never:\n    - id: 9\n      rule: \"Keep me\"\nstate: ignored\n---\n\n# Body\n";
         let mut rules = empty_rules();
-        rules.get_mut("always").unwrap().push(RuleItem {
-            id: 1,
-            rule: "Run tests".to_string(),
-            source: Some("decision-1".to_string()),
-        });
-        let output = patch_rules_category_content(input, "always", &rules).unwrap();
+        rules
+            .get_mut("always")
+            .unwrap()
+            .push(protocol::config::RuleItem {
+                id: 1,
+                rule: "Run tests".to_string(),
+                source: Some("decision-1".to_string()),
+            });
+        let output = project::rules::patch_rules_category_content(input, "always", &rules).unwrap();
         assert!(output.contains("rules:\n  always:\n    - id: 1\n"));
         assert!(output.contains("      source: \"decision-1\"\n"));
         assert!(output.contains("  never:\n    - id: 9\n      rule: \"Keep me\"\n"));
@@ -4853,8 +4350,8 @@ rules:
 
     #[test]
     fn decision_status_validation_rejects_workflow_states() {
-        assert!(validate_decision_status("accepted").is_ok());
-        let error = validate_decision_status("todo").unwrap_err();
+        assert!(app::decisions::validate_status("accepted").is_ok());
+        let error = app::decisions::validate_status("todo").unwrap_err();
         assert!(error.message.contains("invalid decision status `todo`"));
         assert!(error.message.contains("proposed, accepted, rejected"));
     }
@@ -4886,7 +4383,7 @@ rules:
         )
         .unwrap();
 
-        let warnings = decision_add_warnings(
+        let warnings = app::decisions::diagnostics(
             &workspace,
             &DecisionAddOptions {
                 references: vec!["missing-ref".to_string()],
@@ -4910,7 +4407,10 @@ rules:
 
     #[test]
     fn date_from_timestamp_uses_utc_calendar_date() {
-        assert_eq!(date_from_timestamp("2026-07-01T18:05:47Z"), "2026-07-01");
+        assert_eq!(
+            app::support::date_from_timestamp("2026-07-01T18:05:47Z"),
+            "2026-07-01"
+        );
     }
 
     #[test]

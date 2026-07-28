@@ -9,11 +9,8 @@ use ratatui::{
 
 use super::theme::{StatusTone, TuiTheme};
 use super::{centered_rect, detail_field_line, TuiApp};
-use crate::{
-    append_event, document_exists, ensure_file_unchanged, parse_rules_from_content,
-    patch_rules_category_content, read_file_snapshot, validate_rule_category, write_atomic,
-    CliError, RuleItem, RulesByCategory, TandemProject,
-};
+use crate::app;
+use crate::protocol::config::{RuleItem, RulesByCategory};
 
 const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
 
@@ -542,7 +539,12 @@ impl TuiApp {
     }
 
     fn finish_rule_add(&mut self, category: String, rule: String, source: String) {
-        match add_rule_to_workspace(&self.workspace, &category, &rule, &source) {
+        match app::rules::add(
+            &self.workspace,
+            &category,
+            &rule,
+            Some(normalized_rule_source(&source)),
+        ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_rule_by_id(&outcome.category, outcome.id);
@@ -556,7 +558,13 @@ impl TuiApp {
     }
 
     fn finish_rule_edit(&mut self, category: String, id: usize, rule: String, source: String) {
-        match edit_rule_in_workspace(&self.workspace, &category, id, &rule, &source) {
+        match app::rules::edit(
+            &self.workspace,
+            &category,
+            id,
+            &rule,
+            Some(normalized_rule_source(&source)),
+        ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_rule_by_id(&outcome.category, outcome.id);
@@ -570,7 +578,7 @@ impl TuiApp {
     }
 
     fn finish_rule_delete(&mut self, category: String, id: usize) {
-        match delete_rule_from_workspace(&self.workspace, &category, id) {
+        match app::rules::delete(&self.workspace, &category, id) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_rule_category(&outcome.category);
@@ -822,20 +830,6 @@ struct RuleDisplayRow {
     line: Line<'static>,
 }
 
-#[derive(Debug)]
-struct RuleMutationOutcome {
-    category: String,
-    id: usize,
-    rule: String,
-    warning: Option<String>,
-}
-
-#[derive(Debug)]
-struct RuleDeleteOutcome {
-    category: String,
-    id: usize,
-}
-
 fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -> Line<'static> {
     let marker = if active { ">" } else { " " };
     let value = if value.is_empty() { "<empty>" } else { value };
@@ -859,149 +853,15 @@ fn nearest_rule_position(positions: &[(usize, usize)], category_index: usize) ->
         .unwrap_or_else(|| positions.len().saturating_sub(1))
 }
 
-fn add_rule_to_workspace(
-    workspace: &TandemProject,
-    category: &str,
-    rule: &str,
-    source: &str,
-) -> Result<RuleMutationOutcome, CliError> {
-    validate_rule_category(category)?;
-    let rule = require_rule_text(rule, "rules add requires --rule <text>")?;
-    let source = optional_rule_source(source);
-    let warning = missing_rule_source_warning(workspace, source.as_deref())?;
-
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let next_id = rules
-        .get(category)
-        .into_iter()
-        .flatten()
-        .map(|item| item.id)
-        .max()
-        .unwrap_or(0)
-        + 1;
-    rules
-        .entry(category.to_string())
-        .or_default()
-        .push(RuleItem {
-            id: next_id,
-            rule: rule.to_string(),
-            source,
-        });
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        workspace,
-        "rules.updated",
-        "rules",
-        &format!("Added rule {next_id} to {category}"),
-    )?;
-
-    Ok(RuleMutationOutcome {
-        category: category.to_string(),
-        id: next_id,
-        rule: rule.to_string(),
-        warning,
-    })
+fn normalized_rule_source(source: &str) -> String {
+    source.trim().to_string()
 }
 
-fn edit_rule_in_workspace(
-    workspace: &TandemProject,
-    category: &str,
-    id: usize,
-    rule: &str,
-    source: &str,
-) -> Result<RuleMutationOutcome, CliError> {
-    validate_rule_category(category)?;
-    let rule = require_rule_text(rule, "rules edit requires --rule <text>")?;
-    let source = optional_rule_source(source);
-    let warning = missing_rule_source_warning(workspace, source.as_deref())?;
-
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let items = rules.entry(category.to_string()).or_default();
-    let item = items
-        .iter_mut()
-        .find(|item| item.id == id)
-        .ok_or_else(|| CliError::user(format!("rule not found: {category} #{id}")))?;
-    item.rule = rule.to_string();
-    item.source = source;
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        workspace,
-        "rules.updated",
-        "rules",
-        &format!("Edited rule {id} in {category}"),
-    )?;
-
-    Ok(RuleMutationOutcome {
-        category: category.to_string(),
-        id,
-        rule: rule.to_string(),
-        warning,
-    })
-}
-
-fn delete_rule_from_workspace(
-    workspace: &TandemProject,
-    category: &str,
-    id: usize,
-) -> Result<RuleDeleteOutcome, CliError> {
-    validate_rule_category(category)?;
-    let (content, signature) = read_file_snapshot(&workspace.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &workspace.config_path)?;
-    let items = rules.entry(category.to_string()).or_default();
-    let before_len = items.len();
-    items.retain(|item| item.id != id);
-    if items.len() == before_len {
-        return Err(CliError::user(format!("rule not found: {category} #{id}")));
-    }
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&workspace.config_path, &signature)?;
-    write_atomic(&workspace.config_path, &patched)?;
-    append_event(
-        workspace,
-        "rules.updated",
-        "rules",
-        &format!("Deleted rule {id} from {category}"),
-    )?;
-
-    Ok(RuleDeleteOutcome {
-        category: category.to_string(),
-        id,
-    })
-}
-
-fn require_rule_text<'a>(value: &'a str, message: &str) -> Result<&'a str, CliError> {
-    let value = value.trim();
-    if value.is_empty() {
-        Err(CliError::usage(message))
-    } else {
-        Ok(value)
-    }
-}
-
-fn optional_rule_source(value: &str) -> Option<String> {
-    let value = value.trim();
-    (!value.is_empty()).then(|| value.to_string())
-}
-
-fn missing_rule_source_warning(
-    workspace: &TandemProject,
-    source: Option<&str>,
-) -> Result<Option<String>, CliError> {
-    if let Some(source) = source.filter(|source| !source.trim().is_empty()) {
-        if !document_exists(workspace, source)? {
-            return Ok(Some(format!("rule source not found: {source}")));
-        }
-    }
-    Ok(None)
-}
-
-fn format_rule_outcome(verb: &str, outcome: &RuleMutationOutcome, reload_note: &str) -> String {
+fn format_rule_outcome(
+    verb: &str,
+    outcome: &app::rules::MutationOutcome,
+    reload_note: &str,
+) -> String {
     format!(
         "{verb} {} #{}: {}{}{}",
         outcome.category,
@@ -1027,6 +887,12 @@ mod tests {
         assert_eq!(nearest_rule_position(&positions, 1), 1);
         assert_eq!(nearest_rule_position(&positions, 3), 3);
         assert_eq!(nearest_rule_position(&positions, 4), 3);
+    }
+
+    #[test]
+    fn tui_rule_source_trims_and_clears_before_app_input() {
+        assert_eq!(normalized_rule_source("  decision-1  "), "decision-1");
+        assert_eq!(normalized_rule_source("   "), "");
     }
 
     #[test]
