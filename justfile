@@ -12,6 +12,7 @@ dev:
 	route_file="$git_common_dir/tandem-dev-preview"
 	manifest="$repo_root/tandem/Cargo.toml"
 	workspace="$repo_root"
+	routed_preview=false
 	if [[ -f "$route_file" ]]; then
 		mapfile -t route < "$route_file"
 		if [[ "${#route[@]}" -ne 2 ]]; then
@@ -20,12 +21,21 @@ dev:
 		fi
 		manifest="${route[0]}"
 		workspace="${route[1]}"
+		routed_preview=true
 	fi
 	test -f "$manifest"
 	test -f "$workspace/.tandem/tandem.md"
 	echo "Tandem code:      $manifest"
 	echo "Tandem workspace: $workspace"
 	cd "$workspace"
+	if $routed_preview && grep -Eq '^protocolVersion: *("?0\.1\.0"?)$' .tandem/tandem.md; then
+		case "$workspace/" in
+			"$repo_root/.pi/visual-lab/workspaces/"*) ;;
+			*) echo "Refusing to auto-upgrade non-visual-lab preview workspace: $workspace" >&2; exit 2 ;;
+		esac
+		echo "Upgrading delegated preview fixture to the current protocol..."
+		cargo run --manifest-path "$manifest" -- upgrade
+	fi
 	exec cargo run --manifest-path "$manifest" -- tui
 
 # Agent/orchestrator helper: configure the one-command delegated preview slot.
