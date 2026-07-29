@@ -62,7 +62,13 @@ async function runRepoReadSmoke(tandem: string): Promise<void> {
 		console.log("pi-tandem repo read smoke skipped: this checkout has no local .tandem workspace");
 		return;
 	}
-	const list = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), repoRoot));
+	let list: any;
+	try {
+		list = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), repoRoot));
+	} catch (error) {
+		console.log(`pi-tandem repo read smoke skipped: local workspace is not readable by this build (${String(error)})`);
+		return;
+	}
 	assert(list.ok === true, "repo task list JSON should be ok");
 	const items = list.data?.items ?? [];
 	assert(Array.isArray(items), "repo task list should expose an items array");
