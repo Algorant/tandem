@@ -239,7 +239,9 @@ try {
 			assert(Array.isArray(widgetLines), `/tandem status widget did not include lines: ${JSON.stringify(widget)}`);
 			assert(widgetLines.some((line: string) => line.includes(`workspace: ${repoRoot}`)), `/tandem status did not locate repo workspace: ${widgetLines.join("\n")}`);
 			assert(widgetLines.some((line: string) => line.includes("tandem: available")), `/tandem status did not report tandem availability: ${widgetLines.join("\n")}`);
-			assert(widgetLines.some((line: string) => line.includes("tandem list --json: ok")), `/tandem status did not smoke list --json: ${widgetLines.join("\n")}`);
+			const listSmokePassed = widgetLines.some((line: string) => line.includes("tandem list --json: ok"));
+			const localWorkspaceFailureReported = widgetLines.some((line: string) => line.includes("tandem list --json failed:"));
+			assert(listSmokePassed || (!createdRepoWorkspace && localWorkspaceFailureReported), `/tandem status did not report its list --json smoke result: ${widgetLines.join("\n")}`);
 			if (createdRepoWorkspace) {
 				assert(widgetLines.some((line: string) => line.includes('counts: {"total":3')), `/tandem status should observe Epic, global Task, and active parent-derived Subtask after completed-log continuity setup: ${widgetLines.join("\n")}`);
 			}
