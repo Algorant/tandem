@@ -1,7 +1,7 @@
 //! Private support shared by Task and accord application use cases.
 //!
-//! `CliError` remains a temporary crate-root exception pending task-159; this
-//! module otherwise depends only on project/protocol ownership boundaries.
+//! Application errors use the crate-level `CliError` value while this module
+//! otherwise depends only on project/protocol ownership boundaries.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
