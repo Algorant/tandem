@@ -80,20 +80,69 @@ pub(crate) fn upgrade() -> Result<UpgradeOutcome, CliError> {
     match protocol_version(&project)?.as_str() {
         PROTOCOL_VERSION => Ok(UpgradeOutcome::AlreadyCurrent),
         LEGACY_PROTOCOL_VERSION => {
-            let (content, signature) = read_file_snapshot(&project.config_path)?;
-            let patched = patch_frontmatter_content(
-                &content,
+            let (config_content, config_signature) = read_file_snapshot(&project.config_path)?;
+            let patched_config = patch_frontmatter_content(
+                &config_content,
                 &BTreeMap::from([("protocolVersion".to_string(), PROTOCOL_VERSION.to_string())]),
                 &[],
             )?;
-            ensure_file_unchanged(&project.config_path, &signature)?;
-            write_atomic(&project.config_path, &patched)?;
+
+            // Protocol 0.2 validates priority vocabulary strictly. Prepare all
+            // recognized legacy aliases before writing anything, and patch the
+            // config last so a failed document write remains safely retryable
+            // as an explicit 0.1 -> 0.2 upgrade.
+            let mut document_patches = Vec::new();
+            for document in project.read_documents()? {
+                if !matches!(document.field("priority"), Some("med" | "normal")) {
+                    continue;
+                }
+                let (content, signature) = read_file_snapshot(&document.path)?;
+                let legacy_priority = document
+                    .field("priority")
+                    .expect("legacy priority was matched above");
+                let patched = patch_legacy_priority(&content, legacy_priority)?;
+                document_patches.push((document.path.clone(), signature, patched));
+            }
+
+            ensure_file_unchanged(&project.config_path, &config_signature)?;
+            for (path, signature, _) in &document_patches {
+                ensure_file_unchanged(path, signature)?;
+            }
+            for (path, _, patched) in document_patches {
+                write_atomic(&path, &patched)?;
+            }
+            write_atomic(&project.config_path, &patched_config)?;
             Ok(UpgradeOutcome::Upgraded)
         }
         version => Err(CliError::user(format!(
             "Cannot upgrade unsupported protocol version `{version}`; expected {LEGACY_PROTOCOL_VERSION} or {PROTOCOL_VERSION}."
         ))),
     }
+}
+
+fn patch_legacy_priority(content: &str, legacy_priority: &str) -> Result<String, CliError> {
+    let (frontmatter, _) = split_frontmatter(content).map_err(CliError::user)?;
+    let frontmatter_start = content
+        .find(&frontmatter)
+        .expect("split frontmatter is a slice of source content");
+    let mut offset = frontmatter_start;
+    for line in frontmatter.split_inclusive('\n') {
+        let source_line = line.trim_end_matches(['\n', '\r']);
+        if crate::project::frontmatter_line_key(source_line) == Some("priority") {
+            let value_start = source_line.find(':').expect("frontmatter key has colon") + 1;
+            if let Some(relative) = source_line[value_start..].find(legacy_priority) {
+                let start = offset + value_start + relative;
+                let end = start + legacy_priority.len();
+                let mut patched = content.to_string();
+                patched.replace_range(start..end, "medium");
+                return Ok(patched);
+            }
+        }
+        offset += line.len();
+    }
+    Err(CliError::user(
+        "Upgrade failed: legacy priority could not be patched safely.",
+    ))
 }
 
 pub(crate) fn protocol_version(project: &TandemProject) -> Result<String, CliError> {

@@ -969,7 +969,7 @@ types:
     completable: true
 ```
 
-Upgrade preserves declarations and documents byte-for-byte apart from the workspace `protocolVersion` patch. Tandem warns that they are deprecated, allows list/show/search access, and rejects creation or mutation; there are no type-management commands.
+Explicit upgrade preserves legacy declarations and document content except for two intentional protocol 0.2 migrations: it patches the workspace `protocolVersion`, and canonicalizes recognized `priority` aliases `med` and `normal` to `medium` in active documents and completed logs. Priority migration changes only the scalar value, preserving unrelated frontmatter formatting, unknown fields, and Markdown bodies. Tandem warns that custom types are deprecated, allows list/show/search access, and rejects creation or mutation; there are no type-management commands.
 
 ## Validation diagnostics
 

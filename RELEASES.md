@@ -2,6 +2,15 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.7.1
+
+Tandem v0.7.1 fixes protocol 0.2 upgrades for projects containing recognized legacy priority aliases.
+
+### Fixed
+
+- Explicit `tandem upgrade` canonicalizes legacy `med` and `normal` priorities to `medium` in active documents and completed logs while preserving unrelated frontmatter and Markdown bodies.
+- Already-canonical priorities and archived log content remain unchanged; ordinary commands still never upgrade or mutate projects implicitly.
+
 ## 0.7.0
 
 Tandem v0.7.0 establishes protocol 0.2 and a canonical implementation architecture shared by peer CLI and TUI interfaces.

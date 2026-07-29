@@ -555,7 +555,7 @@ pub(super) fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
                 "Upgraded Tandem project protocol: {LEGACY_PROTOCOL_VERSION} -> {PROTOCOL_VERSION}"
             );
             println!(
-                "Preserved existing documents, configuration, events, and logs without conversion."
+                "Preserved existing content while canonicalizing legacy `med` and `normal` priorities to `medium` in documents and logs."
             );
         }
     }

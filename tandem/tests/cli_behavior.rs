@@ -241,13 +241,16 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     fs::write(&config_path, legacy_config.clone()).expect("seed legacy protocol config");
     fs::write(
         project.path(".tandem/board/note-1.md"),
-        "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n",
+        "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\npriority: normal # legacy alias\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n",
     )
     .expect("seed legacy custom document");
     let event_before = "{\"event\":\"legacy.event\",\"id\":\"note-1\"}\n";
     fs::write(project.path(".tandem/events.jsonl"), event_before).expect("seed legacy event");
-    let log_before = "---\nid: task-99\ntype: task\ntitle: Historical log\ncompletedAt: 2026-01-01T00:00:00Z\n---\n\nHistorical body.\n";
+    let log_before = "---\nid: task-99\ntype: task\ntitle: Historical log\npriority: med\ncompletedAt: 2026-01-01T00:00:00Z\nunknownLogField: keep\n---\n\nHistorical body.\n";
     fs::write(project.path(".tandem/logs/task-99.md"), log_before).expect("seed historical log");
+    let canonical_before = "---\nid: task-98\ntype: task\ntitle: Canonical log\npriority: medium\ncompletedAt: 2026-01-02T00:00:00Z\n---\n\nCanonical body.\n";
+    fs::write(project.path(".tandem/logs/task-98.md"), canonical_before)
+        .expect("seed canonical historical log");
 
     let refused = project.run(&["list"]);
     refused.assert_exit(1);
@@ -267,14 +270,15 @@ fn protocol_upgrade_requires_explicit_conversion_and_preserves_legacy_content() 
     let upgrade = project.run(&["upgrade"]);
     upgrade.assert_success();
     assert!(upgrade.stdout.contains("0.1.0 -> 0.2.0"));
-    assert!(upgrade.stdout.contains("without conversion"));
+    assert!(upgrade.stdout.contains("canonicalizing legacy"));
     let upgraded_config = project.read(".tandem/tandem.md");
     assert!(upgraded_config.contains("protocolVersion: \"0.2.0\""));
     assert!(upgraded_config.contains("idPrefix: note"));
     assert!(upgraded_config.contains("requireReview: true"));
-    assert_eq!(project.read(".tandem/board/note-1.md"), "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n");
+    assert_eq!(project.read(".tandem/board/note-1.md"), "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\npriority: medium # legacy alias\neffort: xlarge\nunknownField: preserve\n---\n\nLegacy custom body.\n");
     assert_eq!(project.read(".tandem/events.jsonl"), event_before);
-    assert_eq!(project.read(".tandem/logs/task-99.md"), log_before);
+    assert_eq!(project.read(".tandem/logs/task-99.md"), "---\nid: task-99\ntype: task\ntitle: Historical log\npriority: medium\ncompletedAt: 2026-01-01T00:00:00Z\nunknownLogField: keep\n---\n\nHistorical body.\n");
+    assert_eq!(project.read(".tandem/logs/task-98.md"), canonical_before);
 
     let listed = project.run(&["list"]);
     listed.assert_success();
