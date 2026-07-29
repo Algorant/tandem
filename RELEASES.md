@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.7.2
+
+Tandem v0.7.2 gives the bare `tandem` command a polished, concise landing page.
+
+### CLI
+
+- Commands are grouped by purpose with aligned names and short descriptions.
+- The landing page includes every top-level command and points to `tandem <command> --help` for detailed usage.
+- Restrained terminal styling is enabled only for interactive terminals; piped output and `NO_COLOR` remain ANSI-free.
+
 ## 0.7.1
 
 Tandem v0.7.1 fixes protocol 0.2 upgrades for projects containing recognized legacy priority aliases.
