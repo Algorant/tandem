@@ -26,8 +26,13 @@ impl TempProject {
     }
 
     fn run(&self, args: &[&str]) -> Run {
+        self.run_with_env(args, &[])
+    }
+
+    fn run_with_env(&self, args: &[&str], envs: &[(&str, &str)]) -> Run {
         let output = Command::new(env!("CARGO_BIN_EXE_tandem"))
             .args(args)
+            .envs(envs.iter().copied())
             .current_dir(&self.root)
             .output()
             .expect("run tandem executable");
@@ -103,6 +108,38 @@ impl Run {
 #[test]
 fn process_help_version_usage_and_missing_project_contracts() {
     let project = TempProject::new("process-contracts");
+
+    let landing = project.run(&[]);
+    landing.assert_success();
+    assert!(landing.stderr.is_empty());
+    assert!(!landing.stdout.contains("\x1b["));
+    assert!(landing
+        .stdout
+        .starts_with("Tandem\nLocal-first coordination for humans and agents.\n"));
+    for heading in ["Work", "Collaborate", "Explore", "Workspace"] {
+        assert!(landing.stdout.contains(&format!("\n{heading}\n")));
+    }
+    for command in [
+        "add", "move", "update", "complete", "cancel", "accord", "rules", "decision", "list",
+        "show", "search", "log", "init", "upgrade", "tui", "version",
+    ] {
+        assert!(
+            landing.stdout.lines().any(|line| {
+                line.strip_prefix("  ")
+                    .and_then(|line| line.split_whitespace().next())
+                    == Some(command)
+            }),
+            "landing output omitted {command}"
+        );
+    }
+    assert!(landing
+        .stdout
+        .ends_with("Run `tandem <command> --help` for detailed usage.\n"));
+
+    let no_color = project.run_with_env(&[], &[("NO_COLOR", "1")]);
+    no_color.assert_success();
+    assert!(!no_color.stdout.contains("\x1b["));
+    assert_eq!(no_color.stdout, landing.stdout);
 
     let help = project.run(&["--help"]);
     help.assert_success();

@@ -6,6 +6,7 @@
 
 mod args;
 mod commands;
+mod landing;
 mod output;
 
 use crate::CliError;
@@ -25,7 +26,7 @@ pub(crate) fn run(args: Vec<String>) -> Result<StartupRequest, CliError> {
 
 fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
     if args.is_empty() {
-        print_help();
+        landing::print();
         return Ok(StartupRequest::Exit);
     }
 
