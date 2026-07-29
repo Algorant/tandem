@@ -66,8 +66,8 @@ Keep protocol and CLI/TUI work together while the idea is still forming. Split l
 
 Current areas:
 
-- `protocol/` — the protocol/spec source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile.
-- `tandem/` — CLI + TUI design and implementation. The user-facing CLI is `tandem`; the prior v0 surface is implemented as a single Rust binary crate, but the accepted strict Epic → Task → Subtask correction remains active implementation work across CLI and TUI.
+- `protocol/` — the normative protocol source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile. `tandem/src/protocol/` is its executable Rust implementation.
+- `tandem/` — one Rust binary crate containing executable `protocol`, concrete `project::TandemProject`, shared `app` operations, and peer CLI/TUI interfaces. `main.rs` and `tui/mod.rs` are wiring roots.
 - `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tandem` CLI.
 - `plan/` — parent project coordination and cross-cutting decisions.
 
@@ -77,10 +77,10 @@ Do not overdesign the repository. For v0, keep CLI/TUI implementation under `tan
 
 Protocol:
 
-- Protocol version for the first v0 draft is `0.1.0`.
-- Canonical workflow field is `state`; default states are `todo`, `in-progress`, `review`.
+- Current protocol version is `0.2.0`; `0.1.0` projects require explicit `tandem upgrade` before ordinary operations.
+- Canonical workflow field is `state`; default states are `todo`, `in-progress`, `validation`, with legacy `review` reads tolerated.
 - New work items use `type: task`; Epics and Tasks—including direct Epic Tasks—use the global `task-N` namespace. Only a Subtask directly beneath a Task uses `task-N-M`.
-- First-class document types are `task` and `decision`; decision documents are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type; custom types are config-only in v0.
+- First-class document types are `task` and `decision`; decision documents are ADR-compatible durable records, do not need a lifecycle field in v0, and should not be split into a separate ADR type. Legacy custom declarations/documents are deprecated read-only compatibility content after upgrade.
 - Epic, Task, and Subtask are derived roles over `type: task` documents. An Epic has `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Resolve documents to classify these roles—never infer them from ID shape.
 - Direct Epic children are Tasks with relationship `epic-task`; children of Tasks are Subtasks with relationship `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.
 - The hierarchy and ID grammar are strict: Epics cannot have `parentId`; Subtasks cannot have children; Epics/Tasks require global `task-N`; Subtasks require parent-derived `task-N-M`. Invalid role/ID forms and role-changing or ID-invalidating reparenting are errors.
@@ -98,12 +98,12 @@ Protocol:
 CLI/TUI:
 
 - v0 commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
-- `tandem log` includes `list`, `show`, `search`; `tandem rules` includes `list`, `add`, `edit`, `delete`; `tandem accord` includes `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- `tandem log` includes `list`, `show`, `search`; `tandem rules` includes `list`, `add`, `edit`, `delete`; `tandem accord` includes `claim`, `deliver`, `accept`, `rework`, `block`, `fail` while persisted `ready` remains readable.
 - Human-readable output is default using compact tables for list/search and labeled detail blocks for show/log/decision; all read commands support `--json` envelope objects.
-- First CLI implementation language is Rust inside `tandem/`; the current implementation remains one `tandem` binary crate with `yaml-rust2` parsing, raw-source CLI mutations, and a `src/tui.rs` Ratatui/crossterm module.
+- The implementation is one Rust `tandem` binary crate. `project::TandemProject` owns concrete `.tandem/` filesystem work, shared `app` operations own use-case orchestration, and peer `src/cli/` and `src/tui/` interfaces consume canonical protocol outcomes.
 - `tandem decision` supports `list`, `show`, and `add`.
 - The TUI launches as `tandem tui` only in v0.
-- First TUI MVP includes board mutations, Board/Review/Logs/Rules/Decisions views, theme support, mouse enabled by default without drag/drop, fixed default keybindings, styled-basic Markdown rendering, and a simple filtered-list Review queue. The current Board layout uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
+- First TUI MVP includes board mutations, Board/Logs/Rules/Decisions views, Board Validation flows, theme support, mouse enabled by default without drag/drop, fixed default keybindings, and styled-basic Markdown rendering. The current Board layout uses count-labeled state subviews with a full-width selected-state list rather than simultaneous columns.
 - V0 CLI uses canonical command names and long flags only; no short aliases.
 - Theme config loads in this order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display semantics such as project tag badge opt-ins load from user config and workspace `.tandem/config.toml`.
 - Defer templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, and fixtures.

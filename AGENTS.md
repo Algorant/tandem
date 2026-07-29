@@ -23,10 +23,10 @@ Current direction is intentionally simple:
 
 - Keep this as one parent monorepo named `tandem`.
 - Keep exactly three major child areas for now: `protocol/`, `tandem/`, and `extensions/`.
-- `protocol/` is the protocol/spec source of truth. Treat the protocol as the spec, not as a package/crate implementation area.
+- Repository `protocol/` Markdown is the normative protocol source of truth. `tandem/src/protocol/` is its executable Rust implementation, not a second specification.
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
-- The prior v0 `tandem` CLI surface is implemented, but the accepted strict Epic → Task → Subtask correction is not complete until its delegated protocol, CLI, TUI, and integration tasks deliver. Do not describe the current CLI/TUI implementation as complete while that work remains open. Aim for broad feature parity with live Brainfile CLI/TUI while fixing known flaws and not blindly copying every detail.
+- The Rust architecture is implemented as `protocol`, `project`, `app`, `cli`, and `tui` modules in one binary crate. `project::TandemProject` owns concrete `.tandem/` discovery and filesystem safety; shared `app` operations coordinate protocol rules and project I/O; CLI and TUI are peer interfaces. `main.rs` and `tui/mod.rs` are wiring roots, not protocol or persistence owners.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
 - `extensions/` is the scoped home for agent/editor integrations. The first integration is `extensions/pi-tandem/`, a lightweight Pi adapter over an installed `tandem` CLI; extension code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
@@ -37,11 +37,11 @@ Current direction is intentionally simple:
 Protocol:
 
 - Canonical workflow field: `state` / `states`.
-- Default active states: `todo`, `in-progress`, `review`.
-- Protocol version for the first v0 draft: `0.1.0`.
+- Default active states: `todo`, `in-progress`, `validation`; legacy `review` reads remain tolerated.
+- Current protocol version: `0.2.0`. Discovered `0.1.0` projects are upgrade-only until an explicit `tandem upgrade`; ordinary operations must not upgrade implicitly.
 - Default task identity: `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
 - First-class document types: `task` and `decision`; decision documents are ADR-compatible durable records and do not need a lifecycle field in v0.
-- Custom document types: allowed in config only; no v0 type-management CLI.
+- First-class creation supports only `task` and `decision`; legacy custom-type declarations/documents are preserved as deprecated read-only content after upgrade.
 - Hierarchy roles are derived from resolved documents, never ID shape: an Epic is `type: task` plus `kind: epic`; a Task is a normal task that is root-level, has a generic non-task parent, or is directly parented by an Epic; a Subtask is a normal task directly parented by a Task. Direct Epic children use relationship `epic-task`, Task children use `subtask`, and decision/custom-document parents use generic `parent`.
 - Work agreement object: `accord`.
 - Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
@@ -59,14 +59,14 @@ CLI/TUI:
 - v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
 - v0 `tandem log`: `list`, `show`, `search` only.
 - v0 `tandem rules`: `list`, `add`, `edit`, `delete`.
-- v0 `tandem accord`: `ready`, `claim`, `deliver`, `accept`, `rework`, `block`, `fail`.
+- `tandem accord`: `claim`, `deliver`, `accept`, `rework`, `block`, `fail`; persisted `ready` remains readable but is not a command action.
 - CLI output: human-readable by default using compact tables for list/search and labeled detail blocks for show/log/decision; `--json` envelope objects for all read commands.
 - V0 CLI alias policy: canonical command names and long flags only; no short aliases.
 - `tandem decision`: `list`, `show`, `add`.
 - First CLI implementation language: Rust, inside `tandem/`.
 - TUI invocation: `tandem tui` only in v0.
 - First TUI MVP: includes board mutations immediately.
-- TUI top-level views: Board, Review, Logs, Rules, Decisions.
+- TUI top-level views: Board, Logs, Rules, Decisions; validation/review work is presented through Board state and validation flows.
 - Theme and mouse support are part of the first TUI MVP.
 - Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded from v0.
 - Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badge opt-ins load from user config and workspace `.tandem/config.toml`.
@@ -183,7 +183,7 @@ CLI/TUI:
 - Support themes from the beginning.
 - Support mouse selection/scroll/click via a hit-map style event model.
 - Keep keyboard-first ergonomics with vim-style and conventional bindings.
-- Keep v0 implementation under `tandem/`; treat package/module layout and dependency choices inside that area as open until coding begins.
+- Keep implementation under the single `tandem/` binary crate. Preserve the implemented dependency direction: `protocol` owns meaning, `project` owns concrete files, `app` owns shared operations, and peer `cli`/`tui` interfaces consume those layers.
 - Evaluate live Brainfile CLI/TUI features for parity, then decide what to keep, rename, improve, or intentionally omit.
 
 Extensions:
@@ -198,10 +198,8 @@ Extensions:
 
 While the `refactor/protocol-architecture` campaign is active, follow
 [`plan/refactor_campaign_baseline.md`](plan/refactor_campaign_baseline.md) and
-[`plan/refactor_spec.md`](plan/refactor_spec.md). The campaign targets five
-ownership boundaries: `protocol`, `project`, `app`, `cli`, and `tui`; they are
-target boundaries and do not assert that every corresponding Rust module exists
-yet.
+[`plan/refactor_spec.md`](plan/refactor_spec.md). The campaign established five implemented ownership boundaries: `protocol`,
+`project`, `app`, `cli`, and `tui`.
 
 - Keep Rust CLI/TUI implementation work frozen on `main`. Unrelated
   documentation, planning, extension, and non-Rust work may continue only when
@@ -235,11 +233,13 @@ When recording durable decisions:
 - Do not model decisions as task lifecycle states, accord statuses, completed logs, or a separate `adr` document type.
 - For ADR-compatible records, include body sections such as Status, Context, Decision, Consequences, and Supersession; optional status/supersession metadata is decision record metadata, not workflow `state`.
 
-When adding implementation code later:
+When changing implementation code:
 
 - Prefer small, reviewable commits/changes.
-- Add tests with protocol changes when implementation exists; do not add schemas or fixtures in v0.
-- Keep protocol parsing/mutation logic separate from TUI rendering logic and extension adapter logic.
+- Add tests with protocol changes; do not add schemas or fixtures in v0.
+- Change normative semantics in `protocol/` first, then update `tandem/src/protocol/`; do not infer roles, IDs, lifecycle, accord, review, or event rules in `project`, CLI, TUI, or extensions.
+- Route durable CLI and TUI mutations through shared `app` operations over `project::TandemProject`.
+- Keep `pi-tandem` CLI-only: it may build argument arrays and consume CLI JSON, but must never parse or mutate Tandem Markdown/frontmatter or reclassify protocol relationships.
 - Do not create opaque state as the only source of truth.
 
 ## File editing rules

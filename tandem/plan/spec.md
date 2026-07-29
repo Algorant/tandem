@@ -3,20 +3,23 @@
 Status: draft  
 Date: 2026-06-26  
 Working name: Tandem  
-Implementation target: prior CLI v0 surface implemented; strict Epic → Task → Subtask correction pending across CLI and TUI inside `tandem/`
+Implementation status: protocol `0.2.0` and strict Epic → Task → Subtask behavior implemented in one binary crate with `protocol`, `project`, `app`, `cli`, and `tui` boundaries
 
 Naming:
 
 - Product/protocol: **Tandem**
 - CLI/TUI source directory: `tandem/`
 - CLI binary: `tandem`
-- CLI design and the prior v0 implementation precede TUI implementation; accepted decision-7 hierarchy correction is active required CLI/TUI work, not a completed surface
+- CLI and TUI are peer interfaces over shared application operations and the executable protocol implementation
 - V0 TUI invocation: `tandem tui` only
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
-This document describes the user-facing `tandem` CLI and terminal UI for the Tandem protocol described in `../../protocol/plan/spec.md`.
+This document describes the user-facing `tandem` CLI and terminal UI for the
+normative Tandem protocol in `../../protocol/plan/spec.md`. Executable semantics
+live in `../src/protocol/`; concrete project files are owned by
+`project::TandemProject`; shared use cases live in `../src/app/`.
 
-The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. The prior CLI v0 surface is implemented, but strict Epic → Task → Subtask classification and validation remain active implementation work alongside the responsive, themeable, mouse-aware TUI.
+The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. Strict Epic → Task → Subtask classification and validation are implemented canonically and are consumed by both interfaces; remaining TUI gaps are tracked separately.
 
 ## Baseline inputs
 

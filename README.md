@@ -14,8 +14,8 @@ This is a monorepo that houses the spec, the cli and tui, and the documentation 
 ## Repository layout
 
 ```text
-protocol/      Protocol source of truth and detailed specification
-tandem/        Rust CLI and Ratatui TUI application
+protocol/      Normative protocol source of truth and detailed specification
+tandem/        Executable Rust protocol, project/app layers, CLI, and Ratatui TUI
 docs/          Public documentation source
 site/          Astro Starlight documentation site
 extensions/    Agent and editor adapters, including pi-tandem
@@ -58,6 +58,21 @@ Initialization creates a `.tandem/` workspace containing active Board documents,
 [placeholder for .tandem directory structure]
 
 See the [agent-first quickstart](https://trytandem.dev/quick-start/) to take a small task through the complete workflow.
+
+## Implementation architecture
+
+The Markdown under [`protocol/`](protocol/) is normative. Its executable Rust
+implementation lives in [`tandem/src/protocol/`](tandem/src/protocol/) and is
+consumed by the concrete [`project::TandemProject`](tandem/src/project/mod.rs)
+filesystem boundary. Shared [`app`](tandem/src/app/) operations coordinate
+protocol validation and project I/O. [`cli`](tandem/src/cli/) and
+[`tui`](tandem/src/tui/) are peer interfaces over those operations;
+[`main.rs`](tandem/src/main.rs) only composes process startup and exit handling,
+and `tui/mod.rs` wires the terminal application and cohesive TUI modules.
+
+New projects use protocol `0.2.0`. A discovered `0.1.0` project requires an
+explicit `tandem upgrade` before ordinary project operations; upgrades are not
+implicit.
 
 ## Everyday workflow
 

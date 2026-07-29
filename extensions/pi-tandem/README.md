@@ -14,7 +14,13 @@
 LLM → Pi tool call → pi-tandem extension → tandem CLI → .tandem workspace
 ```
 
-The extension does not parse or mutate Tandem Markdown/frontmatter directly. It only builds safe `tandem` argument arrays, runs the CLI, parses JSON output from read commands when available, formats results, and adds diagnostics.
+The extension is a CLI-only adapter. It does not import Tandem Rust modules or
+parse, validate, classify, or mutate Tandem Markdown/frontmatter directly. It
+only builds safe `tandem` argument arrays, runs the installed CLI, consumes JSON
+output from read commands when available, formats results, and adds diagnostics.
+Normative semantics remain in repository `protocol/`; the CLI reaches their
+executable implementation through shared Rust `app` operations and
+`project::TandemProject`.
 
 ## Tools
 

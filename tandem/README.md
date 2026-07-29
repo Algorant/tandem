@@ -19,7 +19,29 @@ The CLI/TUI area owns:
 - review, accord, completion, and logs workflows as presented in the UI
 - TUI tests and snapshots
 
-The CLI/TUI area does **not** own the underlying protocol semantics. Protocol rules and data-model decisions belong in `../protocol/`, though the CLI and TUI must represent them faithfully.
+The CLI/TUI area does **not** own the underlying protocol semantics. Normative
+rules and data-model decisions belong in `../protocol/`; their executable Rust
+implementation lives in `src/protocol/` and both interfaces must represent it
+faithfully.
+
+## Implemented architecture
+
+The package remains one binary crate with five cohesive boundaries:
+
+- `src/protocol/` implements the normative repository protocol Markdown.
+- `src/project/` exposes concrete `project::TandemProject` discovery, reads,
+  raw-source preservation, locking, conflict checks, atomic writes, archive
+  moves, and event files; it does not infer protocol meaning.
+- `src/app/` provides shared typed queries and mutation use cases over protocol
+  rules and `TandemProject`, without printing or rendering.
+- `src/cli/` owns argument parsing, dispatch, and exact human/JSON output.
+- `src/tui/` owns terminal lifecycle, transient state, input, projection, and
+  rendering. `src/tui/mod.rs` is the wiring root for its cohesive modules.
+
+CLI and TUI are peers over shared `app` and protocol behavior. `src/main.rs`
+only composes startup, TUI handoff, errors, and process exit. There is no legacy
+root `Workspace`, generic persistence layer, public library crate, or second
+protocol implementation.
 
 ## Current status
 

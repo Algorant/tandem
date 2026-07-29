@@ -1,28 +1,28 @@
 # Tandem Rust Architecture Refactor Specification
 
-- Status: reviewed specification; ready for Task decomposition and architecture decision
+- Status: accepted by decision-8; implementation campaign at final documentation checkpoint
 - Date: 2026-07-22
 - Inputs: task-145 modularization research, Tandem protocol specification, decision-7 hierarchy work, and follow-up architecture discussion
 
 ## Decision posture
 
-This reviewed planning specification records the project owner's resolved architecture and compatibility choices. It is not itself the accepted architecture decision and does not authorize implementation.
+Decision-8 accepts the architectural boundaries, dependency direction, and
+protocol compatibility policy in this specification. Epic `task-146` records
+the campaign boundary, and implementation proceeded through independently
+reviewed Tasks on `refactor/protocol-architecture`. Tandem workflow records,
+not this document, authorize individual Tasks.
 
-Epic `task-146` records the campaign boundary. The remaining sequence is:
-
-1. commit this reviewed specification;
-2. decompose `task-146` into independently reviewable direct Tasks;
-3. record one broad accepted Tandem architecture decision referencing the specification, Epic, and Tasks;
-4. create the dedicated refactor integration branch;
-5. begin a Task only after it is explicitly authorized.
-
-The eventual decision should lock the architectural boundaries and dependency direction, not every final filename or line count.
+Leaf filenames and line ranges below remain planning and review aids. They are
+not immutable protocol or architecture requirements; the implemented cohesive
+module tree is authoritative for source paths.
 
 ## Purpose
 
-Tandem's Rust implementation currently concentrates most behavior in `tandem/src/main.rs` and `tandem/src/tui.rs`. The code works and has broad test coverage, but protocol semantics, concrete Tandem-project file access, application operations, CLI presentation, and TUI behavior are not visibly separated.
+At campaign inception, Tandem's Rust implementation concentrated most behavior
+in the former `tandem/src/main.rs` and `tandem/src/tui.rs`. That historical
+baseline motivated the implemented module boundaries described below.
 
-The refactor should make the canonical Tandem protocol implementation unmistakable and shared while keeping the CLI and TUI as separate peer interfaces over the same behavior.
+The refactor makes the canonical Tandem protocol implementation unmistakable and shared while keeping the CLI and TUI as separate peer interfaces over the same behavior.
 
 The campaign combines an explicitly approved protocol `0.2.0` compatibility change with an organizational refactor. The protocol change must land in dedicated behavior-changing Tasks and commits. Move-only stages must not change protocol behavior, CLI output, persisted data, events, TUI behavior, keybindings, themes, or release packaging.
 
@@ -92,7 +92,7 @@ The CLI and TUI are two peer human/tool interfaces:
 
 The external `pi-tandem` extension remains another adapter, but it continues to call the installed CLI rather than importing or reimplementing Tandem protocol behavior.
 
-## Proposed dependency direction
+## Implemented dependency direction
 
 ```text
 repository protocol/*.md
@@ -145,9 +145,11 @@ The diagram is not intended to suggest that `project` calls application code. Ap
 - `project` must preserve unknown fields and Markdown bodies according to protocol requirements.
 - Cross-layer APIs should use private items by default, `pub(super)` where possible, and narrow `pub(crate)` only for genuine sibling-layer seams.
 
-## Proposed source structure
+## Planning source map
 
-This is a target map. A file should be created only when cohesive code moves into it.
+This target map guided extraction. It is intentionally non-normative at the leaf
+level: files were created only when cohesive code moved, and the current
+`tandem/src/` tree—not this illustrative list—defines the final source paths.
 
 ```text
 tandem/src/
@@ -565,7 +567,7 @@ The Epic should explicitly review and update, where applicable:
 - `tandem/plan/todo.md` and root `plan/todo.md` when milestones change;
 - `extensions/README.md` and `extensions/pi-tandem/README.md` to preserve the thin-CLI-adapter rule;
 - code-level module documentation for `protocol`, `project`, `app`, `cli`, and `tui`;
-- agent prompts/rules that currently refer to `main.rs`, `tui.rs`, or the legacy root `Workspace` ownership model.
+- agent prompts/rules that refer to implementation behavior as owned by `main.rs`, the former `tui.rs`, or the legacy root `Workspace` model.
 
 Documentation should continue to state:
 
@@ -625,7 +627,7 @@ Line ranges are review aids, not CI rules.
 
 ## Completion criteria
 
-The refactor branch is ready to merge only when:
+The refactor branch is ready to merge only when the final campaign checkpoints confirm:
 
 1. the accepted architecture decision and implementation agree;
 2. normative protocol docs and executable-protocol module docs are clearly distinguished;

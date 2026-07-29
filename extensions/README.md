@@ -30,7 +30,7 @@ extensions/
 ## Adapter principle
 
 ```text
-LLM / editor agent → integration adapter → tandem CLI → .tandem workspace
+LLM / editor agent → integration adapter → installed tandem CLI → app/project → .tandem workspace
 ```
 
 Adapters may own:
@@ -47,7 +47,12 @@ Adapters must not own:
 - ID allocation or relationship reclassification.
 - Alternate task, accord, rule, decision, or log parsers beyond trivial CLI JSON output handling.
 
-Those behaviors belong in `protocol/` and the `tandem` implementation under `tandem/`. Adapters pass through and consume Tandem's canonical hierarchy:
+Normative behavior belongs in repository `protocol/`; executable behavior belongs
+in `tandem/src/protocol/` and shared `app` operations over
+`project::TandemProject`. The current `pi-tandem` integration is CLI-only: it
+must not import Rust internals, discover an alternate application API, or bypass
+the installed CLI. Adapters pass through and consume the CLI's canonical
+hierarchy:
 
 ```text
 task-10       Epic: global ID

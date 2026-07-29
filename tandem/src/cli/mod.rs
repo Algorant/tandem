@@ -1,4 +1,8 @@
-//! Manual command parsing, dispatch, command adapters, and exact process output.
+//! Peer command-line interface over shared application and protocol behavior.
+//!
+//! This module owns manual argument parsing, dispatch, command adapters, and
+//! exact process output. It does not own durable filesystem mutation or infer
+//! protocol semantics; those remain in `app`, `project`, and `protocol`.
 
 mod args;
 mod commands;

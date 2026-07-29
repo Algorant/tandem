@@ -6,7 +6,10 @@ Working name: Tandem
 
 This document sketches the Tandem protocol: a Brainfile-inspired file format that keeps Brainfile's useful shape, adapts the language for Tandem, and folds in local v3 improvements around review, complete/archive, and first-class logs.
 
-The protocol is the spec/source of truth for Tandem's local-first project coordination files. It is not an implementation package or crate layout.
+The repository `protocol/` Markdown is the normative source of truth for
+Tandem's local-first project coordination files. It is not an implementation
+package or crate layout. `tandem/src/protocol/` is the executable Rust
+implementation; `tandem/src/project/` owns concrete file access and preservation.
 
 Acceptance stamp: the v0 draft is complete enough to implement `tandem init`, `tandem list`, `tandem show`, and subsequent v0 mutations. Future protocol edits should come from implementation feedback or explicit product decisions, not abstract planning churn.
 

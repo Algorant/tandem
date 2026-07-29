@@ -1,3 +1,10 @@
+//! Peer terminal interface over shared application and protocol behavior.
+//!
+//! This module is the TUI wiring root: it composes terminal lifecycle,
+//! transient state, input, reload, projection, feature, and rendering modules.
+//! Durable mutations route through `app`; protocol inference and concrete
+//! project-file safety remain outside the interface.
+
 use std::collections::{BTreeMap, BTreeSet};
 #[cfg(test)]
 use std::env;

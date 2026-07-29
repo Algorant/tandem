@@ -1,6 +1,12 @@
 # Tandem Protocol
 
-This directory contains the Tandem protocol/spec planning.
+This directory contains the normative Tandem protocol specification.
+
+The Markdown here is the source of truth for Tandem format and semantics. The
+executable Rust implementation lives in `../tandem/src/protocol/`; it implements
+these requirements and is not a second specification. Concrete project discovery,
+raw-source preservation, locking, and atomic filesystem writes belong to
+`../tandem/src/project/`, not to the normative document model.
 
 The protocol defines the local-first file format for human/agent coordination. It is inspired by Brainfile's useful shape, adapted into Tandem terminology, and extended with the local v3 direction around review, complete/archive, and first-class logs. It has no v0 Brainfile import/migration requirement.
 
@@ -23,7 +29,10 @@ The protocol area does **not** own TUI rendering details. TUI design belongs in 
 
 ## Current status
 
-Protocol v0 draft is accepted for implementation. No protocol crate, schemas, or fixtures exist, and schemas/fixtures are not part of v0. Implementation begins in `../tandem/`; protocol docs should change only for implementation feedback, bug fixes, or explicit product decisions.
+Protocol `0.2.0` is implemented in the single Rust binary crate under
+`../tandem/`. No separate protocol crate, schemas, or fixtures exist, and
+schemas/fixtures are not part of v0. Protocol docs should change only for
+implementation feedback, bug fixes, or explicit product decisions.
 
 ## Documentation
 

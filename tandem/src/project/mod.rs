@@ -1,8 +1,10 @@
 //! Concrete filesystem boundary for one discovered Tandem project.
 //!
-//! This module resolves project-local paths and reads source documents without
-//! interpreting their protocol meaning. The executable `protocol` module owns
-//! validation, hierarchy, workflow, accord, review, and event semantics.
+//! [`TandemProject`] resolves project-local paths and owns concrete reads,
+//! raw-source preservation, locks, conflict checks, atomic writes, archive
+//! moves, and event files without interpreting protocol meaning. The executable
+//! `protocol` module owns validation, hierarchy, workflow, accord, review, and
+//! event semantics; shared `app` operations coordinate both boundaries.
 
 use std::collections::HashMap;
 use std::env;

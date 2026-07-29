@@ -41,11 +41,11 @@ Set relationship fields explicitly:
 Example:
 
 ```text
-tandem_task action=add title="Ship relationship UI" kind="epic" relatedFiles=["tandem/src/tui.rs"]
+tandem_task action=add title="Ship relationship UI" kind="epic" relatedFiles=["tandem/src/tui/"]
 # Suppose Tandem returns task-10.
-tandem_task action=add title="Implement relationship display" parent="task-10" relatedFiles=["tandem/src/tui.rs"]
+tandem_task action=add title="Implement relationship display" parent="task-10" relatedFiles=["tandem/src/tui/board/"]
 # Tandem returns a global Task such as task-11 with parentRelationship=epic-task.
-tandem_task action=add title="Render relationship labels" parent="task-11" relatedFiles=["tandem/src/tui.rs"]
+tandem_task action=add title="Render relationship labels" parent="task-11" relatedFiles=["tandem/src/tui/board/render.rs"]
 # Tandem returns a Subtask such as task-11-1 with parentRelationship=subtask.
 ```
 

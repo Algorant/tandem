@@ -30,10 +30,11 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [x] Added first-class TUI theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, plus workspace `theme = "name"` selection and `default-dark`/`verdigris` preset examples.
 - [x] Added `extensions/` as the third major area for agent/editor integrations.
 - [x] Added the initial `extensions/pi-tandem` Pi adapter MVP over installed `tandem`.
+- [x] Established the accepted `protocol` → `project` → `app` architecture with peer CLI/TUI interfaces, `project::TandemProject`, `tui/mod.rs`, protocol `0.2.0` compatibility, real-command coverage, and strict Clippy checkpoints.
 
 ## Current tasks
 
-- [ ] Implement accepted decision-7 across protocol, CLI, TUI, and integrations: derive Epic/Task/Subtask roles from resolved documents, enforce global `task-N` IDs for Epics/Tasks and `task-N-M` only for Subtasks, emit `epic-task`/`subtask`/generic `parent`, and reject invalid roles, IDs, and reparenting.
+- [x] Implement accepted decision-7 across protocol, CLI, TUI, and integrations: derive Epic/Task/Subtask roles from resolved documents, enforce global `task-N` IDs for Epics/Tasks and `task-N-M` only for Subtasks, emit `epic-task`/`subtask`/generic `parent`, and reject invalid roles, IDs, and reparenting.
 - [ ] Integrate delegated Task campaigns with the accepted worker direction: Epics are not delegated; Worker A executes a delegated Task's Subtask documents through one `pi-todos` checklist and one root settlement without independent Subtask delegation.
 - [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
