@@ -11,7 +11,8 @@ The Tandem protocol defines the local `.tandem/` data model used by the CLI, TUI
 ├── tandem.md        # workspace config and rules
 ├── board/           # active Markdown documents
 ├── logs/            # completed or canceled Markdown documents
-├── events/          # per-actor append-only lifecycle events
+├── actor-id         # ignored checkout/worktree-local runtime identity
+├── events/          # tracked per-actor append-only lifecycle events
 │   └── <actor_id>.jsonl
 └── events.jsonl     # legacy global event log; readable during transition
 ```
@@ -72,7 +73,9 @@ Successful completion and reasoned cancellation both archive the Task to `.tande
 
 ## Events
 
-New event writes append to the current writer's `.tandem/events/<actor_id>.jsonl`; readers aggregate all per-actor logs plus any legacy `.tandem/events.jsonl`. Event records require `ts`, `event`, `id`, `summary`, canonical `actor`, and per-actor `seq`; the event identity is `<actor>:<seq>`. Optional `actorName` is display-only and never determines canonical identity or file ownership.
+New event writes append to the current writer's tracked `.tandem/events/<actor_id>.jsonl`; readers aggregate all per-actor logs plus any legacy `.tandem/events.jsonl`. Event records require `ts`, `event`, `id`, `summary`, canonical `actor`, and per-actor `seq`; the event identity is `<actor>:<seq>`. Optional `actorName` is display-only and never determines canonical identity or file ownership.
+
+The automatic actor identifies one independent writable checkout or linked worktree. Tandem resolves a filename-safe `TANDEM_ACTOR_ID` override first. Otherwise, it reuses or atomically creates a random UUID in `.tandem/actor-id`. This identity file is ignored local runtime state in Git projects and remains local in non-Git workspaces. New worktrees get distinct identities; retained or recovered worktrees reuse theirs. Integrations must remain identity-unaware and must not inject one shared actor override across worktrees.
 
 Per-actor logs avoid Git file-level append conflicts, but semantic conflicts between actors' task or review changes can still happen and should be surfaced rather than discarded.
 

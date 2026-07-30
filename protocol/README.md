@@ -18,7 +18,7 @@ The protocol area owns:
 - `.tandem/tandem.md` workspace config shape
 - active work documents in `.tandem/board/`
 - completed and canceled work-history documents in `.tandem/logs/`
-- per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with legacy `.tandem/events.jsonl` reads during transition
+- tracked per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with ignored checkout/worktree-local `.tandem/actor-id` identity and legacy `.tandem/events.jsonl` reads during transition
 - `accord` work-agreement model
 - review and completion semantics
 - Brainfile-inspired protocol parity decisions
@@ -72,6 +72,6 @@ implementation feedback, bug fixes, or explicit product decisions.
 - Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
 - Rules are structured objects. References can point to any Tandem document by ID.
 - Completion always warns but allows completion unless structural validation blocks it. Legacy project-level completion-policy settings are preserved, deprecated, and ignored.
-- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition.
+- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in tracked per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition. Tandem persists the automatic actor UUID in ignored `.tandem/actor-id` per independent checkout or linked worktree.
 - Validation is built-in structural validation only, with strict structure/core refs, hierarchy roles, and ID grammar: unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, role-changing reparenting, and invalid optional `priority` (`low|medium|high|critical`) or `effort` (`trivial|small|medium|large`) values are errors; unresolved related `references` are warnings.
 - No Brainfile import/migration command is required in v0.

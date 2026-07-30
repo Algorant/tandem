@@ -21,4 +21,5 @@ lto = "thin"
 [dependencies]
 crossterm = "0.28"
 ratatui = "0.29"
+uuid = { version = "1", features = ["v4"] }
 yaml-rust2 = "0.11"

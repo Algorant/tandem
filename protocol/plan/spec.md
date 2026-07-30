@@ -98,7 +98,8 @@ The protocol is a project-local directory containing:
 │   └── decision-1.md
 ├── logs/              # completed/archived Markdown documents
 │   └── task-1.md
-├── events/            # per-actor append-only lifecycle events
+├── actor-id           # ignored checkout/worktree-local runtime identity
+├── events/            # tracked per-actor append-only lifecycle events
 │   ├── actor_01HV9ABC.jsonl
 │   └── actor_01HV9XYZ.jsonl
 └── events.jsonl       # legacy global event log; readable during transition
@@ -838,7 +839,9 @@ New Tandem event storage uses per-actor append logs:
 └── events.jsonl       # legacy global log; read-only transition source for new tools
 ```
 
-Each `actor_id` is the canonical writer identity and event-log ownership key. It must be unique enough for file ownership and safe as a filename segment. Tools may reuse an actor ID from user-level or workspace-local actor configuration when one exists. If no existing actor ID can be found, Tandem may generate a new opaque ID and continue rather than blocking; the primary goal is disentangling Git appends, not perfect machine or human recognition. Tools should avoid sharing one actor ID among independent concurrent writers.
+Each `actor_id` is the canonical writer identity and event-log ownership key. An actor identifies one independent writable checkout or linked worktree, not a person, machine, agent, clone, or whole repository. On the first mutation, Tandem resolves it from a filename-safe `TANDEM_ACTOR_ID` override, an existing `.tandem/actor-id`, or a newly generated random UUID that it atomically persists there. Concurrent first writers must converge on the persisted UUID. Invalid, unreadable, or unwritable identity state is an error.
+
+`.tandem/actor-id` is ignored local runtime state in Git projects and remains local in non-Git workspaces. The `.tandem/events/<actor_id>.jsonl` ledger is tracked audit history. Tandem owns identity generation, persistence, validation, and event writing. Integrations and orchestrators must not generate, copy, parse, or automatically inject actor IDs. In particular, one global `TANDEM_ACTOR_ID` must not be shared across independent Herdr or Worktrunk worktrees. Retained or recovered worktrees reuse their local identity; new worktrees generate a different identity.
 
 Each writer must append only to `.tandem/events/<actor_id>.jsonl` for its own canonical `actor_id`. New writes should not append to the legacy `.tandem/events.jsonl` by default. Readers aggregate all readable `.tandem/events/*.jsonl` files plus `.tandem/events.jsonl` when it exists, so workspaces can transition without losing audit history.
 

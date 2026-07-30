@@ -1,9 +1,12 @@
 //! Concrete per-actor event-ledger operations.
 
+use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+use uuid::Uuid;
 
 use crate::project::{display_path, extract_json_string, extract_json_u64, TandemProject};
 use crate::protocol::event::{self, CanonicalEventEnvelope};
@@ -19,7 +22,14 @@ pub(crate) fn append_event(
     timestamp: &str,
 ) -> Result<(), CliError> {
     debug_assert!(event::is_known_name(event_name));
-    append_event_for_actor(project, event_name, id, summary, timestamp, &actor_id()?)
+    append_event_for_actor(
+        project,
+        event_name,
+        id,
+        summary,
+        timestamp,
+        &actor_id(project)?,
+    )
 }
 
 fn append_event_for_actor(
@@ -64,13 +74,19 @@ fn append_event_for_actor(
     result
 }
 
-pub(crate) fn actor_id() -> Result<String, CliError> {
-    let configured = std::env::var("TANDEM_ACTOR_ID").ok();
-    // Without an explicit durable identity, isolate independent CLI processes
-    // rather than letting them race on a shared user-name ledger. A process
-    // may create a fresh opaque actor ledger; callers needing cross-process
-    // identity set the filename-safe TANDEM_ACTOR_ID override.
-    let candidate = configured.unwrap_or_else(fallback_actor_id);
+pub(crate) fn actor_id(project: &TandemProject) -> Result<String, CliError> {
+    match std::env::var_os("TANDEM_ACTOR_ID") {
+        Some(value) => validate_override(value),
+        None => persisted_actor_id(project),
+    }
+}
+
+fn validate_override(value: OsString) -> Result<String, CliError> {
+    let candidate = value.into_string().map_err(|_| {
+        CliError::user(
+            "Event append failure: TANDEM_ACTOR_ID must contain valid Unicode and be a filename-safe actor ID",
+        )
+    })?;
     if is_safe_actor_id(&candidate) {
         Ok(candidate)
     } else {
@@ -80,17 +96,215 @@ pub(crate) fn actor_id() -> Result<String, CliError> {
     }
 }
 
-fn fallback_actor_id() -> String {
-    static FALLBACK_ACTOR_ID: OnceLock<String> = OnceLock::new();
-    FALLBACK_ACTOR_ID
-        .get_or_init(|| {
-            let nanos = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0);
-            format!("local-{}-{nanos}", std::process::id())
-        })
-        .clone()
+fn persisted_actor_id(project: &TandemProject) -> Result<String, CliError> {
+    let path = project.data_dir().join("actor-id");
+    fs::create_dir_all(project.data_dir()).map_err(|error| identity_error(&path, error))?;
+    ensure_git_ignored(project, &path)?;
+    match fs::read_to_string(&path) {
+        Ok(content) => parse_persisted_actor_id(&path, &content),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let generated = Uuid::new_v4().hyphenated().to_string();
+            let created = crate::project::write::write_new_atomic(&path, &format!("{generated}\n"))
+                .map_err(|error| {
+                    CliError::user(format!(
+                        "Event actor identity failure: could not atomically persist {}: {}",
+                        display_path(&path),
+                        error.message
+                    ))
+                })?;
+            if created {
+                Ok(generated)
+            } else {
+                let content =
+                    fs::read_to_string(&path).map_err(|error| identity_error(&path, error))?;
+                parse_persisted_actor_id(&path, &content)
+            }
+        }
+        Err(error) => Err(identity_error(&path, error)),
+    }
+}
+
+fn parse_persisted_actor_id(path: &Path, content: &str) -> Result<String, CliError> {
+    let candidate = content.strip_suffix('\n').unwrap_or(content);
+    let candidate = candidate.strip_suffix('\r').unwrap_or(candidate);
+    let valid = !candidate.contains(['\n', '\r'])
+        && Uuid::parse_str(candidate).is_ok_and(|uuid| uuid.hyphenated().to_string() == candidate);
+    if valid {
+        Ok(candidate.to_string())
+    } else {
+        Err(CliError::user(format!(
+            "Event actor identity failure: {} must contain one canonical lowercase hyphenated UUID",
+            display_path(path)
+        )))
+    }
+}
+
+fn identity_error(path: &Path, error: std::io::Error) -> CliError {
+    CliError::user(format!(
+        "Event actor identity failure: could not read or write {}: {error}",
+        display_path(path)
+    ))
+}
+
+fn ensure_git_ignored(project: &TandemProject, actor_path: &Path) -> Result<(), CliError> {
+    let Some((git_root, exclude_path)) = git_paths(project.root())? else {
+        return Ok(());
+    };
+    let relative = actor_path.strip_prefix(&git_root).map_err(|_| {
+        CliError::user(format!(
+            "Event actor identity failure: {} is outside Git worktree {}",
+            display_path(actor_path),
+            display_path(&git_root)
+        ))
+    })?;
+    let relative_arg = relative.as_os_str();
+    if let Some(parent) = exclude_path.parent() {
+        fs::create_dir_all(parent).map_err(|error| identity_error(&exclude_path, error))?;
+    }
+    let mut exclude = OpenOptions::new()
+        .read(true)
+        .append(true)
+        .create(true)
+        .open(&exclude_path)
+        .map_err(|error| identity_error(&exclude_path, error))?;
+    exclude
+        .lock()
+        .map_err(|error| identity_error(&exclude_path, error))?;
+    let result = (|| {
+        let ignored = Command::new("git")
+            .arg("-C")
+            .arg(&git_root)
+            .args(["check-ignore", "--quiet", "--"])
+            .arg(relative_arg)
+            .status()
+            .map_err(|error| git_identity_error(project.root(), error))?;
+        if ignored.success() {
+            return Ok(());
+        }
+        if ignored.code() != Some(1) {
+            return Err(CliError::user(format!(
+                "Event actor identity failure: Git could not check whether {} is ignored",
+                display_path(actor_path)
+            )));
+        }
+        let pattern = format!(
+            "/{}",
+            relative
+                .components()
+                .map(|component| component.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/")
+        );
+        exclude
+            .seek(SeekFrom::Start(0))
+            .map_err(|error| identity_error(&exclude_path, error))?;
+        let mut content = String::new();
+        exclude
+            .read_to_string(&mut content)
+            .map_err(|error| identity_error(&exclude_path, error))?;
+        if !content.lines().any(|line| line == pattern) {
+            if !content.is_empty() && !content.ends_with('\n') {
+                exclude
+                    .write_all(b"\n")
+                    .map_err(|error| identity_error(&exclude_path, error))?;
+            }
+            exclude
+                .write_all(format!("{pattern}\n").as_bytes())
+                .and_then(|_| exclude.sync_data())
+                .map_err(|error| identity_error(&exclude_path, error))?;
+        }
+        Ok(())
+    })();
+    let _ = exclude.unlock();
+    result
+}
+
+fn git_paths(root: &Path) -> Result<Option<(PathBuf, PathBuf)>, CliError> {
+    let top = match Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        Ok(output) => output,
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                && nearest_git_metadata(root).is_none() =>
+        {
+            return Ok(None);
+        }
+        Err(error) => return Err(git_identity_error(root, error)),
+    };
+    if !top.status.success() {
+        if let Some(metadata) = nearest_git_metadata(root) {
+            return Err(CliError::user(format!(
+                "Event actor identity failure: Git could not inspect {} despite Git metadata at {}: {}",
+                display_path(root),
+                display_path(&metadata),
+                String::from_utf8_lossy(&top.stderr).trim()
+            )));
+        }
+        return Ok(None);
+    }
+    let git_root = output_path(root, "worktree root", &top)?;
+    let exclude = git_output(root, &["rev-parse", "--git-path", "info/exclude"])?;
+    if !exclude.status.success() {
+        return Err(CliError::user(
+            "Event actor identity failure: Git could not resolve its exclude file",
+        ));
+    }
+    let exclude_path = output_path(root, "exclude file", &exclude)?;
+    let exclude_path = if exclude_path.is_absolute() {
+        exclude_path
+    } else {
+        root.join(exclude_path)
+    };
+    Ok(Some((git_root, exclude_path)))
+}
+
+fn nearest_git_metadata(root: &Path) -> Option<PathBuf> {
+    root.ancestors()
+        .map(|ancestor| ancestor.join(".git"))
+        .find(|path| path.exists())
+}
+
+fn git_output(root: &Path, args: &[&str]) -> Result<Output, CliError> {
+    Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| git_identity_error(root, error))
+}
+
+fn git_identity_error(root: &Path, error: std::io::Error) -> CliError {
+    let action = if error.kind() == std::io::ErrorKind::NotFound {
+        "the Git executable is required for this Git workspace but was not found"
+    } else {
+        "could not run Git"
+    };
+    CliError::user(format!(
+        "Event actor identity failure: {action} for {}: {error}",
+        display_path(root)
+    ))
+}
+
+fn output_path(root: &Path, label: &str, output: &Output) -> Result<PathBuf, CliError> {
+    let value = std::str::from_utf8(&output.stdout).map_err(|_| {
+        CliError::user(format!(
+            "Event actor identity failure: Git returned a non-Unicode {label} for {}",
+            display_path(root)
+        ))
+    })?;
+    let value = value.trim_end_matches(['\r', '\n']);
+    if value.is_empty() {
+        Err(CliError::user(format!(
+            "Event actor identity failure: Git returned an empty {label} for {}",
+            display_path(root)
+        )))
+    } else {
+        Ok(PathBuf::from(value))
+    }
 }
 
 pub(crate) fn is_safe_actor_id(actor: &str) -> bool {
@@ -210,11 +424,56 @@ mod tests {
     }
 
     #[test]
-    fn fallback_actor_is_filename_safe_and_process_isolated() {
-        let actor = fallback_actor_id();
-        assert!(is_safe_actor_id(&actor));
-        assert!(actor.starts_with(&format!("local-{}-", std::process::id())));
-        assert_eq!(actor, fallback_actor_id());
+    fn persisted_actor_is_reused_and_malformed_state_fails() {
+        let (project, root) = project();
+        let first = persisted_actor_id(&project).unwrap();
+        assert_eq!(
+            Uuid::parse_str(&first).unwrap().hyphenated().to_string(),
+            first
+        );
+        assert_eq!(persisted_actor_id(&project).unwrap(), first);
+        fs::write(project.data_dir().join("actor-id"), "not-an-identity\n").unwrap();
+        let error = persisted_actor_id(&project).unwrap_err();
+        assert!(error
+            .message
+            .contains("canonical lowercase hyphenated UUID"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn explicit_override_accepts_safe_ids_and_rejects_unsafe_ids() {
+        assert_eq!(
+            validate_override(OsString::from("worker.explicit-1")).unwrap(),
+            "worker.explicit-1"
+        );
+        assert!(validate_override(OsString::from("../shared")).is_err());
+    }
+
+    #[test]
+    fn concurrent_first_use_converges_on_one_persisted_actor() {
+        let (project, root) = project();
+        let project = Arc::new(project);
+        let barrier = Arc::new(Barrier::new(8));
+        let handles = (0..8)
+            .map(|_| {
+                let project = Arc::clone(&project);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    persisted_actor_id(&project).unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        let actors = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert!(actors.iter().all(|actor| actor == &actors[0]));
+        assert_eq!(
+            fs::read_to_string(project.data_dir().join("actor-id")).unwrap(),
+            format!("{}\n", actors[0])
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

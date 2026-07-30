@@ -32,6 +32,7 @@ impl TempProject {
     fn run_with_env(&self, args: &[&str], envs: &[(&str, &str)]) -> Run {
         let output = Command::new(env!("CARGO_BIN_EXE_tandem"))
             .args(args)
+            .env_remove("TANDEM_ACTOR_ID")
             .envs(envs.iter().copied())
             .current_dir(&self.root)
             .output()
@@ -531,6 +532,229 @@ fn hierarchy_validation_completion_and_logs_remain_observable_at_the_process_bou
 
     let events = project.actor_events();
     assert!(events.contains("\"event\":\"task.completed\""));
+}
+
+#[test]
+fn automatic_actor_identity_is_reused_and_override_has_precedence() {
+    let project = TempProject::new("actor-identity");
+    project.init();
+
+    project
+        .run(&["add", "--title", "Automatic one"])
+        .assert_success();
+    let automatic = project.read(".tandem/actor-id").trim().to_string();
+    project
+        .run(&["add", "--title", "Automatic two"])
+        .assert_success();
+    assert!(project
+        .path(format!(".tandem/events/{automatic}.jsonl"))
+        .is_file());
+
+    project
+        .run_with_env(
+            &["add", "--title", "Explicit actor"],
+            &[("TANDEM_ACTOR_ID", "explicit.worker-1")],
+        )
+        .assert_success();
+    assert!(project
+        .path(".tandem/events/explicit.worker-1.jsonl")
+        .is_file());
+    assert_eq!(project.read(".tandem/actor-id").trim(), automatic);
+
+    let invalid = project.run_with_env(
+        &["add", "--title", "Invalid actor"],
+        &[("TANDEM_ACTOR_ID", "../shared")],
+    );
+    invalid.assert_exit(1);
+    assert!(invalid
+        .stderr
+        .contains("TANDEM_ACTOR_ID must be a filename-safe actor ID"));
+}
+
+#[test]
+fn non_git_workspace_persists_identity_when_git_is_unavailable() {
+    let project = TempProject::new("non-git-without-git-executable");
+    project.init();
+
+    project
+        .run_with_env(&["add", "--title", "First without Git"], &[("PATH", "")])
+        .assert_success();
+    let actor = project.read(".tandem/actor-id").trim().to_string();
+    project
+        .run_with_env(&["add", "--title", "Second without Git"], &[("PATH", "")])
+        .assert_success();
+    assert_eq!(project.read(".tandem/actor-id").trim(), actor);
+    let events = project.read(format!(".tandem/events/{actor}.jsonl"));
+    assert_eq!(events.lines().count(), 2);
+}
+
+#[test]
+fn git_workspace_reports_missing_git_executable() {
+    let project = TempProject::new("git-without-git-executable");
+    project.init();
+    let initialized = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(&project.root)
+        .status()
+        .expect("initialize Git workspace");
+    assert!(initialized.success());
+
+    let result = project.run_with_env(
+        &["add", "--title", "Cannot ignore identity"],
+        &[("PATH", "")],
+    );
+    result.assert_exit(1);
+    assert!(result
+        .stderr
+        .contains("the Git executable is required for this Git workspace but was not found"));
+    assert!(!project.path(".tandem/actor-id").exists());
+}
+
+#[test]
+fn concurrent_first_mutations_share_one_actor_ledger() {
+    let project = TempProject::new("concurrent-actor-identity");
+    project.init();
+    let mut children = (0..6)
+        .map(|index| {
+            Command::new(env!("CARGO_BIN_EXE_tandem"))
+                .args(["add", "--title", &format!("Concurrent {index}")])
+                .env_remove("TANDEM_ACTOR_ID")
+                .current_dir(&project.root)
+                .spawn()
+                .expect("spawn concurrent tandem mutation")
+        })
+        .collect::<Vec<_>>();
+    for child in &mut children {
+        assert!(child.wait().expect("wait for mutation").success());
+    }
+    let actor = project.read(".tandem/actor-id").trim().to_string();
+    let events = project.read(format!(".tandem/events/{actor}.jsonl"));
+    assert_eq!(events.lines().count(), 6);
+    assert_eq!(
+        fs::read_dir(project.path(".tandem/events"))
+            .expect("read events")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn git_linked_worktrees_get_distinct_ignored_actor_identities() {
+    let project = TempProject::new("git-actor-identity");
+    project.init();
+    let git = |cwd: &Path, args: &[&str]| {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .expect("run git");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&project.root, &["init", "--quiet"]);
+    git(&project.root, &["config", "user.name", "Tandem Test"]);
+    git(
+        &project.root,
+        &["config", "user.email", "tandem@example.invalid"],
+    );
+    git(&project.root, &["add", ".tandem/tandem.md"]);
+    git(&project.root, &["commit", "--quiet", "-m", "initialize"]);
+
+    let linked = project.root.with_extension("linked");
+    git(
+        &project.root,
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "linked-actor-test",
+            linked.to_str().unwrap(),
+        ],
+    );
+    project
+        .run(&["add", "--title", "Root actor"])
+        .assert_success();
+    let linked_run = Command::new(env!("CARGO_BIN_EXE_tandem"))
+        .args(["add", "--title", "Linked actor"])
+        .env_remove("TANDEM_ACTOR_ID")
+        .current_dir(&linked)
+        .output()
+        .expect("run linked-worktree mutation");
+    assert!(
+        linked_run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&linked_run.stderr)
+    );
+
+    let root_actor = project.read(".tandem/actor-id").trim().to_string();
+    let linked_actor = fs::read_to_string(linked.join(".tandem/actor-id"))
+        .unwrap()
+        .trim()
+        .to_string();
+    assert_ne!(root_actor, linked_actor);
+    for cwd in [&project.root, &linked] {
+        let ignored = Command::new("git")
+            .args(["check-ignore", "--quiet", ".tandem/actor-id"])
+            .current_dir(cwd)
+            .status()
+            .unwrap();
+        assert!(ignored.success());
+        let status = Command::new("git")
+            .args(["status", "--porcelain", "--untracked-files=all"])
+            .current_dir(cwd)
+            .output()
+            .unwrap();
+        let status = String::from_utf8(status.stdout).unwrap();
+        assert!(!status.contains("actor-id"));
+        assert!(status.contains(".tandem/events/"));
+    }
+    git(&project.root, &["add", ".tandem/board", ".tandem/events"]);
+    git(&project.root, &["commit", "--quiet", "-m", "root mutation"]);
+    let clone = project.root.with_extension("clone");
+    let clone_output = Command::new("git")
+        .args([
+            "clone",
+            "--quiet",
+            project.root.to_str().unwrap(),
+            clone.to_str().unwrap(),
+        ])
+        .output()
+        .expect("clone actor test repository");
+    assert!(clone_output.status.success());
+    let clone_run = Command::new(env!("CARGO_BIN_EXE_tandem"))
+        .args(["add", "--title", "Clone actor"])
+        .env_remove("TANDEM_ACTOR_ID")
+        .current_dir(&clone)
+        .output()
+        .expect("run clone mutation");
+    assert!(
+        clone_run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&clone_run.stderr)
+    );
+    let clone_actor = fs::read_to_string(clone.join(".tandem/actor-id"))
+        .unwrap()
+        .trim()
+        .to_string();
+    assert_ne!(root_actor, clone_actor);
+    assert_ne!(linked_actor, clone_actor);
+    assert!(Command::new("git")
+        .args(["check-ignore", "--quiet", ".tandem/actor-id"])
+        .current_dir(&clone)
+        .status()
+        .unwrap()
+        .success());
+
+    git(
+        &project.root,
+        &["worktree", "remove", "--force", linked.to_str().unwrap()],
+    );
+    fs::remove_dir_all(clone).unwrap();
 }
 
 #[test]
