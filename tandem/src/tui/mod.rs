@@ -2490,7 +2490,7 @@ tone = "success"
         app.status.clear();
         assert_eq!(
             app.rules_footer_text(),
-            "Rules · h/l category · j/k select · n new · e edit · d delete · ? help"
+            "Rules · h/l category · j/k select · Enter preview · n new · e edit · d delete · ? help"
         );
     }
 
@@ -2513,7 +2513,7 @@ tone = "success"
     }
 
     #[test]
-    fn rules_mouse_hits_select_categories_and_variable_height_open_rows() {
+    fn rules_mouse_hits_select_categories_and_dense_rows() {
         let mut app = keyboard_test_app();
         app.view = TuiView::Rules;
         app.rules.get_mut("prefer").unwrap().extend([
@@ -2534,7 +2534,7 @@ tone = "success"
                 action: HitAction::SelectRuleCategory(2),
             },
             HitRegion {
-                rect: Rect::new(2, 6, 30, 6),
+                rect: Rect::new(2, 7, 30, 1),
                 action: HitAction::SelectRuleItem(1),
             },
         ];
@@ -2542,8 +2542,34 @@ tone = "success"
         app.handle_mouse(left_click(3, 2));
         assert_eq!(app.rules_view.selected_category, 2);
         assert_eq!(app.rules_view.selected_item, 0);
-        app.handle_mouse(left_click(4, 9));
+        app.handle_mouse(left_click(4, 7));
         assert_eq!(app.rules_view.selected_item, 1);
+    }
+
+    #[test]
+    fn rules_enter_toggles_preview_and_selection_follows_without_closing_it() {
+        let mut app = keyboard_test_app();
+        app.view = TuiView::Rules;
+        app.rules.get_mut("always").unwrap().extend([
+            crate::protocol::config::RuleItem {
+                id: 1,
+                rule: "First rule".to_string(),
+                source: None,
+            },
+            crate::protocol::config::RuleItem {
+                id: 2,
+                rule: "Second rule".to_string(),
+                source: Some("decision-10".to_string()),
+            },
+        ]);
+
+        app.handle_rules_key(KeyEvent::from(KeyCode::Enter));
+        assert!(app.rules_view.preview_open);
+        app.handle_rules_key(KeyEvent::from(KeyCode::Char('j')));
+        assert_eq!(app.rules_view.selected_item, 1);
+        assert!(app.rules_view.preview_open);
+        app.handle_rules_key(KeyEvent::from(KeyCode::Enter));
+        assert!(!app.rules_view.preview_open);
     }
 
     #[test]

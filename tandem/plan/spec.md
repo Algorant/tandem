@@ -1044,7 +1044,7 @@ A one-pane view for project rules grouped by category:
 - `prefer`
 - `context`
 
-Each rule renders as a bounded card. The card wraps the full rule text and separates its stable ID from optional source metadata. Narrow terminals use taller wrapped cards instead of a permanent detail pane. The selected card uses the active theme accent rail, while category tabs retain counts and local keyboard and mouse navigation.
+Each rule renders as a stable, dense one-line row with a selection cursor, category-colored stable ID, truncated neutral preview, and muted source metadata. `Enter` toggles a full-width preview drawer for the selected rule. The bounded drawer wraps the complete rule text and shows category, ID, and source metadata; selection changes update it without changing list row heights. Narrow terminals preserve list space instead of introducing a permanent detail pane. Category tabs retain counts and local keyboard and mouse navigation.
 
 Actions:
 

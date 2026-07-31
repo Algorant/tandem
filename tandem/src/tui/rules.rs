@@ -14,6 +14,9 @@ use crate::app;
 use crate::protocol::config::{RuleItem, RulesByCategory};
 
 const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
+const MIN_RULE_LIST_HEIGHT: u16 = 3;
+const MIN_RULE_PREVIEW_HEIGHT: u16 = 5;
+const MAX_RULE_PREVIEW_HEIGHT: u16 = 10;
 
 fn title_case(value: &str) -> String {
     let mut chars = value.chars();
@@ -34,6 +37,7 @@ pub(super) struct RulesState {
     pub(super) selected_category: usize,
     pub(super) selected_item: usize,
     pub(super) list_offset: usize,
+    pub(super) preview_open: bool,
     prompt: Option<RulePrompt>,
 }
 
@@ -199,27 +203,19 @@ impl TuiApp {
             KeyCode::Char('e') => self.start_rule_edit_prompt(),
             KeyCode::Char('d') => self.start_rule_delete_prompt(),
             KeyCode::Enter => {
-                self.status = self
-                    .selected_rule()
-                    .map(|(category, rule)| {
-                        let source = rule
-                            .source
-                            .as_deref()
-                            .filter(|source| !source.trim().is_empty())
-                            .map(|source| format!(" · source {source}"))
-                            .unwrap_or_default();
-                        format!(
-                            "{category} #{}: {}{source}",
-                            rule.id,
-                            super::truncate(&rule.rule, 140)
-                        )
-                    })
-                    .unwrap_or_else(|| {
-                        format!(
-                            "No {} rules defined. Press n to add one.",
-                            self.selected_rule_category()
-                        )
-                    });
+                if self.selected_rule().is_some() {
+                    self.rules_view.preview_open = !self.rules_view.preview_open;
+                    self.status = if self.rules_view.preview_open {
+                        "Rule preview opened; selection changes update it.".to_string()
+                    } else {
+                        "Rule preview closed.".to_string()
+                    };
+                } else {
+                    self.status = format!(
+                        "No {} rules defined. Press n to add one.",
+                        self.selected_rule_category()
+                    );
+                }
             }
             _ => {}
         }
@@ -240,7 +236,24 @@ impl TuiApp {
             .constraints([Constraint::Length(1), Constraint::Min(3)])
             .split(area);
         self.draw_rule_category_tabs(frame, chunks[0]);
-        self.draw_rules_list(frame, chunks[1]);
+        let content = chunks[1];
+        if self.rules_view.preview_open
+            && self.selected_rule().is_some()
+            && rule_preview_fits(content.height)
+        {
+            let drawer_height = self.rule_preview_height(content);
+            let panes = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(MIN_RULE_LIST_HEIGHT),
+                    Constraint::Length(drawer_height),
+                ])
+                .split(content);
+            self.draw_rules_list(frame, panes[0]);
+            self.draw_rule_preview(frame, panes[1]);
+        } else {
+            self.draw_rules_list(frame, content);
+        }
     }
 
     pub(super) fn draw_rules_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -285,7 +298,7 @@ impl TuiApp {
 
     pub(super) fn rules_footer_text(&self) -> String {
         self.with_status(
-            "Rules · h/l category · j/k select · n new · e edit · d delete · ? help".to_string(),
+            "Rules · h/l category · j/k select · Enter preview · n new · e edit · d delete · ? help".to_string(),
         )
     }
 
@@ -341,7 +354,7 @@ impl TuiApp {
     }
 
     fn draw_rules_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let row_width = area.width.saturating_sub(2).max(12) as usize;
+        let row_width = area.width.max(12) as usize;
         let rows = self.rule_display_rows(row_width);
         let selected_row = self.selected_rule_row_index(&rows);
         let items = rows
@@ -358,11 +371,64 @@ impl TuiApp {
         self.register_rule_row_hits(area, &rows);
     }
 
+    fn rule_preview_height(&self, area: Rect) -> u16 {
+        let width = area.width.saturating_sub(2).max(8) as usize;
+        let text_lines = self
+            .selected_rule()
+            .map(|(_, rule)| wrap_words(&rule.rule, width).len() as u16)
+            .unwrap_or(1);
+        text_lines.saturating_add(4).clamp(
+            MIN_RULE_PREVIEW_HEIGHT,
+            area.height
+                .saturating_sub(MIN_RULE_LIST_HEIGHT)
+                .clamp(MIN_RULE_PREVIEW_HEIGHT, MAX_RULE_PREVIEW_HEIGHT),
+        )
+    }
+
+    fn draw_rule_preview(&self, frame: &mut Frame<'_>, area: Rect) {
+        let Some((category, rule)) = self.selected_rule() else {
+            return;
+        };
+        let source = rule
+            .source
+            .as_deref()
+            .filter(|source| !source.trim().is_empty())
+            .unwrap_or("project config");
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled(
+                    title_case(category),
+                    self.theme.rule_row_accent_style(category),
+                ),
+                Span::styled(format!("  Rule #{}", rule.id), self.theme.label_style()),
+                Span::styled(format!("  ·  {source}"), self.theme.muted_style()),
+            ]),
+            Line::from(""),
+        ];
+        lines.extend(
+            wrap_words(&rule.rule, area.width.saturating_sub(2).max(8) as usize)
+                .into_iter()
+                .map(|line| Line::from(Span::styled(line, self.theme.text_style()))),
+        );
+        frame.render_widget(
+            Paragraph::new(lines)
+                .style(self.theme.panel_style())
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(" Preview · Enter to close ")
+                        .border_style(self.theme.rule_row_accent_style(category)),
+                )
+                .wrap(Wrap { trim: false }),
+            area,
+        );
+    }
+
     fn register_rule_row_hits(&mut self, area: Rect, rows: &[RuleDisplayRow]) {
         let mut y = area.y;
         let bottom = area.bottom();
         for row in rows.iter().skip(self.rules_view.list_offset) {
-            let height = row.lines.len() as u16;
+            let height = 1;
             if y >= bottom {
                 break;
             }
@@ -477,13 +543,13 @@ impl TuiApp {
                 category_index,
                 item_index: Some(item_index),
                 empty_marker: false,
-                lines: rule_row_lines(
+                lines: vec![rule_row_line(
                     item,
                     category,
                     width,
                     item_index == self.rules_view.selected_item,
                     &self.theme,
-                ),
+                )],
             });
         }
         rows
@@ -845,53 +911,40 @@ struct RuleDisplayRow {
     lines: Vec<Line<'static>>,
 }
 
-fn rule_row_lines(
+fn rule_row_line(
     item: &RuleItem,
     category: &str,
     width: usize,
     selected: bool,
     theme: &TuiTheme,
-) -> Vec<Line<'static>> {
+) -> Line<'static> {
     let width = width.max(12);
-    let prefix = if selected { "▎ " } else { "  " };
-    let content_width = width.saturating_sub(prefix.chars().count()).max(8);
-    let accent = theme.rule_row_accent_style(category);
-    let prefix_span = |text: &str| {
-        Span::styled(
-            text.to_string(),
-            if selected {
-                accent
-            } else {
-                theme.panel_style()
-            },
-        )
-    };
+    let cursor = if selected { "› " } else { "  " };
+    let id = format!("#{:<3}", item.id);
     let source = item
         .source
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("project config");
-    let compact_metadata = format!("Rule #{}  ·  {source}", item.id);
-    let mut lines = Vec::new();
-    for (index, text) in wrap_words(&compact_metadata, content_width)
-        .into_iter()
-        .enumerate()
-    {
-        lines.push(Line::from(vec![
-            prefix_span(if index == 0 { prefix } else { "  " }),
-            Span::styled(text, accent),
-        ]));
-    }
-    for text in wrap_words(&item.rule, content_width) {
-        lines.push(Line::from(vec![
-            prefix_span(prefix),
-            Span::styled(text, theme.text_style()),
-        ]));
-    }
-    // Open rows use whitespace, not boxes or divider rails, as their boundary.
-    lines.push(Line::from(""));
-    lines.push(Line::from(""));
-    lines
+    let source_width = (width / 4).clamp(8, 24);
+    let source = super::truncate(source, source_width);
+    let fixed_width = cursor.chars().count() + id.chars().count() + source.chars().count() + 5;
+    let preview_width = width.saturating_sub(fixed_width).max(1);
+    let preview = super::truncate(&item.rule, preview_width);
+
+    Line::from(vec![
+        Span::styled(
+            cursor.to_string(),
+            if selected {
+                theme.rule_row_accent_style(category)
+            } else {
+                theme.muted_style()
+            },
+        ),
+        Span::styled(id, theme.rule_row_accent_style(category)),
+        Span::styled(format!("  {preview}"), theme.text_style()),
+        Span::styled(format!("  ·  {source}"), theme.muted_style()),
+    ])
 }
 
 fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -> Line<'static> {
@@ -908,6 +961,10 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
             },
         ),
     ])
+}
+
+fn rule_preview_fits(content_height: u16) -> bool {
+    content_height >= MIN_RULE_LIST_HEIGHT + MIN_RULE_PREVIEW_HEIGHT
 }
 
 fn nearest_rule_position(positions: &[(usize, usize)], category_index: usize) -> usize {
@@ -961,80 +1018,71 @@ mod tests {
     }
 
     #[test]
-    fn open_rule_rows_wrap_full_text_and_source_at_narrow_widths() {
+    fn compact_rule_row_is_one_line_and_truncates_at_narrow_widths() {
         let item = RuleItem {
             id: 17,
-            rule: "Keep every important word readable instead of truncating the rule text"
-                .to_string(),
+            rule: "Keep every important word readable instead of expanding row heights".to_string(),
             source: Some("decision-10 selected direction".to_string()),
         };
-        let lines = rule_row_lines(&item, "prefer", 24, false, &TuiTheme::default_dark());
-        let text = lines
+        let line = rule_row_line(&item, "prefer", 32, false, &TuiTheme::default_dark());
+        let text = line
+            .spans
             .iter()
-            .map(|line| {
-                line.spans
-                    .iter()
-                    .map(|span| span.content.as_ref())
-                    .collect::<String>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+            .map(|span| span.content.as_ref())
+            .collect::<String>();
 
-        assert!(lines.len() >= 7, "narrow rows should grow vertically");
-        for word in item.rule.split_whitespace() {
-            assert!(text.contains(word), "missing wrapped word {word:?}");
-        }
-        assert!(text.contains("decision-10"));
-        assert!(!text.contains('…'));
+        assert!(text.contains("#17"));
+        assert!(text.contains('…'));
+        assert_eq!(line.spans[2].style, TuiTheme::default_dark().text_style());
+        assert_eq!(line.spans[3].style, TuiTheme::default_dark().muted_style());
     }
 
     #[test]
-    fn variable_height_rule_rows_scroll_selected_row_into_view() {
-        let mut terminal = Terminal::new(TestBackend::new(40, 9)).unwrap();
-        let rows = (0..4)
-            .map(|index| ListItem::new(vec![Line::from(format!("row {index}")); 4]))
+    fn fixed_height_rule_rows_scroll_selected_row_into_view() {
+        let mut terminal = Terminal::new(TestBackend::new(40, 3)).unwrap();
+        let rows = (0..8)
+            .map(|index| ListItem::new(Line::from(format!("row {index}"))))
             .collect::<Vec<_>>();
         let mut state = ListState::default();
-        state.select(Some(3));
+        state.select(Some(7));
 
         terminal
-            .draw(|frame| {
-                frame.render_stateful_widget(
-                    List::new(rows).highlight_symbol("▸ "),
-                    frame.area(),
-                    &mut state,
-                );
-            })
+            .draw(|frame| frame.render_stateful_widget(List::new(rows), frame.area(), &mut state))
             .unwrap();
 
-        assert!(state.offset() > 0);
-        assert!(state.offset() <= 3);
+        assert!(state.offset() >= 5);
     }
 
     #[test]
-    fn selected_rule_row_uses_category_rail_and_neutral_prose_without_boxes() {
+    fn selected_rule_row_has_cursor_category_id_and_neutral_preview() {
         let theme = TuiTheme::default_dark();
         let item = RuleItem {
             id: 2,
             rule: "Use a restrained active treatment".to_string(),
             source: None,
         };
-        let selected = rule_row_lines(&item, "never", 42, true, &theme);
+        let selected = rule_row_line(&item, "never", 56, true, &theme);
         let rendered = selected
+            .spans
             .iter()
-            .flat_map(|line| line.spans.iter())
             .map(|span| span.content.as_ref())
             .collect::<String>();
 
-        assert_eq!(selected[0].spans[0].content, "▎ ");
-        assert_eq!(selected[1].spans[1].style, theme.text_style());
+        assert_eq!(selected.spans[0].content, "› ");
+        assert_eq!(
+            selected.spans[1].style,
+            theme.rule_row_accent_style("never")
+        );
+        assert_eq!(selected.spans[2].style, theme.text_style());
         assert!(rendered.contains("project config"));
-        assert!(!rendered.contains(['┌', '└', '─']));
-        assert!(selected
-            .iter()
-            .rev()
-            .take(2)
-            .all(|line| line.spans.is_empty()));
+    }
+
+    #[test]
+    fn preview_layout_requires_minimum_list_and_drawer_space() {
+        assert!(!rule_preview_fits(6));
+        assert!(!rule_preview_fits(7));
+        assert!(rule_preview_fits(8));
+        assert!(rule_preview_fits(40));
     }
 
     #[test]
