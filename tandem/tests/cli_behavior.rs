@@ -32,7 +32,6 @@ impl TempProject {
     fn run_with_env(&self, args: &[&str], envs: &[(&str, &str)]) -> Run {
         let output = Command::new(env!("CARGO_BIN_EXE_tandem"))
             .args(args)
-            .env_remove("TANDEM_ACTOR_ID")
             .envs(envs.iter().copied())
             .current_dir(&self.root)
             .output()
@@ -535,7 +534,7 @@ fn hierarchy_validation_completion_and_logs_remain_observable_at_the_process_bou
 }
 
 #[test]
-fn automatic_actor_identity_is_reused_and_override_has_precedence() {
+fn automatic_actor_identity_is_reused_and_cannot_be_overridden_by_environment() {
     let project = TempProject::new("actor-identity");
     project.init();
 
@@ -544,31 +543,18 @@ fn automatic_actor_identity_is_reused_and_override_has_precedence() {
         .assert_success();
     let automatic = project.read(".tandem/actor-id").trim().to_string();
     project
-        .run(&["add", "--title", "Automatic two"])
-        .assert_success();
-    assert!(project
-        .path(format!(".tandem/events/{automatic}.jsonl"))
-        .is_file());
-
-    project
         .run_with_env(
-            &["add", "--title", "Explicit actor"],
-            &[("TANDEM_ACTOR_ID", "explicit.worker-1")],
+            &["add", "--title", "Automatic two"],
+            &[("TANDEM_ACTOR_ID", "ignored-environment-value")],
         )
         .assert_success();
-    assert!(project
-        .path(".tandem/events/explicit.worker-1.jsonl")
-        .is_file());
-    assert_eq!(project.read(".tandem/actor-id").trim(), automatic);
 
-    let invalid = project.run_with_env(
-        &["add", "--title", "Invalid actor"],
-        &[("TANDEM_ACTOR_ID", "../shared")],
-    );
-    invalid.assert_exit(1);
-    assert!(invalid
-        .stderr
-        .contains("TANDEM_ACTOR_ID must be a filename-safe actor ID"));
+    assert_eq!(project.read(".tandem/actor-id").trim(), automatic);
+    let events = project.read(format!(".tandem/events/{automatic}.jsonl"));
+    assert_eq!(events.lines().count(), 2);
+    assert!(!project
+        .path(".tandem/events/ignored-environment-value.jsonl")
+        .exists());
 }
 
 #[test]
@@ -618,7 +604,6 @@ fn concurrent_first_mutations_share_one_actor_ledger() {
         .map(|index| {
             Command::new(env!("CARGO_BIN_EXE_tandem"))
                 .args(["add", "--title", &format!("Concurrent {index}")])
-                .env_remove("TANDEM_ACTOR_ID")
                 .current_dir(&project.root)
                 .spawn()
                 .expect("spawn concurrent tandem mutation")
@@ -681,7 +666,6 @@ fn git_linked_worktrees_get_distinct_ignored_actor_identities() {
         .assert_success();
     let linked_run = Command::new(env!("CARGO_BIN_EXE_tandem"))
         .args(["add", "--title", "Linked actor"])
-        .env_remove("TANDEM_ACTOR_ID")
         .current_dir(&linked)
         .output()
         .expect("run linked-worktree mutation");
@@ -728,7 +712,6 @@ fn git_linked_worktrees_get_distinct_ignored_actor_identities() {
     assert!(clone_output.status.success());
     let clone_run = Command::new(env!("CARGO_BIN_EXE_tandem"))
         .args(["add", "--title", "Clone actor"])
-        .env_remove("TANDEM_ACTOR_ID")
         .current_dir(&clone)
         .output()
         .expect("run clone mutation");

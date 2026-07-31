@@ -21,9 +21,9 @@ output from read commands when available, formats results, and adds diagnostics.
 Normative semantics remain in repository `protocol/`; the CLI reaches their
 executable implementation through shared Rust `app` operations and
 `project::TandemProject`. Tandem also owns event actor identity generation,
-persistence, validation, and event writing. This adapter must not generate,
-copy, parse, or automatically pass actor IDs. In particular, it must not inject
-one shared `TANDEM_ACTOR_ID` across independent Herdr or Worktrunk worktrees.
+persistence, validation, and event writing. Actor identity has no environment
+or integration override. This adapter must not generate, copy, parse, or pass
+actor IDs.
 
 ## Tools
 

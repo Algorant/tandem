@@ -1,6 +1,5 @@
 //! Concrete per-actor event-ledger operations.
 
-use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -75,25 +74,7 @@ fn append_event_for_actor(
 }
 
 pub(crate) fn actor_id(project: &TandemProject) -> Result<String, CliError> {
-    match std::env::var_os("TANDEM_ACTOR_ID") {
-        Some(value) => validate_override(value),
-        None => persisted_actor_id(project),
-    }
-}
-
-fn validate_override(value: OsString) -> Result<String, CliError> {
-    let candidate = value.into_string().map_err(|_| {
-        CliError::user(
-            "Event append failure: TANDEM_ACTOR_ID must contain valid Unicode and be a filename-safe actor ID",
-        )
-    })?;
-    if is_safe_actor_id(&candidate) {
-        Ok(candidate)
-    } else {
-        Err(CliError::user(
-            "Event append failure: TANDEM_ACTOR_ID must be a filename-safe actor ID containing only ASCII letters, digits, `_`, `-`, or `.`",
-        ))
-    }
+    persisted_actor_id(project)
 }
 
 fn persisted_actor_id(project: &TandemProject) -> Result<String, CliError> {
@@ -438,15 +419,6 @@ mod tests {
             .message
             .contains("canonical lowercase hyphenated UUID"));
         fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn explicit_override_accepts_safe_ids_and_rejects_unsafe_ids() {
-        assert_eq!(
-            validate_override(OsString::from("worker.explicit-1")).unwrap(),
-            "worker.explicit-1"
-        );
-        assert!(validate_override(OsString::from("../shared")).is_err());
     }
 
     #[test]
