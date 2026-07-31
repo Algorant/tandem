@@ -1037,12 +1037,14 @@ Deferred log actions:
 
 ### 4. Rules view
 
-A view for project rules:
+A one-pane view for project rules grouped by category:
 
 - `always`
 - `never`
 - `prefer`
 - `context`
+
+Each rule renders as a bounded card. The card wraps the full rule text and separates its stable ID from optional source metadata. Narrow terminals use taller wrapped cards instead of a permanent detail pane. The selected card uses the active theme accent rail, while category tabs retain counts and local keyboard and mouse navigation.
 
 Actions:
 

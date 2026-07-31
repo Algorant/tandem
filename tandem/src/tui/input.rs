@@ -217,6 +217,18 @@ impl TuiApp {
                             self.clamp_selection();
                         }
                         HitAction::SelectLog(_) => {}
+                        HitAction::SelectRuleCategory(index) if self.view == TuiView::Rules => {
+                            self.rules_view.selected_category = index;
+                            self.rules_view.selected_item = 0;
+                            self.rules_view.list_offset = 0;
+                            self.clamp_rules_state();
+                        }
+                        HitAction::SelectRuleCategory(_) => {}
+                        HitAction::SelectRuleItem(index) if self.view == TuiView::Rules => {
+                            self.rules_view.selected_item = index;
+                            self.clamp_rules_state();
+                        }
+                        HitAction::SelectRuleItem(_) => {}
                         HitAction::FocusLogList if self.view == TuiView::Logs => {
                             self.focus = FocusPane::Board
                         }

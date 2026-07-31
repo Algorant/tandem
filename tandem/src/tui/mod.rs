@@ -190,6 +190,8 @@ enum HitAction {
     SelectReviewItem(usize),
     FocusReviewDetail,
     SelectLog(usize),
+    SelectRuleCategory(usize),
+    SelectRuleItem(usize),
     FocusLogList,
     FocusLogDetail,
     StartLogSearch,
@@ -2508,6 +2510,40 @@ tone = "success"
             row,
             modifiers: KeyModifiers::NONE,
         }
+    }
+
+    #[test]
+    fn rules_mouse_hits_select_categories_and_variable_height_cards() {
+        let mut app = keyboard_test_app();
+        app.view = TuiView::Rules;
+        app.rules.get_mut("prefer").unwrap().extend([
+            crate::protocol::config::RuleItem {
+                id: 1,
+                rule: "First rule".to_string(),
+                source: None,
+            },
+            crate::protocol::config::RuleItem {
+                id: 2,
+                rule: "Second wrapped rule".to_string(),
+                source: Some("decision-10".to_string()),
+            },
+        ]);
+        app.hits = vec![
+            HitRegion {
+                rect: Rect::new(2, 2, 12, 1),
+                action: HitAction::SelectRuleCategory(2),
+            },
+            HitRegion {
+                rect: Rect::new(2, 6, 30, 6),
+                action: HitAction::SelectRuleItem(1),
+            },
+        ];
+
+        app.handle_mouse(left_click(3, 2));
+        assert_eq!(app.rules_view.selected_category, 2);
+        assert_eq!(app.rules_view.selected_item, 0);
+        app.handle_mouse(left_click(4, 9));
+        assert_eq!(app.rules_view.selected_item, 1);
     }
 
     #[test]
