@@ -236,15 +236,19 @@ impl TuiApp {
             .split(area);
         self.draw_rule_category_tabs(frame, chunks[0]);
         let content = chunks[1];
-        if self.rules_view.preview_open && self.selected_rule().is_some() {
-            if let Some([list, preview]) = rule_preview_layout(content) {
-                self.draw_rules_list(frame, list);
-                self.draw_rule_preview(frame, preview);
-            } else {
-                self.draw_rules_list(frame, content);
-            }
-        } else {
-            self.draw_rules_list(frame, content);
+        let has_selected_rule = self.selected_rule().is_some();
+        let visible_rule_rows = self
+            .rules
+            .get(self.selected_rule_category())
+            .map_or(1, |rules| rules.len().max(1));
+        let (list, preview) = rule_view_layout(
+            content,
+            self.rules_view.preview_open && has_selected_rule,
+            visible_rule_rows,
+        );
+        self.draw_rules_list(frame, list);
+        if let Some(preview) = preview {
+            self.draw_rule_preview(frame, preview);
         }
     }
 
@@ -346,7 +350,9 @@ impl TuiApp {
     }
 
     fn draw_rules_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let row_width = area.width.max(12) as usize;
+        let category = self.selected_rule_category();
+        let list_area = Block::default().borders(Borders::ALL).inner(area);
+        let row_width = list_area.width.max(12) as usize;
         let rows = self.rule_display_rows(row_width);
         let selected_row = self.selected_rule_row_index(&rows);
         let items = rows
@@ -357,10 +363,11 @@ impl TuiApp {
         state.select(selected_row);
         let list = List::new(items)
             .style(self.theme.panel_style())
-            .highlight_style(self.theme.rule_selected_row_style());
+            .highlight_style(self.theme.rule_selected_row_style())
+            .block(rule_list_block(&self.theme, category));
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
-        self.register_rule_row_hits(area, &rows);
+        self.register_rule_row_hits(list_area, &rows);
     }
 
     fn draw_rule_preview(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -403,22 +410,11 @@ impl TuiApp {
     }
 
     fn register_rule_row_hits(&mut self, area: Rect, rows: &[RuleDisplayRow]) {
-        let mut y = area.y;
-        let bottom = area.bottom();
-        for row in rows.iter().skip(self.rules_view.list_offset) {
-            let height = 1;
-            if y >= bottom {
-                break;
-            }
-            let visible_height = height.min(bottom.saturating_sub(y));
-            if let Some(item_index) = row.item_index {
-                self.hits.push(HitRegion {
-                    rect: Rect::new(area.x, y, area.width, visible_height),
-                    action: HitAction::SelectRuleItem(item_index),
-                });
-            }
-            y = y.saturating_add(height);
-        }
+        self.hits.extend(rule_row_hit_regions(
+            area,
+            self.rules_view.list_offset,
+            rows,
+        ));
     }
 
     fn selected_rule_category(&self) -> &'static str {
@@ -925,6 +921,33 @@ fn rule_row_line(
     ])
 }
 
+fn rule_list_block<'a>(theme: &TuiTheme, category: &str) -> Block<'a> {
+    Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {} rules ", title_case(category)))
+        .border_style(theme.rule_row_accent_style(category))
+        .style(theme.panel_style())
+}
+
+fn rule_row_hit_regions(area: Rect, list_offset: usize, rows: &[RuleDisplayRow]) -> Vec<HitRegion> {
+    rows.iter()
+        .skip(list_offset)
+        .take(area.height as usize)
+        .enumerate()
+        .filter_map(|(visible_index, row)| {
+            row.item_index.map(|item_index| HitRegion {
+                rect: Rect::new(
+                    area.x,
+                    area.y.saturating_add(visible_index as u16),
+                    area.width,
+                    1,
+                ),
+                action: HitAction::SelectRuleItem(item_index),
+            })
+        })
+        .collect()
+}
+
 fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -> Line<'static> {
     let marker = if active { ">" } else { " " };
     let value = if value.is_empty() { "<empty>" } else { value };
@@ -941,15 +964,34 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
     ])
 }
 
-fn rule_preview_layout(area: Rect) -> Option<[Rect; 2]> {
+fn rule_view_layout(
+    area: Rect,
+    preview_open: bool,
+    visible_rule_rows: usize,
+) -> (Rect, Option<Rect>) {
+    if preview_open {
+        if let Some([list, preview]) = rule_preview_layout(area, visible_rule_rows) {
+            return (list, Some(preview));
+        }
+    }
+    (area, None)
+}
+
+fn rule_preview_layout(area: Rect, visible_rule_rows: usize) -> Option<[Rect; 2]> {
     if area.height < MIN_RULE_LIST_HEIGHT + MIN_RULE_PREVIEW_HEIGHT {
         return None;
     }
 
-    // Allocate the rounding remainder to the list; above the minimum-only range,
-    // this keeps the list as the larger region.
-    let preview_height = (area.height / 3).max(MIN_RULE_PREVIEW_HEIGHT);
-    let list_height = area.height.saturating_sub(preview_height);
+    let required_list_height = u16::try_from(visible_rule_rows)
+        .unwrap_or(u16::MAX)
+        .saturating_add(2)
+        .max(MIN_RULE_LIST_HEIGHT);
+    // The list cap is two thirds, rounded up by assigning the remainder to it.
+    let list_cap = area.height.saturating_sub(area.height / 3);
+    let list_height = required_list_height
+        .min(list_cap)
+        .min(area.height.saturating_sub(MIN_RULE_PREVIEW_HEIGHT));
+    let preview_height = area.height.saturating_sub(list_height);
     let panes = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1071,31 +1113,101 @@ mod tests {
     }
 
     #[test]
-    fn preview_layout_requires_minimum_list_and_drawer_space() {
-        assert!(rule_preview_layout(Rect::new(0, 0, 80, 7)).is_none());
+    fn preview_closed_and_below_threshold_keep_full_height_list() {
+        let area = Rect::new(3, 4, 80, 20);
+        assert_eq!(rule_view_layout(area, false, 100), (area, None));
 
-        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 8)).unwrap();
+        let short = Rect::new(3, 4, 80, 7);
+        assert_eq!(rule_view_layout(short, true, 2), (short, None));
+    }
+
+    #[test]
+    fn preview_layout_requires_minimum_list_and_drawer_space() {
+        assert!(rule_preview_layout(Rect::new(0, 0, 80, 7), 2).is_none());
+
+        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 8), 2).unwrap();
         assert_eq!((list.height, preview.height), (3, 5));
         assert_eq!(preview.y, list.bottom());
     }
 
     #[test]
-    fn preview_layout_uses_two_thirds_for_the_list_at_normal_and_tall_heights() {
-        for (height, expected) in [(15, (10, 5)), (30, (20, 10)), (40, (27, 13))] {
-            let [list, preview] = rule_preview_layout(Rect::new(4, 6, 80, height)).unwrap();
-            assert_eq!((list.height, preview.height), expected);
-            assert_eq!(list.height + preview.height, height);
-            assert!(list.height > preview.height);
-            assert!(list.height >= MIN_RULE_LIST_HEIGHT);
-            assert!(preview.height >= MIN_RULE_PREVIEW_HEIGHT);
+    fn preview_layout_fits_small_and_empty_categories() {
+        for rows in [0, 1, 2] {
+            let [list, preview] = rule_preview_layout(Rect::new(4, 6, 80, 24), rows).unwrap();
+            let expected_list = (rows as u16).saturating_add(2).max(3);
+            assert_eq!(list.height, expected_list);
+            assert_eq!(preview.height, 24 - expected_list);
             assert_eq!(preview.y, list.bottom());
         }
     }
 
     #[test]
-    fn preview_layout_assigns_integer_rounding_to_the_list() {
-        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 31)).unwrap();
-        assert_eq!((list.height, preview.height), (21, 10));
+    fn preview_layout_caps_large_categories_at_rounded_up_two_thirds() {
+        for (height, expected_list) in [(15, 10), (30, 20), (31, 21), (40, 27)] {
+            let [list, preview] = rule_preview_layout(Rect::new(4, 6, 80, height), 100).unwrap();
+            assert_eq!(list.height, expected_list);
+            assert_eq!(list.height + preview.height, height);
+            assert!(preview.height >= MIN_RULE_PREVIEW_HEIGHT);
+        }
+    }
+
+    #[test]
+    fn preview_layout_guarantees_preview_minimum_before_two_thirds_cap() {
+        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 9), 100).unwrap();
+        assert_eq!((list.height, preview.height), (4, 5));
+    }
+
+    #[test]
+    fn rule_list_block_uses_category_border_style() {
+        let theme = TuiTheme::default_dark();
+        let mut terminal = Terminal::new(TestBackend::new(30, 3)).unwrap();
+        terminal
+            .draw(|frame| {
+                frame.render_widget(rule_list_block(&theme, "context"), frame.area());
+            })
+            .unwrap();
+        let border = terminal.backend().buffer().cell((0, 0)).unwrap();
+        assert_eq!(
+            border.fg,
+            theme.rule_row_accent_style("context").fg.unwrap()
+        );
+    }
+
+    #[test]
+    fn bordered_list_scrolls_with_inner_height() {
+        let mut terminal = Terminal::new(TestBackend::new(40, 5)).unwrap();
+        let rows = (0..8)
+            .map(|index| ListItem::new(Line::from(format!("row {index}"))))
+            .collect::<Vec<_>>();
+        let mut state = ListState::default();
+        state.select(Some(7));
+        terminal
+            .draw(|frame| {
+                frame.render_stateful_widget(
+                    List::new(rows).block(Block::default().borders(Borders::ALL)),
+                    frame.area(),
+                    &mut state,
+                )
+            })
+            .unwrap();
+        assert_eq!(state.offset(), 5);
+    }
+
+    #[test]
+    fn rule_mouse_hits_start_inside_border_and_respect_scroll_offset() {
+        let rows = (0..5)
+            .map(|item_index| RuleDisplayRow {
+                category_index: 0,
+                item_index: Some(item_index),
+                empty_marker: false,
+                lines: vec![Line::from("rule")],
+            })
+            .collect::<Vec<_>>();
+        let hits = rule_row_hit_regions(Rect::new(11, 8, 30, 2), 2, &rows);
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].rect, Rect::new(11, 8, 30, 1));
+        assert!(matches!(hits[0].action, HitAction::SelectRuleItem(2)));
+        assert_eq!(hits[1].rect.y, 9);
     }
 
     #[test]
