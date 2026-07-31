@@ -341,8 +341,8 @@ impl TuiApp {
     }
 
     fn draw_rules_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let card_width = area.width.saturating_sub(6).max(12) as usize;
-        let rows = self.rule_display_rows(card_width);
+        let row_width = area.width.saturating_sub(2).max(12) as usize;
+        let rows = self.rule_display_rows(row_width);
         let selected_row = self.selected_rule_row_index(&rows);
         let items = rows
             .iter()
@@ -352,25 +352,15 @@ impl TuiApp {
         state.select(selected_row);
         let list = List::new(items)
             .style(self.theme.panel_style())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!(
-                        " {} rules ",
-                        title_case(self.selected_rule_category())
-                    ))
-                    .border_style(self.theme.border_style(true))
-                    .style(self.theme.panel_style()),
-            )
-            .highlight_symbol("▸ ");
+            .highlight_style(self.theme.rule_selected_row_style());
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
-        self.register_rule_card_hits(area, &rows);
+        self.register_rule_row_hits(area, &rows);
     }
 
-    fn register_rule_card_hits(&mut self, area: Rect, rows: &[RuleDisplayRow]) {
-        let mut y = area.y.saturating_add(1);
-        let bottom = area.bottom().saturating_sub(1);
+    fn register_rule_row_hits(&mut self, area: Rect, rows: &[RuleDisplayRow]) {
+        let mut y = area.y;
+        let bottom = area.bottom();
         for row in rows.iter().skip(self.rules_view.list_offset) {
             let height = row.lines.len() as u16;
             if y >= bottom {
@@ -379,12 +369,7 @@ impl TuiApp {
             let visible_height = height.min(bottom.saturating_sub(y));
             if let Some(item_index) = row.item_index {
                 self.hits.push(HitRegion {
-                    rect: Rect::new(
-                        area.x.saturating_add(1),
-                        y,
-                        area.width.saturating_sub(2),
-                        visible_height,
-                    ),
+                    rect: Rect::new(area.x, y, area.width, visible_height),
                     action: HitAction::SelectRuleItem(item_index),
                 });
             }
@@ -492,8 +477,9 @@ impl TuiApp {
                 category_index,
                 item_index: Some(item_index),
                 empty_marker: false,
-                lines: rule_card_lines(
+                lines: rule_row_lines(
                     item,
+                    category,
                     width,
                     item_index == self.rules_view.selected_item,
                     &self.theme,
@@ -859,68 +845,51 @@ struct RuleDisplayRow {
     lines: Vec<Line<'static>>,
 }
 
-fn rule_card_lines(
+fn rule_row_lines(
     item: &RuleItem,
+    category: &str,
     width: usize,
     selected: bool,
     theme: &TuiTheme,
 ) -> Vec<Line<'static>> {
     let width = width.max(12);
-    let inner_width = width.saturating_sub(4).max(8);
-    let rail_style = if selected {
-        theme
-            .status_style(StatusTone::Accent)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        theme.muted_style()
-    };
-    let id_style = if selected {
-        theme
-            .status_style(StatusTone::Accent)
-            .add_modifier(Modifier::BOLD)
-    } else {
-        theme.status_style(StatusTone::Accent)
-    };
-    let mut lines = vec![Line::from(vec![
-        Span::styled(if selected { "╭─" } else { "┌─" }, rail_style),
-        Span::styled(format!(" Rule #{} ", item.id), id_style),
+    let prefix = if selected { "▎ " } else { "  " };
+    let content_width = width.saturating_sub(prefix.chars().count()).max(8);
+    let accent = theme.rule_row_accent_style(category);
+    let prefix_span = |text: &str| {
         Span::styled(
-            "─".repeat(width.saturating_sub(format!(" Rule #{} ", item.id).chars().count() + 3)),
-            rail_style,
-        ),
-    ])];
-    for text in wrap_words(&item.rule, inner_width) {
-        lines.push(Line::from(vec![
-            Span::styled(if selected { "┃ " } else { "│ " }, rail_style),
-            Span::styled(text, theme.text_style()),
-        ]));
-    }
+            text.to_string(),
+            if selected {
+                accent
+            } else {
+                theme.panel_style()
+            },
+        )
+    };
     let source = item
         .source
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("project config");
-    for (index, text) in wrap_words(source, inner_width.saturating_sub(8).max(12))
+    let compact_metadata = format!("Rule #{}  ·  {source}", item.id);
+    let mut lines = Vec::new();
+    for (index, text) in wrap_words(&compact_metadata, content_width)
         .into_iter()
         .enumerate()
     {
         lines.push(Line::from(vec![
-            Span::styled(if selected { "┃ " } else { "│ " }, rail_style),
-            Span::styled(
-                if index == 0 { "Source  " } else { "        " },
-                theme.label_style(),
-            ),
-            Span::styled(text, theme.muted_style()),
+            prefix_span(if index == 0 { prefix } else { "  " }),
+            Span::styled(text, accent),
         ]));
     }
-    lines.push(Line::from(Span::styled(
-        if selected {
-            format!("╰{}", "─".repeat(width.saturating_sub(1)))
-        } else {
-            format!("└{}", "─".repeat(width.saturating_sub(1)))
-        },
-        rail_style,
-    )));
+    for text in wrap_words(&item.rule, content_width) {
+        lines.push(Line::from(vec![
+            prefix_span(prefix),
+            Span::styled(text, theme.text_style()),
+        ]));
+    }
+    // Open rows use whitespace, not boxes or divider rails, as their boundary.
+    lines.push(Line::from(""));
     lines.push(Line::from(""));
     lines
 }
@@ -992,14 +961,14 @@ mod tests {
     }
 
     #[test]
-    fn rule_cards_wrap_full_text_and_source_at_narrow_widths() {
+    fn open_rule_rows_wrap_full_text_and_source_at_narrow_widths() {
         let item = RuleItem {
             id: 17,
             rule: "Keep every important word readable instead of truncating the rule text"
                 .to_string(),
             source: Some("decision-10 selected direction".to_string()),
         };
-        let lines = rule_card_lines(&item, 24, false, &TuiTheme::default_dark());
+        let lines = rule_row_lines(&item, "prefer", 24, false, &TuiTheme::default_dark());
         let text = lines
             .iter()
             .map(|line| {
@@ -1011,7 +980,7 @@ mod tests {
             .collect::<Vec<_>>()
             .join("\n");
 
-        assert!(lines.len() >= 8, "narrow cards should grow vertically");
+        assert!(lines.len() >= 7, "narrow rows should grow vertically");
         for word in item.rule.split_whitespace() {
             assert!(text.contains(word), "missing wrapped word {word:?}");
         }
@@ -1020,10 +989,10 @@ mod tests {
     }
 
     #[test]
-    fn variable_height_rule_cards_scroll_selected_card_into_view() {
+    fn variable_height_rule_rows_scroll_selected_row_into_view() {
         let mut terminal = Terminal::new(TestBackend::new(40, 9)).unwrap();
-        let cards = (0..4)
-            .map(|index| ListItem::new(vec![Line::from(format!("card {index}")); 4]))
+        let rows = (0..4)
+            .map(|index| ListItem::new(vec![Line::from(format!("row {index}")); 4]))
             .collect::<Vec<_>>();
         let mut state = ListState::default();
         state.select(Some(3));
@@ -1031,7 +1000,7 @@ mod tests {
         terminal
             .draw(|frame| {
                 frame.render_stateful_widget(
-                    List::new(cards).highlight_symbol("▸ "),
+                    List::new(rows).highlight_symbol("▸ "),
                     frame.area(),
                     &mut state,
                 );
@@ -1043,23 +1012,29 @@ mod tests {
     }
 
     #[test]
-    fn selected_rule_card_uses_an_accent_rail_without_restyling_rule_text() {
+    fn selected_rule_row_uses_category_rail_and_neutral_prose_without_boxes() {
         let theme = TuiTheme::default_dark();
         let item = RuleItem {
             id: 2,
             rule: "Use a restrained active treatment".to_string(),
             source: None,
         };
-        let selected = rule_card_lines(&item, 42, true, &theme);
+        let selected = rule_row_lines(&item, "never", 42, true, &theme);
+        let rendered = selected
+            .iter()
+            .flat_map(|line| line.spans.iter())
+            .map(|span| span.content.as_ref())
+            .collect::<String>();
 
-        assert_eq!(selected[0].spans[0].content, "╭─");
-        assert_eq!(selected[1].spans[0].content, "┃ ");
+        assert_eq!(selected[0].spans[0].content, "▎ ");
         assert_eq!(selected[1].spans[1].style, theme.text_style());
-        assert!(selected.iter().any(|line| {
-            line.spans
-                .iter()
-                .any(|span| span.content.contains("project config"))
-        }));
+        assert!(rendered.contains("project config"));
+        assert!(!rendered.contains(['┌', '└', '─']));
+        assert!(selected
+            .iter()
+            .rev()
+            .take(2)
+            .all(|line| line.spans.is_empty()));
     }
 
     #[test]

@@ -2513,7 +2513,7 @@ tone = "success"
     }
 
     #[test]
-    fn rules_mouse_hits_select_categories_and_variable_height_cards() {
+    fn rules_mouse_hits_select_categories_and_variable_height_open_rows() {
         let mut app = keyboard_test_app();
         app.view = TuiView::Rules;
         app.rules.get_mut("prefer").unwrap().extend([

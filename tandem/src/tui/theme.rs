@@ -541,32 +541,52 @@ impl TuiTheme {
         )
     }
 
-    pub(super) fn rule_category_style(&self, category: &str, selected: bool) -> Style {
-        if self.no_color {
-            return if selected {
-                Style::default().add_modifier(Modifier::BOLD | Modifier::REVERSED)
-            } else {
-                Style::default()
-            };
-        }
-        let color = match normalized(category).as_str() {
+    fn rule_category_color(&self, category: &str) -> Color {
+        match normalized(category).as_str() {
+            "always" => self.colors.success,
             "never" => self.colors.error,
             "prefer" => self.colors.warning,
             "context" => Color::Rgb(192, 132, 252),
             _ => self.colors.muted,
-        };
-        if selected {
-            if normalized(category).as_str() == "always" {
-                self.style(
-                    self.colors.selected_fg,
-                    Some(self.colors.selected_bg),
-                    Modifier::BOLD,
-                )
+        }
+    }
+
+    pub(super) fn rule_category_style(&self, category: &str, selected: bool) -> Style {
+        if self.no_color {
+            return if selected {
+                Style::default().add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
             } else {
-                self.style(self.colors.background, Some(color), Modifier::BOLD)
-            }
+                Style::default()
+            };
+        }
+        self.style(
+            self.rule_category_color(category),
+            self.panel_background(),
+            if selected {
+                Modifier::BOLD | Modifier::UNDERLINED
+            } else {
+                Modifier::empty()
+            },
+        )
+    }
+
+    pub(super) fn rule_row_accent_style(&self, category: &str) -> Style {
+        if self.no_color {
+            Style::default().add_modifier(Modifier::BOLD)
         } else {
-            self.style(color, self.panel_background(), Modifier::empty())
+            self.style(
+                self.rule_category_color(category),
+                self.panel_background(),
+                Modifier::BOLD,
+            )
+        }
+    }
+
+    pub(super) fn rule_selected_row_style(&self) -> Style {
+        if self.no_color {
+            Style::default().add_modifier(Modifier::REVERSED)
+        } else {
+            Style::default().bg(self.colors.selected_bg)
         }
     }
 
@@ -1508,12 +1528,25 @@ mod tests {
     }
 
     #[test]
-    fn selected_always_rule_category_reads_active_not_disabled() {
+    fn rule_categories_use_structural_tones_for_tabs_and_rows() {
         let theme = TuiTheme::default_dark();
-        let selected = theme.rule_category_style("always", true);
-        assert_eq!(selected.fg, Some(theme.colors.selected_fg));
-        assert_eq!(selected.bg, Some(theme.colors.selected_bg));
-        assert!(selected.add_modifier.contains(Modifier::BOLD));
+        let categories = [
+            ("always", theme.colors.success),
+            ("never", theme.colors.error),
+            ("prefer", theme.colors.warning),
+            ("context", Color::Rgb(192, 132, 252)),
+        ];
+        for (category, color) in categories {
+            let selected_tab = theme.rule_category_style(category, true);
+            assert_eq!(selected_tab.fg, Some(color));
+            assert_eq!(selected_tab.bg, theme.panel_background());
+            assert!(selected_tab.add_modifier.contains(Modifier::BOLD));
+            assert_eq!(theme.rule_row_accent_style(category).fg, Some(color));
+        }
+        assert_eq!(
+            theme.rule_selected_row_style().bg,
+            Some(theme.colors.selected_bg)
+        );
     }
 
     #[test]
