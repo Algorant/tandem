@@ -2,6 +2,18 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.8.1
+
+Tandem v0.8.1 makes project rules easier to scan and read in the TUI.
+
+### Rules view
+
+- Rules use a dense, stable one-line list with category-colored IDs, neutral previews, muted source metadata, and clear selection treatment.
+- `Enter` toggles a full-width preview pane that follows keyboard and mouse selection and wraps the complete selected rule.
+- The bordered list pane dynamically fits small categories, caps large categories near two-thirds with scrolling, and gives all remaining space to the preview.
+- Always, Never, Prefer, and Context retain distinct green, red, amber, and purple visual identities.
+- Short terminals preserve minimum list and preview space and safely fall back to the full list when both panes cannot fit.
+
 ## 0.8.0
 
 Tandem v0.8.0 gives every writable checkout and linked worktree a stable, isolated event-writer identity without configuration.
