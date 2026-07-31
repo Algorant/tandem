@@ -16,7 +16,6 @@ use crate::protocol::config::{RuleItem, RulesByCategory};
 const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
 const MIN_RULE_LIST_HEIGHT: u16 = 3;
 const MIN_RULE_PREVIEW_HEIGHT: u16 = 5;
-const MAX_RULE_PREVIEW_HEIGHT: u16 = 10;
 
 fn title_case(value: &str) -> String {
     let mut chars = value.chars();
@@ -237,20 +236,13 @@ impl TuiApp {
             .split(area);
         self.draw_rule_category_tabs(frame, chunks[0]);
         let content = chunks[1];
-        if self.rules_view.preview_open
-            && self.selected_rule().is_some()
-            && rule_preview_fits(content.height)
-        {
-            let drawer_height = self.rule_preview_height(content);
-            let panes = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(MIN_RULE_LIST_HEIGHT),
-                    Constraint::Length(drawer_height),
-                ])
-                .split(content);
-            self.draw_rules_list(frame, panes[0]);
-            self.draw_rule_preview(frame, panes[1]);
+        if self.rules_view.preview_open && self.selected_rule().is_some() {
+            if let Some([list, preview]) = rule_preview_layout(content) {
+                self.draw_rules_list(frame, list);
+                self.draw_rule_preview(frame, preview);
+            } else {
+                self.draw_rules_list(frame, content);
+            }
         } else {
             self.draw_rules_list(frame, content);
         }
@@ -369,20 +361,6 @@ impl TuiApp {
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
         self.register_rule_row_hits(area, &rows);
-    }
-
-    fn rule_preview_height(&self, area: Rect) -> u16 {
-        let width = area.width.saturating_sub(2).max(8) as usize;
-        let text_lines = self
-            .selected_rule()
-            .map(|(_, rule)| wrap_words(&rule.rule, width).len() as u16)
-            .unwrap_or(1);
-        text_lines.saturating_add(4).clamp(
-            MIN_RULE_PREVIEW_HEIGHT,
-            area.height
-                .saturating_sub(MIN_RULE_LIST_HEIGHT)
-                .clamp(MIN_RULE_PREVIEW_HEIGHT, MAX_RULE_PREVIEW_HEIGHT),
-        )
     }
 
     fn draw_rule_preview(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -963,8 +941,23 @@ fn prompt_input_line(label: &str, value: &str, active: bool, theme: &TuiTheme) -
     ])
 }
 
-fn rule_preview_fits(content_height: u16) -> bool {
-    content_height >= MIN_RULE_LIST_HEIGHT + MIN_RULE_PREVIEW_HEIGHT
+fn rule_preview_layout(area: Rect) -> Option<[Rect; 2]> {
+    if area.height < MIN_RULE_LIST_HEIGHT + MIN_RULE_PREVIEW_HEIGHT {
+        return None;
+    }
+
+    // Allocate the rounding remainder to the list; above the minimum-only range,
+    // this keeps the list as the larger region.
+    let preview_height = (area.height / 3).max(MIN_RULE_PREVIEW_HEIGHT);
+    let list_height = area.height.saturating_sub(preview_height);
+    let panes = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(list_height),
+            Constraint::Length(preview_height),
+        ])
+        .split(area);
+    Some([panes[0], panes[1]])
 }
 
 fn nearest_rule_position(positions: &[(usize, usize)], category_index: usize) -> usize {
@@ -1079,10 +1072,30 @@ mod tests {
 
     #[test]
     fn preview_layout_requires_minimum_list_and_drawer_space() {
-        assert!(!rule_preview_fits(6));
-        assert!(!rule_preview_fits(7));
-        assert!(rule_preview_fits(8));
-        assert!(rule_preview_fits(40));
+        assert!(rule_preview_layout(Rect::new(0, 0, 80, 7)).is_none());
+
+        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 8)).unwrap();
+        assert_eq!((list.height, preview.height), (3, 5));
+        assert_eq!(preview.y, list.bottom());
+    }
+
+    #[test]
+    fn preview_layout_uses_two_thirds_for_the_list_at_normal_and_tall_heights() {
+        for (height, expected) in [(15, (10, 5)), (30, (20, 10)), (40, (27, 13))] {
+            let [list, preview] = rule_preview_layout(Rect::new(4, 6, 80, height)).unwrap();
+            assert_eq!((list.height, preview.height), expected);
+            assert_eq!(list.height + preview.height, height);
+            assert!(list.height > preview.height);
+            assert!(list.height >= MIN_RULE_LIST_HEIGHT);
+            assert!(preview.height >= MIN_RULE_PREVIEW_HEIGHT);
+            assert_eq!(preview.y, list.bottom());
+        }
+    }
+
+    #[test]
+    fn preview_layout_assigns_integer_rounding_to_the_list() {
+        let [list, preview] = rule_preview_layout(Rect::new(0, 0, 80, 31)).unwrap();
+        assert_eq!((list.height, preview.height), (21, 10));
     }
 
     #[test]
