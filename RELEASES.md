@@ -2,6 +2,23 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.8.0
+
+Tandem v0.8.0 gives every writable checkout and linked worktree a stable, isolated event-writer identity without configuration.
+
+### Events and collaboration
+
+- Tandem atomically creates and reuses an ignored `.tandem/actor-id` UUID for each independent checkout or linked worktree.
+- New audit events remain tracked in separate `.tandem/events/<actor-id>.jsonl` ledgers, preserving existing per-actor sequence identities and legacy event reads without migration.
+- Concurrent processes in one worktree converge on the same identity and retain serialized event appends, while independent clones and worktrees use distinct ledgers that merge normally through Git.
+- Actor identity is non-configurable, so shell variables and orchestration integrations cannot accidentally collapse independent worktrees onto one event ledger.
+- Git projects add the identity path to local exclude state without changing tracked project policy; non-Git workspaces retain the same local identity behavior.
+
+### Integration boundaries
+
+- Tandem alone owns actor identity generation, persistence, validation, and event writing.
+- Herdr, Worktrunk, Pi Workers, Reviewers, Subagents, and Pi-Tandem remain identity-unaware; retained or recovered worktrees reuse their identity and new worktrees receive a new one.
+
 ## 0.7.2
 
 Tandem v0.7.2 gives the bare `tandem` command a polished, concise landing page.
