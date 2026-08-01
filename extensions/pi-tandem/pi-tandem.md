@@ -80,6 +80,14 @@ Recommended body sections are Status, Context, Decision, Consequences, and Super
 - Do not accept accords, complete tasks, or archive work unless the user/orchestrator owns and requests that transition.
 - Treat logs as first-class completed-work history.
 
+## Commit Tandem workspace changes regularly
+
+Commit durable `.tandem` changes regularly. Do not leave important board, decision, rule, or completed-work changes only in a local working tree for an extended period. Regular commits make work visible to collaborators and agents, preserve tasks across clones and worktrees, protect state from resets or cleanup, and keep Tandem history reasonably aligned with project history.
+
+Agents should use judgment about commit boundaries. They may include Tandem changes in a related project commit, group related Tandem changes, or create a standalone coordination commit. A separate commit is useful when Tandem changes would otherwise remain uncommitted, when they represent planning without implementation, or when other participants need the updated state.
+
+Do not require one commit for every Tandem command. Never commit checkout-local identity, caches, credentials, or other runtime state.
+
 ## Bootstrap behavior
 
 If no workspace exists, ask before creating one. Use `tandem init --title <title>` only after user intent is clear.
