@@ -1,0 +1,32 @@
+# Workspace TUI display config.
+#
+# Project/domain Board tag badges live here so .tandem/theme.toml can stay
+# focused on theme selection, colors, transparency, and badge style.
+
+[board.badges.tags.docs]
+label = "DOCS"
+tone = "success"
+
+[board.badges.tags.site]
+label = "SITE"
+tone = "accent"
+
+[board.badges.tags.tui]
+label = "TUI"
+tone = "accent"
+
+[board.badges.tags.cli]
+label = "CLI"
+tone = "warning"
+
+[board.badges.tags.protocol]
+label = "SPEC"
+tone = "warning"
+
+[board.badges.tags.ci]
+label = "CI"
+tone = "muted"
+
+[board.badges.tags.bug]
+label = "BUG"
+tone = "error"

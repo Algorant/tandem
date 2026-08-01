@@ -1,0 +1,1062 @@
+{"ts":"2026-06-27T03:42:16Z","event":"task.created","id":"task-1","summary":"dogfood tandem in this repo"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-2","summary":"Implement first TUI board mutation flow"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-2","summary":"Accord ready for task-2"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-3","summary":"Add TUI quick-add task flow"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-3","summary":"Accord ready for task-3"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-4","summary":"Add top-level TUI view switching"}
+{"ts":"2026-06-27T03:58:59Z","event":"accord.ready","id":"task-4","summary":"Accord ready for task-4"}
+{"ts":"2026-06-27T03:58:59Z","event":"task.created","id":"task-5","summary":"Implement Review queue view"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-5","summary":"Accord ready for task-5"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-6","summary":"Implement Logs view list/show/search"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-6","summary":"Accord ready for task-6"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-7","summary":"Implement Rules and Decisions TUI views"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-7","summary":"Accord ready for task-7"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-8","summary":"Implement TUI theme loading and visual language"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-8","summary":"Accord ready for task-8"}
+{"ts":"2026-06-27T03:59:00Z","event":"task.created","id":"task-9","summary":"Harden TUI runtime interactions and rendering"}
+{"ts":"2026-06-27T03:59:00Z","event":"accord.ready","id":"task-9","summary":"Accord ready for task-9"}
+{"ts":"2026-06-27T04:04:32Z","event":"accord.claimed","id":"task-2","summary":"Accord claim for task-2"}
+{"ts":"2026-06-27T04:04:32Z","event":"task.moved","id":"task-2","summary":"Moved task-2 from todo to in-progress"}
+{"ts":"2026-06-27T04:12:05Z","event":"accord.delivered","id":"task-2","summary":"Accord deliver for task-2"}
+{"ts":"2026-06-27T04:35:47Z","event":"accord.accepted","id":"task-2","summary":"Accord accept for task-2"}
+{"ts":"2026-06-27T04:35:47Z","event":"task.completed","id":"task-2","summary":"Implemented first TUI board mutation: H/L moves selected tasks between configured states, reloads, and surfaces errors in the status line."}
+{"ts":"2026-06-27T04:36:07Z","event":"accord.claimed","id":"task-3","summary":"Accord claim for task-3"}
+{"ts":"2026-06-27T04:36:07Z","event":"task.moved","id":"task-3","summary":"Moved task-3 from todo to in-progress"}
+{"ts":"2026-06-27T04:46:09Z","event":"accord.delivered","id":"task-3","summary":"Accord deliver for task-3"}
+{"ts":"2026-06-27T04:56:59Z","event":"accord.accepted","id":"task-3","summary":"Accord accept for task-3"}
+{"ts":"2026-06-27T04:56:59Z","event":"task.completed","id":"task-3","summary":"Implemented TUI quick-add: a opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, then reloads/selects the new task."}
+{"ts":"2026-06-27T04:58:34Z","event":"accord.claimed","id":"task-4","summary":"Accord claim for task-4"}
+{"ts":"2026-06-27T04:58:34Z","event":"task.moved","id":"task-4","summary":"Moved task-4 from todo to in-progress"}
+{"ts":"2026-06-27T04:58:34Z","event":"accord.claimed","id":"task-8","summary":"Accord claim for task-8"}
+{"ts":"2026-06-27T04:58:34Z","event":"task.moved","id":"task-8","summary":"Moved task-8 from todo to in-progress"}
+{"ts":"2026-06-27T05:11:42Z","event":"accord.delivered","id":"task-4","summary":"Accord deliver for task-4"}
+{"ts":"2026-06-27T05:13:37Z","event":"accord.delivered","id":"task-8","summary":"Accord deliver for task-8"}
+{"ts":"2026-06-27T05:49:31Z","event":"accord.accepted","id":"task-4","summary":"Accord accept for task-4"}
+{"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-4","summary":"Integrated top-level TUI view switching with Board, Review, Logs, Rules, and Decisions tabs, numeric/mouse tab switching, and read-only placeholder/count views while preserving Board mutations."}
+{"ts":"2026-06-27T05:49:31Z","event":"accord.accepted","id":"task-8","summary":"Accord accept for task-8"}
+{"ts":"2026-06-27T05:49:31Z","event":"task.completed","id":"task-8","summary":"Integrated TUI theme foundation with default-dark palette, workspace .tandem/theme.toml overrides, no-color fallback, and themed Board/status/badge styling."}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-5","summary":"Accord claim for task-5"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-5","summary":"Moved task-5 from todo to in-progress"}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-6","summary":"Accord claim for task-6"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-6","summary":"Moved task-6 from todo to in-progress"}
+{"ts":"2026-06-27T14:48:05Z","event":"accord.claimed","id":"task-7","summary":"Accord claim for task-7"}
+{"ts":"2026-06-27T14:48:05Z","event":"task.moved","id":"task-7","summary":"Moved task-7 from todo to in-progress"}
+{"ts":"2026-06-27T15:02:47Z","event":"task.created","id":"task-10","summary":"Prototype Verdigris TUI theme"}
+{"ts":"2026-06-27T15:02:47Z","event":"accord.ready","id":"task-10","summary":"Accord ready for task-10"}
+{"ts":"2026-06-27T15:02:47Z","event":"task.created","id":"task-11","summary":"Adopt Brainfile-style Board state subviews"}
+{"ts":"2026-06-27T15:02:47Z","event":"accord.ready","id":"task-11","summary":"Accord ready for task-11"}
+{"ts":"2026-06-27T15:04:57Z","event":"accord.delivered","id":"task-6","summary":"Accord deliver for task-6"}
+{"ts":"2026-06-27T15:04:59Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T15:12:04Z","event":"accord.delivered","id":"task-5","summary":"Accord deliver for task-5"}
+{"ts":"2026-06-27T16:06:08Z","event":"task.completed","id":"task-1","summary":"Initial dogfood/test task used to verify Tandem board setup in this repo."}
+{"ts":"2026-06-27T16:36:15Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T16:36:40Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T16:56:48Z","event":"accord.accepted","id":"task-5","summary":"Accord accept for task-5"}
+{"ts":"2026-06-27T16:56:48Z","event":"task.completed","id":"task-5","summary":"Integrated Review queue TUI pane with validation and smoke coverage."}
+{"ts":"2026-06-27T16:56:48Z","event":"accord.accepted","id":"task-6","summary":"Accord accept for task-6"}
+{"ts":"2026-06-27T16:56:48Z","event":"task.completed","id":"task-6","summary":"Integrated Logs TUI pane with recency list, detail, search, events, validation, and smoke coverage."}
+{"ts":"2026-06-27T19:11:55Z","event":"accord.delivered","id":"task-7","summary":"Accord deliver for task-7"}
+{"ts":"2026-06-27T22:45:02Z","event":"accord.accepted","id":"task-7","summary":"Accord accept for task-7"}
+{"ts":"2026-06-27T22:45:02Z","event":"task.completed","id":"task-7","summary":"Integrated Rules and Decisions TUI panes with separate source modules, validation, and smoke coverage."}
+{"ts":"2026-06-27T22:49:30Z","event":"accord.claimed","id":"task-10","summary":"Accord claim for task-10"}
+{"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-10","summary":"Moved task-10 from todo to in-progress"}
+{"ts":"2026-06-27T22:49:30Z","event":"accord.claimed","id":"task-11","summary":"Accord claim for task-11"}
+{"ts":"2026-06-27T22:49:30Z","event":"task.moved","id":"task-11","summary":"Moved task-11 from todo to in-progress"}
+{"ts":"2026-06-27T23:04:00Z","event":"accord.delivered","id":"task-11","summary":"Accord deliver for task-11"}
+{"ts":"2026-06-27T23:04:03Z","event":"accord.delivered","id":"task-10","summary":"Accord deliver for task-10"}
+{"ts":"2026-06-27T23:27:58Z","event":"task.created","id":"task-12","summary":"Scaffold pi-tandem extension area and adapter spec"}
+{"ts":"2026-06-27T23:30:04Z","event":"accord.ready","id":"task-12","summary":"Accord ready for task-12"}
+{"ts":"2026-06-27T23:30:04Z","event":"task.created","id":"task-13","summary":"Implement CLI-backed pi-tandem extension MVP"}
+{"ts":"2026-06-27T23:30:04Z","event":"accord.ready","id":"task-13","summary":"Accord ready for task-13"}
+{"ts":"2026-06-27T23:30:04Z","event":"task.created","id":"task-14","summary":"Project-local install and smoke pi-tandem"}
+{"ts":"2026-06-27T23:30:05Z","event":"accord.ready","id":"task-14","summary":"Accord ready for task-14"}
+{"ts":"2026-06-27T23:30:05Z","event":"task.created","id":"task-15","summary":"Promote pi-tandem to canonical Pi config"}
+{"ts":"2026-06-27T23:30:05Z","event":"accord.ready","id":"task-15","summary":"Accord ready for task-15"}
+{"ts":"2026-06-27T23:45:33Z","event":"accord.accepted","id":"task-10","summary":"Accord accept for task-10"}
+{"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-10","summary":"Integrated selectable Verdigris TUI theme with example theme selector, docs, validation, and smoke coverage."}
+{"ts":"2026-06-27T23:45:33Z","event":"accord.accepted","id":"task-11","summary":"Accord accept for task-11"}
+{"ts":"2026-06-27T23:45:33Z","event":"task.completed","id":"task-11","summary":"Integrated Brainfile-style Board state subviews with richer full-width rows, docs, validation, and smoke coverage."}
+{"ts":"2026-06-28T00:11:43Z","event":"task.created","id":"task-16","summary":"Test pi-tandem task relationship guidance"}
+{"ts":"2026-06-28T00:11:43Z","event":"accord.ready","id":"task-16","summary":"Accord ready for task-16"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-17","summary":"Use Verdigris as this repo's default TUI theme"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-17","summary":"Accord ready for task-17"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-18","summary":"Add first-class user theme discovery and presets"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-18","summary":"Accord ready for task-18"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-19","summary":"Tighten TUI keyboard and focus semantics"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-19","summary":"Accord ready for task-19"}
+{"ts":"2026-06-28T00:17:02Z","event":"task.created","id":"task-20","summary":"Surface Board accord details for selected tasks"}
+{"ts":"2026-06-28T00:17:02Z","event":"accord.ready","id":"task-20","summary":"Accord ready for task-20"}
+{"ts":"2026-06-28T00:17:03Z","event":"task.created","id":"task-21","summary":"Open selected Tandem items in $EDITOR from TUI"}
+{"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-21","summary":"Accord ready for task-21"}
+{"ts":"2026-06-28T00:17:03Z","event":"task.created","id":"task-22","summary":"Define Tandem task tag taxonomy for delegation"}
+{"ts":"2026-06-28T00:17:03Z","event":"accord.ready","id":"task-22","summary":"Accord ready for task-22"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.claimed","id":"task-17","summary":"Accord claim for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.delivered","id":"task-17","summary":"Accord deliver for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"accord.accepted","id":"task-17","summary":"Accord accept for task-17"}
+{"ts":"2026-06-28T00:24:37Z","event":"task.completed","id":"task-17","summary":"Committed repo-local .tandem/theme.toml selecting the built-in Verdigris TUI theme."}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-12","summary":"Moved task-12 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-12","summary":"Accord claim for task-12"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-13","summary":"Moved task-13 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-13","summary":"Accord claim for task-13"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-19","summary":"Moved task-19 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-19","summary":"Accord claim for task-19"}
+{"ts":"2026-06-28T00:35:13Z","event":"task.moved","id":"task-18","summary":"Moved task-18 from todo to in-progress"}
+{"ts":"2026-06-28T00:35:13Z","event":"accord.claimed","id":"task-18","summary":"Accord claim for task-18"}
+{"ts":"2026-06-28T00:51:24Z","event":"accord.delivered","id":"task-18","summary":"Accord deliver for task-18"}
+{"ts":"2026-06-28T00:51:58Z","event":"accord.delivered","id":"task-12","summary":"Accord deliver for task-12"}
+{"ts":"2026-06-28T00:52:05Z","event":"accord.delivered","id":"task-13","summary":"Accord deliver for task-13"}
+{"ts":"2026-06-28T00:59:38Z","event":"accord.delivered","id":"task-19","summary":"Accord deliver for task-19"}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-12","summary":"Accord accept for task-12"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-12","summary":"Scaffolded the extensions/pi-tandem area and adapter guidance; integrated in ce6303d."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-13","summary":"Accord accept for task-13"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-13","summary":"Implemented the CLI-backed pi-tandem MVP, including the tdm_task summary schema fix; integrated in ce6303d."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-18","summary":"Accord accept for task-18"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-18","summary":"Integrated user theme discovery, presets, and documentation; validation passed after merge."}
+{"ts":"2026-06-28T01:34:29Z","event":"accord.accepted","id":"task-19","summary":"Accord accept for task-19"}
+{"ts":"2026-06-28T01:34:29Z","event":"task.completed","id":"task-19","summary":"Integrated tightened TUI keyboard and focus semantics; validation passed after merge."}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-14","summary":"Accord claim for task-14"}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-20","summary":"Accord claim for task-20"}
+{"ts":"2026-06-28T01:43:16Z","event":"accord.claimed","id":"task-21","summary":"Accord claim for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-14","summary":"Accord deliver for task-14"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-14","summary":"Accord accept for task-14"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-14","summary":"Integrated project-local pi-tandem runtime smoke coverage and documentation."}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-20","summary":"Accord deliver for task-20"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-20","summary":"Accord accept for task-20"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-20","summary":"Integrated Board accord detail rendering with status styling, metadata, and CLI hints."}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.delivered","id":"task-21","summary":"Accord deliver for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"accord.accepted","id":"task-21","summary":"Accord accept for task-21"}
+{"ts":"2026-06-28T02:04:09Z","event":"task.completed","id":"task-21","summary":"Integrated TUI editor-open support for active task documents from Board and Review."}
+{"ts":"2026-06-28T02:18:41Z","event":"accord.claimed","id":"task-16","summary":"Accord claim for task-16"}
+{"ts":"2026-06-28T02:18:41Z","event":"accord.claimed","id":"task-22","summary":"Accord claim for task-22"}
+{"ts":"2026-06-28T02:27:57Z","event":"accord.claimed","id":"task-9","summary":"Accord claim for task-9"}
+{"ts":"2026-06-28T02:39:54Z","event":"accord.delivered","id":"task-16","summary":"Accord deliver for task-16"}
+{"ts":"2026-06-28T02:39:54Z","event":"accord.accepted","id":"task-16","summary":"Accord accept for task-16"}
+{"ts":"2026-06-28T02:39:55Z","event":"task.completed","id":"task-16","summary":"Integrated pi-tandem relationship guidance and smoke coverage; identified CLI/TUI relationship-display gap."}
+{"ts":"2026-06-28T02:39:55Z","event":"accord.delivered","id":"task-22","summary":"Accord deliver for task-22"}
+{"ts":"2026-06-28T02:39:55Z","event":"accord.accepted","id":"task-22","summary":"Accord accept for task-22"}
+{"ts":"2026-06-28T02:39:55Z","event":"task.completed","id":"task-22","summary":"Integrated tag taxonomy rules/conventions and reconciled task-9 tags with the new subtask breakdown."}
+{"ts":"2026-06-28T03:31:41Z","event":"task.created","id":"task-23","summary":"Polish Board row visual hierarchy and badges"}
+{"ts":"2026-06-28T03:32:39Z","event":"accord.ready","id":"task-23","summary":"Accord ready for task-23"}
+{"ts":"2026-06-28T03:45:11Z","event":"task.created","id":"task-24","summary":"Research Tandem documentation platform and static site approach"}
+{"ts":"2026-06-28T03:45:21Z","event":"accord.ready","id":"task-24","summary":"Accord ready for task-24"}
+{"ts":"2026-06-28T04:30:03Z","event":"task.created","id":"task-25","summary":"Remove top-level Review pane from TUI"}
+{"ts":"2026-06-28T04:30:10Z","event":"accord.ready","id":"task-25","summary":"Accord ready for task-25"}
+{"ts":"2026-06-28T04:41:29Z","event":"accord.claimed","id":"task-23","summary":"Accord claim for task-23"}
+{"ts":"2026-06-28T04:42:04Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from todo to in-progress"}
+{"ts":"2026-06-28T04:42:04Z","event":"accord.claimed","id":"task-24","summary":"Accord claim for task-24"}
+{"ts":"2026-06-28T04:42:04Z","event":"task.moved","id":"task-24","summary":"Moved task-24 from todo to in-progress"}
+{"ts":"2026-06-28T04:46:25Z","event":"task.moved","id":"task-9","summary":"Moved task-9 from todo to in-progress"}
+{"ts":"2026-06-28T04:49:08Z","event":"task.created","id":"task-26","summary":"Sync workflow state and accord status transitions"}
+{"ts":"2026-06-28T04:49:08Z","event":"accord.ready","id":"task-26","summary":"Accord ready for task-26"}
+{"ts":"2026-06-28T05:05:18Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T05:05:18Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T12:51:19Z","event":"task.created","id":"task-27","summary":"Create first Tandem CLI/TUI release"}
+{"ts":"2026-06-28T12:51:19Z","event":"accord.ready","id":"task-27","summary":"Accord ready for task-27"}
+{"ts":"2026-06-28T12:51:19Z","event":"task.updated","id":"task-15","summary":"Marked task-15 blocked by task-27 CLI/TUI release."}
+{"ts":"2026-06-28T12:57:29Z","event":"accord.claimed","id":"task-27","summary":"Accord claim for task-27"}
+{"ts":"2026-06-28T12:57:29Z","event":"task.moved","id":"task-27","summary":"Moved task-27 from todo to in-progress"}
+{"ts":"2026-06-28T13:08:56Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to in-progress"}
+{"ts":"2026-06-28T13:08:58Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T13:08:59Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to in-progress"}
+{"ts":"2026-06-28T13:09:00Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from in-progress to review"}
+{"ts":"2026-06-28T13:28:31Z","event":"accord.accepted","id":"task-27","summary":"Accord accept for task-27"}
+{"ts":"2026-06-28T13:28:31Z","event":"task.completed","id":"task-27","summary":"Prepared and merged the first Tandem CLI/TUI release target for tdm v0.1.0, including release notes, lockfile, and install instructions."}
+{"ts":"2026-06-28T14:58:57Z","event":"accord.claimed","id":"task-33","summary":"Accord claim for task-33"}
+{"ts":"2026-06-28T15:05:06Z","event":"accord.claimed","id":"task-28","summary":"Accord claim for task-28"}
+{"ts":"2026-06-28T15:05:13Z","event":"task.moved","id":"task-28","summary":"Moved task-28 from todo to in-progress"}
+{"ts":"2026-06-28T15:05:19Z","event":"task.moved","id":"task-33","summary":"Moved task-33 from todo to in-progress"}
+{"ts":"2026-06-28T15:05:19Z","event":"accord.delivered","id":"task-33","summary":"Accord deliver for task-33"}
+{"ts":"2026-06-28T15:08:24Z","event":"task.moved","id":"task-28","summary":"Moved task-28 from in-progress to validation"}
+{"ts":"2026-06-28T15:08:28Z","event":"accord.claimed","id":"task-29","summary":"Accord claim for task-29"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-31","summary":"Accord claim for task-31"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-32","summary":"Accord claim for task-32"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.claimed","id":"task-26","summary":"Accord claim for task-26"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-28","summary":"Accord deliver for task-28"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-29","summary":"Accord deliver for task-29"}
+{"ts":"2026-06-28T15:16:45Z","event":"accord.delivered","id":"task-32","summary":"Accord deliver for task-32"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.moved","id":"task-23","summary":"Moved task-23 from review to validation"}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-33","summary":"Accord accept for task-33"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-33","summary":"Accepted Board layout/header/inline expansion work; Enter expands rows and Tab toggles the detail pane as intended."}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-34","summary":"Renamed CLI/TUI app and release surface to tandem; global install and command verified."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-28","summary":"Accord accept for task-28"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-28","summary":"Defined Validation as the canonical workflow state in protocol/root docs while preserving review metadata and legacy review-state tolerance."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-29","summary":"Accord accept for task-29"}
+{"ts":"2026-06-28T15:31:34Z","event":"task.completed","id":"task-29","summary":"Updated CLI defaults and state handling to prefer validation while tolerating legacy review aliases and syncing common accord transitions."}
+{"ts":"2026-06-28T15:31:34Z","event":"accord.accepted","id":"task-32","summary":"Accord accept for task-32"}
+{"ts":"2026-06-28T16:09:13Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T16:15:40Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:16:37Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:17:06Z","event":"task.created","id":"task-35","summary":"Differentiate research and spike tasks in the TUI"}
+{"ts":"2026-06-28T16:53:06Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T16:55:02Z","event":"accord.delivered","id":"task-24","summary":"Accord deliver for task-24"}
+{"ts":"2026-06-28T16:55:02Z","event":"accord.accepted","id":"task-24","summary":"Accord accept for task-24"}
+{"ts":"2026-06-28T16:55:02Z","event":"task.completed","id":"task-24","summary":"Accepted Tandem docs platform research: Astro Starlight primary, Zensical secondary, with docs/ Markdown source feeding a site/ Astro/Starlight static site for GitHub Pages deployment."}
+{"ts":"2026-06-28T16:55:19Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-36","summary":"Implement Tandem docs site foundation"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-37","summary":"Create docs Markdown skeleton"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-38","summary":"Create Astro Starlight site project"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-39","summary":"Wire docs source into Astro site"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-40","summary":"Document docs local preview and build workflow"}
+{"ts":"2026-06-28T16:58:46Z","event":"task.created","id":"task-41","summary":"Add GitHub Pages deployment workflow for docs site"}
+{"ts":"2026-06-28T17:08:22Z","event":"accord.rework","id":"task-23","summary":"Accord rework for task-23"}
+{"ts":"2026-06-28T17:09:00Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23"}
+{"ts":"2026-06-28T17:12:04Z","event":"accord.accepted","id":"task-23","summary":"Accord accept for task-23"}
+{"ts":"2026-06-28T17:12:04Z","event":"task.completed","id":"task-23","summary":"Accepted Board row visual polish: priority/tag/accord chips, subtle selected row, expanded Tags/Summary/Files/Checklist sections with spacing, and preserved Tab/Enter behavior."}
+{"ts":"2026-06-28T17:26:15Z","event":"accord.claimed","id":"task-36","summary":"Accord claim for task-36"}
+{"ts":"2026-06-28T17:26:18Z","event":"accord.claimed","id":"task-37","summary":"Accord claim for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"accord.delivered","id":"task-37","summary":"Accord deliver for task-37"}
+{"ts":"2026-06-28T17:27:10Z","event":"task.completed","id":"task-37","summary":"Created the initial docs/ Markdown skeleton as canonical documentation source."}
+{"ts":"2026-06-28T17:27:14Z","event":"accord.claimed","id":"task-38","summary":"Accord claim for task-38"}
+{"ts":"2026-06-28T17:29:31Z","event":"accord.delivered","id":"task-38","summary":"Accord deliver for task-38"}
+{"ts":"2026-06-28T17:29:31Z","event":"task.completed","id":"task-38","summary":"Created minimal site/ Astro Starlight project."}
+{"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-42","summary":"Implement TUI mouse hit-map and action buttons"}
+{"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-43","summary":"Finalize TUI keybinding and help discoverability"}
+{"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-44","summary":"Reuse workflow-state and accord sync in TUI mutations"}
+{"ts":"2026-06-28T17:29:46Z","event":"task.created","id":"task-45","summary":"Add state/accord divergence warnings and tests"}
+{"ts":"2026-06-28T17:30:14Z","event":"accord.claimed","id":"task-39","summary":"Accord claim for task-39"}
+{"ts":"2026-06-28T17:30:32Z","event":"task.completed","id":"task-9","summary":"Rescoped broad TUI runtime tracker: hot reload and Markdown rendering are complete; remaining mouse/action-button and keybinding/help work is split into task-42 and task-43."}
+{"ts":"2026-06-28T17:30:32Z","event":"task.completed","id":"task-26","summary":"Rescoped broad workflow/accord synchronization tracker: CLI mapping and conservative baseline are captured; remaining TUI mutation reuse and divergence warning/test work is split into task-44 and task-45."}
+{"ts":"2026-06-28T17:30:44Z","event":"accord.delivered","id":"task-39","summary":"Accord deliver for task-39"}
+{"ts":"2026-06-28T17:30:44Z","event":"task.completed","id":"task-39","summary":"Wired docs/ Markdown source into the Astro Starlight site via sync step."}
+{"ts":"2026-06-28T17:30:58Z","event":"accord.claimed","id":"task-40","summary":"Accord claim for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"accord.delivered","id":"task-40","summary":"Accord deliver for task-40"}
+{"ts":"2026-06-28T17:31:31Z","event":"task.completed","id":"task-40","summary":"Documented docs local preview and build workflow."}
+{"ts":"2026-06-28T17:32:11Z","event":"accord.claimed","id":"task-41","summary":"Accord claim for task-41"}
+{"ts":"2026-06-28T17:32:31Z","event":"accord.delivered","id":"task-41","summary":"Accord deliver for task-41"}
+{"ts":"2026-06-28T17:32:31Z","event":"task.completed","id":"task-41","summary":"Added GitHub Pages deployment workflow for docs site."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-25","summary":"Removed the top-level Review pane from TUI navigation/rendering/help/status paths while preserving review metadata and Board Validation state."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-30","summary":"Implemented Board Validation flow hints in the TUI for delivered work awaiting accept/rework/complete and kept blocked/failed/rework as cross-cutting signals outside Validation placement."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-31","summary":"Refreshed CLI/TUI documentation for Validation as a Board workflow state and removed stale top-level Review pane language from current docs."}
+{"ts":"2026-06-28T17:33:50Z","event":"task.completed","id":"task-32","summary":"Logged accepted pi-tandem Validation guidance after Validation blockers were resolved."}
+{"ts":"2026-06-28T17:34:29Z","event":"accord.delivered","id":"task-36","summary":"Accord deliver for task-36"}
+{"ts":"2026-06-28T17:34:29Z","event":"task.completed","id":"task-36","summary":"Implemented Tandem docs site foundation across docs/, site/, and GitHub Pages workflow."}
+{"ts":"2026-06-28T18:27:09Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to always"}
+{"ts":"2026-06-28T18:30:22Z","event":"task.created","id":"task-46","summary":"test dry"}
+{"ts":"2026-06-28T18:30:49Z","event":"task.created","id":"task-47","summary":"Scope persistent TUI footer hints to current context"}
+{"ts":"2026-06-28T18:30:49Z","event":"task.created","id":"task-48","summary":"Remove Board sub-pane position indicator text"}
+{"ts":"2026-06-28T18:30:49Z","event":"task.created","id":"task-49","summary":"Redesign Logs list pane for readable minimal rows"}
+{"ts":"2026-06-28T18:30:49Z","event":"task.created","id":"task-50","summary":"Rework Rules pane into Board-style category view"}
+{"ts":"2026-06-28T22:39:10Z","event":"task.created","id":"task-51","summary":"Add CLI version flag"}
+{"ts":"2026-06-28T22:41:16Z","event":"task.created","id":"task-52","summary":"Add Board filtering by tag and severity"}
+{"ts":"2026-06-29T00:03:17Z","event":"task.created","id":"task-53","summary":"Make tandem init title optional"}
+{"ts":"2026-06-29T00:06:15Z","event":"accord.delivered","id":"task-53","summary":"Accord deliver for task-53"}
+{"ts":"2026-06-29T00:15:41Z","event":"accord.claimed","id":"task-44","summary":"Accord claim for task-44"}
+{"ts":"2026-06-29T00:15:41Z","event":"accord.claimed","id":"task-45","summary":"Accord claim for task-45"}
+{"ts":"2026-06-29T00:17:38Z","event":"accord.claimed","id":"task-51","summary":"Accord claim for task-51"}
+{"ts":"2026-06-29T00:17:49Z","event":"accord.delivered","id":"task-51","summary":"Accord deliver for task-51"}
+{"ts":"2026-06-29T00:19:14Z","event":"accord.delivered","id":"task-47","summary":"Accord deliver for task-47"}
+{"ts":"2026-06-29T00:19:14Z","event":"accord.delivered","id":"task-43","summary":"Accord deliver for task-43"}
+{"ts":"2026-06-29T00:19:14Z","event":"accord.delivered","id":"task-48","summary":"Accord deliver for task-48"}
+{"ts":"2026-06-29T00:19:43Z","event":"task.created","id":"task-54","summary":"Add optional transparent theme background support"}
+{"ts":"2026-06-29T00:20:10Z","event":"accord.delivered","id":"task-35","summary":"Accord deliver for task-35"}
+{"ts":"2026-06-29T00:20:17Z","event":"accord.delivered","id":"task-52","summary":"Accord deliver for task-52"}
+{"ts":"2026-06-29T00:21:03Z","event":"accord.delivered","id":"task-46","summary":"Accord deliver for task-46"}
+{"ts":"2026-06-29T00:21:03Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49"}
+{"ts":"2026-06-29T00:21:03Z","event":"accord.delivered","id":"task-50","summary":"Accord deliver for task-50"}
+{"ts":"2026-06-29T00:21:24Z","event":"accord.delivered","id":"task-44","summary":"Accord deliver for task-44"}
+{"ts":"2026-06-29T00:21:24Z","event":"accord.delivered","id":"task-45","summary":"Accord deliver for task-45"}
+{"ts":"2026-06-29T01:27:12Z","event":"task.completed","id":"task-51","summary":"Accepted as test-verifiable CLI/release work. Implemented `tandem --version` and `tandem version`, updated docs, and validated with cargo tests and focused CLI smoke."}
+{"ts":"2026-06-29T01:27:12Z","event":"task.completed","id":"task-44","summary":"Accepted as test-covered behavior work. TUI Board moves now reuse shared CLI move/accord synchronization behavior, including ready-to-claimed sync for todo-to-in-progress moves."}
+{"ts":"2026-06-29T01:27:12Z","event":"task.completed","id":"task-45","summary":"Accepted as test-covered warning behavior. State/accord divergence warnings now surface in CLI read paths and TUI detail without collapsing workflow state, review metadata, and accord status."}
+{"ts":"2026-06-29T01:27:21Z","event":"task.completed","id":"task-53","summary":"Accepted as test-verifiable CLI init behavior. `tandem init` now succeeds without title, deriving exact directory basename with fallback and preserving explicit title override."}
+{"ts":"2026-06-29T01:31:46Z","event":"task.created","id":"task-55","summary":"Refine Validation review actions and badge semantics"}
+{"ts":"2026-06-29T01:35:34Z","event":"accord.accepted","id":"task-35","summary":"Accord accept for task-35"}
+{"ts":"2026-06-29T01:35:39Z","event":"task.completed","id":"task-35","summary":"Accepted after visual review. Research/spike tags now provide sufficient visual distinction in the TUI without introducing new protocol machinery."}
+{"ts":"2026-06-29T01:35:52Z","event":"accord.rework","id":"task-46","summary":"Accord rework for task-46"}
+{"ts":"2026-06-29T01:37:19Z","event":"accord.accepted","id":"task-47","summary":"Accord accept for task-47"}
+{"ts":"2026-06-29T01:37:19Z","event":"accord.accepted","id":"task-48","summary":"Accord accept for task-48"}
+{"ts":"2026-06-29T01:37:19Z","event":"accord.rework","id":"task-49","summary":"Accord rework for task-49"}
+{"ts":"2026-06-29T01:37:32Z","event":"task.completed","id":"task-47","summary":"Accepted after visual review. Persistent footer hints are now contextual and concise enough for the current TUI direction."}
+{"ts":"2026-06-29T01:37:32Z","event":"task.completed","id":"task-48","summary":"Accepted after visual review. Board sub-pane x/y indicator text has been removed and focus remains clear through styling."}
+{"ts":"2026-06-29T01:40:34Z","event":"accord.rework","id":"task-50","summary":"Accord rework for task-50"}
+{"ts":"2026-06-29T01:40:34Z","event":"accord.accepted","id":"task-43","summary":"Accord accept for task-43"}
+{"ts":"2026-06-29T01:40:42Z","event":"task.completed","id":"task-43","summary":"Accepted after visual review. Keybinding/help discoverability and contextual footer behavior are good enough to complete."}
+{"ts":"2026-06-29T01:42:34Z","event":"accord.rework","id":"task-52","summary":"Accord rework for task-52"}
+{"ts":"2026-06-29T01:49:41Z","event":"accord.delivered","id":"task-52","summary":"Accord deliver for task-52"}
+{"ts":"2026-06-29T01:52:35Z","event":"accord.delivered","id":"task-46","summary":"Accord deliver for task-46"}
+{"ts":"2026-06-29T01:52:40Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49"}
+{"ts":"2026-06-29T01:52:45Z","event":"accord.delivered","id":"task-50","summary":"Accord deliver for task-50"}
+{"ts":"2026-06-29T02:02:34Z","event":"task.created","id":"task-56","summary":"Keep TUI footer styling uniform across panes"}
+{"ts":"2026-06-29T02:03:28Z","event":"task.created","id":"task-57","summary":"Rework TUI help popup organization and visual design"}
+{"ts":"2026-06-29T02:06:29Z","event":"accord.accepted","id":"task-46","summary":"Accord accept for task-46"}
+{"ts":"2026-06-29T02:06:34Z","event":"task.completed","id":"task-46","summary":"Accepted after visual review. Reworked header/navigation layout is good: shortcut, label, and count are clearer and the header uses space better."}
+{"ts":"2026-06-29T02:08:38Z","event":"accord.rework","id":"task-49","summary":"Accord rework for task-49"}
+{"ts":"2026-06-29T02:09:47Z","event":"accord.rework","id":"task-50","summary":"Accord rework for task-50"}
+{"ts":"2026-06-29T02:11:04Z","event":"accord.accepted","id":"task-52","summary":"Accord accept for task-52"}
+{"ts":"2026-06-29T02:11:09Z","event":"task.completed","id":"task-52","summary":"Accepted after visual review. Board filter visibility is now clear and polished; active filters are prominent without being jarring."}
+{"ts":"2026-06-29T03:03:14Z","event":"task.moved","id":"task-55","summary":"Moved task-55 from todo to in-progress"}
+{"ts":"2026-06-29T03:05:35Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49"}
+{"ts":"2026-06-29T03:05:35Z","event":"accord.delivered","id":"task-50","summary":"Accord deliver for task-50"}
+{"ts":"2026-06-29T03:06:11Z","event":"accord.delivered","id":"task-56","summary":"Accord deliver for task-56"}
+{"ts":"2026-06-29T03:06:15Z","event":"accord.delivered","id":"task-57","summary":"Accord deliver for task-57"}
+{"ts":"2026-06-29T03:10:22Z","event":"accord.delivered","id":"task-42","summary":"Accord deliver for task-42"}
+{"ts":"2026-06-29T03:10:28Z","event":"accord.delivered","id":"task-54","summary":"Accord deliver for task-54"}
+{"ts":"2026-06-29T03:11:45Z","event":"accord.ready","id":"task-55","summary":"Accord ready for task-55"}
+{"ts":"2026-06-29T03:11:49Z","event":"accord.claimed","id":"task-55","summary":"Accord claim for task-55"}
+{"ts":"2026-06-29T03:11:55Z","event":"accord.delivered","id":"task-55","summary":"Accord deliver for task-55"}
+{"ts":"2026-06-29T17:13:05Z","event":"validation.accepted","id":"task-54","summary":"Accepted sign-off for task-54"}
+{"ts":"2026-06-29T17:13:24Z","event":"validation.accepted","id":"task-50","summary":"Accepted sign-off for task-50"}
+{"ts":"2026-06-29T17:17:20Z","event":"accord.rework","id":"task-55","summary":"Accord rework for task-55"}
+{"ts":"2026-06-29T17:22:29Z","event":"task.created","id":"task-58","summary":"Add Validation apply-accepted workflow"}
+{"ts":"2026-06-29T17:22:35Z","event":"validation.accepted","id":"task-56","summary":"Accepted sign-off for task-56"}
+{"ts":"2026-06-29T17:22:38Z","event":"validation.accepted","id":"task-57","summary":"Accepted sign-off for task-57"}
+{"ts":"2026-06-29T17:38:29Z","event":"accord.rework","id":"task-49","summary":"Accord rework for task-49"}
+{"ts":"2026-06-29T17:40:21Z","event":"accord.accepted","id":"task-42","summary":"Accord accept for task-42"}
+{"ts":"2026-06-29T17:54:47Z","event":"task.completed","id":"task-42","summary":"Accepted after review. Mouse hit-map/action button support is good enough for current v0 scope."}
+{"ts":"2026-06-29T17:54:47Z","event":"task.completed","id":"task-50","summary":"Accepted after visual review. Rules pane category view and selected Always styling are good."}
+{"ts":"2026-06-29T17:54:47Z","event":"task.completed","id":"task-54","summary":"Accepted after review. Transparent background theme support works for current workspace needs."}
+{"ts":"2026-06-29T17:54:47Z","event":"task.completed","id":"task-56","summary":"Accepted after review. Footer/hotkey styling remains uniform and neutral across panes."}
+{"ts":"2026-06-29T17:54:47Z","event":"task.completed","id":"task-57","summary":"Accepted after review. Help popup organization and visual grouping are good."}
+{"ts":"2026-06-29T18:04:58Z","event":"accord.claimed","id":"task-15","summary":"Accord claim for task-15"}
+{"ts":"2026-06-29T18:07:32Z","event":"accord.delivered","id":"task-15","summary":"Accord deliver for task-15"}
+{"ts":"2026-06-29T18:08:01Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49"}
+{"ts":"2026-06-29T18:09:29Z","event":"accord.delivered","id":"task-55","summary":"Accord deliver for task-55"}
+{"ts":"2026-06-29T18:09:29Z","event":"accord.delivered","id":"task-58","summary":"Accord deliver for task-58"}
+{"ts":"2026-06-29T18:27:55Z","event":"task.completed","id":"task-15","summary":"Closed per user direction without applying additional promotion changes. The accidental dotfiles documentation commit from the delegated herd was reset locally and not pushed."}
+{"ts":"2026-06-29T20:10:37Z","event":"validation.rework","id":"task-49","summary":"Requested rework for task-49"}
+{"ts":"2026-06-29T20:11:03Z","event":"validation.accepted","id":"task-55","summary":"Accepted sign-off for task-55"}
+{"ts":"2026-06-29T20:11:10Z","event":"validation.accepted","id":"task-58","summary":"Accepted sign-off for task-58"}
+{"ts":"2026-06-29T20:11:14Z","event":"task.completed","id":"task-55","summary":"Applied accepted Validation sign-off for task-55"}
+{"ts":"2026-06-29T20:11:14Z","event":"task.completed","id":"task-58","summary":"Applied accepted Validation sign-off for task-58"}
+{"ts":"2026-06-29T20:24:35Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49"}
+{"ts":"2026-06-29T20:30:12Z","event":"validation.accepted","id":"task-49","summary":"Accepted sign-off for task-49"}
+{"ts":"2026-06-29T20:30:14Z","event":"task.completed","id":"task-49","summary":"Applied accepted Validation sign-off for task-49"}
+{"ts":"2026-06-29T20:49:04Z","event":"decision.created","id":"decision-1","summary":"Use Astro Starlight and GitHub Pages for Tandem docs"}
+{"ts":"2026-06-29T20:49:04Z","event":"task.created","id":"task-59","summary":"Upgrade Tandem documentation and docs site for public launch"}
+{"ts":"2026-06-29T20:49:19Z","event":"task.created","id":"task-60","summary":"Design docs information architecture and launch content map"}
+{"ts":"2026-06-29T20:49:19Z","event":"task.created","id":"task-60","summary":"Write polished landing, quickstart, and concepts docs"}
+{"ts":"2026-06-29T20:49:19Z","event":"task.created","id":"task-61","summary":"Expand CLI and protocol reference documentation"}
+{"ts":"2026-06-29T20:49:19Z","event":"task.created","id":"task-61","summary":"Create TUI user guide with visual assets"}
+{"ts":"2026-06-29T20:49:28Z","event":"task.created","id":"task-62","summary":"Design docs information architecture and launch content map"}
+{"ts":"2026-06-29T20:49:33Z","event":"task.created","id":"task-63","summary":"Expand CLI and protocol reference documentation"}
+{"ts":"2026-06-29T20:49:37Z","event":"task.created","id":"task-64","summary":"Polish docs site branding, homepage, and navigation"}
+{"ts":"2026-06-29T20:49:41Z","event":"task.created","id":"task-65","summary":"Configure custom domain and GitHub Pages launch workflow"}
+{"ts":"2026-06-29T20:49:45Z","event":"task.created","id":"task-66","summary":"Add docs quality checks and contribution workflow"}
+{"ts":"2026-06-29T22:56:39Z","event":"task.created","id":"task-67","summary":"Research how to obtain a .md TLD/domain for tandem.md"}
+{"ts":"2026-06-29T23:00:02Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to prefer"}
+{"ts":"2026-06-29T23:04:11Z","event":"task.created","id":"task-68","summary":"Research and apply the official Astro Gruvbox theme"}
+{"ts":"2026-06-30T03:09:11Z","event":"task.created","id":"task-69","summary":"Support global Tandem theme selection from user config"}
+{"ts":"2026-06-30T03:09:15Z","event":"accord.claimed","id":"task-69","summary":"Accord claim for task-69"}
+{"ts":"2026-06-30T03:18:15Z","event":"accord.delivered","id":"task-69","summary":"Accord deliver for task-69"}
+{"ts":"2026-06-30T03:22:18Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to always"}
+{"ts":"2026-06-30T03:22:18Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to always"}
+{"ts":"2026-06-30T03:22:18Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to never"}
+{"ts":"2026-06-30T12:02:34Z","event":"task.created","id":"task-70","summary":"Investigate docs deploy runtime pinning and package-manager choice"}
+{"ts":"2026-06-30T12:02:43Z","event":"task.created","id":"task-71","summary":"Fix docs deploy workflow runtime and package-manager grounding"}
+{"ts":"2026-06-30T12:03:37Z","event":"task.created","id":"task-72","summary":"Investigate concise GitHub Release notes generation for Tandem releases"}
+{"ts":"2026-06-30T12:24:47Z","event":"accord.accepted","id":"task-69","summary":"Accord accept for task-69"}
+{"ts":"2026-06-30T12:24:51Z","event":"task.completed","id":"task-69","summary":"Added global Tandem theme selection from user config, documented verification path, removed the workspace-local theme override, and left theme selection centralized in ~/.config/tandem."}
+{"ts":"2026-06-30T12:37:00Z","event":"task.created","id":"task-73","summary":"Add configurable TUI badge display styles"}
+{"ts":"2026-06-30T18:03:40Z","event":"task.created","id":"task-74","summary":"Add tandem update command for task metadata edits"}
+{"ts":"2026-06-30T18:26:49Z","event":"accord.claimed","id":"task-74","summary":"Accord claim for task-74"}
+{"ts":"2026-06-30T18:33:26Z","event":"accord.delivered","id":"task-74","summary":"Accord deliver for task-74"}
+{"ts":"2026-06-30T18:42:38Z","event":"accord.accepted","id":"task-74","summary":"Accord accept for task-74"}
+{"ts":"2026-06-30T18:42:38Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to prefer"}
+{"ts":"2026-06-30T18:42:43Z","event":"task.completed","id":"task-74","summary":"Implemented and verified `tandem update <id>` for active task metadata edits, including scalar replacements, append/dedupe list metadata, priority validation, old/new mutation output, docs/spec updates, repo-local pi-tandem smoke coverage, and canonical Pi config pi-tandem update."}
+{"ts":"2026-06-30T19:21:17Z","event":"accord.claimed","id":"task-72","summary":"Accord claim for task-72"}
+{"ts":"2026-06-30T19:21:17Z","event":"accord.claimed","id":"task-73","summary":"Accord claim for task-73"}
+{"ts":"2026-06-30T19:21:17Z","event":"accord.claimed","id":"task-70","summary":"Accord claim for task-70"}
+{"ts":"2026-06-30T19:27:40Z","event":"accord.delivered","id":"task-72","summary":"Accord deliver for task-72"}
+{"ts":"2026-06-30T19:27:40Z","event":"accord.delivered","id":"task-73","summary":"Accord deliver for task-73"}
+{"ts":"2026-06-30T19:27:40Z","event":"accord.delivered","id":"task-70","summary":"Accord deliver for task-70"}
+{"ts":"2026-06-30T19:35:53Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to prefer"}
+{"ts":"2026-06-30T19:38:42Z","event":"accord.accepted","id":"task-70","summary":"Accord accept for task-70"}
+{"ts":"2026-06-30T19:38:46Z","event":"task.completed","id":"task-70","summary":"Documented docs-site runtime and package-manager policy, recommending Node 24 LTS for deployment and keeping npm/package-lock/npm ci for now."}
+{"ts":"2026-06-30T19:39:14Z","event":"accord.accepted","id":"task-72","summary":"Accord accept for task-72"}
+{"ts":"2026-06-30T19:39:19Z","event":"task.completed","id":"task-72","summary":"Split concise public GitHub Release notes into tandem/GITHUB_RELEASE_NOTES.md and kept tandem/RELEASE.md as reusable release checklist; updated just release to publish from the concise notes file."}
+{"ts":"2026-06-30T19:50:53Z","event":"validation.rework","id":"task-73","summary":"Requested rework for task-73"}
+{"ts":"2026-06-30T19:55:44Z","event":"task.created","id":"task-75","summary":"Explore configurable TUI badge shapes"}
+{"ts":"2026-06-30T19:57:01Z","event":"accord.delivered","id":"task-73","summary":"Accord deliver for task-73"}
+{"ts":"2026-06-30T19:59:00Z","event":"accord.delivered","id":"task-73","summary":"Accord deliver for task-73"}
+{"ts":"2026-06-30T20:06:22Z","event":"validation.accepted","id":"task-73","summary":"Accepted sign-off for task-73"}
+{"ts":"2026-06-30T20:06:41Z","event":"accord.accepted","id":"task-73","summary":"Accord accept for task-73"}
+{"ts":"2026-06-30T20:06:49Z","event":"task.completed","id":"task-73","summary":"Added configurable TUI badge styles with canonical values muted, accent, text, ghost, and solid; included compatibility aliases for previous names, docs/examples/spec updates, aligned text-style priority labels, and user-accepted visual rework."}
+{"ts":"2026-07-01T03:04:38Z","event":"task.moved","id":"task-67","summary":"Moved task-67 from todo to in-progress"}
+{"ts":"2026-07-01T03:04:38Z","event":"task.moved","id":"task-75","summary":"Moved task-75 from todo to in-progress"}
+{"ts":"2026-07-01T03:04:38Z","event":"task.moved","id":"task-71","summary":"Moved task-71 from todo to in-progress"}
+{"ts":"2026-07-01T03:10:03Z","event":"accord.delivered","id":"task-67","summary":"Accord deliver for task-67"}
+{"ts":"2026-07-01T03:10:03Z","event":"accord.delivered","id":"task-71","summary":"Accord deliver for task-71"}
+{"ts":"2026-07-01T03:10:03Z","event":"accord.delivered","id":"task-75","summary":"Accord deliver for task-75"}
+{"ts":"2026-07-01T03:10:13Z","event":"accord.accepted","id":"task-67","summary":"Accord accept for task-67"}
+{"ts":"2026-07-01T03:10:13Z","event":"accord.accepted","id":"task-71","summary":"Accord accept for task-71"}
+{"ts":"2026-07-01T03:10:21Z","event":"task.completed","id":"task-67","summary":"Completed domain research for tandem.md. Added plan/domain-research.md with recommendation, registrar/pricing notes, alternatives, DNS/hosting setup, sources, and validation commands."}
+{"ts":"2026-07-01T03:10:21Z","event":"task.completed","id":"task-71","summary":"Completed docs deploy runtime/package-manager grounding. Workflow now reads site/.node-version, local just docs shortcuts enforce Node 24 and mirror CI with npm ci, package engines document Astro's Node floor, and docs explain npm/package-lock policy."}
+{"ts":"2026-07-01T04:11:24Z","event":"accord.rework","id":"task-75","summary":"Accord rework for task-75"}
+{"ts":"2026-07-01T04:20:41Z","event":"accord.rework","id":"task-75","summary":"Accord rework for task-75"}
+{"ts":"2026-07-01T04:21:19Z","event":"accord.failed","id":"task-75","summary":"Accord fail for task-75"}
+{"ts":"2026-07-01T04:21:23Z","event":"task.completed","id":"task-75","summary":"Abandoned configurable rounded TUI badge shapes after failed visual validation. Parentheses were rejected as plain bracket text, and the glyph-cap approach was also rejected because it looked poor and did not blend with badge colors. No further rework desired."}
+{"ts":"2026-07-01T15:33:37Z","event":"task.created","id":"task-76","summary":"Remove configurable TUI badge style support"}
+{"ts":"2026-07-01T15:33:44Z","event":"task.moved","id":"task-76","summary":"Moved task-76 from todo to in-progress"}
+{"ts":"2026-07-01T15:51:12Z","event":"accord.delivered","id":"task-76","summary":"Accord deliver for task-76"}
+{"ts":"2026-07-01T15:51:18Z","event":"accord.rework","id":"task-76","summary":"Accord rework for task-76"}
+{"ts":"2026-07-01T16:05:24Z","event":"task.created","id":"task-77","summary":"Specify Git-safe per-actor event logs"}
+{"ts":"2026-07-01T16:09:16Z","event":"accord.delivered","id":"task-76","summary":"Accord deliver for task-76"}
+{"ts":"2026-07-01T16:09:22Z","event":"accord.accepted","id":"task-76","summary":"Accord accept for task-76"}
+{"ts":"2026-07-01T16:09:30Z","event":"task.completed","id":"task-76","summary":"Removed configurable TUI badge style support. Badge rendering is fixed saturated filled style again; badge_style and [badges] style are no longer parsed specially and produce ordinary theme warnings. Removed docs/examples/release-note advertising and resolved the badge_style_mode dead-code warning."}
+{"ts":"2026-07-01T16:21:32Z","event":"task.created","id":"task-78","summary":"Investigate and improve validation summary rendering"}
+{"ts":"2026-07-01T16:51:34Z","event":"task.created","id":"task-79","summary":"Specify default and project-configurable TUI badges"}
+{"ts":"2026-07-01T16:59:41Z","event":"task.created","id":"task-80","summary":"Add first-class Epic and ADR support across Tandem"}
+{"ts":"2026-07-01T17:26:15Z","event":"task.created","id":"task-80","summary":"Add lightweight Epic support as a task kind"}
+{"ts":"2026-07-01T17:26:25Z","event":"task.created","id":"task-81","summary":"Strengthen Decision docs with ADR-compatible structure"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-59","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-60","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-61","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-62","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-63","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-64","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-65","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-66","summary":"Set priority to low for docs/Astro backlog reprioritization","actor":"pi"}
+{"ts":"2026-07-01T17:28:35Z","event":"task.updated","id":"task-79","summary":"Set priority to high for badge specification work","actor":"pi"}
+{"ts":"2026-07-01T18:05:30Z","event":"task.created","id":"task-82","summary":"Add Epic protocol and CLI core support"}
+{"ts":"2026-07-01T18:05:35Z","event":"task.created","id":"task-83","summary":"Add Epic TUI rendering and relationship hints"}
+{"ts":"2026-07-01T18:05:41Z","event":"task.created","id":"task-84","summary":"Document Epic convention and update agent guidance"}
+{"ts":"2026-07-01T18:05:47Z","event":"task.created","id":"task-85","summary":"Strengthen Decision ADR protocol and CLI core"}
+{"ts":"2026-07-01T18:05:52Z","event":"task.created","id":"task-86","summary":"Improve Decision TUI rendering and board classification"}
+{"ts":"2026-07-01T18:05:58Z","event":"task.created","id":"task-87","summary":"Document ADR-compatible Decisions and update agent guidance"}
+{"ts":"2026-07-01T18:07:22Z","event":"accord.claimed","id":"task-77","summary":"Accord claim for task-77"}
+{"ts":"2026-07-01T18:07:32Z","event":"accord.claimed","id":"task-79","summary":"Accord claim for task-79"}
+{"ts":"2026-07-01T18:07:40Z","event":"accord.claimed","id":"task-82","summary":"Accord claim for task-82"}
+{"ts":"2026-07-01T18:07:48Z","event":"accord.claimed","id":"task-83","summary":"Accord claim for task-83"}
+{"ts":"2026-07-01T18:07:56Z","event":"accord.claimed","id":"task-84","summary":"Accord claim for task-84"}
+{"ts":"2026-07-01T18:08:04Z","event":"accord.claimed","id":"task-85","summary":"Accord claim for task-85"}
+{"ts":"2026-07-01T18:08:12Z","event":"accord.claimed","id":"task-86","summary":"Accord claim for task-86"}
+{"ts":"2026-07-01T18:08:20Z","event":"accord.claimed","id":"task-87","summary":"Accord claim for task-87"}
+{"ts":"2026-07-01T18:08:30Z","event":"task.moved","id":"task-80","summary":"Moved task-80 from todo to in-progress"}
+{"ts":"2026-07-01T18:08:30Z","event":"task.moved","id":"task-81","summary":"Moved task-81 from todo to in-progress"}
+{"ts":"2026-07-01T18:28:38Z","event":"accord.delivered","id":"task-77","summary":"Accord deliver for task-77"}
+{"ts":"2026-07-01T18:28:47Z","event":"accord.delivered","id":"task-79","summary":"Accord deliver for task-79"}
+{"ts":"2026-07-01T18:28:54Z","event":"accord.delivered","id":"task-82","summary":"Accord deliver for task-82"}
+{"ts":"2026-07-01T18:29:02Z","event":"accord.delivered","id":"task-83","summary":"Accord deliver for task-83"}
+{"ts":"2026-07-01T18:29:10Z","event":"accord.delivered","id":"task-84","summary":"Accord deliver for task-84"}
+{"ts":"2026-07-01T18:29:19Z","event":"accord.delivered","id":"task-85","summary":"Accord deliver for task-85"}
+{"ts":"2026-07-01T18:29:27Z","event":"accord.delivered","id":"task-86","summary":"Accord deliver for task-86"}
+{"ts":"2026-07-01T18:29:37Z","event":"accord.delivered","id":"task-87","summary":"Accord deliver for task-87"}
+{"ts":"2026-07-01T18:30:06Z","event":"accord.accepted","id":"task-77","summary":"Accord accept for task-77"}
+{"ts":"2026-07-01T18:30:13Z","event":"task.completed","id":"task-77","summary":"Completed Git-safe per-actor event-log specification update after verification."}
+{"ts":"2026-07-01T18:30:19Z","event":"accord.accepted","id":"task-82","summary":"Accord accept for task-82"}
+{"ts":"2026-07-01T18:30:24Z","event":"task.completed","id":"task-82","summary":"Completed Epic protocol and CLI core support after verification."}
+{"ts":"2026-07-01T19:03:00Z","event":"accord.accepted","id":"task-79","summary":"Accord accept for task-79"}
+{"ts":"2026-07-01T19:03:05Z","event":"task.completed","id":"task-79","summary":"Completed configurable TUI badge support after automated verification and user visual approval."}
+{"ts":"2026-07-01T19:03:26Z","event":"accord.rework","id":"task-83","summary":"Accord rework for task-83"}
+{"ts":"2026-07-01T19:13:12Z","event":"accord.delivered","id":"task-83","summary":"Accord deliver for task-83"}
+{"ts":"2026-07-01T20:07:43Z","event":"accord.rework","id":"task-83","summary":"Accord rework for task-83"}
+{"ts":"2026-07-01T20:07:55Z","event":"task.moved","id":"task-83","summary":"Moved task-83 from in-progress to todo"}
+{"ts":"2026-07-01T20:15:01Z","event":"accord.accepted","id":"task-84","summary":"Accord accept for task-84"}
+{"ts":"2026-07-01T20:15:09Z","event":"task.completed","id":"task-84","summary":"Completed documentation-only Epic convention and agent guidance updates. User directed documentation validation tasks can be marked complete without manual review."}
+{"ts":"2026-07-01T20:15:16Z","event":"accord.accepted","id":"task-87","summary":"Accord accept for task-87"}
+{"ts":"2026-07-01T20:15:25Z","event":"task.completed","id":"task-87","summary":"Completed documentation-only ADR-compatible Decision guide and agent guidance updates. User directed documentation validation tasks can be marked complete without manual review."}
+{"ts":"2026-07-01T20:19:48Z","event":"accord.accepted","id":"task-85","summary":"Accord accept for task-85"}
+{"ts":"2026-07-01T20:19:58Z","event":"task.completed","id":"task-85","summary":"Completed ADR-compatible Decision protocol and CLI core work. Accepted as objective non-visual work with recorded automated validation evidence."}
+{"ts":"2026-07-01T21:42:55Z","event":"accord.rework","id":"task-86","summary":"Accord rework for task-86"}
+{"ts":"2026-07-01T22:18:19Z","event":"task.moved","id":"task-83","summary":"Moved task-83 from todo to in-progress"}
+{"ts":"2026-07-01T22:32:55Z","event":"accord.rework","id":"task-86","summary":"Accord rework for task-86"}
+{"ts":"2026-07-01T23:04:20Z","event":"accord.delivered","id":"task-83","summary":"Accord deliver for task-83"}
+{"ts":"2026-07-01T23:04:32Z","event":"accord.accepted","id":"task-83","summary":"Accord accept for task-83"}
+{"ts":"2026-07-01T23:04:46Z","event":"task.completed","id":"task-83","summary":"Completed Epic TUI rendering and relationship hints after approved rework. Main now includes grouped Epic Board arrangement and relationship expansion behavior."}
+{"ts":"2026-07-01T23:05:07Z","event":"accord.delivered","id":"task-86","summary":"Accord deliver for task-86"}
+{"ts":"2026-07-01T23:05:19Z","event":"accord.accepted","id":"task-86","summary":"Accord accept for task-86"}
+{"ts":"2026-07-01T23:05:33Z","event":"task.completed","id":"task-86","summary":"Completed Decision TUI rendering and board classification work after approved rework. Main now includes compact Decisions list rows, minimal selection, Enter expansion, and approved detail pane rendering."}
+{"ts":"2026-07-04T11:36:30Z","event":"task.completed","id":"task-80","summary":"Completed parent Epic support task after validating that all child implementation, TUI, documentation, and agent guidance work has been completed and accepted."}
+{"ts":"2026-07-04T11:36:34Z","event":"task.completed","id":"task-81","summary":"Completed parent ADR-compatible Decision support task after validating that all child protocol/CLI, TUI, documentation, and agent guidance work has been completed and accepted."}
+{"ts":"2026-07-04T11:46:30Z","event":"task.created","id":"task-88","summary":"Update docs deploy workflow actions for Node 24 runtime"}
+{"ts":"2026-07-04T11:46:38Z","event":"task.created","id":"task-89","summary":"task 88 to shep agent"}
+{"ts":"2026-07-04T11:46:38Z","event":"task.moved","id":"task-89","summary":"Moved task-89 from todo to in-progress"}
+{"ts":"2026-07-04T11:47:27Z","event":"task.created","id":"task-90","summary":"task 88 to shep pane"}
+{"ts":"2026-07-04T11:47:27Z","event":"task.moved","id":"task-90","summary":"Moved task-90 from todo to in-progress"}
+{"ts":"2026-07-04T11:51:06Z","event":"accord.claimed","id":"task-88","summary":"Accord claim for task-88"}
+{"ts":"2026-07-04T11:52:29Z","event":"task.updated","id":"task-68","summary":"Updated task-68 metadata: tags"}
+{"ts":"2026-07-04T11:53:19Z","event":"accord.claimed","id":"task-68","summary":"Accord claim for task-68"}
+{"ts":"2026-07-04T11:53:48Z","event":"accord.delivered","id":"task-88","summary":"Accord deliver for task-88"}
+{"ts":"2026-07-04T11:53:52Z","event":"accord.accepted","id":"task-88","summary":"Accord accept for task-88"}
+{"ts":"2026-07-04T11:53:57Z","event":"task.completed","id":"task-88","summary":"Updated docs deploy workflow actions to Node 24-compatible versions after verification."}
+{"ts":"2026-07-04T12:54:55Z","event":"accord.delivered","id":"task-68","summary":"Accord deliver for task-68"}
+{"ts":"2026-07-04T13:03:06Z","event":"decision.created","id":"decision-2","summary":"Use Bun as the default JavaScript package manager and runner"}
+{"ts":"2026-07-04T13:03:21Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to always"}
+{"ts":"2026-07-04T13:03:21Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to always"}
+{"ts":"2026-07-04T13:03:34Z","event":"rules.updated","id":"rules","summary":"Added rule 6 to always"}
+{"ts":"2026-07-04T13:03:54Z","event":"task.created","id":"task-89","summary":"Migrate docs site package management from npm to Bun"}
+{"ts":"2026-07-04T13:03:54Z","event":"task.created","id":"task-89","summary":"Audit remaining npm references and document Bun exception policy"}
+{"ts":"2026-07-04T13:03:54Z","event":"task.created","id":"task-89","summary":"Update docs automation and GitHub Pages workflow to use Bun"}
+{"ts":"2026-07-04T13:04:06Z","event":"task.created","id":"task-90","summary":"Migrate docs site package management from npm to Bun"}
+{"ts":"2026-07-04T13:04:16Z","event":"task.created","id":"task-91","summary":"Audit remaining npm references and document Bun exception policy"}
+{"ts":"2026-07-04T13:06:20Z","event":"task.created","id":"task-92","summary":"Investigate Tandem task ID race condition on concurrent adds"}
+{"ts":"2026-07-04T13:10:04Z","event":"decision.created","id":"decision-3","summary":"Define the Tandem project stack and tooling realms"}
+{"ts":"2026-07-04T13:10:24Z","event":"accord.accepted","id":"task-68","summary":"Accord accept for task-68"}
+{"ts":"2026-07-04T13:10:32Z","event":"task.completed","id":"task-68","summary":"Completed Astro 7/Starlight-compatible Gruvbox docs-site workaround after user validation."}
+{"ts":"2026-07-04T13:18:34Z","event":"accord.claimed","id":"task-90","summary":"Accord claim for task-90"}
+{"ts":"2026-07-04T13:34:47Z","event":"accord.delivered","id":"task-90","summary":"Accord deliver for task-90"}
+{"ts":"2026-07-04T13:34:58Z","event":"accord.accepted","id":"task-90","summary":"Accord accept for task-90"}
+{"ts":"2026-07-04T13:35:10Z","event":"task.completed","id":"task-90","summary":"Migrated docs-site package-management state from npm/package-lock to Bun/bun.lock after verification."}
+{"ts":"2026-07-04T13:40:07Z","event":"accord.claimed","id":"task-89","summary":"Accord claim for task-89"}
+{"ts":"2026-07-04T13:59:54Z","event":"accord.delivered","id":"task-89","summary":"Accord deliver for task-89"}
+{"ts":"2026-07-04T14:00:00Z","event":"accord.accepted","id":"task-89","summary":"Accord accept for task-89"}
+{"ts":"2026-07-04T14:00:08Z","event":"task.completed","id":"task-89","summary":"Updated docs automation and GitHub Pages workflow to use Bun after verification."}
+{"ts":"2026-07-04T14:16:03Z","event":"task.created","id":"task-93","summary":"Explore Verdigris-inspired docs theme direction with Sideshow mockups"}
+{"ts":"2026-07-04T14:17:32Z","event":"accord.claimed","id":"task-93","summary":"Accord claim for task-93"}
+{"ts":"2026-07-04T14:17:32Z","event":"accord.claimed","id":"task-91","summary":"Accord claim for task-91"}
+{"ts":"2026-07-04T14:21:32Z","event":"accord.delivered","id":"task-91","summary":"Accord deliver for task-91"}
+{"ts":"2026-07-04T14:21:45Z","event":"accord.accepted","id":"task-91","summary":"Accord accept for task-91"}
+{"ts":"2026-07-04T14:21:59Z","event":"task.completed","id":"task-91","summary":"Audited remaining npm references and documented Bun exception policy after verification."}
+{"ts":"2026-07-04T14:30:20Z","event":"accord.delivered","id":"task-93","summary":"Accord deliver for task-93"}
+{"ts":"2026-07-04T14:33:24Z","event":"accord.rework","id":"task-93","summary":"Accord rework for task-93"}
+{"ts":"2026-07-04T14:38:34Z","event":"accord.delivered","id":"task-93","summary":"Accord deliver for task-93"}
+{"ts":"2026-07-04T14:47:36Z","event":"accord.rework","id":"task-93","summary":"Accord rework for task-93"}
+{"ts":"2026-07-04T14:58:29Z","event":"accord.delivered","id":"task-93","summary":"Accord deliver for task-93"}
+{"ts":"2026-07-04T15:08:35Z","event":"task.created","id":"task-94","summary":"Implement standalone vendorable Verdigris docs theme"}
+{"ts":"2026-07-04T15:10:04Z","event":"accord.delivered","id":"task-93","summary":"Accord deliver for task-93"}
+{"ts":"2026-07-04T15:33:48Z","event":"accord.rework","id":"task-93","summary":"Accord rework for task-93"}
+{"ts":"2026-07-04T15:36:30Z","event":"accord.delivered","id":"task-93","summary":"Accord deliver for task-93"}
+{"ts":"2026-07-04T15:38:54Z","event":"accord.accepted","id":"task-93","summary":"Accord accept for task-93"}
+{"ts":"2026-07-04T15:39:09Z","event":"task.completed","id":"task-93","summary":"Completed visual direction exploration after explicit user approval. Approved direction is a standalone Verdigris docs/site theme with colorful heading scale, Verdigris links/tags/sidebar/cards/callouts/blockquotes, and intentional Verdigris code block styling. Final republished Sideshow mockup: http://localhost:8228/s/pRcDGGYSsE4"}
+{"ts":"2026-07-04T15:39:09Z","event":"accord.claimed","id":"task-94","summary":"Accord claim for task-94"}
+{"ts":"2026-07-04T15:57:10Z","event":"accord.delivered","id":"task-94","summary":"Accord deliver for task-94"}
+{"ts":"2026-07-04T16:08:53Z","event":"accord.rework","id":"task-94","summary":"Accord rework for task-94"}
+{"ts":"2026-07-04T16:33:15Z","event":"accord.delivered","id":"task-94","summary":"Accord deliver for task-94"}
+{"ts":"2026-07-04T16:41:20Z","event":"task.created","id":"task-95","summary":"Move project tag badge configuration out of theme.toml"}
+{"ts":"2026-07-04T16:55:43Z","event":"accord.accepted","id":"task-94","summary":"Accord accept for task-94"}
+{"ts":"2026-07-04T16:55:51Z","event":"task.completed","id":"task-94","summary":"Implemented and accepted standalone vendorable Verdigris docs theme. Replaced Gruvbox workaround with Verdigris CSS and Shiki themes, added theme tester page, fixed Expressive Code rendering, documented theme asset boundary, and validated docs build."}
+{"ts":"2026-07-04T17:22:07Z","event":"task.updated","id":"task-65","summary":"Updated task-65 metadata: relatedFiles"}
+{"ts":"2026-07-04T17:22:36Z","event":"accord.claimed","id":"task-65","summary":"Accord claim for task-65"}
+{"ts":"2026-07-04T17:39:39Z","event":"accord.delivered","id":"task-65","summary":"Accord deliver for task-65"}
+{"ts":"2026-07-04T17:48:44Z","event":"accord.accepted","id":"task-65","summary":"Accord accept for task-65"}
+{"ts":"2026-07-04T17:48:53Z","event":"task.completed","id":"task-65","summary":"Configured the docs site for trytandem.dev custom-domain launch. Updated Astro site/base settings, added CNAME artifact source, documented GitHub Pages and Namecheap DNS setup, and used GitHub CLI to configure/inspect Pages custom-domain state."}
+{"ts":"2026-07-04T17:59:12Z","event":"accord.claimed","id":"task-92","summary":"Accord claim for task-92"}
+{"ts":"2026-07-04T17:59:12Z","event":"accord.claimed","id":"task-95","summary":"Accord claim for task-95"}
+{"ts":"2026-07-04T17:59:12Z","event":"accord.claimed","id":"task-66","summary":"Accord claim for task-66"}
+{"ts":"2026-07-04T18:36:50Z","event":"accord.delivered","id":"task-95","summary":"Accord deliver for task-95"}
+{"ts":"2026-07-04T18:40:53Z","event":"accord.delivered","id":"task-66","summary":"Accord deliver for task-66"}
+{"ts":"2026-07-04T18:41:01Z","event":"accord.delivered","id":"task-92","summary":"Accord deliver for task-92"}
+{"ts":"2026-07-04T18:43:45Z","event":"accord.accepted","id":"task-95","summary":"Accord accept for task-95"}
+{"ts":"2026-07-04T18:44:07Z","event":"task.completed","id":"task-95","summary":"Completed project tag badge config migration. Board/TUI project-domain badge semantics now load from user config and workspace `.tandem/config.toml` via `[board.badges]` / `[board.badges.tags.*]`, with legacy theme-file `[badges]` support preserved for migration."}
+{"ts":"2026-07-04T18:50:43Z","event":"accord.accepted","id":"task-92","summary":"Accord accept for task-92"}
+{"ts":"2026-07-04T18:51:11Z","event":"task.completed","id":"task-92","summary":"Completed concurrent add race-condition fix. New task/decision document creation now uses atomic create-with-retry to reserve sequential IDs without replacing existing files, covering CLI task add, CLI decision add, TUI quick task add, and TUI decision add."}
+{"ts":"2026-07-04T18:55:09Z","event":"accord.accepted","id":"task-66","summary":"Accord accept for task-66"}
+{"ts":"2026-07-04T18:55:50Z","event":"task.completed","id":"task-66","summary":"Completed docs quality checks and contribution workflow. Added dependency-free built-site internal link checker, Bun docs quality scripts, CI link-check step, docs maintenance/checklist updates, generated content ignore/notice fixes, and favicon asset."}
+{"ts":"2026-07-04T19:47:53Z","event":"accord.claimed","id":"task-62","summary":"Accord claim for task-62"}
+{"ts":"2026-07-04T20:26:13Z","event":"accord.delivered","id":"task-62","summary":"Accord deliver for task-62"}
+{"ts":"2026-07-04T20:35:33Z","event":"accord.rework","id":"task-62","summary":"Accord rework for task-62"}
+{"ts":"2026-07-04T20:53:41Z","event":"accord.delivered","id":"task-62","summary":"Accord deliver for task-62"}
+{"ts":"2026-07-04T20:53:50Z","event":"accord.accepted","id":"task-62","summary":"Accord accept for task-62"}
+{"ts":"2026-07-04T20:53:58Z","event":"task.completed","id":"task-62","summary":"Approved and completed docs IA planning. First-pass docs/site shape is Home + real top-level /quick-start/ with brief curl/install.sh, Cargo, and AUR binary install lanes; CLI/TUI-only quickstart; TUI-framed Concepts covering Board states todo/in-progress/validation, accords, epics, rules, decisions, and logs; practical CLI/TUI/Protocol pages; and optional Extensions link-out only. Prior maybe-later/drop items are not relevant for now: Why Tandem, daily workflow guide, separate completion/logs guide, separate epics guide, Pi adapter guide, split reference tree, MCP/API/library/schema/template/migration docs."}
+{"ts":"2026-07-04T21:01:49Z","event":"accord.claimed","id":"task-60","summary":"Accord claim for task-60"}
+{"ts":"2026-07-04T21:26:47Z","event":"accord.delivered","id":"task-60","summary":"Accord deliver for task-60"}
+{"ts":"2026-07-04T21:29:21Z","event":"accord.accepted","id":"task-60","summary":"Accord accept for task-60"}
+{"ts":"2026-07-04T21:29:45Z","event":"task.completed","id":"task-60","summary":"Completed docs content pass after user validation. Added top-level Quickstart with install lanes and CLI/TUI workflow, updated landing copy, refocused Concepts around Board states/accords/epics/rules/decisions/logs, pruned Guides and CLI pages to first-pass essentials, and added Quickstart to Starlight navigation."}
+{"ts":"2026-07-04T21:38:22Z","event":"accord.claimed","id":"task-64","summary":"Accord claim for task-64"}
+{"ts":"2026-07-04T22:52:27Z","event":"accord.delivered","id":"task-64","summary":"Accord deliver for task-64"}
+{"ts":"2026-07-04T22:52:31Z","event":"accord.accepted","id":"task-64","summary":"Accord accept for task-64"}
+{"ts":"2026-07-04T22:52:39Z","event":"task.completed","id":"task-64","summary":"Completed docs site polish after user visual validation. Polished the homepage into a launch-style landing page, grouped sidebar navigation, added/refined branding assets and social metadata, fixed canonical edit links to docs sources, and improved Verdigris homepage/code readability styling. User liked the logo and favicon and accepted overview cards as fine for now."}
+{"ts":"2026-07-04T23:06:43Z","event":"accord.claimed","id":"task-78","summary":"Accord claim for task-78"}
+{"ts":"2026-07-04T23:25:26Z","event":"task.updated","id":"task-59","summary":"Updated task-59 metadata: title, kind, priority, relatedFiles"}
+{"ts":"2026-07-04T23:25:37Z","event":"task.created","id":"task-96","summary":"Simplify docs sidebar into a barebones information architecture"}
+{"ts":"2026-07-04T23:25:43Z","event":"task.created","id":"task-97","summary":"Reduce docs landing page to a minimal Home"}
+{"ts":"2026-07-04T23:25:48Z","event":"task.created","id":"task-98","summary":"Trim Quickstart to a short first-use path"}
+{"ts":"2026-07-04T23:25:54Z","event":"task.created","id":"task-99","summary":"Stub secondary docs pages with placeholders instead of reference bulk"}
+{"ts":"2026-07-04T23:26:06Z","event":"task.completed","id":"task-61","summary":"Closed as superseded by the new barebones docs-site plan under task-59. The old standalone TUI visual guide is intentionally deferred; TUI should be represented first as a sparse Overview stub/placeholders via task-99, with future visual guide work cut later only when needed."}
+{"ts":"2026-07-04T23:26:11Z","event":"task.completed","id":"task-63","summary":"Closed as superseded by the new barebones docs-site plan under task-59. The old exhaustive CLI/protocol reference expansion is replaced by sparse secondary-page stubs via task-99 and a smaller navigation/content reset via tasks 96-98."}
+{"ts":"2026-07-04T23:31:12Z","event":"accord.delivered","id":"task-78","summary":"Accord deliver for task-78"}
+{"ts":"2026-07-04T23:34:41Z","event":"accord.accepted","id":"task-78","summary":"Accord accept for task-78"}
+{"ts":"2026-07-04T23:35:48Z","event":"task.completed","id":"task-78","summary":"Improved TUI expanded board preview rendering for validation summaries and committed/pushed the change in 2b960b9. Expanded board rows now preserve Markdown-ish line structure, Validation rows prefer delivery summary/accord metadata, and bottom-row previews are capped to remain visible."}
+{"ts":"2026-07-04T23:36:48Z","event":"task.created","id":"task-100","summary":"Fix Epic Board toggle ergonomics and filtering scope"}
+{"ts":"2026-07-04T23:37:21Z","event":"accord.claimed","id":"task-100","summary":"Accord claim for task-100"}
+{"ts":"2026-07-05T01:08:10Z","event":"accord.delivered","id":"task-100","summary":"Accord deliver for task-100"}
+{"ts":"2026-07-05T01:49:43Z","event":"accord.accepted","id":"task-100","summary":"Accord accept for task-100"}
+{"ts":"2026-07-05T01:50:08Z","event":"task.completed","id":"task-100","summary":"Fixed Epic Board filtering and toggle ergonomics in commit 25306a7. Epic Board now shows only active epic task parents and active task children linked to those epics, excludes decisions and unrelated/unparented tasks, and uses `b` instead of uppercase `E` for State/Epic Board arrangement switching."}
+{"ts":"2026-07-05T16:22:12Z","event":"task.created","id":"task-101","summary":"Define and adopt first-class subtask hierarchy"}
+{"ts":"2026-07-05T16:22:34Z","event":"task.created","id":"task-102","summary":"Specify first-class subtask protocol convention"}
+{"ts":"2026-07-05T16:22:34Z","event":"task.created","id":"task-102","summary":"Update docs for first-class subtasks"}
+{"ts":"2026-07-05T16:22:34Z","event":"task.created","id":"task-103","summary":"Adapt CLI terminology and reads for subtask hierarchy"}
+{"ts":"2026-07-05T16:22:34Z","event":"task.created","id":"task-104","summary":"Add TUI subtask hierarchy view and context"}
+{"ts":"2026-07-05T16:22:34Z","event":"task.created","id":"task-105","summary":"Teach Pi/Shep delegation surfaces about subtasks"}
+{"ts":"2026-07-05T16:23:00Z","event":"task.created","id":"task-106","summary":"Specify first-class subtask protocol convention"}
+{"ts":"2026-07-05T16:39:39Z","event":"task.created","id":"task-107","summary":"Fix tandem update/pi-tandem mismatch for unsupported task fields"}
+{"ts":"2026-07-05T16:43:24Z","event":"accord.claimed","id":"task-107","summary":"Accord claim for task-107"}
+{"ts":"2026-07-05T17:08:07Z","event":"task.created","id":"task-108","summary":"Release automation and binary install distribution"}
+{"ts":"2026-07-05T17:08:25Z","event":"task.created","id":"task-109","summary":"Configure cargo-dist GitHub Release binary artifacts"}
+{"ts":"2026-07-05T17:08:25Z","event":"task.created","id":"task-110","summary":"Expose branded trytandem.dev install script redirect"}
+{"ts":"2026-07-05T17:08:25Z","event":"task.created","id":"task-111","summary":"Automate tandem-bin AUR updates after releases"}
+{"ts":"2026-07-05T17:08:25Z","event":"task.created","id":"task-112","summary":"Document Tandem release and install workflow"}
+{"ts":"2026-07-05T17:15:45Z","event":"accord.delivered","id":"task-107","summary":"Accord deliver for task-107"}
+{"ts":"2026-07-05T17:28:32Z","event":"accord.accepted","id":"task-107","summary":"Accord accept for task-107"}
+{"ts":"2026-07-05T17:28:36Z","event":"task.completed","id":"task-107","summary":"Fixed pi-tandem unsupported update field handling with explicit rejection, guidance/spec updates, and regression smoke coverage."}
+{"ts":"2026-07-05T21:24:37Z","event":"accord.claimed","id":"task-109","summary":"Accord claim for task-109"}
+{"ts":"2026-07-05T21:31:08Z","event":"accord.delivered","id":"task-109","summary":"Accord deliver for task-109"}
+{"ts":"2026-07-05T21:59:44Z","event":"accord.accepted","id":"task-109","summary":"Accord accept for task-109"}
+{"ts":"2026-07-05T21:59:59Z","event":"task.completed","id":"task-109","summary":"Configured cargo-dist GitHub Release binary artifact automation for Tandem and updated release flow/docs."}
+{"ts":"2026-07-05T22:12:40Z","event":"accord.claimed","id":"task-110","summary":"Accord claim for task-110"}
+{"ts":"2026-07-05T23:54:10Z","event":"accord.delivered","id":"task-110","summary":"Accord deliver for task-110"}
+{"ts":"2026-07-06T02:02:54Z","event":"task.created","id":"task-113","summary":"Replace branded install shim with real installer redirect"}
+{"ts":"2026-07-06T02:03:05Z","event":"accord.claimed","id":"task-113","summary":"Accord claim for task-113"}
+{"ts":"2026-07-06T02:06:39Z","event":"accord.delivered","id":"task-113","summary":"Accord deliver for task-113"}
+{"ts":"2026-07-06T03:15:22Z","event":"accord.claimed","id":"task-111","summary":"Accord claim for task-111"}
+{"ts":"2026-07-06T03:44:10Z","event":"accord.delivered","id":"task-111","summary":"Accord deliver for task-111"}
+{"ts":"2026-07-07T01:48:22Z","event":"task.created","id":"task-114","summary":"Fix cargo-dist release build profile configuration"}
+{"ts":"2026-07-07T01:48:36Z","event":"accord.claimed","id":"task-114","summary":"Accord claim for task-114"}
+{"ts":"2026-07-07T01:52:06Z","event":"accord.delivered","id":"task-114","summary":"Accord deliver for task-114"}
+{"ts":"2026-07-07T01:52:26Z","event":"accord.accepted","id":"task-114","summary":"Accord accept for task-114"}
+{"ts":"2026-07-07T01:52:38Z","event":"task.completed","id":"task-114","summary":"Fixed cargo-dist release build profile configuration and documented failed-tag recovery."}
+{"ts":"2026-07-07T23:56:21Z","event":"accord.accepted","id":"task-111","summary":"Accord accept for task-111"}
+{"ts":"2026-07-07T23:56:27Z","event":"task.completed","id":"task-111","summary":"Automated tandem-bin AUR updates after releases and validated successful AUR workflow run."}
+{"ts":"2026-07-07T23:57:13Z","event":"accord.accepted","id":"task-113","summary":"Accord accept for task-113"}
+{"ts":"2026-07-07T23:57:19Z","event":"task.completed","id":"task-113","summary":"Replaced the branded install shim approach with a real Cloudflare HTTP redirect to the cargo-dist generated installer and validated it live."}
+{"ts":"2026-07-07T23:57:22Z","event":"accord.accepted","id":"task-110","summary":"Accord accept for task-110"}
+{"ts":"2026-07-07T23:57:28Z","event":"task.completed","id":"task-110","summary":"Closed branded install URL work as fulfilled by the final real-redirect implementation from task-113, superseding the earlier checked-in shim."}
+{"ts":"2026-07-08T00:07:25Z","event":"accord.claimed","id":"task-112","summary":"Accord claim for task-112"}
+{"ts":"2026-07-08T00:10:03Z","event":"accord.claimed","id":"task-96","summary":"Accord claim for task-96"}
+{"ts":"2026-07-08T00:35:38Z","event":"accord.delivered","id":"task-112","summary":"Accord deliver for task-112"}
+{"ts":"2026-07-08T00:35:47Z","event":"accord.accepted","id":"task-112","summary":"Accord accept for task-112"}
+{"ts":"2026-07-08T00:35:55Z","event":"task.completed","id":"task-112","summary":"Documented Tandem release/install workflow: cargo-dist/GitHub Actions release artifacts, supported targets, checksums, trytandem.dev installer, x86_64 tandem-bin AUR automation, and release checklist verification steps."}
+{"ts":"2026-07-08T00:38:12Z","event":"accord.delivered","id":"task-96","summary":"Accord deliver for task-96"}
+{"ts":"2026-07-08T00:46:10Z","event":"accord.delivered","id":"task-96","summary":"Accord deliver for task-96"}
+{"ts":"2026-07-08T00:48:14Z","event":"accord.accepted","id":"task-96","summary":"Accord accept for task-96"}
+{"ts":"2026-07-08T00:48:20Z","event":"task.completed","id":"task-96","summary":"Simplified docs sidebar into a barebones IA and removed duplicate page headings after human visual review."}
+{"ts":"2026-07-08T01:09:01Z","event":"task.completed","id":"task-108","summary":"Completed release automation and binary install distribution epic. The release workflow now uses cargo-dist/GitHub Actions for official binary artifacts, the branded install URL redirects to the cargo-dist installer, tandem-bin AUR automation is implemented and validated, and release/install documentation is updated."}
+{"ts":"2026-07-08T01:13:09Z","event":"accord.claimed","id":"task-97","summary":"Accord claim for task-97"}
+{"ts":"2026-07-08T01:16:09Z","event":"accord.delivered","id":"task-97","summary":"Accord deliver for task-97"}
+{"ts":"2026-07-08T01:27:46Z","event":"accord.accepted","id":"task-97","summary":"Accord accept for task-97"}
+{"ts":"2026-07-08T01:27:52Z","event":"task.completed","id":"task-97","summary":"Reduced docs landing page to a minimal Home with sparse tagline, retained logo, no CTA buttons, and minimal body copy after human visual validation."}
+{"ts":"2026-07-08T01:30:45Z","event":"task.created","id":"task-115","summary":"Fix Epic Board child task ID truncation"}
+{"ts":"2026-07-08T01:31:14Z","event":"accord.claimed","id":"task-115","summary":"Accord claim for task-115"}
+{"ts":"2026-07-08T01:36:49Z","event":"accord.delivered","id":"task-115","summary":"Accord deliver for task-115"}
+{"ts":"2026-07-08T01:50:45Z","event":"accord.accepted","id":"task-115","summary":"Accord accept for task-115"}
+{"ts":"2026-07-08T01:51:05Z","event":"task.completed","id":"task-115","summary":"Fixed Epic Board child task ID truncation by preserving right-side metadata width and accounting for the list highlight symbol."}
+{"ts":"2026-07-10T10:44:34Z","event":"task.moved","id":"task-59","summary":"Moved task-59 from todo to in-progress"}
+{"ts":"2026-07-10T10:44:37Z","event":"accord.claimed","id":"task-98","summary":"Accord claim for task-98"}
+{"ts":"2026-07-10T10:44:39Z","event":"accord.claimed","id":"task-99","summary":"Accord claim for task-99"}
+{"ts":"2026-07-10T10:45:24Z","event":"accord.delivered","id":"task-99","summary":"Accord deliver for task-99"}
+{"ts":"2026-07-10T10:45:28Z","event":"accord.accepted","id":"task-99","summary":"Accord accept for task-99"}
+{"ts":"2026-07-10T10:45:31Z","event":"task.completed","id":"task-99","summary":"Reconciled the secondary-page reset scope with the current docs: prior work already removed the old reference bulk, and the user confirmed further stubbing is no longer desired."}
+{"ts":"2026-07-10T10:45:50Z","event":"accord.delivered","id":"task-98","summary":"Accord deliver for task-98"}
+{"ts":"2026-07-10T10:58:06Z","event":"task.created","id":"task-116","summary":"Rewrite README to reflect the current Tandem project"}
+{"ts":"2026-07-10T11:02:14Z","event":"accord.rework","id":"task-98","summary":"Accord rework for task-98"}
+{"ts":"2026-07-10T11:02:42Z","event":"accord.claimed","id":"task-98","summary":"Accord claim for task-98"}
+{"ts":"2026-07-10T11:07:18Z","event":"accord.claimed","id":"task-116","summary":"Accord claim for task-116"}
+{"ts":"2026-07-10T11:08:34Z","event":"accord.delivered","id":"task-98","summary":"Accord deliver for task-98"}
+{"ts":"2026-07-10T11:19:48Z","event":"task.completed","id":"task-98","summary":"Discarded the attempted Quickstart rewrites after human review and restored docs/quick-start/index.md exactly to its pre-task state. No task-98 content was accepted or retained; the Quickstart direction will be rewritten separately by the user later."}
+{"ts":"2026-07-10T12:16:38Z","event":"task.created","id":"task-117","summary":"Create Sideshow mockups and assets for docs placeholders"}
+{"ts":"2026-07-10T12:31:10Z","event":"accord.delivered","id":"task-116","summary":"Accord deliver for task-116"}
+{"ts":"2026-07-10T12:31:17Z","event":"accord.accepted","id":"task-116","summary":"Accord accept for task-116"}
+{"ts":"2026-07-10T12:31:22Z","event":"task.completed","id":"task-116","summary":"Completed the root README rewrite with the user's final copy, current project framing, installation and usage guidance, documentation links, and intentional visual placeholders tracked by task-117."}
+{"ts":"2026-07-10T12:37:08Z","event":"task.completed","id":"task-59","summary":"Closed the barebones docs-site reset epic. The sidebar and Home were simplified and human-approved, the existing pared-down secondary pages were retained, and the rejected Quickstart rewrite was discarded and restored to its prior state. Future visual placeholders/assets are tracked separately in task-117."}
+{"ts":"2026-07-10T12:41:01Z","event":"task.created","id":"task-118","summary":"Add progress bars to Board Epic view"}
+{"ts":"2026-07-10T12:42:01Z","event":"task.created","id":"task-119","summary":"Research storage options for Tandem event logs outside the project repository"}
+{"ts":"2026-07-10T12:43:17Z","event":"task.created","id":"task-120","summary":"Research database-backed Tandem state and pluggable sync providers"}
+{"ts":"2026-07-10T12:44:41Z","event":"task.created","id":"task-121","summary":"Research a lightweight Tandem web server and UI"}
+{"ts":"2026-07-10T13:20:09Z","event":"task.created","id":"task-122","summary":"Include parentId in tandem show JSON output"}
+{"ts":"2026-07-10T17:20:12Z","event":"accord.claimed","id":"task-122","summary":"Accord claim for task-122"}
+{"ts":"2026-07-10T17:23:04Z","event":"accord.delivered","id":"task-122","summary":"Accord deliver for task-122"}
+{"ts":"2026-07-10T17:23:09Z","event":"accord.accepted","id":"task-122","summary":"Accord accept for task-122"}
+{"ts":"2026-07-10T17:23:18Z","event":"task.completed","id":"task-122","summary":"Fixed task detail output so parent-linked tasks expose `parentId` in JSON and `Parent:` in human-readable output, with Rust regression coverage and pi-tandem relationship smoke enforcement."}
+{"ts":"2026-07-10T17:25:58Z","event":"accord.ready","id":"task-101","summary":"Accord ready for task-101"}
+{"ts":"2026-07-10T17:26:00Z","event":"accord.claimed","id":"task-101","summary":"Accord claim for task-101"}
+{"ts":"2026-07-10T17:26:18Z","event":"accord.claimed","id":"task-103","summary":"Accord claim for task-103"}
+{"ts":"2026-07-10T17:26:18Z","event":"accord.claimed","id":"task-106","summary":"Accord claim for task-106"}
+{"ts":"2026-07-10T17:48:34Z","event":"accord.delivered","id":"task-106","summary":"Accord deliver for task-106"}
+{"ts":"2026-07-10T17:48:59Z","event":"accord.accepted","id":"task-106","summary":"Accord accept for task-106"}
+{"ts":"2026-07-10T17:49:05Z","event":"task.completed","id":"task-106","summary":"Defined and adopted the protocol convention for first-class subtasks: normal task documents linked by parentId, optional hierarchical IDs, legacy inline checklist compatibility, and hierarchy distinct from epic classification."}
+{"ts":"2026-07-10T19:30:59Z","event":"accord.delivered","id":"task-103","summary":"Accord deliver for task-103"}
+{"ts":"2026-07-10T19:31:15Z","event":"accord.accepted","id":"task-103","summary":"Accord accept for task-103"}
+{"ts":"2026-07-10T19:31:22Z","event":"task.completed","id":"task-103","summary":"Adapted Tandem CLI hierarchy behavior so parent-linked task children are first-class subtasks, non-task parent relationships remain generic, add/update/show/list/search expose the distinction, and inline checklist authoring is deprecated without hierarchical ID auto-generation."}
+{"ts":"2026-07-10T19:32:10Z","event":"task.created","id":"task-123","summary":"Migrate repository pi-tandem adapter to first-class subtasks"}
+{"ts":"2026-07-10T19:32:22Z","event":"task.created","id":"task-124","summary":"Update canonical Pi and Shep subtask delegation guidance"}
+{"ts":"2026-07-10T19:32:27Z","event":"accord.ready","id":"task-105","summary":"Accord ready for task-105"}
+{"ts":"2026-07-10T19:32:32Z","event":"accord.claimed","id":"task-105","summary":"Accord claim for task-105"}
+{"ts":"2026-07-10T19:32:43Z","event":"accord.claimed","id":"task-123","summary":"Accord claim for task-123"}
+{"ts":"2026-07-12T03:41:24Z","event":"accord.delivered","id":"task-123","summary":"Accord deliver for task-123"}
+{"ts":"2026-07-12T03:41:35Z","event":"accord.accepted","id":"task-123","summary":"Accord accept for task-123"}
+{"ts":"2026-07-12T03:41:42Z","event":"task.completed","id":"task-123","summary":"Migrated repository-local pi-tandem to first-class parent-linked subtasks, removed deprecated inline authoring from its public schema/forwarding, added parent filters and update support, and aligned guidance plus comprehensive smokes with CLI-owned relationship output."}
+{"ts":"2026-07-12T03:43:16Z","event":"accord.claimed","id":"task-124","summary":"Accord claim for task-124"}
+{"ts":"2026-07-12T03:58:38Z","event":"accord.delivered","id":"task-124","summary":"Accord deliver for task-124"}
+{"ts":"2026-07-12T03:58:46Z","event":"accord.accepted","id":"task-124","summary":"Accord accept for task-124"}
+{"ts":"2026-07-12T03:58:55Z","event":"task.completed","id":"task-124","summary":"Aligned canonical Pi and Shep delegation with first-class parent-linked Tandem subtasks, including parent-aware task creation, CLI-provided relationship context in prompts/checks/deliveries, legacy inline-checklist guidance, and canonical pi-tandem parity."}
+{"ts":"2026-07-12T03:59:56Z","event":"accord.delivered","id":"task-105","summary":"Accord deliver for task-105"}
+{"ts":"2026-07-12T04:00:04Z","event":"accord.accepted","id":"task-105","summary":"Accord accept for task-105"}
+{"ts":"2026-07-12T04:00:31Z","event":"task.completed","id":"task-105","summary":"Completed Pi/Tandem and Shep adoption of first-class parent-linked subtasks across repository and canonical integrations, delegation prompts, relationship-aware handoffs/delivery summaries, guidance, and tests."}
+{"ts":"2026-07-12T13:48:01Z","event":"accord.claimed","id":"task-104","summary":"Accord claim for task-104"}
+{"ts":"2026-07-12T13:48:01Z","event":"accord.claimed","id":"task-119","summary":"Accord claim for task-119"}
+{"ts":"2026-07-12T13:55:36Z","event":"accord.delivered","id":"task-119","summary":"Accord deliver for task-119"}
+{"ts":"2026-07-12T13:55:52Z","event":"accord.accepted","id":"task-119","summary":"Accord accept for task-119"}
+{"ts":"2026-07-12T13:56:02Z","event":"task.completed","id":"task-119","summary":"Completed a concise event-log storage options analysis recommending external user-state storage for review, with tracked/ignored/Git/checkpoint/backend alternatives, migration implications, rollout stages, terminology, and open questions; no protocol decision was encoded."}
+{"ts":"2026-07-14T00:28:32Z","event":"accord.delivered","id":"task-104","summary":"Accord deliver for task-104"}
+{"ts":"2026-07-14T00:52:56Z","event":"accord.failed","id":"task-104","summary":"Accord fail for task-104"}
+{"ts":"2026-07-14T00:53:07Z","event":"task.completed","id":"task-104","summary":"Closed as unimplemented after human product review rejected the separate Subtask Board direction. Commit 0edd67d was not merged; replacement work will follow the clarified parent-derived hierarchical subtask ID model and Epic Board-focused UX."}
+{"ts":"2026-07-14T00:53:44Z","event":"decision.created","id":"decision-4","summary":"Allocate parent-derived hierarchical IDs for new first-class subtasks"}
+{"ts":"2026-07-14T00:53:58Z","event":"task.updated","id":"task-101","summary":"Updated task-101 metadata: references"}
+{"ts":"2026-07-14T00:54:17Z","event":"task.created","id":"task-125","summary":"Correct protocol specification for hierarchical first-class subtask IDs"}
+{"ts":"2026-07-14T00:54:30Z","event":"task.created","id":"task-126","summary":"Implement hierarchical subtask ID allocation in Tandem CLI"}
+{"ts":"2026-07-14T00:54:43Z","event":"task.created","id":"task-127","summary":"Align repository pi-tandem with hierarchical subtask allocation"}
+{"ts":"2026-07-14T00:54:54Z","event":"task.created","id":"task-128","summary":"Align canonical Pi and Shep guidance with hierarchical subtask IDs"}
+{"ts":"2026-07-14T00:55:06Z","event":"task.created","id":"task-129","summary":"Augment Epic Board for hierarchical first-class subtasks"}
+{"ts":"2026-07-14T00:55:16Z","event":"task.created","id":"task-130","summary":"Document hierarchical first-class subtasks"}
+{"ts":"2026-07-14T00:55:26Z","event":"task.completed","id":"task-102","summary":"Closed unimplemented because its optional/manual hierarchical-ID wording was superseded by accepted decision-4. Replacement documentation work is tracked in task-130 after protocol, CLI, integration, and Epic Board corrections."}
+{"ts":"2026-07-14T01:05:41Z","event":"accord.claimed","id":"task-125","summary":"Accord claim for task-125"}
+{"ts":"2026-07-14T01:09:35Z","event":"accord.delivered","id":"task-125","summary":"Accord deliver for task-125"}
+{"ts":"2026-07-14T01:22:40Z","event":"accord.rework","id":"task-125","summary":"Accord rework for task-125"}
+{"ts":"2026-07-14T01:29:46Z","event":"accord.delivered","id":"task-125","summary":"Accord deliver for task-125"}
+{"ts":"2026-07-14T01:30:24Z","event":"accord.accepted","id":"task-125","summary":"Accord accept for task-125"}
+{"ts":"2026-07-14T01:30:31Z","event":"task.completed","id":"task-125","summary":"Corrected Tandem's protocol and locked project guidance so new first-class task children default to parent-derived hierarchical IDs while parentId remains canonical, existing flat children remain valid, IDs remain immutable, inline checklist authoring remains legacy, and nested allocation/reparenting semantics are consistent."}
+{"ts":"2026-07-14T02:17:51Z","event":"accord.claimed","id":"task-126","summary":"Accord claim for task-126"}
+{"ts":"2026-07-14T02:25:22Z","event":"accord.delivered","id":"task-126","summary":"Accord deliver for task-126"}
+{"ts":"2026-07-14T02:27:33Z","event":"accord.accepted","id":"task-126","summary":"Accord accept for task-126"}
+{"ts":"2026-07-14T02:27:41Z","event":"task.completed","id":"task-126","summary":"Implemented hierarchical first-class subtask allocation in the Tandem CLI: task parents allocate parent-derived and nested IDs, generic parents retain flat IDs, completed IDs are not reused, concurrent creation is atomic, IDs remain immutable on reparenting, JSON/human output exposes relationships, and compatibility behavior is tested and documented."}
+{"ts":"2026-07-14T02:31:54Z","event":"accord.claimed","id":"task-127","summary":"Accord claim for task-127"}
+{"ts":"2026-07-14T02:31:54Z","event":"accord.claimed","id":"task-129","summary":"Accord claim for task-129"}
+{"ts":"2026-07-14T02:40:44Z","event":"accord.delivered","id":"task-127","summary":"Accord deliver for task-127"}
+{"ts":"2026-07-14T02:41:32Z","event":"accord.accepted","id":"task-127","summary":"Accord accept for task-127"}
+{"ts":"2026-07-14T02:41:41Z","event":"task.completed","id":"task-127","summary":"Aligned repository pi-tandem guidance and smoke coverage with CLI-owned hierarchical and nested subtask IDs, completed-log sequence continuity, generic parents, legacy flat children, collision errors, and deprecated inline-authoring boundaries."}
+{"ts":"2026-07-14T02:43:03Z","event":"accord.delivered","id":"task-129","summary":"Accord deliver for task-129"}
+{"ts":"2026-07-14T02:45:08Z","event":"accord.rework","id":"task-129","summary":"Accord rework for task-129"}
+{"ts":"2026-07-14T02:54:28Z","event":"accord.delivered","id":"task-129","summary":"Accord deliver for task-129"}
+{"ts":"2026-07-14T03:01:41Z","event":"accord.rework","id":"task-129","summary":"Accord rework for task-129"}
+{"ts":"2026-07-14T03:25:32Z","event":"accord.delivered","id":"task-129","summary":"Accord deliver for task-129"}
+{"ts":"2026-07-14T03:26:34Z","event":"accord.accepted","id":"task-129","summary":"Accord accept for task-129"}
+{"ts":"2026-07-14T03:26:44Z","event":"task.completed","id":"task-129","summary":"Augmented Epic Board with recursive first-class task descendants, compact aligned SUB/state rows, parent-to-child arrows, logged descendant rollups, legacy flat-child compatibility, logged-intermediary traversal, and correct Board/Review relationship context."}
+{"ts":"2026-07-14T03:29:15Z","event":"accord.claimed","id":"task-128","summary":"Accord claim for task-128"}
+{"ts":"2026-07-14T04:02:41Z","event":"accord.failed","id":"task-128","summary":"Accord fail for task-128"}
+{"ts":"2026-07-14T04:02:52Z","event":"task.completed","id":"task-128","summary":"Closed unimplemented after the user rejected its canonical-dotfiles scope. No task-128 commit was integrated; task-33 and the shared dotfiles checkout are outside this Tandem-repository epic."}
+{"ts":"2026-07-14T04:15:22Z","event":"accord.claimed","id":"task-130","summary":"Accord claim for task-130"}
+{"ts":"2026-07-14T04:28:52Z","event":"accord.delivered","id":"task-130","summary":"Accord deliver for task-130"}
+{"ts":"2026-07-14T04:29:27Z","event":"accord.rework","id":"task-130","summary":"Accord rework for task-130"}
+{"ts":"2026-07-14T04:45:03Z","event":"accord.delivered","id":"task-130","summary":"Accord deliver for task-130"}
+{"ts":"2026-07-14T04:55:58Z","event":"accord.accepted","id":"task-130","summary":"Accord accept for task-130"}
+{"ts":"2026-07-14T04:56:07Z","event":"task.completed","id":"task-130","summary":"Documented first-class hierarchical subtasks across public concepts, CLI, extension, TUI, and root README surfaces, including canonical parentId, nested allocation, immutable IDs, legacy flat compatibility, generic parents, supported delegation flow, and Epic Board presentation."}
+{"ts":"2026-07-14T04:56:57Z","event":"accord.delivered","id":"task-101","summary":"Accord deliver for task-101"}
+{"ts":"2026-07-14T04:57:06Z","event":"accord.accepted","id":"task-101","summary":"Accord accept for task-101"}
+{"ts":"2026-07-14T11:25:19Z","event":"task.completed","id":"task-101","summary":"Completed the first-class subtask hierarchy epic under accepted decision-4: new task children use CLI-allocated parent-derived and nested IDs, parentId remains canonical, IDs are immutable, existing flat children remain valid, inline checklist subtasks are legacy, repository pi-tandem stays thin, Epic Board hierarchy UX is human-approved, and public docs are current."}
+{"ts":"2026-07-14T11:37:20Z","event":"task.created","id":"task-131","summary":"Create a release notes guidance decision record"}
+{"ts":"2026-07-14T13:05:40Z","event":"task.created","id":"task-132","summary":"Add collapsible subtask hierarchy to the default Board"}
+{"ts":"2026-07-14T13:08:44Z","event":"accord.claimed","id":"task-132","summary":"Accord claim for task-132"}
+{"ts":"2026-07-14T14:34:31Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to context"}
+{"ts":"2026-07-14T14:34:42Z","event":"rules.updated","id":"rules","summary":"Edited rule 1 in context"}
+{"ts":"2026-07-14T16:18:50Z","event":"rules.updated","id":"rules","summary":"Edited rule 1 in context"}
+{"ts":"2026-07-14T19:56:17Z","event":"accord.delivered","id":"task-132","summary":"Accord deliver for task-132"}
+{"ts":"2026-07-14T20:01:35Z","event":"accord.accepted","id":"task-132","summary":"Accord accept for task-132"}
+{"ts":"2026-07-14T20:01:43Z","event":"task.completed","id":"task-132","summary":"Shipped collapsible inline State Board hierarchy with quiet Option C rows, compact guides, keyboard/mouse expansion, cross-state context, filter/reload behavior, documentation, and one-command delegated visual previews."}
+{"ts":"2026-07-14T20:04:15Z","event":"accord.claimed","id":"task-131","summary":"Accord claim for task-131"}
+{"ts":"2026-07-14T20:05:05Z","event":"decision.created","id":"decision-5","summary":"Curate concise public release notes without installation guidance"}
+{"ts":"2026-07-14T20:16:26Z","event":"accord.delivered","id":"task-131","summary":"Accord deliver for task-131"}
+{"ts":"2026-07-15T04:25:17Z","event":"accord.accepted","id":"task-131","summary":"Accord accept for task-131"}
+{"ts":"2026-07-15T04:25:24Z","event":"task.completed","id":"task-131","summary":"Created and accepted decision-5 establishing conventional, concise, curated public release notes without installation guidance and requiring a dedicated Bug fixes section whenever fixes ship."}
+{"ts":"2026-07-15T17:01:44Z","event":"decision.created","id":"decision-6","summary":"Use one Git-merged event ledger with UUIDv7 identities"}
+{"ts":"2026-07-15T17:01:54Z","event":"task.created","id":"task-133","summary":"Implement the Git-native union-merged event ledger"}
+{"ts":"2026-07-15T17:42:24Z","event":"decision.created","id":"decision-7","summary":"Distinguish epic tasks from subtasks with a strict three-tier hierarchy"}
+{"ts":"2026-07-15T17:42:36Z","event":"task.created","id":"task-134","summary":"Correct Epic, Task, and Subtask roles across Tandem"}
+{"ts":"2026-07-15T17:42:47Z","event":"task.updated","id":"task-133","summary":"Updated task-133 metadata: blockers, references"}
+{"ts":"2026-07-15T17:51:57Z","event":"task.moved","id":"task-134","summary":"Moved task-134 from todo to in-progress"}
+{"ts":"2026-07-15T18:25:18Z","event":"task.updated","id":"task-134","summary":"Updated task-134 metadata: relatedFiles"}
+{"ts":"2026-07-15T19:42:43Z","event":"task.created","id":"task-135","summary":"Align event protocol and design with decision-6"}
+{"ts":"2026-07-15T19:43:07Z","event":"task.updated","id":"task-135","summary":"Updated task-135 metadata: parentId"}
+{"ts":"2026-07-15T19:43:30Z","event":"task.created","id":"task-136","summary":"Implement UUIDv7 event writes and Git-local actor identity"}
+{"ts":"2026-07-15T19:43:46Z","event":"task.created","id":"task-137","summary":"Implement mixed event reads, ordering, and corruption diagnostics"}
+{"ts":"2026-07-15T19:44:05Z","event":"task.created","id":"task-138","summary":"Validate Git union event behavior and publish migration guidance"}
+{"ts":"2026-07-15T19:44:23Z","event":"task.created","id":"task-139","summary":"Specify canonical Epic, Task, and Subtask semantics"}
+{"ts":"2026-07-15T19:44:39Z","event":"task.created","id":"task-140","summary":"Implement canonical hierarchy allocation, classification, and validation in the CLI"}
+{"ts":"2026-07-15T19:44:53Z","event":"task.created","id":"task-141","summary":"Align TUI hierarchy rendering with canonical roles and IDs"}
+{"ts":"2026-07-15T19:45:15Z","event":"task.created","id":"task-142","summary":"Align repository pi-tandem guidance and smokes with canonical roles"}
+{"ts":"2026-07-15T19:45:33Z","event":"task.created","id":"task-143","summary":"Publish and integration-test the canonical three-tier hierarchy"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-136","summary":"Updated task-136 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-137","summary":"Updated task-137 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-138","summary":"Updated task-138 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-139","summary":"Updated task-139 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-140","summary":"Updated task-140 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-141","summary":"Updated task-141 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-142","summary":"Updated task-142 metadata: parentId"}
+{"ts":"2026-07-15T19:45:45Z","event":"task.updated","id":"task-143","summary":"Updated task-143 metadata: parentId"}
+{"ts":"2026-07-17T02:46:13Z","event":"task.moved","id":"task-139","summary":"Moved task-139 from todo to in-progress"}
+{"ts":"2026-07-17T02:46:24Z","event":"accord.ready","id":"task-139","summary":"Accord ready for task-139"}
+{"ts":"2026-07-17T02:46:31Z","event":"accord.claimed","id":"task-139","summary":"Accord claim for task-139"}
+{"ts":"2026-07-17T02:46:56Z","event":"accord.delivered","id":"task-139","summary":"Accord deliver for task-139"}
+{"ts":"2026-07-17T02:47:04Z","event":"accord.accepted","id":"task-139","summary":"Accord accept for task-139"}
+{"ts":"2026-07-17T02:47:21Z","event":"task.completed","id":"task-139","summary":"Specified canonical Epic, Task, and Subtask roles, global Task versus parent-derived Subtask IDs, strict validation/reparenting rules, decision-4 supersession, and Task-only delegated campaigns."}
+{"ts":"2026-07-22T02:17:01Z","event":"accord.claimed","id":"task-140","summary":"Accord claim for task-140"}
+{"ts":"2026-07-22T02:18:35Z","event":"task.created","id":"task-144","summary":"Release canonical hierarchy hardening as Tandem v0.6.0"}
+{"ts":"2026-07-22T02:50:07Z","event":"task.created","id":"task-143-1","summary":"Migrate historical hierarchy metadata for strict validation"}
+{"ts":"2026-07-22T02:50:13Z","event":"accord.ready","id":"task-143-1","summary":"Accord ready for task-143-1"}
+{"ts":"2026-07-22T02:50:22Z","event":"accord.claimed","id":"task-143-1","summary":"Accord claim for task-143-1"}
+{"ts":"2026-07-22T02:51:57Z","event":"accord.delivered","id":"task-143-1","summary":"Accord deliver for task-143-1"}
+{"ts":"2026-07-22T02:52:04Z","event":"accord.accepted","id":"task-143-1","summary":"Accord accept for task-143-1"}
+{"ts":"2026-07-22T02:52:10Z","event":"task.completed","id":"task-143-1","summary":"Migrated five historical broad grouping logs to root Epics, preserving 14 global Task IDs and all event history; strict decision-7 board+logs validation now passes."}
+{"ts":"2026-07-22T02:52:25Z","event":"accord.delivered","id":"task-140","summary":"Accord deliver for task-140"}
+{"ts":"2026-07-22T02:53:09Z","event":"accord.accepted","id":"task-140","summary":"Accord accept for task-140"}
+{"ts":"2026-07-22T02:53:16Z","event":"task.completed","id":"task-140","summary":"Integrated canonical decision-7 CLI hierarchy allocation, classification, validation, relationship output, graph locking, and aggregated diagnostics in commits 4baccda and 58d937a."}
+{"ts":"2026-07-22T02:54:34Z","event":"accord.claimed","id":"task-141","summary":"Accord claim for task-141"}
+{"ts":"2026-07-22T02:54:34Z","event":"accord.claimed","id":"task-142","summary":"Accord claim for task-142"}
+{"ts":"2026-07-22T03:09:44Z","event":"task.created","id":"task-143-2","summary":"Remove stale public hierarchy and Subtask-delegation guidance"}
+{"ts":"2026-07-22T03:19:10Z","event":"accord.delivered","id":"task-142","summary":"Accord deliver for task-142"}
+{"ts":"2026-07-22T03:19:54Z","event":"accord.accepted","id":"task-142","summary":"Accord accept for task-142"}
+{"ts":"2026-07-22T03:20:02Z","event":"task.completed","id":"task-142","summary":"Integrated strict canonical pi-tandem hierarchy guidance, thin kind/parent forwarding, Task-only delegation handoff, completed-Subtask retrieval guidance, and comprehensive Bun smokes in bdafd73."}
+{"ts":"2026-07-22T03:35:11Z","event":"task.created","id":"task-145","summary":"Research idiomatic modularization of large Rust CLI and TUI modules"}
+{"ts":"2026-07-22T03:51:03Z","event":"accord.delivered","id":"task-141","summary":"Accord deliver for task-141"}
+{"ts":"2026-07-22T03:56:45Z","event":"accord.accepted","id":"task-141","summary":"Accord accept for task-141"}
+{"ts":"2026-07-22T03:56:52Z","event":"task.completed","id":"task-141","summary":"Integrated canonical TUI hierarchy rendering on main as 3c1712e after parent diff review, 154 passing Rust tests, strict real-workspace reads, pi-tandem relationship/runtime smokes, and explicit user approval of the routed `just dev` visual preview."}
+{"ts":"2026-07-22T03:59:16Z","event":"accord.claimed","id":"task-143","summary":"Accord claim for task-143"}
+{"ts":"2026-07-22T04:13:46Z","event":"accord.delivered","id":"task-143","summary":"Accord deliver for task-143"}
+{"ts":"2026-07-22T04:14:26Z","event":"accord.ready","id":"task-143-2","summary":"Accord ready for task-143-2"}
+{"ts":"2026-07-22T04:14:29Z","event":"accord.claimed","id":"task-143-2","summary":"Accord claim for task-143-2"}
+{"ts":"2026-07-22T04:14:39Z","event":"accord.delivered","id":"task-143-2","summary":"Accord deliver for task-143-2"}
+{"ts":"2026-07-22T04:14:42Z","event":"accord.accepted","id":"task-143-2","summary":"Accord accept for task-143-2"}
+{"ts":"2026-07-22T04:14:48Z","event":"task.completed","id":"task-143-2","summary":"Removed stale normative hierarchy and Subtask-delegation guidance across public documentation; integrated as 0309e2f with canonical Task-only campaign semantics."}
+{"ts":"2026-07-22T04:14:54Z","event":"accord.accepted","id":"task-143","summary":"Accord accept for task-143"}
+{"ts":"2026-07-22T04:15:01Z","event":"task.completed","id":"task-143","summary":"Published and integration-tested the canonical three-tier hierarchy across protocol, CLI/TUI, public docs, and pi-tandem surfaces; integrated commit 0309e2f after aggregate Subtask completion and user visual approval."}
+{"ts":"2026-07-22T04:16:57Z","event":"accord.claimed","id":"task-144","summary":"Accord claim for task-144"}
+{"ts":"2026-07-22T04:25:27Z","event":"accord.delivered","id":"task-144","summary":"Accord deliver for task-144"}
+{"ts":"2026-07-22T04:30:55Z","event":"accord.accepted","id":"task-144","summary":"Accord accept for task-144"}
+{"ts":"2026-07-22T04:31:13Z","event":"task.completed","id":"task-144","summary":"Released and verified Tandem v0.6.0 from e39fd86: pushed main and annotated tag, published curated GitHub Release notes and cargo-dist artifacts, validated checksums/archive/isolated installer, and confirmed tandem-bin AUR 0.6.0 publication."}
+{"ts":"2026-07-22T04:32:09Z","event":"accord.ready","id":"task-134","summary":"Accord ready for task-134"}
+{"ts":"2026-07-22T04:32:15Z","event":"accord.claimed","id":"task-134","summary":"Accord claim for task-134"}
+{"ts":"2026-07-22T04:32:28Z","event":"accord.delivered","id":"task-134","summary":"Accord deliver for task-134"}
+{"ts":"2026-07-22T04:32:31Z","event":"accord.accepted","id":"task-134","summary":"Accord accept for task-134"}
+{"ts":"2026-07-22T04:32:39Z","event":"task.completed","id":"task-134","summary":"Completed decision-7 hierarchy hardening across Tandem and released the canonical Epic → global Task → parent-derived leaf Subtask model as verified v0.6.0."}
+{"ts":"2026-07-22T04:33:21Z","event":"accord.claimed","id":"task-145","summary":"Accord claim for task-145"}
+{"ts":"2026-07-22T18:03:18Z","event":"accord.delivered","id":"task-145","summary":"Accord deliver for task-145"}
+{"ts":"2026-07-22T18:03:31Z","event":"accord.accepted","id":"task-145","summary":"Accord accept for task-145"}
+{"ts":"2026-07-22T18:03:41Z","event":"task.completed","id":"task-145","summary":"Completed and integrated the research-only idiomatic Rust modularization recommendation as 8a17d91; the audited document now provides the verified basis for the separate refactor specification, architecture decision, and future Epic decomposition."}
+{"ts":"2026-07-22T19:04:53Z","event":"task.created","id":"task-146","summary":"Refactor Tandem around a canonical protocol and peer CLI/TUI interfaces"}
+{"ts":"2026-07-22T19:17:28Z","event":"task.created","id":"task-147","summary":"Finalize the refactor specification and compatibility policy"}
+{"ts":"2026-07-22T20:24:44Z","event":"task.completed","id":"task-147","summary":"Closed without implementation: this planning conversation was mistakenly recorded as a lifecycle-bearing Task. The project owner correctly directed that the remaining specification choices be resolved directly before real implementation Tasks are created."}
+{"ts":"2026-07-22T20:40:11Z","event":"task.created","id":"task-148","summary":"Establish the architecture campaign branch and governance baseline"}
+{"ts":"2026-07-22T20:40:21Z","event":"task.created","id":"task-149","summary":"Establish executable behavior and strict lint guardrails"}
+{"ts":"2026-07-22T20:40:37Z","event":"task.created","id":"task-150","summary":"Implement the approved protocol 0.2 compatibility policy"}
+{"ts":"2026-07-22T20:40:56Z","event":"task.created","id":"task-151","summary":"Establish tui/mod.rs and extract terminal and editor seams"}
+{"ts":"2026-07-22T20:41:09Z","event":"task.created","id":"task-152","summary":"Extract executable protocol document and configuration semantics"}
+{"ts":"2026-07-22T20:41:19Z","event":"task.created","id":"task-153","summary":"Extract canonical protocol IDs and hierarchy authority"}
+{"ts":"2026-07-22T20:41:30Z","event":"task.created","id":"task-154","summary":"Extract canonical workflow, accord, review, event, and diagnostic semantics"}
+{"ts":"2026-07-22T20:41:41Z","event":"task.created","id":"task-155","summary":"Introduce project::TandemProject and concrete read boundaries"}
+{"ts":"2026-07-22T20:41:52Z","event":"task.created","id":"task-156","summary":"Extract TandemProject writes, locking, conflicts, and event files"}
+{"ts":"2026-07-22T20:42:03Z","event":"task.created","id":"task-157","summary":"Unify Task, accord, Validation, and completion application operations"}
+{"ts":"2026-07-22T20:42:14Z","event":"task.created","id":"task-158","summary":"Unify Rules and Decision application operations"}
+{"ts":"2026-07-22T20:42:30Z","event":"task.created","id":"task-159","summary":"Extract CLI parsing, dispatch, commands, and output ownership"}
+{"ts":"2026-07-22T20:42:43Z","event":"task.created","id":"task-160","summary":"Extract TUI reload, input, and Validation adapter boundaries"}
+{"ts":"2026-07-22T20:42:55Z","event":"task.created","id":"task-161","summary":"Extract TUI Board projection, rendering, and hit geometry"}
+{"ts":"2026-07-22T20:43:07Z","event":"task.created","id":"task-162","summary":"Complete TUI chrome, text, state, and visibility boundaries"}
+{"ts":"2026-07-22T20:43:18Z","event":"task.created","id":"task-163","summary":"Align repository documentation and agent guidance with the final architecture"}
+{"ts":"2026-07-22T20:43:33Z","event":"task.created","id":"task-164","summary":"Validate, synchronize, and merge the completed architecture refactor"}
+{"ts":"2026-07-23T01:20:30Z","event":"task.created","id":"task-165","summary":"Add safe active-Task Markdown body editing"}
+{"ts":"2026-07-23T01:20:49Z","event":"task.created","id":"task-166","summary":"Add auditable active-Task cancellation to Logs"}
+{"ts":"2026-07-23T01:21:04Z","event":"task.created","id":"task-167","summary":"Release Task body editing and cancellation as Tandem v0.6.1"}
+{"ts":"2026-07-23T01:21:08Z","event":"task.updated","id":"task-148","summary":"Updated task-148 metadata: blockers, references"}
+{"ts":"2026-07-23T01:21:12Z","event":"accord.ready","id":"task-165","summary":"Accord ready for task-165"}
+{"ts":"2026-07-23T01:21:18Z","event":"accord.claimed","id":"task-165","summary":"Accord claim for task-165"}
+{"ts":"2026-07-23T01:26:28Z","event":"accord.delivered","id":"task-165","summary":"Accord deliver for task-165"}
+{"ts":"2026-07-23T01:26:36Z","event":"accord.accepted","id":"task-165","summary":"Accord accept for task-165"}
+{"ts":"2026-07-23T01:26:49Z","event":"task.completed","id":"task-165","summary":"Added safe exact Markdown body editing for active Tasks across Tandem CLI and pi-tandem in commit 7a531a4."}
+{"ts":"2026-07-23T01:27:01Z","event":"accord.ready","id":"task-166","summary":"Accord ready for task-166"}
+{"ts":"2026-07-23T01:27:05Z","event":"accord.claimed","id":"task-166","summary":"Accord claim for task-166"}
+{"ts":"2026-07-23T01:51:16Z","event":"accord.delivered","id":"task-166","summary":"Accord deliver for task-166"}
+{"ts":"2026-07-23T01:51:28Z","event":"accord.accepted","id":"task-166","summary":"Accord accept for task-166"}
+{"ts":"2026-07-23T01:51:45Z","event":"task.completed","id":"task-166","summary":"Added auditable active-Task cancellation with compatible canceled Logs, outcome-aware CLI/JSON/TUI behavior, progress exclusion, and pi-tandem support in commit e88a85f."}
+{"ts":"2026-07-23T01:52:07Z","event":"accord.ready","id":"task-167","summary":"Accord ready for task-167"}
+{"ts":"2026-07-23T01:52:15Z","event":"accord.claimed","id":"task-167","summary":"Accord claim for task-167"}
+{"ts":"2026-07-23T02:04:53Z","event":"accord.delivered","id":"task-167","summary":"Accord deliver for task-167"}
+{"ts":"2026-07-23T02:05:02Z","event":"accord.accepted","id":"task-167","summary":"Accord accept for task-167"}
+{"ts":"2026-07-23T02:05:15Z","event":"task.completed","id":"task-167","summary":"Released and verified Tandem v0.6.1 from 3eb9309: pushed main and annotated tag, published curated GitHub Release notes and cargo-dist artifacts, validated checksums/archive/isolated installer and released body-edit/cancel behavior, and confirmed tandem-bin AUR 0.6.1 publication."}
+{"ts":"2026-07-23T14:32:09Z","event":"task.created","id":"task-168","summary":"Overhaul TUI Board hierarchy and visual clarity"}
+{"ts":"2026-07-23T14:32:18Z","event":"task.created","id":"task-169","summary":"Show in-progress subtasks in the Board pane"}
+{"ts":"2026-07-23T14:32:22Z","event":"task.created","id":"task-170","summary":"Make Board task IDs consistently discoverable"}
+{"ts":"2026-07-23T14:32:28Z","event":"task.created","id":"task-171","summary":"Repair Board hierarchy expand/collapse rendering"}
+{"ts":"2026-07-23T14:33:23Z","event":"accord.claimed","id":"task-169","summary":"Accord claim for task-169"}
+{"ts":"2026-07-23T14:36:09Z","event":"accord.delivered","id":"task-169","summary":"Accord deliver for task-169"}
+{"ts":"2026-07-23T14:49:36Z","event":"task.created","id":"task-172","summary":"UI inspection fixture: cross-state hierarchy"}
+{"ts":"2026-07-23T14:49:40Z","event":"task.created","id":"task-173","summary":"UI inspection fixture: todo parent task"}
+{"ts":"2026-07-23T14:49:43Z","event":"task.created","id":"task-173-1","summary":"UI inspection fixture: in-progress subtask"}
+{"ts":"2026-07-23T14:49:46Z","event":"task.moved","id":"task-173-1","summary":"Moved task-173-1 from todo to in-progress"}
+{"ts":"2026-07-23T14:52:08Z","event":"accord.rework","id":"task-169","summary":"Accord rework for task-169"}
+{"ts":"2026-07-23T14:53:25Z","event":"accord.delivered","id":"task-169","summary":"Accord deliver for task-169"}
+{"ts":"2026-07-23T14:54:35Z","event":"accord.accepted","id":"task-169","summary":"Accord accept for task-169"}
+{"ts":"2026-07-23T14:54:39Z","event":"task.completed","id":"task-169","summary":"State Board now projects in-progress Subtasks with auto-expanded ancestor context and explicit WIP state chips; visually accepted by the user."}
+{"ts":"2026-07-23T14:54:58Z","event":"task.canceled","id":"task-173-1","summary":"Canceled: Temporary visual-inspection fixture no longer needed."}
+{"ts":"2026-07-23T14:54:58Z","event":"task.canceled","id":"task-173","summary":"Canceled: Temporary visual-inspection fixture parent no longer needed."}
+{"ts":"2026-07-23T14:54:58Z","event":"task.canceled","id":"task-172","summary":"Canceled: Temporary visual-inspection fixture Epic no longer needed."}
+{"ts":"2026-07-23T14:55:07Z","event":"accord.claimed","id":"task-170","summary":"Accord claim for task-170"}
+{"ts":"2026-07-23T14:58:13Z","event":"accord.delivered","id":"task-170","summary":"Accord deliver for task-170"}
+{"ts":"2026-07-23T15:10:00Z","event":"accord.claimed","id":"task-171","summary":"Accord claim for task-171"}
+{"ts":"2026-07-23T15:51:16Z","event":"accord.delivered","id":"task-171","summary":"Accord deliver for task-171"}
+{"ts":"2026-07-23T16:02:16Z","event":"task.created","id":"task-174","summary":"UI inspection fixture: active subtask hierarchy"}
+{"ts":"2026-07-23T16:02:19Z","event":"task.created","id":"task-175","summary":"UI inspection fixture: parent task"}
+{"ts":"2026-07-23T16:02:24Z","event":"task.created","id":"task-175-1","summary":"UI inspection fixture: in-progress subtask"}
+{"ts":"2026-07-23T16:02:28Z","event":"task.moved","id":"task-175-1","summary":"Moved task-175-1 from todo to in-progress"}
+{"ts":"2026-07-23T16:03:49Z","event":"accord.accepted","id":"task-170","summary":"Accord accept for task-170"}
+{"ts":"2026-07-23T16:03:54Z","event":"accord.accepted","id":"task-171","summary":"Accord accept for task-171"}
+{"ts":"2026-07-23T16:03:58Z","event":"task.completed","id":"task-170","summary":"Board task IDs now appear as compact #<number> chips across State and Epic Board rows; user validated visually."}
+{"ts":"2026-07-23T16:04:05Z","event":"task.completed","id":"task-171","summary":"State Board hierarchy now collapses same-state roots by default, exposes cross-state active paths, and labels every row with its own state; user validated visually."}
+{"ts":"2026-07-23T16:04:09Z","event":"task.canceled","id":"task-175-1","summary":"Canceled: Temporary active-Subtask visual fixture verified by user."}
+{"ts":"2026-07-23T16:04:09Z","event":"task.canceled","id":"task-175","summary":"Canceled: Temporary active-Subtask visual fixture parent no longer needed."}
+{"ts":"2026-07-23T16:04:10Z","event":"task.canceled","id":"task-174","summary":"Canceled: Temporary active-Subtask visual fixture Epic no longer needed."}
+{"ts":"2026-07-23T16:06:22Z","event":"task.completed","id":"task-168","summary":"Completed the TUI Board hierarchy/clarity overhaul: active Subtasks project with visible WIP state, Board task IDs are consistently discoverable, and hierarchy collapse/expansion behavior was visually validated."}
+{"ts":"2026-07-23T16:25:38Z","event":"accord.claimed","id":"task-118","summary":"Accord claim for task-118"}
+{"ts":"2026-07-23T17:51:57Z","event":"task.created","id":"task-176","summary":"UI inspection fixture: Epic progress ratio"}
+{"ts":"2026-07-23T17:52:01Z","event":"task.created","id":"task-177","summary":"UI inspection fixture: completed one"}
+{"ts":"2026-07-23T17:52:05Z","event":"task.created","id":"task-178","summary":"UI inspection fixture: completed two"}
+{"ts":"2026-07-23T17:52:09Z","event":"task.created","id":"task-179","summary":"UI inspection fixture: outstanding three"}
+{"ts":"2026-07-23T17:52:16Z","event":"task.created","id":"task-180","summary":"UI inspection fixture: outstanding four"}
+{"ts":"2026-07-23T17:52:20Z","event":"task.completed","id":"task-177","summary":"Temporary progress-bar fixture completed child."}
+{"ts":"2026-07-23T17:52:23Z","event":"task.completed","id":"task-178","summary":"Temporary progress-bar fixture completed child."}
+{"ts":"2026-07-23T19:00:48Z","event":"accord.delivered","id":"task-118","summary":"Accord deliver for task-118"}
+{"ts":"2026-07-23T19:00:53Z","event":"accord.accepted","id":"task-118","summary":"Accord accept for task-118"}
+{"ts":"2026-07-23T19:00:57Z","event":"task.completed","id":"task-118","summary":"Selected-Epic Board progress bar shipped in v0.6.2: descendant completion ratio, 24 segments, and configurable [colors] progress fill."}
+{"ts":"2026-07-23T19:01:04Z","event":"task.canceled","id":"task-179","summary":"Canceled: Temporary Epic progress-ratio fixture no longer needed after user validation."}
+{"ts":"2026-07-23T19:01:04Z","event":"task.canceled","id":"task-180","summary":"Canceled: Temporary Epic progress-ratio fixture no longer needed after user validation."}
+{"ts":"2026-07-23T19:01:04Z","event":"task.canceled","id":"task-176","summary":"Canceled: Temporary Epic progress-ratio fixture no longer needed after user validation."}
+{"ts":"2026-07-24T00:51:28Z","event":"task.created","id":"task-181","summary":"Add supported decision correction and withdrawal workflows"}
+{"ts":"2026-07-24T01:17:48Z","event":"accord.claimed","id":"task-181","summary":"Accord claim for task-181"}
+{"ts":"2026-07-24T03:25:08Z","event":"accord.delivered","id":"task-181","summary":"Accord deliver for task-181"}
+{"ts":"2026-07-24T03:30:22Z","event":"task.created","id":"task-182","summary":"Remove redundant ready accord status and streamline delegation claims"}
+{"ts":"2026-07-24T03:39:04Z","event":"accord.claimed","id":"task-182","summary":"Accord claim for task-182"}
+{"ts":"2026-07-24T03:45:15Z","event":"accord.delivered","id":"task-182","summary":"Accord deliver for task-182"}
+{"ts":"2026-07-24T03:58:47Z","event":"accord.accepted","id":"task-181","summary":"Accord accept for task-181"}
+{"ts":"2026-07-24T03:58:53Z","event":"accord.accepted","id":"task-182","summary":"Accord accept for task-182"}
+{"ts":"2026-07-24T03:58:58Z","event":"task.completed","id":"task-181","summary":"Added supported decision update and withdrawal CLI workflows with auditable withdrawn metadata/events and TUI guidance."}
+{"ts":"2026-07-24T03:59:04Z","event":"task.completed","id":"task-182","summary":"Removed ready from new accord actions/statuses; direct claim is now the normal delegation and recovery transition while legacy ready remains readable."}
+{"ts":"2026-07-24T12:32:57Z","event":"task.created","id":"task-183","summary":"Fix retired ready accord action leaking through Pi tools and CLI help"}
+{"ts":"2026-07-24T12:39:50Z","event":"accord.claimed","id":"task-183","summary":"Accord claim for task-183"}
+{"ts":"2026-07-24T12:39:50Z","event":"task.updated","id":"task-183","summary":"Updated task-183 metadata: assignee"}
+{"ts":"2026-07-24T12:59:22Z","event":"accord.delivered","id":"task-183","summary":"Accord deliver for task-183"}
+{"ts":"2026-07-24T13:03:07Z","event":"accord.accepted","id":"task-183","summary":"Accord accept for task-183"}
+{"ts":"2026-07-24T13:03:13Z","event":"task.completed","id":"task-183","summary":"Removed the retired ready action from Tandem CLI help and repository-owned Pi-Tandem action/schema/docs, added regression coverage, and preserved legacy persisted ready status reads. External Pi UI presentation is intentionally outside Tandem scope."}
+{"ts":"2026-07-24T13:43:06Z","event":"task.created","id":"task-184","summary":"Investigate Pi/Codex premature stop after worker handoffs"}
+{"ts":"2026-07-24T13:54:17Z","event":"task.canceled","id":"task-184","summary":"Canceled: Created in error: user intended a task about the release issue, not premature Pi/Codex continuation behavior."}
+{"ts":"2026-07-24T13:55:53Z","event":"task.created","id":"task-185","summary":"Adopt cargo-dist changelog releases with release preflight and publication verification"}
+{"ts":"2026-07-24T14:33:15Z","event":"accord.claimed","id":"task-185","summary":"Accord claim for task-185"}
+{"ts":"2026-07-24T14:33:15Z","event":"task.updated","id":"task-185","summary":"Updated task-185 metadata: assignee"}
+{"ts":"2026-07-24T15:18:31Z","event":"accord.delivered","id":"task-185","summary":"Accord deliver for task-185"}
+{"ts":"2026-07-24T15:25:42Z","event":"task.created","id":"task-186","summary":"Expose workflow-state badge styling through Tandem themes"}
+{"ts":"2026-07-24T15:54:58Z","event":"task.updated","id":"task-186","summary":"Updated task-186 metadata: body"}
+{"ts":"2026-07-24T16:08:58Z","event":"accord.claimed","id":"task-186","summary":"Accord claim for task-186"}
+{"ts":"2026-07-24T16:08:58Z","event":"task.updated","id":"task-186","summary":"Updated task-186 metadata: assignee"}
+{"ts":"2026-07-24T17:11:43Z","event":"accord.delivered","id":"task-186","summary":"Accord deliver for task-186"}
+{"ts":"2026-07-24T17:16:31Z","event":"task.created","id":"task-187","summary":"Preview Verdigris WIP badge"}
+{"ts":"2026-07-24T17:16:38Z","event":"accord.claimed","id":"task-187","summary":"Accord claim for task-187"}
+{"ts":"2026-07-24T17:16:38Z","event":"task.updated","id":"task-187","summary":"Updated task-187 metadata: assignee"}
+{"ts":"2026-07-24T17:37:50Z","event":"accord.accepted","id":"task-186","summary":"Accord accept for task-186"}
+{"ts":"2026-07-24T17:38:01Z","event":"task.completed","id":"task-186","summary":"Added same-file theme color aliases and configurable per-workflow-state Board chips; user visually validated Verdigris WIP and VAL colors in live TUI."}
+{"ts":"2026-07-24T17:38:01Z","event":"task.canceled","id":"task-187","summary":"Canceled: Temporary task created solely to visually inspect the new WIP badge; user validation is complete."}
+{"ts":"2026-07-26T14:25:42Z","event":"accord.accepted","id":"task-185","summary":"Accord accept for task-185"}
+{"ts":"2026-07-26T14:25:47Z","event":"task.completed","id":"task-185","summary":"Replaced the unused release-notes path with cargo-dist-backed RELEASES.md preflight and publication verification, proven by the v0.6.5 release."}
+{"ts":"2026-07-26T14:27:04Z","event":"accord.claimed","id":"task-121","summary":"Accord claim for task-121"}
+{"ts":"2026-07-26T14:27:04Z","event":"task.updated","id":"task-121","summary":"Updated task-121 metadata: assignee"}
+{"ts":"2026-07-26T14:27:04Z","event":"accord.claimed","id":"task-120","summary":"Accord claim for task-120"}
+{"ts":"2026-07-26T14:27:04Z","event":"task.updated","id":"task-120","summary":"Updated task-120 metadata: assignee"}
+{"ts":"2026-07-26T14:47:04Z","event":"accord.delivered","id":"task-120","summary":"Accord deliver for task-120"}
+{"ts":"2026-07-26T14:47:04Z","event":"accord.delivered","id":"task-121","summary":"Accord deliver for task-121"}
+{"ts":"2026-07-26T14:47:15Z","event":"accord.accepted","id":"task-120","summary":"Accord accept for task-120"}
+{"ts":"2026-07-26T14:47:15Z","event":"accord.accepted","id":"task-121","summary":"Accord accept for task-121"}
+{"ts":"2026-07-26T14:47:20Z","event":"task.completed","id":"task-120","summary":"Completed database-backed Tandem state and pluggable sync provider research; architecture remains a research proposal pending a separate decision."}
+{"ts":"2026-07-26T14:47:20Z","event":"task.completed","id":"task-121","summary":"Completed lightweight Tandem web server/UI research; architecture remains a research proposal pending product/security decisions."}
+{"ts":"2026-07-26T21:16:20Z","event":"accord.claimed","id":"task-148","summary":"Accord claim for task-148"}
+{"ts":"2026-07-26T21:16:20Z","event":"task.updated","id":"task-148","summary":"Updated task-148 metadata: assignee"}
+{"ts":"2026-07-26T21:18:21Z","event":"decision.created","id":"decision-8","summary":"Define canonical protocol, project, app, and peer CLI/TUI architecture"}
+{"ts":"2026-07-26T21:18:25Z","event":"task.updated","id":"task-146","summary":"Updated task-146 metadata: references"}
+{"ts":"2026-07-26T21:18:25Z","event":"task.updated","id":"task-148","summary":"Updated task-148 metadata: references"}
+{"ts":"2026-07-26T21:20:47Z","event":"accord.delivered","id":"task-148","summary":"Accord deliver for task-148"}
+{"ts":"2026-07-26T21:20:51Z","event":"accord.accepted","id":"task-148","summary":"Accord accept for task-148"}
+{"ts":"2026-07-26T21:21:00Z","event":"task.completed","id":"task-148","summary":"Created and integrated the controlled refactor/protocol-architecture baseline at main commit 355e76c; added campaign governance in AGENTS.md and plan/refactor_campaign_baseline.md; recorded accepted architecture decision-8 and retained decision-7 as hierarchy authority; verified no Rust/Cargo changes or push."}
+{"ts":"2026-07-26T21:21:22Z","event":"accord.claimed","id":"task-149","summary":"Accord claim for task-149"}
+{"ts":"2026-07-26T21:21:22Z","event":"task.updated","id":"task-149","summary":"Updated task-149 metadata: assignee"}
+{"ts":"2026-07-26T21:31:05Z","event":"accord.delivered","id":"task-149","summary":"Accord deliver for task-149"}
+{"ts":"2026-07-26T21:31:12Z","event":"accord.accepted","id":"task-149","summary":"Accord accept for task-149"}
+{"ts":"2026-07-26T21:31:20Z","event":"task.completed","id":"task-149","summary":"Added deterministic executable Tandem CLI regression tests and established a strict-Clippy-clean campaign baseline. Covered process contracts, representative reads/mutations, hierarchy failures, preservation, events, completion, and Logs; safely fixed 21 diagnostics and isolated 8 Board/Review argument-count diagnostics with precise Stage 6 removal checkpoints."}
+{"ts":"2026-07-26T21:31:38Z","event":"accord.claimed","id":"task-150","summary":"Accord claim for task-150"}
+{"ts":"2026-07-26T21:31:38Z","event":"task.updated","id":"task-150","summary":"Updated task-150 metadata: assignee"}
+{"ts":"2026-07-26T21:46:47Z","event":"accord.delivered","id":"task-150","summary":"Accord deliver for task-150"}
+{"ts":"2026-07-26T21:46:52Z","event":"accord.accepted","id":"task-150","summary":"Accord accept for task-150"}
+{"ts":"2026-07-26T21:47:00Z","event":"task.completed","id":"task-150","summary":"Implemented protocol 0.2.0 compatibility: explicit upgrade-only conversion from 0.1.0, project-operation gating, legacy custom data preserved as deprecated read-only content, legacy completion policies preserved/deprecated/ignored, fixed priority/effort validation, coherent CLI/TUI/pi-tandem exposure, and regression coverage."}
+{"ts":"2026-07-26T21:47:24Z","event":"accord.claimed","id":"task-151","summary":"Accord claim for task-151"}
+{"ts":"2026-07-26T21:47:25Z","event":"task.updated","id":"task-151","summary":"Updated task-151 metadata: assignee"}
+{"ts":"2026-07-26T21:54:11Z","event":"accord.delivered","id":"task-151","summary":"Accord deliver for task-151"}
+{"ts":"2026-07-26T21:54:20Z","event":"accord.accepted","id":"task-151","summary":"Accord accept for task-151"}
+{"ts":"2026-07-26T21:54:26Z","event":"task.completed","id":"task-151","summary":"Established tandem/src/tui/mod.rs and extracted cohesive editor and terminal lifecycle seams without behavior changes. Preserved terminal cleanup/editor suspend-resume, TUI rendering/input/state, and test coverage."}
+{"ts":"2026-07-26T21:55:10Z","event":"accord.claimed","id":"task-152","summary":"Accord claim for task-152"}
+{"ts":"2026-07-26T21:55:10Z","event":"task.updated","id":"task-152","summary":"Updated task-152 metadata: assignee"}
+{"ts":"2026-07-26T22:04:57Z","event":"accord.delivered","id":"task-152","summary":"Accord deliver for task-152"}
+{"ts":"2026-07-26T22:05:03Z","event":"accord.accepted","id":"task-152","summary":"Accord accept for task-152"}
+{"ts":"2026-07-26T22:05:09Z","event":"task.completed","id":"task-152","summary":"Created the executable protocol boundary for logical document/configuration semantics, fixed vocabularies, supported types, workflow configuration, aliases, and unknown-field/body preservation while retaining concrete source ownership in a temporary root StoredDocument wrapper."}
+{"ts":"2026-07-26T22:06:03Z","event":"accord.claimed","id":"task-153","summary":"Accord claim for task-153"}
+{"ts":"2026-07-26T22:06:03Z","event":"task.updated","id":"task-153","summary":"Updated task-153 metadata: assignee"}
+{"ts":"2026-07-26T22:13:26Z","event":"accord.delivered","id":"task-153","summary":"Accord deliver for task-153"}
+{"ts":"2026-07-26T22:13:32Z","event":"accord.accepted","id":"task-153","summary":"Accord accept for task-153"}
+{"ts":"2026-07-26T22:13:40Z","event":"task.completed","id":"task-153","summary":"Moved canonical task ID grammar/allocation and all resolved Epic/Task/Subtask hierarchy semantics into protocol/ids.rs and protocol/hierarchy.rs; migrated CLI/TUI callers and removed duplicate root inference while retaining locked Board+Logs snapshot inputs."}
+{"ts":"2026-07-26T22:13:59Z","event":"accord.claimed","id":"task-154","summary":"Accord claim for task-154"}
+{"ts":"2026-07-26T22:13:59Z","event":"task.updated","id":"task-154","summary":"Updated task-154 metadata: assignee"}
+{"ts":"2026-07-26T22:27:18Z","event":"accord.delivered","id":"task-154","summary":"Accord deliver for task-154"}
+{"ts":"2026-07-26T22:57:02Z","event":"accord.accepted","id":"task-154","summary":"Accord accept for task-154"}
+{"ts":"2026-07-26T22:57:12Z","event":"task.completed","id":"task-154","summary":"Extracted canonical workflow/completion, accord, review, event-envelope, and diagnostic semantics into protocol modules; migrated CLI/TUI callers and kept concrete event/path I/O outside protocol after a reviewed correction."}
+{"ts":"2026-07-26T22:58:55Z","event":"accord.claimed","id":"task-155","summary":"Accord claim for task-155"}
+{"ts":"2026-07-26T22:58:56Z","event":"task.updated","id":"task-155","summary":"Updated task-155 metadata: assignee"}
+{"ts":"2026-07-26T23:14:24Z","event":"accord.delivered","id":"task-155","summary":"Accord deliver for task-155"}
+{"ts":"2026-07-26T23:14:30Z","event":"accord.accepted","id":"task-155","summary":"Accord accept for task-155"}
+{"ts":"2026-07-26T23:14:36Z","event":"task.completed","id":"task-155","summary":"Extracted TandemProject and concrete read boundaries while preserving strict/tolerant behavior and protocol/project dependency direction."}
+{"ts":"2026-07-26T23:15:30Z","event":"accord.claimed","id":"task-156","summary":"Accord claim for task-156"}
+{"ts":"2026-07-26T23:15:30Z","event":"task.updated","id":"task-156","summary":"Updated task-156 metadata: assignee"}
+{"ts":"2026-07-27T03:46:15Z","event":"accord.delivered","id":"task-156","summary":"Accord deliver for task-156"}
+{"ts":"2026-07-27T03:46:21Z","event":"accord.accepted","id":"task-156","summary":"Accord accept for task-156"}
+{"ts":"2026-07-27T03:46:28Z","event":"task.completed","id":"task-156","summary":"Completed the TandemProject write boundary, including safe atomic mutations and canonical per-actor event ledgers with legacy-compatible aggregation."}
+{"ts":"2026-07-27T03:47:02Z","event":"accord.claimed","id":"task-157","summary":"Accord claim for task-157"}
+{"ts":"2026-07-27T03:47:03Z","event":"task.updated","id":"task-157","summary":"Updated task-157 metadata: assignee"}
+{"ts":"2026-07-27T04:40:32Z","event":"task.created","id":"task-157-1","summary":"Establish task-157 application boundary foundation"}
+{"ts":"2026-07-27T04:40:40Z","event":"task.created","id":"task-157-2","summary":"Complete shared Task lifecycle application operations"}
+{"ts":"2026-07-27T04:40:51Z","event":"task.created","id":"task-157-3","summary":"Complete shared accord lifecycle application operations"}
+{"ts":"2026-07-27T04:40:58Z","event":"task.created","id":"task-157-4","summary":"Complete shared Validation and completion operations"}
+{"ts":"2026-07-27T04:41:05Z","event":"task.created","id":"task-157-5","summary":"Validate task-157 application boundary and interface parity"}
+{"ts":"2026-07-27T04:41:11Z","event":"task.updated","id":"task-157-1","summary":"Updated task-157-1 metadata: assignee"}
+{"ts":"2026-07-27T04:41:16Z","event":"task.moved","id":"task-157-1","summary":"Moved task-157-1 from todo to in-progress"}
+{"ts":"2026-07-27T04:41:39Z","event":"task.updated","id":"task-157-1","summary":"Updated task-157-1 metadata: body"}
+{"ts":"2026-07-27T04:51:37Z","event":"task.completed","id":"task-157-1","summary":"Reviewed and accepted application-boundary foundation checkpoint at worker commits 4c2f128 and 569b85a. App support delegates event writes to project, owner imports are direct, and all remaining root helpers are explicitly assigned to task-157-2/3/4."}
+{"ts":"2026-07-27T04:51:44Z","event":"task.updated","id":"task-157-2","summary":"Updated task-157-2 metadata: assignee"}
+{"ts":"2026-07-27T04:51:47Z","event":"task.moved","id":"task-157-2","summary":"Moved task-157-2 from todo to in-progress"}
+{"ts":"2026-07-28T01:57:24Z","event":"task.completed","id":"task-157-2","summary":"Accepted checkpoint task-157-2 at 3cccb55 after independent diff review, root-import boundary audit, clean status/diff checks, cargo fmt, 198 unit plus 4 CLI behavior tests, and strict Clippy."}
+{"ts":"2026-07-28T01:57:51Z","event":"accord.claimed","id":"task-157","summary":"Accord claim for task-157"}
+{"ts":"2026-07-28T01:57:52Z","event":"task.updated","id":"task-157","summary":"Updated task-157 metadata: assignee"}
+{"ts":"2026-07-28T02:04:13Z","event":"task.completed","id":"task-157-3","summary":"Accepted checkpoint task-157-3 at b6c6765 after independent diff and ownership review, format check, 199 unit plus 4 real-command tests, strict Clippy, reverse-dependency audit, and clean diff/status validation."}
+{"ts":"2026-07-28T02:04:17Z","event":"task.moved","id":"task-157-4","summary":"Moved task-157-4 from todo to in-progress"}
+{"ts":"2026-07-28T02:04:17Z","event":"task.updated","id":"task-157-4","summary":"Updated task-157-4 metadata: assignee"}
+{"ts":"2026-07-28T02:07:51Z","event":"task.created","id":"task-188","summary":"Polish the bare `tandem` CLI landing output"}
+{"ts":"2026-07-28T02:10:39Z","event":"task.moved","id":"task-157-4","summary":"Moved task-157-4 from in-progress to validation"}
+{"ts":"2026-07-28T02:15:13Z","event":"task.completed","id":"task-157-4","summary":"Accepted checkpoint task-157-4 at 363d559 after independent architecture/diff review, 200 unit and 4 real-command tests, formatting, strict Clippy, ownership/dependency audits, and human `just dev` confirmation that visible Validation behavior looks correct and works as expected."}
+{"ts":"2026-07-28T02:15:17Z","event":"task.moved","id":"task-157-5","summary":"Moved task-157-5 from todo to in-progress"}
+{"ts":"2026-07-28T02:15:17Z","event":"task.updated","id":"task-157-5","summary":"Updated task-157-5 metadata: assignee"}
+{"ts":"2026-07-28T02:17:07Z","event":"task.completed","id":"task-157-5","summary":"Accepted final task-157 architecture and interface-parity audit at 363d559. No checkpoint-5 code changes were required; independent validation confirmed shared CLI/TUI app reachability, no lifecycle orchestration remnants, no reverse dependencies, clean status, 200 unit tests, 4 real-command tests, formatting, strict Clippy, and prior human visible Validation approval."}
+{"ts":"2026-07-28T02:17:14Z","event":"accord.delivered","id":"task-157","summary":"Accord deliver for task-157"}
+{"ts":"2026-07-28T02:17:17Z","event":"accord.accepted","id":"task-157","summary":"Accord accept for task-157"}
+{"ts":"2026-07-28T02:17:59Z","event":"task.completed","id":"task-157","summary":"Unified Task, accord, Validation, and completion application operations across shared app boundaries. All five checkpoints completed; Worker changes integrated as cba6cdf into refactor/protocol-architecture and revalidated on target with 200 unit tests, 4 real-command tests, formatting, strict Clippy, ownership/interface audits, and human visible Validation approval."}
+{"ts":"2026-07-28T02:21:27Z","event":"task.moved","id":"task-146","summary":"Moved task-146 from todo to in-progress"}
+{"ts":"2026-07-28T02:21:27Z","event":"task.moved","id":"task-158","summary":"Moved task-158 from todo to in-progress"}
+{"ts":"2026-07-28T02:21:38Z","event":"accord.claimed","id":"task-158","summary":"Accord claim for task-158"}
+{"ts":"2026-07-28T02:21:38Z","event":"task.updated","id":"task-158","summary":"Updated task-158 metadata: assignee"}
+{"ts":"2026-07-28T02:22:43Z","event":"task.updated","id":"task-188","summary":"Updated task-188 metadata: blockers, references"}
+{"ts":"2026-07-28T02:36:17Z","event":"accord.delivered","id":"task-158","summary":"Accord deliver for task-158"}
+{"ts":"2026-07-28T02:36:23Z","event":"accord.accepted","id":"task-158","summary":"Accord accept for task-158"}
+{"ts":"2026-07-28T02:36:58Z","event":"task.completed","id":"task-158","summary":"Unified Rules and Decision application operations with corrected protocol/project/app ownership and preserved CLI/TUI semantics. Integrated as e6bf181 into refactor/protocol-architecture and revalidated on target with 204 unit tests, 5 real-command tests, formatting, strict Clippy, diff, dependency, and parity audits."}
+{"ts":"2026-07-28T02:43:44Z","event":"task.moved","id":"task-159","summary":"Moved task-159 from todo to in-progress"}
+{"ts":"2026-07-28T02:44:00Z","event":"accord.claimed","id":"task-159","summary":"Accord claim for task-159"}
+{"ts":"2026-07-28T02:44:00Z","event":"task.updated","id":"task-159","summary":"Updated task-159 metadata: assignee"}
+{"ts":"2026-07-28T03:11:10Z","event":"accord.delivered","id":"task-159","summary":"Accord deliver for task-159"}
+{"ts":"2026-07-28T03:11:17Z","event":"accord.accepted","id":"task-159","summary":"Accord accept for task-159"}
+{"ts":"2026-07-28T03:12:07Z","event":"task.completed","id":"task-159","summary":"Extracted CLI parsing, dispatch, thin command adapters, and exact output ownership; moved durable project/Decision operations and canonical queries into app; reduced main.rs to 55 lines of wiring/error handling. Integrated as cb3a69e and revalidated on target with 206 unit and 6 real-command tests, formatting, strict Clippy, exact process, persistence/import, reverse-dependency, and no-test-loss audits."}
+{"ts":"2026-07-28T21:31:58Z","event":"accord.claimed","id":"task-160","summary":"Accord claim for task-160"}
+{"ts":"2026-07-28T21:31:58Z","event":"task.updated","id":"task-160","summary":"Updated task-160 metadata: assignee"}
+{"ts":"2026-07-28T21:37:50Z","event":"accord.delivered","id":"task-160","summary":"Accord deliver for task-160"}
+{"ts":"2026-07-28T22:37:08Z","event":"accord.accepted","id":"task-160","summary":"Accord accept for task-160"}
+{"ts":"2026-07-28T22:37:12Z","event":"task.completed","id":"task-160","summary":"Extracted TUI reload, input translation, and Validation adapter boundaries; integrated commit 6b51a0c after automated and human validation."}
+{"ts":"2026-07-28T23:03:16Z","event":"accord.claimed","id":"task-161","summary":"Accord claim for task-161"}
+{"ts":"2026-07-28T23:03:16Z","event":"task.updated","id":"task-161","summary":"Updated task-161 metadata: assignee"}
+{"ts":"2026-07-28T23:09:07Z","event":"accord.delivered","id":"task-161","summary":"Accord deliver for task-161"}
+{"ts":"2026-07-28T23:11:17Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to context"}
+{"ts":"2026-07-28T23:12:11Z","event":"accord.accepted","id":"task-161","summary":"Accord accept for task-161"}
+{"ts":"2026-07-28T23:12:16Z","event":"task.completed","id":"task-161","summary":"Extracted canonical hierarchy-backed Board projection and rendering into tui/board and integrated commit 375e7b3 after automated and direct visual validation."}
+{"ts":"2026-07-28T23:32:21Z","event":"accord.claimed","id":"task-162","summary":"Accord claim for task-162"}
+{"ts":"2026-07-28T23:32:21Z","event":"task.updated","id":"task-162","summary":"Updated task-162 metadata: assignee"}
+{"ts":"2026-07-28T23:44:23Z","event":"accord.delivered","id":"task-162","summary":"Accord deliver for task-162"}
+{"ts":"2026-07-28T23:44:41Z","event":"accord.accepted","id":"task-162","summary":"Accord accept for task-162"}
+{"ts":"2026-07-28T23:44:46Z","event":"task.completed","id":"task-162","summary":"Completed TUI chrome, shared text, and transient state boundaries; integrated as b67ca4b with tui/mod.rs reduced to a focused production wiring root."}
+{"ts":"2026-07-29T00:11:26Z","event":"accord.claimed","id":"task-163","summary":"Accord claim for task-163"}
+{"ts":"2026-07-29T00:11:26Z","event":"task.updated","id":"task-163","summary":"Updated task-163 metadata: assignee"}
+{"ts":"2026-07-29T00:16:54Z","event":"accord.delivered","id":"task-163","summary":"Accord deliver for task-163"}
+{"ts":"2026-07-29T00:17:06Z","event":"accord.accepted","id":"task-163","summary":"Accord accept for task-163"}
+{"ts":"2026-07-29T00:17:13Z","event":"task.completed","id":"task-163","summary":"Aligned repository documentation and agent guidance with the implemented protocol/project/app/CLI/TUI architecture; integrated commit b74bc85."}
+{"ts":"2026-07-29T00:44:44Z","event":"accord.claimed","id":"task-164","summary":"Accord claim for task-164"}
+{"ts":"2026-07-29T00:44:44Z","event":"task.updated","id":"task-164","summary":"Updated task-164 metadata: assignee"}
+{"ts":"2026-07-29T00:50:28Z","event":"accord.delivered","id":"task-164","summary":"Accord deliver for task-164"}
+{"ts":"2026-07-29T00:51:07Z","event":"accord.accepted","id":"task-164","summary":"Accord accept for task-164"}
+{"ts":"2026-07-29T00:51:12Z","event":"task.completed","id":"task-164","summary":"Completed final architecture audit and merged refactor/protocol-architecture into local main with exact 34-commit history at 0fa4955."}
+{"ts":"2026-07-29T00:51:25Z","event":"task.completed","id":"task-146","summary":"Completed the canonical protocol/project/app/CLI/TUI architecture refactor campaign; all 18 direct Tasks completed and exact campaign history merged into local main at 0fa4955."}
+{"ts":"2026-07-29T02:38:38Z","event":"task.created","id":"task-190","summary":"n/dev/worktrees/tandem/worker-task-188-polish-the-bare-tandem-cli-landing-o/tandem/target/debug/tandem"}

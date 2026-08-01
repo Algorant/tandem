@@ -1,6 +1,6 @@
 # Local agent/runtime state
 .pi/
-.tandem/
+.tandem/actor-id
 
 # Rust
 /target/

@@ -1,0 +1,1 @@
+{"ts":"2026-07-30T13:05:49Z","event":"task.canceled","id":"task-136","summary":"Canceled: Superseded by decision-9 after the per-actor event ledger shipped in d974133. UUIDv7 union-ledger writes and Git attributes are not required for the narrower identity fix.","actor":"local-578702-1785416749691379497","seq":1}

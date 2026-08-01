@@ -1,0 +1,1 @@
+{"ts":"2026-07-30T13:05:49Z","event":"task.canceled","id":"task-137","summary":"Canceled: Superseded by decision-9 after the per-actor event ledger shipped in d974133. Existing mixed legacy/per-actor readers and diagnostics remain the selected baseline.","actor":"local-578703-1785416749709324728","seq":1}
