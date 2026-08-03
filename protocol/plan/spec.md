@@ -383,7 +383,18 @@ A valid archived task log should contain:
 
 ### Rule object fields
 
-Rules are structured objects inside one of the workspace config groups: `always`, `never`, `prefer`, or `context`.
+Rules are structured objects inside one of the workspace config groups: `always`, `never`, `prefer`, or `context`. The category carries behavioral semantics; tools must not infer the category from words such as "must", "avoid", or "usually" in the rule text.
+
+| Category | Operational meaning |
+| --- | --- |
+| `always` | A required action or invariant whenever the rule applies. An applicable actor must comply or report that it cannot comply. |
+| `never` | A prohibited action or outcome whenever the rule applies. An applicable actor must not perform it. Prohibitions belong here even when the same text also gives a positive follow-up action. |
+| `prefer` | The default choice when more than one valid action exists. An actor may choose another action when project context, a stronger rule, or a concrete constraint justifies it, and should make a material deviation visible. |
+| `context` | Descriptive or conditional information used to interpret work. It does not require or prohibit an action by itself. A directive with a narrow trigger still belongs in `always`, `never`, or `prefer`; conditional applicability does not make a directive `context`. |
+
+Rule strength and rule applicability are separate. For example, "When changing the API, always update its compatibility note" is `always`, while "The API is consumed by mobile clients" is `context`. A mixed directive such as "Do not modify adapter code; submit an implementation handoff instead" contains a `never` prohibition and an `always` follow-up. Authors should split independently enforceable clauses into separate rules. They may keep an atomic prohibition and its required recovery in one `never` rule when enforcement must preserve the whole instruction.
+
+Actors apply all applicable rules. They should use `context` to evaluate scope and `prefer` to select among allowed options. They must not use a preference to bypass an applicable `always` or `never` rule. If applicable required and prohibited rules conflict, the actor must surface the conflict and obtain clarification rather than silently choosing one.
 
 | Field | Required | Severity | Notes |
 | --- | --- | --- | --- |
@@ -946,7 +957,23 @@ rules:
       rule: This project uses Tandem for local-first coordination.
 ```
 
-Rules are for humans and agents. Agents should read them before starting tasks. `source` is optional and may point to any Tandem document ID.
+Rules are for humans and agents. Agents should read them before starting tasks. Category semantics are normative in [Rule object fields](#rule-object-fields); wording does not override the stored category. `source` is optional and may point to any Tandem document ID.
+
+## Agent and adapter consumption contract
+
+Any agent or integration can consume Tandem without framework-specific prompts or tools:
+
+1. Start from the intended working directory and ask the Tandem implementation to discover the nearest workspace. The canonical marker is `.tandem/tandem.md`. Do not initialize a workspace or upgrade its protocol version without explicit authority.
+2. Read workspace status, configured states, and all rule categories before planning a mutation. Treat active workspace rules as repository policy, not as universal Tandem behavior.
+3. Inspect the target document and resolve its parent, blockers, references, related decisions, and relevant Logs through Tandem read operations. Use structured output when available. Do not infer hierarchy roles from IDs or duplicate protocol validation in an adapter.
+4. Keep workflow `state`, `accord.status`, and `review.status` separate. Use explicit lifecycle operations and consume the result returned by Tandem.
+5. Treat technical capability as distinct from authority. A command that permits a transition, or a warning that permits completion, does not authorize an actor to claim, deliver, accept, cancel, or complete work. The actor must have that authority from its assignment, the responsible caller, or applicable workspace policy.
+6. Record delivery evidence as evidence. Automated validation does not by itself accept an accord, approve a review, or authorize completion.
+7. Use Board documents for active context, Decisions for durable choices, Rules for repository policy, and Logs for terminal history. Events are audit data and are not the current-state source of truth.
+
+Adapters are transport and presentation layers. They may expose command schemas, invoke an installed Tandem implementation with argument arrays or an equivalent non-interpolating API, consume structured output, render results, and add framework diagnostics. They must not parse or mutate Tandem Markdown as an alternate implementation, allocate IDs, reclassify relationships, invent lifecycle transitions, manage actor identity, or turn framework-specific policy into protocol semantics.
+
+A generic adapter should expose enough read operations to discover the workspace, list rules, inspect documents and relationships, search Decisions and Logs, and diagnose compatibility before it offers mutations. Framework-specific tool names, prompts, approval UX, delegation machinery, and rendering remain adapter-owned.
 
 ## Document types
 

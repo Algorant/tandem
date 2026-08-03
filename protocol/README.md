@@ -36,8 +36,9 @@ implementation feedback, bug fixes, or explicit product decisions.
 
 ## Documentation
 
-- `plan/spec.md` — protocol draft
+- `plan/spec.md` — normative protocol draft, including Rule category semantics and the universal agent/adapter consumption contract
 - `plan/todo.md` — protocol task tracker
+- `../docs/guides/agents-and-adapters.md` — public framework-neutral operational guidance
 - `../README.md` — parent project overview
 - `../plan/spec.md` — parent project plan
 - `../plan/todo.md` — parent project todo

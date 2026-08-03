@@ -8,6 +8,7 @@ For first-time usage, start with the [Quickstart](/quick-start/). It walks throu
 
 ## Available guides
 
+- [Agents and adapters](/guides/agents-and-adapters/) — consume Tandem safely from any agent or integration framework.
 - [Decisions and ADRs](/guides/decisions/) — record durable Tandem decisions as ADR-compatible decision documents.
 - [Docs site workflow](/guides/docs-site/) — install, preview, sync, build, and link-check the documentation site.
 - [Theme tester](/guides/theme-tester/) — visual maintenance page for the Verdigris docs theme.

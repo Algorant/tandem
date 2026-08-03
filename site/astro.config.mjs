@@ -94,6 +94,7 @@ export default defineConfig({
         {
           label: 'Workflows',
           items: [
+            { label: 'Agents and adapters', link: '/guides/agents-and-adapters/' },
             { label: 'Decisions and ADRs', link: '/guides/decisions/' },
             { label: 'Docs site workflow', link: '/guides/docs-site/' },
           ],

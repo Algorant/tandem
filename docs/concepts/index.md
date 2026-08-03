@@ -69,9 +69,16 @@ Only Tasks are delegation roots in the initial worker model. Epics are split int
 
 ## Rules
 
-Rules are workspace coordination expectations stored in `.tandem/tandem.md`. They are grouped as `always`, `never`, `prefer`, and `context`.
+Rules are workspace coordination expectations stored in `.tandem/tandem.md`. Read all categories before work starts. The stored category defines its operational effect:
 
-Rules help humans and agents align before work starts. For example, a project can record validation expectations, tag conventions, or delegation policies. Use `tandem rules list` to inspect them.
+- `always` requires an action or invariant whenever the rule applies.
+- `never` prohibits an action or outcome whenever the rule applies.
+- `prefer` defines the default among valid choices but permits a justified deviation.
+- `context` supplies information and does not command an action by itself.
+
+Applicability and strength are separate. A directive with a narrow trigger still belongs in `always`, `never`, or `prefer`. A prohibition belongs in `never`. Do not infer the category from wording alone.
+
+Rules help humans and agents align on repository policy, such as validation expectations, tag conventions, or delegation policies. Use `tandem rules list` to inspect them. See [Agents and adapters](/guides/agents-and-adapters/) for classification examples and the framework-neutral consumption contract.
 
 ## Decisions
 

@@ -2,46 +2,38 @@
 title: Extensions
 description: Tandem integration adapters.
 ---
-Tandem integrations should be thin adapters over the installed `tandem` CLI.
+Tandem integrations are thin adapters over an installed Tandem implementation. Read the framework-neutral [Agents and adapters](/guides/agents-and-adapters/) guide before implementing one.
 
 ## Adapter principle
 
 ```text
-LLM / editor agent → integration adapter → tandem CLI → .tandem workspace
+human or agent → integration adapter → tandem CLI → .tandem workspace
 ```
 
-Adapters own tool schemas, editor or agent ergonomics, output formatting, and diagnostics. They should not duplicate Tandem protocol parsing or mutation behavior.
+Tandem-owned protocol documentation defines documents, IDs, relationships, lifecycle operations, Rules, Decisions, and Logs. Active workspace Rules define repository policy. An adapter owns framework-native tool schemas, prompts, approvals, output formatting, and diagnostics.
 
-## Current adapter
+A conforming adapter:
 
-`extensions/pi-tandem/` provides a Pi adapter that exposes Tandem task, accord, rule, decision, and log operations through Pi tools and commands. Agents should use `tandem_decision` for ADR-compatible decisions instead of inventing task states or a separate ADR type.
+- discovers the workspace from the intended working directory;
+- inspects workspace health and all rule categories before mutation;
+- uses safe, non-interpolated command arguments;
+- consumes structured read output when available;
+- preserves Tandem-returned relationships, warnings, and diagnostics;
+- asks before workspace initialization or protocol upgrade.
 
-### Create a Task campaign
+It does not parse or mutate Tandem Markdown as a second implementation, allocate IDs, reclassify relationships, manage actor identity, or infer lifecycle authority from command availability.
 
-With Pi, pass `kind` and `parent` through to Tandem and consume the IDs and relationships returned by the CLI:
+## Integration sequence
 
-```ts
-// Returns a global Epic ID, for example task-103.
-tandem_task({ action: "add", title: "Coordinate the release", kind: "epic" })
+1. Diagnose the installed Tandem implementation and nearest workspace.
+2. Read configured states and all workspace Rules.
+3. Inspect the target and resolve parents, blockers, references, Decisions, and Logs needed for context.
+4. Ask the responsible actor to approve any initialization, upgrade, or terminal lifecycle action that is not already authorized.
+5. Invoke the Tandem operation and preserve its output.
+6. Present validation as evidence, not as automatic acceptance.
 
-// A direct Epic child is a global Task, for example task-104.
-tandem_task({ action: "add", title: "Write release notes", parent: "task-103" })
+## Current adapter example: Pi
 
-// A direct Task child is a parent-derived leaf Subtask, for example task-104-1.
-tandem_task({ action: "add", title: "Check upgrade notes", parent: "task-104" })
-```
+The repository includes `extensions/pi-tandem/`. It maps Pi-specific tools and commands to the installed `tandem` CLI. Its tool names, prompt hooks, renderer, and local tests are adapter implementation details, not universal Tandem semantics.
 
-The adapter never allocates IDs or reclassifies relationships. Tandem returns `epic-task` for the global Task beneath the Epic, `subtask` for the parent-derived Subtask, and generic `parent` for a global Task attached to a decision or custom document.
-
-Only global-ID Tasks are initial Shep delegation roots. Delegate the Task—not its Epic or Subtask:
-
-```ts
-shep_delegate({
-  taskId: "task-104",
-  checkoutMode: "worktree",
-})
-```
-
-One worker owns the delegated Task's direct Subtasks as its session todo projection and produces one Task-root handoff. Epics and Subtasks are not independently delegated. The adapter does not expose deprecated inline checklist `subtasks` authoring, and there is no compatibility path for hierarchical direct Epic children, global-ID Subtasks, or deeper nesting.
-
-Global Pi config promotion is a separate explicit task. Repository-local extension development should not edit `~/.pi/agent` directly.
+Global Pi configuration promotion is a separate explicit task. Repository-local extension development does not edit personal configuration directly.
