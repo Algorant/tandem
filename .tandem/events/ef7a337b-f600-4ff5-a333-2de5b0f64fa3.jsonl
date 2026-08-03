@@ -41,3 +41,23 @@
 {"ts":"2026-08-03T20:15:07Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":41}
 {"ts":"2026-08-03T20:19:01Z","event":"accord.claimed","id":"task-194","summary":"Accord claim for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":42}
 {"ts":"2026-08-03T20:19:01Z","event":"task.updated","id":"task-194","summary":"Updated task-194 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":43}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Deleted rule 1 from context","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":44}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Deleted rule 2 from context","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":45}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Edited rule 2 in never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":46}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Deleted rule 6 from always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":47}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Deleted rule 4 from prefer","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":48}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Edited rule 5 in prefer","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":49}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Edited rule 7 in always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":50}
+{"ts":"2026-08-03T20:27:24Z","event":"rules.updated","id":"rules","summary":"Edited rule 6 in prefer","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":51}
+{"ts":"2026-08-03T20:27:28Z","event":"rules.updated","id":"rules","summary":"Added rule 7 to prefer","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":52}
+{"ts":"2026-08-03T20:27:32Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":53}
+{"ts":"2026-08-03T20:27:35Z","event":"rules.updated","id":"rules","summary":"Added rule 8 to always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":54}
+{"ts":"2026-08-03T20:27:38Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to context","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":55}
+{"ts":"2026-08-03T20:27:41Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":56}
+{"ts":"2026-08-03T20:27:44Z","event":"rules.updated","id":"rules","summary":"Added rule 9 to always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":57}
+{"ts":"2026-08-03T20:27:47Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":58}
+{"ts":"2026-08-03T20:27:51Z","event":"rules.updated","id":"rules","summary":"Added rule 10 to always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":59}
+{"ts":"2026-08-03T20:27:55Z","event":"rules.updated","id":"rules","summary":"Added rule 11 to always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":60}
+{"ts":"2026-08-03T20:28:03Z","event":"accord.delivered","id":"task-194","summary":"Accord deliver for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":61}
+{"ts":"2026-08-03T20:28:11Z","event":"accord.accepted","id":"task-194","summary":"Accord accept for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":62}
+{"ts":"2026-08-03T20:28:17Z","event":"task.completed","id":"task-194","summary":"Defined universal, framework-neutral agent and adapter guidance; made rule-category semantics normative; added public operational documentation and explicit future adapter handoffs; audited all active project rules; applied the accepted category migrations through Tandem; and preserved the boundary against adapter implementation changes.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":63}

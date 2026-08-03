@@ -2,18 +2,31 @@
 id: task-194
 type: task
 title: "Define universal agent-adapter guidance and produce implementation handoffs"
-state: "in-progress"
 priority: "medium"
 relatedFiles: ["extensions/pi-tandem/pi-tandem.md", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/README.md", "extensions/pi-tandem/plan/spec.md", "extensions/pi-tandem/tests/relationship-smoke.ts", "protocol/plan/spec.md", "docs/concepts/index.md", "extensions/plan/spec.md"]
 tags: ["pi-tandem", "guidance", "docs", "protocol", "agents", "adapters"]
 createdAt: "2026-08-03T15:13:05Z"
-updatedAt: "2026-08-03T20:19:01Z"
+updatedAt: "2026-08-03T20:28:17Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "worker-task-194-2a74c93a"
   claimedAt: "2026-08-03T20:19:01Z"
-  updatedAt: "2026-08-03T20:19:01Z"
+  deliveredAt: "2026-08-03T20:28:03Z"
+  deliverables: ["protocol/plan/spec.md", "docs/guides/agents-and-adapters.md", "plan/agent-adapter-implementation-handoffs.md", "Integrated squash commit 95ffed1"]
+  validation:
+    commands: ["cd site && bun run check:docs", "git diff --check", "No adapter implementation files changed"]
+  summary: "Defined normative rule-category semantics, framework-neutral agent/adapter guidance, disposition and implementation handoffs, and a complete audit of active Tandem rule categories."
+  filesChanged: ["protocol/plan/spec.md", "protocol/README.md", "docs/guides/agents-and-adapters.md", "docs/guides/index.md", "docs/concepts/index.md", "docs/extensions/index.md", "site/astro.config.mjs", "plan/agent-adapter-implementation-handoffs.md"]
+  reviewer: "orchestrator"
+  note: "Accepted after reviewing both Worker commits, requiring and reviewing the active-rule category audit, integrating squash commit 95ffed1, rerunning the full documentation build/link check, and applying the approved rule migrations through Tandem."
+  updatedAt: "2026-08-03T20:28:11Z"
 assignee: "worker-task-194-2a74c93a"
+completedAt: "2026-08-03T20:28:17Z"
+completion:
+  summary: "Defined universal, framework-neutral agent and adapter guidance; made rule-category semantics normative; added public operational documentation and explicit future adapter handoffs; audited all active project rules; applied the accepted category migrations through Tandem; and preserved the boundary against adapter implementation changes."
+  filesChanged: ["protocol/plan/spec.md", "protocol/README.md", "docs/guides/agents-and-adapters.md", "docs/guides/index.md", "docs/concepts/index.md", "docs/extensions/index.md", "site/astro.config.mjs", "plan/agent-adapter-implementation-handoffs.md", ".tandem/tandem.md"]
+  validation: "Reviewed Worker commits 2364c72 and 401a350; integrated squash commit 95ffed1; `cd site && bun run check:docs` passed with 16 pages and 669 links; `git diff --check` passed; confirmed no adapter implementation files changed; reviewed and applied rule-category migrations."
+  reviewer: "orchestrator"
 ---
 
 ## Description
