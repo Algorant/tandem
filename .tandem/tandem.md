@@ -21,6 +21,8 @@ rules:
     - id: 1
       rule: "Do not mark a newly created task as claimed, delivered, validation, accepted, or completed unless the user explicitly asked to start or finish the work; automated tests or smoke checks are evidence only, not permission to advance lifecycle state."
       source: "User correction 2026-06-30"
+    - id: 2
+      rule: "Do not modify `extensions/pi-tandem/`, external Pi configuration, or any other agent/framework adapter implementation as part of core Tandem work for now. Specify generic, framework-neutral behavior in Tandem-owned protocol or guidance documents, and create explicit handoff documents for adapter maintainers when implementation changes are needed."
   prefer:
     - id: 1
       rule: "Use one primary area tag first: `protocol`, `tui`, `pi-tandem`, `docs`, `config`, `rules`, or `ui`."

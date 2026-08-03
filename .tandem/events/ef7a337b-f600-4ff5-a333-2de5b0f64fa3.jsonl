@@ -34,3 +34,10 @@
 {"ts":"2026-08-01T02:34:30Z","event":"accord.accepted","id":"task-193","summary":"Accord accept for task-193","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":34}
 {"ts":"2026-08-01T02:34:38Z","event":"task.completed","id":"task-193","summary":"Confirmed the trailing `-1` is normal Arch package-release metadata, not a Tandem versioning defect. Tandem publishes upstream version `0.8.1`; the AUR PKGBUILD sets `pkgver=0.8.1` and `pkgrel=1`, so paru and AUR correctly display the full package version as `0.8.1-1`. No code, workflow, documentation, release, or AUR update is required.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":35}
 {"ts":"2026-08-03T15:13:05Z","event":"task.created","id":"task-194","summary":"Consolidate pi-tandem agent guidance and remove redundant document","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":36}
+{"ts":"2026-08-03T20:13:12Z","event":"rules.updated","id":"rules","summary":"Added rule 8 to always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":37}
+{"ts":"2026-08-03T20:13:12Z","event":"task.updated","id":"task-194","summary":"Updated task-194 metadata: title, tags, relatedFiles, body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":38}
+{"ts":"2026-08-03T20:15:03Z","event":"rules.updated","id":"rules","summary":"Deleted rule 8 from always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":39}
+{"ts":"2026-08-03T20:15:03Z","event":"task.updated","id":"task-194","summary":"Updated task-194 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":40}
+{"ts":"2026-08-03T20:15:07Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":41}
+{"ts":"2026-08-03T20:19:01Z","event":"accord.claimed","id":"task-194","summary":"Accord claim for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":42}
+{"ts":"2026-08-03T20:19:01Z","event":"task.updated","id":"task-194","summary":"Updated task-194 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":43}
