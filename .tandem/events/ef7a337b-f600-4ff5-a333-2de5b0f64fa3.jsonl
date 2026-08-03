@@ -69,3 +69,4 @@
 {"ts":"2026-08-03T21:11:45Z","event":"rules.updated","id":"rules","summary":"Deleted rule 1 from context","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":69}
 {"ts":"2026-08-03T21:11:48Z","event":"rules.updated","id":"rules","summary":"Edited rule 2 in never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":70}
 {"ts":"2026-08-03T21:17:17Z","event":"accord.blocked","id":"task-195","summary":"Accord block for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":71}
+{"ts":"2026-08-03T21:29:47Z","event":"accord.blocked","id":"task-195","summary":"Accord block for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":72}
