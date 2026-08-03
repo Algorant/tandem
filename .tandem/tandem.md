@@ -11,9 +11,6 @@ states:
     title: Validation
 rules:
   always:
-    - id: 6
-      rule: "Use Bun as the default package manager and script runner for JavaScript/TypeScript project automation, including docs-site local recipes and CI, unless a concrete incompatibility makes Bun impractical."
-      source: "decision-2"
     - id: 7
       rule: "When cutting a Tandem release, create and push both the annotated git tag and the GitHub Release object for that tag; do not treat a pushed tag alone as a complete release unless explicitly asked for tag-only."
       source: "task-15"
@@ -33,7 +30,7 @@ rules:
       rule: "Do not mark a newly created task as claimed, delivered, validation, accepted, or completed unless the user explicitly asked to start or finish the work; automated tests or smoke checks are evidence only, not permission to advance lifecycle state."
       source: "User correction 2026-06-30"
     - id: 2
-      rule: "Do not modify `extensions/pi-tandem/`, external Pi configuration, or any other agent/framework adapter implementation as part of core Tandem work for now. Specify generic, framework-neutral behavior in Tandem-owned protocol or guidance documents, and create explicit handoff documents for adapter maintainers when implementation changes are needed."
+      rule: "Do not modify `extensions/pi-tandem/`, external Pi configuration, or any other agent/framework adapter implementation as part of core Tandem work unless an explicit adapter task authorizes it."
     - id: 3
       rule: "Do not treat a pushed Git tag alone as a complete Tandem release unless the caller explicitly requests tag-only."
       source: "task-15"
@@ -53,9 +50,6 @@ rules:
     - id: 3
       rule: "When prototyping documentation site features, themes, layouts, or diagrams, create quick Sideshow mockups first wherever practical; use those previews to narrow direction before committing implementation or durable design decisions."
       source: "User request 2026-06-29"
-    - id: 4
-      rule: "For delegated non-visual/non-manual work with passing automated validation and no blockers, the orchestrator may accept and complete/log the Tandem task without waiting for human validation; keep visual, UX, manual, high-risk, or ambiguous work in validation for human review."
-      source: "User guidance 2026-06-30"
     - id: 5
       rule: "Prefer separate worktrees for likely file overlap, visual/design experiments, release automation, or independently committed work; prefer a shared tree only for read-only or explicitly coordinated work."
       source: "User guidance 2026-06-30"
@@ -66,9 +60,6 @@ rules:
       rule: "Prefer Bun as the package manager and script runner for JavaScript/TypeScript automation, including docs-site recipes and CI. Use another tool when a concrete incompatibility makes Bun impractical."
       source: "decision-2"
   context:
-    - id: 1
-      rule: "For delegated TUI or visual work, configure the repository's single Git-local preview slot so the user runs only `just dev` from the normal checkout; route it to the delegated code and a safe fixture, report no extra command/setup, and clear the route during cleanup."
-      source: "task-132"
     - id: 2
       rule: "For delegated non-visual, non-manual work with passing automated validation and no blockers, the orchestrator is authorized to accept and complete the task without additional human validation."
       source: "User guidance 2026-06-30"

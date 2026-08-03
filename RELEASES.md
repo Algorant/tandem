@@ -2,6 +2,17 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.8.3
+
+Tandem v0.8.3 defines a framework-neutral contract for agents and integration adapters.
+
+### Agents and adapters
+
+- Universal guidance now explains workspace discovery, authority layers, lifecycle boundaries, context retrieval, and safe adapter behavior without depending on one agent framework.
+- Rule categories now have explicit operational meanings: Always requires, Never prohibits, Prefer defines a justified default, and Context supplies non-directive information.
+- Mixed directives have classification guidance so narrow conditions do not weaken requirements or prohibitions into Context.
+- Adapter implementations remain separate from core Tandem work; future adapter changes use explicit implementation handoffs rather than framework-specific protocol guidance.
+
 ## 0.8.1
 
 Tandem v0.8.1 makes project rules easier to scan and read in the TUI.

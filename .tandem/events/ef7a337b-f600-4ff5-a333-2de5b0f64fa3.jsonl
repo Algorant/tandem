@@ -61,3 +61,10 @@
 {"ts":"2026-08-03T20:28:03Z","event":"accord.delivered","id":"task-194","summary":"Accord deliver for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":61}
 {"ts":"2026-08-03T20:28:11Z","event":"accord.accepted","id":"task-194","summary":"Accord accept for task-194","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":62}
 {"ts":"2026-08-03T20:28:17Z","event":"task.completed","id":"task-194","summary":"Defined universal, framework-neutral agent and adapter guidance; made rule-category semantics normative; added public operational documentation and explicit future adapter handoffs; audited all active project rules; applied the accepted category migrations through Tandem; and preserved the boundary against adapter implementation changes.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":63}
+{"ts":"2026-08-03T21:11:10Z","event":"task.created","id":"task-195","summary":"Release Tandem 0.8.3","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":64}
+{"ts":"2026-08-03T21:11:14Z","event":"accord.claimed","id":"task-195","summary":"Accord claim for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":65}
+{"ts":"2026-08-03T21:11:14Z","event":"task.updated","id":"task-195","summary":"Updated task-195 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":66}
+{"ts":"2026-08-03T21:11:40Z","event":"rules.updated","id":"rules","summary":"Deleted rule 6 from always","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":67}
+{"ts":"2026-08-03T21:11:43Z","event":"rules.updated","id":"rules","summary":"Deleted rule 4 from prefer","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":68}
+{"ts":"2026-08-03T21:11:45Z","event":"rules.updated","id":"rules","summary":"Deleted rule 1 from context","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":69}
+{"ts":"2026-08-03T21:11:48Z","event":"rules.updated","id":"rules","summary":"Edited rule 2 in never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":70}
