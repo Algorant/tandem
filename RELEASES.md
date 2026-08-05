@@ -2,6 +2,26 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.8.4
+
+Tandem v0.8.4 makes the documentation easier to follow and adds common repository work badges to the Board.
+
+### Documentation
+
+- The documentation site now has clearer landing, quick-start, CLI, TUI, workspace, concepts, and extensions pages with a Verdigris-aligned visual treatment and navigation.
+- New fully agentic and human-in-the-loop workflow guides show how to use Tandem across different review and delegation models.
+- Framework-neutral agent guidance now explains coherent commit boundaries for durable `.tandem` workspace data, prudent local squashing, and shared-history safety.
+
+### TUI and themes
+
+- Board rows now render `BUG`, `FEAT`, and `CHORE` as minimal built-in work badges while project-specific tags remain opt-in.
+- Theme-owned orange, sand/beige, and purple tones can be configured or overridden and work with every badge style and terminal no-color mode.
+- Default Dark and Verdigris include distinct palettes for the new badges: corrective work uses orange, features use warm sand, and maintenance uses purple.
+
+### Fixed
+
+- Documentation navigation and internal links found during the site overhaul now resolve to the intended current pages.
+
 ## 0.8.3
 
 Tandem v0.8.3 defines a framework-neutral contract for agents and integration adapters.
