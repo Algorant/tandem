@@ -2,7 +2,7 @@
 id: task-218
 type: task
 title: "Build the read-only Tandem browser interface"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-216"
 blockers: ["task-217"]
@@ -10,7 +10,13 @@ references: ["task-121"]
 relatedFiles: ["tandem/src", "tandem/README.md"]
 tags: ["ui", "web", "frontend", "accessibility"]
 createdAt: "2026-08-05T18:46:16Z"
-updatedAt: "2026-08-05T18:46:16Z"
+updatedAt: "2026-08-05T19:02:57Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-218-c8fd3a7d"
+  claimedAt: "2026-08-05T19:02:57Z"
+  updatedAt: "2026-08-05T19:02:57Z"
+assignee: "worker-task-218-c8fd3a7d"
 ---
 
 ## Description
