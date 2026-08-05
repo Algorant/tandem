@@ -220,3 +220,5 @@
 {"ts":"2026-08-05T19:23:27Z","event":"accord.delivered","id":"task-219","summary":"Accord deliver for task-219","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":220}
 {"ts":"2026-08-05T19:23:31Z","event":"accord.accepted","id":"task-219","summary":"Accord accept for task-219","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":221}
 {"ts":"2026-08-05T19:23:36Z","event":"task.completed","id":"task-219","summary":"Hardened the local read-only web MVP with visible-tab revision polling, changed-view refresh, strict Host validation, restrictive security headers, request limits, no CORS, and safe error/content behavior.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":222}
+{"ts":"2026-08-05T19:24:01Z","event":"accord.claimed","id":"task-220","summary":"Accord claim for task-220","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":223}
+{"ts":"2026-08-05T19:24:01Z","event":"task.updated","id":"task-220","summary":"Updated task-220 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":224}

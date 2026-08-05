@@ -2,7 +2,7 @@
 id: task-220
 type: task
 title: "Validate and document the Tandem web MVP"
-state: todo
+state: "in-progress"
 priority: "medium"
 parentId: "task-216"
 blockers: ["task-217", "task-218", "task-219"]
@@ -10,7 +10,13 @@ references: ["task-121"]
 relatedFiles: ["tandem/README.md", "tandem/RELEASE.md", "docs", "RELEASES.md"]
 tags: ["docs", "web", "validation", "packaging"]
 createdAt: "2026-08-05T18:46:31Z"
-updatedAt: "2026-08-05T18:46:31Z"
+updatedAt: "2026-08-05T19:24:01Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-220-00a81d60"
+  claimedAt: "2026-08-05T19:24:01Z"
+  updatedAt: "2026-08-05T19:24:01Z"
+assignee: "worker-task-220-00a81d60"
 ---
 
 ## Description
