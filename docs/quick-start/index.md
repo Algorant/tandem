@@ -2,183 +2,75 @@
 title: Quickstart
 description: Install Tandem and run one task from idea to completed log.
 ---
-This guide takes one task through the Tandem loop: install, initialize, add work, start and claim it, deliver it for validation, accept it, complete it into logs, and open the TUI.
-
-The workflow below is CLI/TUI-only. Agent and editor integrations are optional; see [Extensions](/extensions/) when you are ready to connect them.
+This guide takes you through the Tandem workflow in six steps. You can work with Tandem directly in the terminal or ask your agent to carry out the work.
 
 ## 1. Install Tandem
 
-Choose the lane that matches your environment.
+Choose one installation method.
 
-### Recommended installer
-
-Install the latest released Tandem binary with the branded installer command:
+### Installer
 
 ```sh
 curl -fsSL https://trytandem.dev/install.sh | sh
-tandem --version
 ```
 
-The branded URL redirects to the cargo-dist generated installer on the latest GitHub Release. The GitHub Release assets are the source of truth for OS/architecture detection, release asset selection, checksums, and installation behavior.
-
-The initial binary target set is Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon. Windows binaries are not published initially.
-
-The installer is user-local and does not require `sudo`. It installs into cargo-dist's user bin directory for this platform, typically a directory such as `~/.local/bin` or `~/.cargo/bin`. If `tandem --version` is not found after installation, add the reported install directory to your shell `PATH`. For example:
-
-```sh
-mkdir -p ~/.local/bin
-printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> ~/.profile
-. ~/.profile
-```
-
-If your install reported `~/.cargo/bin` instead, add that directory instead:
-
-```sh
-printf '\nexport PATH="$HOME/.cargo/bin:$PATH"\n' >> ~/.profile
-. ~/.profile
-```
-
-### Cargo / Rust: available now
-
-If you have Rust and Cargo installed, install from the current tagged source:
+### Rust
 
 ```sh
 cargo install --git https://github.com/Algorant/tandem.git --tag tandem-v0.4.0 --path tandem --locked
-tandem --version
 ```
 
-From a local checkout of this repository, use:
+### AUR
 
 ```sh
-cargo install --path tandem --locked
-tandem --version
+paru -S tandem-bin
 ```
-
-### AUR binary
-
-Arch Linux users can install the x86_64 binary package from AUR once the release automation has published it:
-
-```sh
-yay -S tandem-bin
-tandem --version
-```
-
-The initial AUR package is `tandem-bin` for x86_64 only. It installs the published GitHub Release binary and uses the release `sha256.sum`; it does not build Tandem from source.
 
 ## 2. Initialize a workspace
 
-Run this at the root of the project repository you want to coordinate:
+At the root of the project you want to coordinate, run:
 
 ```sh
-tandem init --title "My Project"
+tandem init
+# Optional: --title "my tandem project"
 ```
 
-Tandem creates `.tandem/tandem.md`, active Board files in `.tandem/board/`, completed or canceled Logs in `.tandem/logs/`, and lifecycle event logs. The default active task states are `todo`, `in-progress`, and `validation`.
+Tandem creates a `.tandem/` workspace for your active tasks, completed work, and project coordination rules.
 
-## 3. Add a task
+## 3. Create a task
 
-```sh
-tandem add --title "Write project brief" --description "Draft and validate the first docs slice."
-tandem list
-tandem show task-1
-```
+For task creation, see the forthcoming [Guidance for agents](/guides/agents-and-adapters/) page. Direct your agent to create a task for you. The agent understands Tandem's fields and can fill them from a natural-language request, such as:
 
-The task is a Markdown file with YAML frontmatter. You can read it in any editor, then use Tandem commands for safe state and accord updates.
+> help me research the best static site generators
+>
+> build me a simple terminal todo app
 
-For a larger outcome, use the canonical three-tier hierarchy and always use each returned ID:
+Run `tandem list` to view your tasks in the terminal, or ask your agent to show them.
 
-```sh
-tandem add --title "Publish the documentation" --kind epic
-# Example result: task-2 (Epic, global ID)
-tandem add --title "Rewrite the guides" --parent task-2
-# Example result: task-3 (Task of Epic, global ID)
-tandem add --title "Update CLI examples" --parent task-3
-# Example result: task-3-1 (leaf Subtask, parent-derived ID)
-```
+## 4. Start the work
 
-A direct Epic child is always a global-ID Task; only a direct Task child is a parent-derived Subtask. Subtasks cannot have children. Only Tasks are delegated initially, with one Task worker owning its Subtasks as a bounded checklist.
+Invite your agent to begin with an actionable prompt:
 
-## 4. Start and claim the work
+> Please begin work on task-4
 
-Move the task into active work and claim the accord:
+You can also ask your agent to delegate the task or ask what to do next. The agent can inspect the task, follow the workspace guidance, and report its progress.
 
-```sh
-tandem move task-1 --state in-progress
-tandem accord claim task-1 --assignee alice
-```
+## 5. Verify the result
 
-Claiming from `todo` also moves a task to `in-progress`; the explicit `move` above is useful when you want the board state change to be visible before the accord claim.
+When the work is ready, your agent may respond with a completion message such as:
 
-## 5. Deliver through the accord
+> Task done! Please review the result: http://localhost:4321
 
-After doing the work, record what changed and how it was checked:
+Open the URL, inspect the changes, or review the deliverables that the agent reports. Confirm that the result meets your needs before you give feedback.
 
-```sh
-tandem accord deliver task-1 \
-  --summary "Drafted the brief and checked the rendered docs" \
-  --deliverable "Updated docs/index.md" \
-  --validation "Ran cd site && bun run check:docs" \
-  --file-changed docs/index.md
-```
+## 6. Give feedback
 
-Delivery moves the task to `validation`. The worker records evidence; a reviewer or orchestrator decides whether the delivery is accepted.
+Tell your agent what needs to change. For example:
 
-## 6. Validate and accept
+> The UX needs some work.
 
-Inspect the delivered task:
+> The “Create task” button is not functioning.
 
-```sh
-tandem list --state validation
-tandem show task-1
-```
+The agent can make fixes and ask you to review the result again. When the work is validated, tell the agent that it is validated and move to the next task.
 
-If the work is acceptable, accept the accord:
-
-```sh
-tandem accord accept task-1 --reviewer bob --summary "Looks good"
-```
-
-If it needs another pass, request rework instead:
-
-```sh
-tandem accord rework task-1 --note "Please add the install path and validation command."
-```
-
-## 7. Complete and search the log
-
-After acceptance, archive the task as completed history:
-
-```sh
-tandem complete task-1 \
-  --summary "Published the project brief" \
-  --validation "Reviewed by Bob" \
-  --file-changed docs/index.md
-```
-
-The v0 CLI may warn when separate `review.status` metadata is missing. Treat that warning as a policy reminder: complete only when the responsible reviewer or orchestrator has intentionally accepted the work.
-
-Search or inspect the completed log:
-
-```sh
-tandem log list
-tandem log show task-1
-tandem search "project brief"
-```
-
-Logs are first-class history, not trash. They preserve what shipped, why it was accepted, which validation evidence was available, and which files changed.
-
-## 8. Open the TUI
-
-Use the terminal interface for day-to-day board work:
-
-```sh
-tandem tui
-```
-
-The TUI centers on the Board, including the `todo`, `in-progress`, and `validation` task states, plus Logs, Rules, and Decisions views.
-
-## Next steps
-
-- Read [Concepts](/concepts/) for the mental model behind states, accords, validation, decisions, and logs.
-- Read [CLI](/cli/) for the command families used by the quickstart.
-- Read [TUI](/tui/) for keyboard, mouse, and theme behavior.
+For more information about completed work, open the [Logs view in `tandem tui`](/tui/#views). For the wider workflow, see [Concepts](/concepts/), [CLI](/cli/), [TUI](/tui/), and [Extensions](/extensions/).
