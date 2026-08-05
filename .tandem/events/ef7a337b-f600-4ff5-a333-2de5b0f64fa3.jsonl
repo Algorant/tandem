@@ -177,3 +177,15 @@
 {"ts":"2026-08-05T16:26:49Z","event":"accord.delivered","id":"task-209","summary":"Accord deliver for task-209","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":177}
 {"ts":"2026-08-05T16:26:52Z","event":"accord.accepted","id":"task-209","summary":"Accord accept for task-209","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":178}
 {"ts":"2026-08-05T16:26:58Z","event":"task.completed","id":"task-209","summary":"Added and verified built-in BUG, FEAT, and CHORE Board badges with theme-owned orange, sand, and purple palettes, configurable overrides, tests, examples, and documentation.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":179}
+{"ts":"2026-08-05T17:58:54Z","event":"task.created","id":"task-211","summary":"Demo: Fix stale cache invalidation","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":180}
+{"ts":"2026-08-05T17:58:57Z","event":"task.created","id":"task-212","summary":"Demo: Add compact Board filters","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":181}
+{"ts":"2026-08-05T17:59:00Z","event":"task.created","id":"task-213","summary":"Demo: Refresh release metadata","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":182}
+{"ts":"2026-08-05T18:02:06Z","event":"task.created","id":"task-214","summary":"Strengthen `.tandem` commit grouping and squash guidance","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":183}
+{"ts":"2026-08-05T18:02:44Z","event":"task.canceled","id":"task-211","summary":"Canceled: Temporary BUG badge demo validated by the user; remove it from the active Board.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":184}
+{"ts":"2026-08-05T18:02:48Z","event":"task.canceled","id":"task-212","summary":"Canceled: Temporary FEAT badge demo validated by the user; remove it from the active Board.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":185}
+{"ts":"2026-08-05T18:02:51Z","event":"task.canceled","id":"task-213","summary":"Canceled: Temporary CHORE badge demo validated by the user; remove it from the active Board.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":186}
+{"ts":"2026-08-05T18:03:36Z","event":"task.created","id":"task-215","summary":"Release Tandem 0.8.4","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":187}
+{"ts":"2026-08-05T18:03:43Z","event":"accord.claimed","id":"task-215","summary":"Accord claim for task-215","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":188}
+{"ts":"2026-08-05T18:03:43Z","event":"task.updated","id":"task-215","summary":"Updated task-215 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":189}
+{"ts":"2026-08-05T18:04:01Z","event":"accord.claimed","id":"task-214","summary":"Accord claim for task-214","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":190}
+{"ts":"2026-08-05T18:04:01Z","event":"task.updated","id":"task-214","summary":"Updated task-214 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":191}
