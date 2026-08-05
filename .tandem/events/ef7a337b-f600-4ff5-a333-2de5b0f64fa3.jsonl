@@ -207,3 +207,6 @@
 {"ts":"2026-08-05T18:46:31Z","event":"task.created","id":"task-220","summary":"Validate and document the Tandem web MVP","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":207}
 {"ts":"2026-08-05T18:49:34Z","event":"accord.claimed","id":"task-217","summary":"Accord claim for task-217","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":208}
 {"ts":"2026-08-05T18:49:35Z","event":"task.updated","id":"task-217","summary":"Updated task-217 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":209}
+{"ts":"2026-08-05T19:02:20Z","event":"accord.delivered","id":"task-217","summary":"Accord deliver for task-217","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":210}
+{"ts":"2026-08-05T19:02:23Z","event":"accord.accepted","id":"task-217","summary":"Accord accept for task-217","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":211}
+{"ts":"2026-08-05T19:02:28Z","event":"task.completed","id":"task-217","summary":"Added the embedded loopback-only Tandem web server, browser-startup command, bundled shell, opaque revisions, and canonical read-only APIs for all MVP data views.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":212}
