@@ -174,3 +174,6 @@
 {"ts":"2026-08-05T16:23:17Z","event":"accord.delivered","id":"task-210","summary":"Accord deliver for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":174}
 {"ts":"2026-08-05T16:23:22Z","event":"accord.accepted","id":"task-210","summary":"Accord accept for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":175}
 {"ts":"2026-08-05T16:23:25Z","event":"task.completed","id":"task-210","summary":"Added framework-neutral Git hygiene for durable `.tandem` data, including regular but coherent commits, prudent local squashing, and shared-history safety.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":176}
+{"ts":"2026-08-05T16:26:49Z","event":"accord.delivered","id":"task-209","summary":"Accord deliver for task-209","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":177}
+{"ts":"2026-08-05T16:26:52Z","event":"accord.accepted","id":"task-209","summary":"Accord accept for task-209","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":178}
+{"ts":"2026-08-05T16:26:58Z","event":"task.completed","id":"task-209","summary":"Added and verified built-in BUG, FEAT, and CHORE Board badges with theme-owned orange, sand, and purple palettes, configurable overrides, tests, examples, and documentation.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":179}
