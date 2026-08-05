@@ -70,3 +70,41 @@
 {"ts":"2026-08-03T21:11:48Z","event":"rules.updated","id":"rules","summary":"Edited rule 2 in never","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":70}
 {"ts":"2026-08-03T21:17:17Z","event":"accord.blocked","id":"task-195","summary":"Accord block for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":71}
 {"ts":"2026-08-03T21:29:47Z","event":"accord.blocked","id":"task-195","summary":"Accord block for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":72}
+{"ts":"2026-08-04T23:33:36Z","event":"task.created","id":"task-196","summary":"Site overhaul","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":73}
+{"ts":"2026-08-04T23:33:39Z","event":"task.created","id":"task-197","summary":"Overhaul home / landing page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":74}
+{"ts":"2026-08-04T23:38:00Z","event":"task.updated","id":"task-197","summary":"Updated task-197 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":75}
+{"ts":"2026-08-04T23:38:41Z","event":"accord.claimed","id":"task-197","summary":"Accord claim for task-197","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":76}
+{"ts":"2026-08-04T23:38:42Z","event":"task.updated","id":"task-197","summary":"Updated task-197 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":77}
+{"ts":"2026-08-04T23:41:12Z","event":"task.created","id":"task-198","summary":"Overhaul Quickstart page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":78}
+{"ts":"2026-08-04T23:46:22Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":79}
+{"ts":"2026-08-04T23:47:44Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":80}
+{"ts":"2026-08-05T00:07:46Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":81}
+{"ts":"2026-08-05T00:14:04Z","event":"task.created","id":"task-199","summary":"Overhaul Spec page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":82}
+{"ts":"2026-08-05T00:22:43Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":83}
+{"ts":"2026-08-05T00:40:02Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":84}
+{"ts":"2026-08-05T00:46:10Z","event":"task.updated","id":"task-198","summary":"Updated task-198 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":85}
+{"ts":"2026-08-05T01:06:07Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":86}
+{"ts":"2026-08-05T01:09:25Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":87}
+{"ts":"2026-08-05T01:12:45Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":88}
+{"ts":"2026-08-05T01:16:42Z","event":"accord.delivered","id":"task-197","summary":"Accord deliver for task-197","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":89}
+{"ts":"2026-08-05T01:16:53Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":90}
+{"ts":"2026-08-05T01:20:20Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":91}
+{"ts":"2026-08-05T01:30:25Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":92}
+{"ts":"2026-08-05T01:32:21Z","event":"task.created","id":"task-200","summary":"Overhaul Concepts page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":93}
+{"ts":"2026-08-05T01:32:29Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":94}
+{"ts":"2026-08-05T01:39:43Z","event":"task.updated","id":"task-200","summary":"Updated task-200 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":95}
+{"ts":"2026-08-05T01:41:03Z","event":"task.updated","id":"task-200","summary":"Updated task-200 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":96}
+{"ts":"2026-08-05T01:50:01Z","event":"task.created","id":"task-201","summary":"Overhaul CLI Reference page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":97}
+{"ts":"2026-08-05T01:51:26Z","event":"task.updated","id":"task-201","summary":"Updated task-201 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":98}
+{"ts":"2026-08-05T01:53:01Z","event":"task.created","id":"task-202","summary":"Overhaul TUI page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":99}
+{"ts":"2026-08-05T01:58:12Z","event":"task.updated","id":"task-202","summary":"Updated task-202 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":100}
+{"ts":"2026-08-05T02:01:03Z","event":"task.created","id":"task-203","summary":"Overhaul Agents and adapters page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":101}
+{"ts":"2026-08-05T02:04:46Z","event":"task.updated","id":"task-203","summary":"Updated task-203 metadata: title, body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":102}
+{"ts":"2026-08-05T02:08:47Z","event":"task.updated","id":"task-203","summary":"Updated task-203 metadata: title, body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":103}
+{"ts":"2026-08-05T02:08:56Z","event":"task.created","id":"task-204","summary":"Create Human in the Loop workflow page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":104}
+{"ts":"2026-08-05T02:08:56Z","event":"task.created","id":"task-205","summary":"Create Fully Agentic workflow page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":105}
+{"ts":"2026-08-05T02:12:08Z","event":"task.created","id":"task-206","summary":"Overhaul Extensions page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":106}
+{"ts":"2026-08-05T02:12:13Z","event":"task.updated","id":"task-203","summary":"Updated task-203 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":107}
+{"ts":"2026-08-05T02:13:51Z","event":"task.updated","id":"task-206","summary":"Updated task-206 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":108}
+{"ts":"2026-08-05T02:18:01Z","event":"task.created","id":"task-207","summary":"Overhaul Skills page","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":109}
+{"ts":"2026-08-05T02:25:44Z","event":"task.updated","id":"task-199","summary":"Updated task-199 metadata: title","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":110}
