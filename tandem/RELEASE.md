@@ -16,7 +16,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 
 ### Current capabilities
 
-- CLI commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `search`, `log list|show|search`, `accord claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, and `tui`.
+- CLI commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `search`, `log list|show|search`, `accord claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, `tui`, and `web`.
 - JSON read paths for supported read commands using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
 - Markdown/YAML-frontmatter Tandem workspace support under `.tandem/`, with active work in `.tandem/board/`, completed logs in `.tandem/logs/`, and audit events in `.tandem/events.jsonl`.
 - Default workflow states are `todo`, `in-progress`, and `validation`; legacy `state: review` reads are tolerated.
@@ -28,6 +28,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 - Completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
 - Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user theme selection from `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, workspace selection/overrides from `.tandem/theme.toml`, and workspace Board display settings from `.tandem/config.toml`.
 - Mouse tab/click/scroll support and fixed keyboard defaults.
+- Read-only `tandem web [--port <port>] [--no-open]` interface with embedded assets, loopback-only one-workspace serving, Board/Validation/details/Logs/Rules/Decisions/health views, revision polling, responsive Verdigris light/dark styling, keyboard focus support, safe Markdown, and restrictive browser security headers.
 - Initial `docs/` Markdown source tree and `site/` Astro Starlight docs site with GitHub Pages workflow.
 
 ### Known limitations
@@ -38,6 +39,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 - AUR binary package automation updates `tandem-bin` for x86_64 after release artifacts/checksums exist; it uses `AUR_SSH_PRIVATE_KEY` to push to AUR and never builds Tandem from source in the AUR package.
 - No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
 - Most mutation commands remain human-readable; `tandem add --json` now provides structured creation output, while broader structured mutation output is deferred.
+- The web interface is local and read-only. Web mutations, remote/LAN access and authentication, SSE/WebSockets, database/sync providers, multi-workspace serving, and agent feedback remain deferred.
 - TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
 - Keybindings are fixed defaults; custom keymap config is deferred.
 - Markdown rendering is styled basics only.
@@ -95,6 +97,8 @@ cd tandem
 cargo fmt --check
 cargo test
 cargo build --release
+cargo build --profile dist
+cargo clippy --all-targets --all-features -- -D warnings
 cargo run -- --version
 cargo run -- version
 cd ../site
@@ -103,6 +107,9 @@ bun run build
 bun run check:links
 bun audit --audit-level=high
 cd ..
+node --check tandem/src/web/app.js
+node --check tandem/src/web/api.js
+node --check tandem/src/web/ui.js
 bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
 TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts

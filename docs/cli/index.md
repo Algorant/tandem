@@ -42,6 +42,7 @@ From a local checkout, use `cargo install --path tandem --locked`.
 - Coordination rules: [`rules`](#tandem-rules)
 - Decisions: [`decision`](#tandem-decision)
 - Terminal UI: [`tui`](#tandem-tui)
+- Local browser UI: [`web`](#tandem-web)
 - Version: [`version`](#tandem-version), [`--version`](#tandem---version)
 
 ## `tandem` v0 command reference
@@ -845,6 +846,26 @@ tandem tui
 - Exit/error notes:
   - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
   - v0 does not include a separate TUI executable.
+
+### `tandem web`
+
+- Purpose: open a local read-only browser view of the nearest workspace.
+- Kind: long-running read interface.
+- Syntax:
+
+```text
+tandem web [--port <port>] [--no-open]
+```
+
+Without options, Tandem selects an available loopback port, prints the URL and
+project path, and opens the default browser. `--port <port>` selects a specific
+port from 1 through 65535. `--no-open` prints and serves the URL without opening
+a browser. Press `Ctrl-C` to stop the server.
+
+The server binds only to `127.0.0.1`, serves one discovered workspace, embeds
+all browser assets in the binary, and exposes no mutations or remote-bind
+option. See the [Web guide](/web/) for available views, refresh behavior,
+security boundaries, appearance, accessibility, and deferred capabilities.
 
 ### `tandem version`
 

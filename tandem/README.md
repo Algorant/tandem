@@ -201,9 +201,13 @@ Open a bundled local browser view of the nearest Tandem workspace:
 cargo run --manifest-path tandem/Cargo.toml -- web
 ```
 
-Use `cargo run --manifest-path tandem/Cargo.toml -- web --no-open` for a terminal-only preview that prints the selected loopback URL. Add `--port <port>` when a stable local port is useful. The interface is read-only and provides Board, Validation attention, document relationships and details, Logs search, Rules, Decisions, and project health over the versioned `/api/v1` read API. It uses no remote assets or separate JavaScript runtime.
+By default, Tandem selects an available port, prints the loopback URL and project path, and opens the default browser. Use `cargo run --manifest-path tandem/Cargo.toml -- web --no-open` for a terminal-only preview that prints the URL. Add `--port <port>` when a stable local port is useful, and press `Ctrl-C` to stop the server. The interface is read-only and provides Board, Validation attention, document relationships and details, Logs search/detail, Rules, Decisions detail, and project health/warnings over the versioned `/api/v1` read API.
 
-The browser interface keeps filters and selection in the current tab. Use its native links, forms, and refresh button with a keyboard or pointer. The layout supports narrow screens and browser zoom, uses visible focus indicators, and includes text in every status badge.
+Each process serves one discovered workspace and binds only to `127.0.0.1`; there is no remote-bind option. It validates the loopback Host, allows no mutation requests or request bodies, sends no permissive CORS headers, and applies no-store, CSP, frame, referrer, and MIME-sniffing protections. Safe Markdown output cannot load remote links or images. HTML, CSS, and JavaScript are embedded in the binary, so installed and packaged builds need neither the source tree nor Node.js at runtime.
+
+The browser interface keeps filters and selection in the current tab. Use its native links, forms, and refresh button with a keyboard or pointer. A visible tab checks for changed project revisions every three seconds. The responsive Verdigris palette follows the browser light/dark preference; the dark preference is the web MVP's Default Dark check. TUI theme selectors do not apply to the browser, and the MVP has no separate web theme picker. The layout supports 390px screens and 200% browser zoom, uses visible focus indicators, and includes text in every status badge.
+
+Deferred web work includes all mutations, remote/LAN access and authentication, SSE/WebSockets, database or synchronization providers, multi-workspace serving, and agent feedback. See the public [Web guide](../docs/web/index.md) for the complete user boundary.
 
 ## TUI interaction
 

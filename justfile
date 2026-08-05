@@ -137,6 +137,8 @@ release VERSION:
 	cargo fmt --check
 	cargo test
 	cargo build --release
+	cargo build --profile dist
+	cargo clippy --all-targets --all-features -- -D warnings
 	cargo run -- --version
 	cargo run -- version
 	cd ../site
@@ -144,6 +146,9 @@ release VERSION:
 	bun run build
 	bun audit --audit-level=high
 	cd ..
+	node --check tandem/src/web/app.js
+	node --check tandem/src/web/api.js
+	node --check tandem/src/web/ui.js
 	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts

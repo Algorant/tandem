@@ -48,6 +48,7 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "rules" => cmd_rules(&args)?,
         "decision" => cmd_decision(&args)?,
         "tui" => return parse_tui_request(&args),
+        "web" if args == ["--help"] => print_web_help(),
         "web" => return Ok(StartupRequest::Web(parse_web_args(&args)?)),
         "version" | "--version" => print_version(),
         "help" | "--help" => print_help(),
@@ -83,6 +84,18 @@ fn print_help() {
     println!("  tandem web [--port <port>] [--no-open]");
     println!("  tandem version");
     println!("  tandem --version");
+}
+
+fn print_web_help() {
+    println!("tandem web - Open the local read-only web interface");
+    println!();
+    println!("Usage:");
+    println!("  tandem web [--port <port>] [--no-open]");
+    println!();
+    println!("Options:");
+    println!("  --port <port>  Use a specific loopback port (1-65535)");
+    println!("  --no-open      Print the URL without opening a browser");
+    println!("  --help         Show this help");
 }
 
 fn print_version() {
@@ -229,6 +242,14 @@ mod tests {
             version_text(),
             format!("tandem {}", env!("CARGO_PKG_VERSION"))
         );
+    }
+
+    #[test]
+    fn web_help_does_not_require_a_workspace() {
+        assert!(matches!(
+            dispatch(vec!["web".into(), "--help".into()]).unwrap(),
+            StartupRequest::Exit
+        ));
     }
 
     #[test]

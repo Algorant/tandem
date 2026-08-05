@@ -92,6 +92,7 @@ export default defineConfig({
             { label: 'Concepts', link: '/concepts/' },
             { label: 'CLI Reference', link: '/cli/' },
             { label: 'TUI', link: '/tui/' },
+            { label: 'Web', link: '/web/' },
           ],
         },
         {

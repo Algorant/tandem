@@ -2,7 +2,7 @@
 
 [placeholder for tandem image]
 
-[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [CLI guide](https://trytandem.dev/cli/) · [TUI guide](https://trytandem.dev/tui/) · [Workspace](https://trytandem.dev/workspace/)
+[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [CLI guide](https://trytandem.dev/cli/) · [TUI guide](https://trytandem.dev/tui/) · [Web guide](https://trytandem.dev/web/) · [Workspace](https://trytandem.dev/workspace/)
 
 Tandem is a protocol for planning, coordination, and delegation of tasks/work between humans and agents:
 - It lives in git alongside your project.
@@ -91,6 +91,20 @@ Only Tasks are delegated initially. One Task worker owns its leaf Subtasks as a 
 ## TUI
 
 [placeholder tui image/gif]
+
+## Local read-only web view
+
+Browse the nearest workspace with the bundled browser interface:
+
+```sh
+tandem web
+```
+
+It opens the default browser on an available `127.0.0.1` port. Use
+`--port <port>` for a stable port or `--no-open` to print the URL only. The MVP
+serves one workspace and has no mutations or remote access. See the
+[web guide](https://trytandem.dev/web/) for views, security boundaries, and
+deferred capabilities.
 
 ## Documentation
 

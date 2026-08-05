@@ -18,6 +18,8 @@ const status = document.querySelector('#app-status');
 const warnings = document.querySelector('#warning-banner');
 const attentionCount = document.querySelector('#attention-count');
 const refresh = document.querySelector('#refresh');
+const skipLink = document.querySelector('.skip-link');
+const main = document.querySelector('#content');
 
 const state = {
   project: null,
@@ -110,7 +112,7 @@ function restoreViewport(saved) {
   }
 }
 
-async function renderRoute({ preserveViewport = false, changed = false } = {}) {
+async function renderRoute({ preserveViewport = false, changed = false, focusHeading = false } = {}) {
   captureTransientState();
   const savedViewport = preserveViewport ? captureViewport() : null;
   const current = route();
@@ -176,7 +178,7 @@ async function renderRoute({ preserveViewport = false, changed = false } = {}) {
     status.textContent = changed ? `${viewName} updated to the latest revision.` : `${viewName} loaded. Read-only.`;
     requestAnimationFrame(() => {
       if (savedViewport) restoreViewport(savedViewport);
-      else document.querySelector('#view-title')?.focus({ preventScroll: true });
+      else if (focusHeading) document.querySelector('#view-title')?.focus({ preventScroll: true });
     });
   } catch (error) {
     if (request !== state.request) return;
@@ -212,10 +214,14 @@ function updatePolling() {
   state.pollTimer = setInterval(pollRevision, REVISION_POLL_MS);
 }
 
-window.addEventListener('hashchange', () => renderRoute());
+window.addEventListener('hashchange', () => renderRoute({ focusHeading: true }));
 document.addEventListener('visibilitychange', () => {
   updatePolling();
   if (!document.hidden) pollRevision();
+});
+skipLink.addEventListener('click', (event) => {
+  event.preventDefault();
+  main.focus();
 });
 refresh.addEventListener('click', async () => {
   captureTransientState();

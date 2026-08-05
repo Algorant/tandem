@@ -1351,6 +1351,10 @@ mod tests {
         assert!(APP_JS.contains("visibilitychange"));
         assert!(APP_JS.contains("envelope.revision === state.revision"));
         assert!(APP_JS.contains("renderRoute({ preserveViewport: true, changed: true })"));
+        assert!(APP_JS.contains("hashchange', () => renderRoute({ focusHeading: true })"));
+        assert!(APP_JS.contains("else if (focusHeading)"));
+        assert!(APP_JS.contains("skipLink.addEventListener('click'"));
+        assert!(APP_JS.contains("main.focus()"));
         assert!(APP_JS.contains("captureTransientState"));
     }
 
