@@ -73,4 +73,4 @@ Tell your agent what needs to change. For example:
 
 The agent can make fixes and ask you to review the result again. When the work is validated, tell the agent that it is validated and move to the next task.
 
-For more information about completed work, open the [Logs view in `tandem tui`](/tui/#views). For the wider workflow, see [Concepts](/concepts/), [CLI](/cli/), [TUI](/tui/), and [Extensions](/extensions/).
+For more information about completed work, open the [Logs view in `tandem tui`](/tui/#views-and-navigation). For the wider workflow, see [Concepts](/concepts/), [CLI](/cli/), [TUI](/tui/), and [Extensions](/extensions/).

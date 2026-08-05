@@ -10,4 +10,4 @@ Extensions connect Tandem with the tools you use to plan and coordinate work. Th
 
 *Overview, setup instructions, and capabilities will be added here.*
 
-See the [`pi-tandem` source](../../extensions/pi-tandem/).
+See the [`pi-tandem` source](https://github.com/Algorant/tandem/tree/main/extensions/pi-tandem).
