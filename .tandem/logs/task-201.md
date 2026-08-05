@@ -2,26 +2,31 @@
 id: task-201
 type: task
 title: "Overhaul CLI Reference page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/cli/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:50:01Z"
-updatedAt: "2026-08-05T02:45:32Z"
+updatedAt: "2026-08-05T02:56:23Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-201-4c9c417d"
   claimedAt: "2026-08-05T02:26:09Z"
   deliveredAt: "2026-08-05T02:45:32Z"
   deliverables: ["docs/cli/index.md"]
   validation:
     commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
-  summary: "Merged the feature-complete CLI Reference including upgrade, command families, options, transitions, JSON output, and examples."
+  summary: "Approved after complete command coverage, upgrade documentation, build, link validation, and local preview verification."
   filesChanged: ["docs/cli/index.md"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:45:32Z"
+  updatedAt: "2026-08-05T02:55:30Z"
 assignee: "worker-task-201-4c9c417d"
+completedAt: "2026-08-05T02:56:23Z"
+completion:
+  summary: "Shipped the feature-complete CLI Reference."
+  filesChanged: ["docs/cli/index.md"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 ## Approved CLI Reference page direction
 

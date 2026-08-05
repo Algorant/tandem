@@ -2,26 +2,31 @@
 id: task-199
 type: task
 title: "Overhaul Workspace page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/protocol/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T00:14:04Z"
-updatedAt: "2026-08-05T02:45:24Z"
+updatedAt: "2026-08-05T02:56:12Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-199-87c7ef87"
   claimedAt: "2026-08-05T02:26:50Z"
   deliveredAt: "2026-08-05T02:45:24Z"
   deliverables: ["docs/workspace/index.md", "site/astro.config.mjs", "README.md"]
   validation:
     commands: ["git diff --check passed", "cd site && bun install --frozen-lockfile && bun run check:docs passed in Worker validation", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
-  summary: "Merged the Workspace page, /protocol/ redirect, and approved Overview navigation."
+  summary: "Approved after Workspace route, navigation, content, build, link validation, and local preview review."
   filesChanged: ["docs/workspace/index.md", "site/astro.config.mjs", "README.md", "docs/protocol/index.md"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:45:24Z"
+  updatedAt: "2026-08-05T02:55:20Z"
 assignee: "worker-task-199-87c7ef87"
+completedAt: "2026-08-05T02:56:12Z"
+completion:
+  summary: "Shipped the Workspace page, route redirect, and Overview navigation."
+  filesChanged: ["docs/workspace/index.md", "site/astro.config.mjs", "README.md", "docs/protocol/index.md"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 ## Approved Workspace page direction
 

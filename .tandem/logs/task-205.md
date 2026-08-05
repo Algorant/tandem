@@ -2,26 +2,31 @@
 id: task-205
 type: task
 title: "Create Fully Agentic workflow page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/guides/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T02:08:56Z"
-updatedAt: "2026-08-05T02:45:52Z"
+updatedAt: "2026-08-05T02:56:43Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-205-a394f1e9"
   claimedAt: "2026-08-05T02:26:10Z"
   deliveredAt: "2026-08-05T02:45:52Z"
   deliverables: ["docs/guides/fully-agentic-workflow.md"]
   validation:
     commands: ["git diff --check passed", "git diff --check on Worker commit", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
-  summary: "Merged the Fully Agentic workflow page with Pi, Herdr, Shep, Codex, sequential/parallel delegation, evidence, and validation guidance."
+  summary: "Approved after Fully Agentic workflow review, Mermaid validation, build, link validation, and local preview verification."
   filesChanged: ["docs/guides/fully-agentic-workflow.md"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:45:52Z"
+  updatedAt: "2026-08-05T02:55:46Z"
 assignee: "worker-task-205-a394f1e9"
+completedAt: "2026-08-05T02:56:43Z"
+completion:
+  summary: "Shipped the Fully Agentic workflow page."
+  filesChanged: ["docs/guides/fully-agentic-workflow.md"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 
 ## Description

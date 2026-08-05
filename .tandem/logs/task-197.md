@@ -2,26 +2,31 @@
 id: task-197
 type: task
 title: "Overhaul home / landing page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-04T23:33:39Z"
-updatedAt: "2026-08-05T02:45:13Z"
+updatedAt: "2026-08-05T02:55:59Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-197-4b43e283"
   claimedAt: "2026-08-04T23:38:41Z"
   deliveredAt: "2026-08-05T02:45:13Z"
   deliverables: ["docs/index.md", "site/src/styles/verdigris.css"]
   validation:
     commands: ["just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files", "just docs reached Astro ready state"]
-  summary: "Merged landing page implementation with approved hero, CTAs, capability sections, and four-color loop."
+  summary: "Approved after Sideshow review, build/link validation, and local preview verification."
   filesChanged: ["docs/index.md", "site/src/styles/verdigris.css"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:45:13Z"
+  updatedAt: "2026-08-05T02:55:14Z"
 assignee: "worker-task-197-4b43e283"
+completedAt: "2026-08-05T02:55:59Z"
+completion:
+  summary: "Shipped the approved landing page overhaul."
+  filesChanged: ["docs/index.md", "site/src/styles/verdigris.css"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 ## Approved landing-page direction
 

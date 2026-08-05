@@ -2,26 +2,31 @@
 id: task-198
 type: task
 title: "Overhaul Quickstart page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/quick-start/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-04T23:41:12Z"
-updatedAt: "2026-08-05T02:45:17Z"
+updatedAt: "2026-08-05T02:56:05Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-198-c6309f47"
   claimedAt: "2026-08-05T02:26:09Z"
   deliveredAt: "2026-08-05T02:45:17Z"
   deliverables: ["docs/quick-start/index.md"]
   validation:
     commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
-  summary: "Merged the approved six-step Quickstart with simple installs, agent-led task creation, verification, feedback, and Logs guidance."
+  summary: "Approved after page review, combined site build, link validation, and local preview verification."
   filesChanged: ["docs/quick-start/index.md"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:45:17Z"
+  updatedAt: "2026-08-05T02:55:17Z"
 assignee: "worker-task-198-c6309f47"
+completedAt: "2026-08-05T02:56:05Z"
+completion:
+  summary: "Shipped the approved Quickstart overhaul."
+  filesChanged: ["docs/quick-start/index.md"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 ## Approved Quickstart review notes
 

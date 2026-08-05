@@ -2,26 +2,31 @@
 id: task-207
 type: task
 title: "Overhaul Skills page"
-state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/skills/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T02:18:01Z"
-updatedAt: "2026-08-05T02:46:05Z"
+updatedAt: "2026-08-05T02:56:54Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-207-64ed7833"
   claimedAt: "2026-08-05T02:26:11Z"
   deliveredAt: "2026-08-05T02:46:05Z"
   deliverables: ["docs/skills/index.md"]
   validation:
     commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
-  summary: "Merged the Skills page placeholders for generic agent guidance, Codex Skill, and Claude Code Skill."
+  summary: "Approved after Skills placeholder review, build, link validation, and local preview verification."
   filesChanged: ["docs/skills/index.md"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T02:46:05Z"
+  updatedAt: "2026-08-05T02:55:54Z"
 assignee: "worker-task-207-64ed7833"
+completedAt: "2026-08-05T02:56:54Z"
+completion:
+  summary: "Shipped the Skills placeholder page."
+  filesChanged: ["docs/skills/index.md"]
+  validation: "just site-build; cd site && bun run check:links; just docs reached Astro ready state"
+  reviewer: "orchestrator"
 ---
 
 ## Description
