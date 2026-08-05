@@ -38,6 +38,14 @@ dev:
 	fi
 	exec cargo run --manifest-path "$manifest" -- tui
 
+# Start the local read-only Tandem web interface and open it in the browser.
+web:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	cd "$repo_root"
+	exec cargo run --manifest-path tandem/Cargo.toml -- web
+
 # Agent/orchestrator helper: configure the one-command delegated preview slot.
 [private]
 dev-route manifest workspace:
