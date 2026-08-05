@@ -2,14 +2,20 @@
 id: task-217
 type: task
 title: "Add the embedded web server and read API"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-216"
 references: ["task-121"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/src/main.rs", "tandem/src/app", "tandem/src/project", "tandem/src/protocol"]
 tags: ["ui", "web", "server", "api"]
 createdAt: "2026-08-05T18:46:08Z"
-updatedAt: "2026-08-05T18:46:08Z"
+updatedAt: "2026-08-05T18:49:35Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-217-58f38cf0"
+  claimedAt: "2026-08-05T18:49:34Z"
+  updatedAt: "2026-08-05T18:49:34Z"
+assignee: "worker-task-217-58f38cf0"
 ---
 
 ## Description

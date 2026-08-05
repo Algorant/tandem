@@ -205,3 +205,5 @@
 {"ts":"2026-08-05T18:46:16Z","event":"task.created","id":"task-218","summary":"Build the read-only Tandem browser interface","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":205}
 {"ts":"2026-08-05T18:46:23Z","event":"task.created","id":"task-219","summary":"Add web refresh and local security safeguards","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":206}
 {"ts":"2026-08-05T18:46:31Z","event":"task.created","id":"task-220","summary":"Validate and document the Tandem web MVP","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":207}
+{"ts":"2026-08-05T18:49:34Z","event":"accord.claimed","id":"task-217","summary":"Accord claim for task-217","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":208}
+{"ts":"2026-08-05T18:49:35Z","event":"task.updated","id":"task-217","summary":"Updated task-217 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":209}
