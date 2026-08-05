@@ -2,18 +2,25 @@
 id: task-202
 type: task
 title: "Overhaul TUI page"
-state: "in-progress"
+state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/tui/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:53:01Z"
-updatedAt: "2026-08-05T02:26:12Z"
+updatedAt: "2026-08-05T02:45:36Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-202-813deff9"
   claimedAt: "2026-08-05T02:26:10Z"
-  updatedAt: "2026-08-05T02:26:10Z"
+  deliveredAt: "2026-08-05T02:45:36Z"
+  deliverables: ["docs/tui/index.md"]
+  validation:
+    commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
+  summary: "Merged the TUI reference with screen placeholders, navigation, hierarchy behavior, validation, and complete theme/badge configuration."
+  filesChanged: ["docs/tui/index.md"]
+  reviewer: "orchestrator"
+  updatedAt: "2026-08-05T02:45:36Z"
 assignee: "worker-task-202-813deff9"
 ---
 ## Approved TUI page direction

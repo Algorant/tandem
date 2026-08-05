@@ -2,18 +2,25 @@
 id: task-200
 type: task
 title: "Overhaul Concepts page"
-state: "in-progress"
+state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/concepts/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:32:21Z"
-updatedAt: "2026-08-05T02:26:10Z"
+updatedAt: "2026-08-05T02:45:28Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-200-5419293e"
   claimedAt: "2026-08-05T02:26:09Z"
-  updatedAt: "2026-08-05T02:26:09Z"
+  deliveredAt: "2026-08-05T02:45:28Z"
+  deliverables: ["docs/concepts/index.md"]
+  validation:
+    commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
+  summary: "Merged the Concepts orientation, lifecycle, hierarchy, Accords, Rules, Decisions, Logs, and Workspace guidance."
+  filesChanged: ["docs/concepts/index.md"]
+  reviewer: "orchestrator"
+  updatedAt: "2026-08-05T02:45:28Z"
 assignee: "worker-task-200-5419293e"
 ---
 ## Approved Concepts page direction

@@ -8,19 +8,19 @@ parentId: "task-196"
 relatedFiles: ["docs/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-04T23:33:39Z"
-updatedAt: "2026-08-05T01:16:42Z"
+updatedAt: "2026-08-05T02:45:13Z"
 accord:
   status: "delivered"
   assignee: "worker-task-197-4b43e283"
   claimedAt: "2026-08-04T23:38:41Z"
-  deliveredAt: "2026-08-05T01:16:42Z"
-  deliverables: ["Updated docs/index.md landing page", "Updated site/src/styles/verdigris.css landing-page styles", "Worker commit e7fb882"]
+  deliveredAt: "2026-08-05T02:45:13Z"
+  deliverables: ["docs/index.md", "site/src/styles/verdigris.css"]
   validation:
-    commands: ["git diff --check passed in worker checkout", "cd site && bun install --frozen-lockfile && bun run check:docs passed", "Checked 680 internal docs links across 16 generated HTML pages"]
-  summary: "Landing page implementation delivered. Build and internal link checks pass after installing the locked site dependencies. Rendered visual review remains required before acceptance and merge."
+    commands: ["just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files", "just docs reached Astro ready state"]
+  summary: "Merged landing page implementation with approved hero, CTAs, capability sections, and four-color loop."
   filesChanged: ["docs/index.md", "site/src/styles/verdigris.css"]
   reviewer: "orchestrator"
-  updatedAt: "2026-08-05T01:16:42Z"
+  updatedAt: "2026-08-05T02:45:13Z"
 assignee: "worker-task-197-4b43e283"
 ---
 ## Approved landing-page direction

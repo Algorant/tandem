@@ -2,18 +2,25 @@
 id: task-206
 type: task
 title: "Overhaul Extensions page"
-state: "in-progress"
+state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/extensions/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T02:12:08Z"
-updatedAt: "2026-08-05T02:26:13Z"
+updatedAt: "2026-08-05T02:45:57Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-206-f3f9244d"
   claimedAt: "2026-08-05T02:26:11Z"
-  updatedAt: "2026-08-05T02:26:11Z"
+  deliveredAt: "2026-08-05T02:45:57Z"
+  deliverables: ["docs/extensions/index.md"]
+  validation:
+    commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
+  summary: "Merged the simplified Extensions page with the official Pi extension placeholder and source link."
+  filesChanged: ["docs/extensions/index.md"]
+  reviewer: "orchestrator"
+  updatedAt: "2026-08-05T02:45:57Z"
 assignee: "worker-task-206-f3f9244d"
 ---
 ## Approved Extensions page direction

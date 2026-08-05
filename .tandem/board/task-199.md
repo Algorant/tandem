@@ -2,18 +2,25 @@
 id: task-199
 type: task
 title: "Overhaul Workspace page"
-state: "in-progress"
+state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/protocol/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T00:14:04Z"
-updatedAt: "2026-08-05T02:26:50Z"
+updatedAt: "2026-08-05T02:45:24Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-199-87c7ef87"
   claimedAt: "2026-08-05T02:26:50Z"
-  updatedAt: "2026-08-05T02:26:50Z"
+  deliveredAt: "2026-08-05T02:45:24Z"
+  deliverables: ["docs/workspace/index.md", "site/astro.config.mjs", "README.md"]
+  validation:
+    commands: ["git diff --check passed", "cd site && bun install --frozen-lockfile && bun run check:docs passed in Worker validation", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
+  summary: "Merged the Workspace page, /protocol/ redirect, and approved Overview navigation."
+  filesChanged: ["docs/workspace/index.md", "site/astro.config.mjs", "README.md", "docs/protocol/index.md"]
+  reviewer: "orchestrator"
+  updatedAt: "2026-08-05T02:45:24Z"
 assignee: "worker-task-199-87c7ef87"
 ---
 ## Approved Workspace page direction

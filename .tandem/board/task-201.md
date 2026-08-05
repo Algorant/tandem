@@ -2,18 +2,25 @@
 id: task-201
 type: task
 title: "Overhaul CLI Reference page"
-state: "in-progress"
+state: "validation"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/cli/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:50:01Z"
-updatedAt: "2026-08-05T02:26:10Z"
+updatedAt: "2026-08-05T02:45:32Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-201-4c9c417d"
   claimedAt: "2026-08-05T02:26:09Z"
-  updatedAt: "2026-08-05T02:26:09Z"
+  deliveredAt: "2026-08-05T02:45:32Z"
+  deliverables: ["docs/cli/index.md"]
+  validation:
+    commands: ["git diff --check passed", "just site-build passed", "cd site && bun run check:links passed: 831 internal links across 19 HTML files"]
+  summary: "Merged the feature-complete CLI Reference including upgrade, command families, options, transitions, JSON output, and examples."
+  filesChanged: ["docs/cli/index.md"]
+  reviewer: "orchestrator"
+  updatedAt: "2026-08-05T02:45:32Z"
 assignee: "worker-task-201-4c9c417d"
 ---
 ## Approved CLI Reference page direction
