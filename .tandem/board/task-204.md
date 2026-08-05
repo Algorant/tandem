@@ -2,13 +2,19 @@
 id: task-204
 type: task
 title: "Create Human in the Loop workflow page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/guides/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T02:08:56Z"
-updatedAt: "2026-08-05T02:08:56Z"
+updatedAt: "2026-08-05T02:26:12Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-204-23b63f66"
+  claimedAt: "2026-08-05T02:26:11Z"
+  updatedAt: "2026-08-05T02:26:11Z"
+assignee: "worker-task-204-23b63f66"
 ---
 
 ## Description

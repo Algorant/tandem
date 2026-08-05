@@ -2,13 +2,19 @@
 id: task-200
 type: task
 title: "Overhaul Concepts page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/concepts/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:32:21Z"
-updatedAt: "2026-08-05T01:41:03Z"
+updatedAt: "2026-08-05T02:26:10Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-200-5419293e"
+  claimedAt: "2026-08-05T02:26:09Z"
+  updatedAt: "2026-08-05T02:26:09Z"
+assignee: "worker-task-200-5419293e"
 ---
 ## Approved Concepts page direction
 

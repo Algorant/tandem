@@ -2,13 +2,19 @@
 id: task-198
 type: task
 title: "Overhaul Quickstart page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/quick-start/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-04T23:41:12Z"
-updatedAt: "2026-08-05T00:46:10Z"
+updatedAt: "2026-08-05T02:26:11Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-198-c6309f47"
+  claimedAt: "2026-08-05T02:26:09Z"
+  updatedAt: "2026-08-05T02:26:09Z"
+assignee: "worker-task-198-c6309f47"
 ---
 ## Approved Quickstart review notes
 

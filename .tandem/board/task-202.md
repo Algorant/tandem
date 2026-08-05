@@ -2,13 +2,19 @@
 id: task-202
 type: task
 title: "Overhaul TUI page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/tui/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:53:01Z"
-updatedAt: "2026-08-05T01:58:12Z"
+updatedAt: "2026-08-05T02:26:12Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-202-813deff9"
+  claimedAt: "2026-08-05T02:26:10Z"
+  updatedAt: "2026-08-05T02:26:10Z"
+assignee: "worker-task-202-813deff9"
 ---
 ## Approved TUI page direction
 

@@ -2,13 +2,19 @@
 id: task-199
 type: task
 title: "Overhaul Workspace page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/protocol/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T00:14:04Z"
-updatedAt: "2026-08-05T02:25:44Z"
+updatedAt: "2026-08-05T02:26:50Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-199-87c7ef87"
+  claimedAt: "2026-08-05T02:26:50Z"
+  updatedAt: "2026-08-05T02:26:50Z"
+assignee: "worker-task-199-87c7ef87"
 ---
 ## Approved Workspace page direction
 

@@ -2,13 +2,19 @@
 id: task-201
 type: task
 title: "Overhaul CLI Reference page"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-196"
 relatedFiles: ["docs/cli/index.md", "site/astro.config.mjs", "site/src/styles/verdigris.css"]
 tags: ["site", "docs", "ui"]
 createdAt: "2026-08-05T01:50:01Z"
-updatedAt: "2026-08-05T01:51:26Z"
+updatedAt: "2026-08-05T02:26:10Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-201-4c9c417d"
+  claimedAt: "2026-08-05T02:26:09Z"
+  updatedAt: "2026-08-05T02:26:09Z"
+assignee: "worker-task-201-4c9c417d"
 ---
 ## Approved CLI Reference page direction
 
