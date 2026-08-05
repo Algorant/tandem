@@ -5,6 +5,7 @@ mod cli;
 mod project;
 mod protocol;
 mod tui;
+mod web;
 
 // Exit code categories: 0 success, 1 runtime/data/write failure, 2 usage/argument failure.
 #[derive(Debug)]
@@ -51,5 +52,6 @@ fn run() -> Result<(), CliError> {
     match cli::run(std::env::args().skip(1).collect())? {
         cli::StartupRequest::Exit => Ok(()),
         cli::StartupRequest::Tui => tui::run_tui(app::project::open()?),
+        cli::StartupRequest::Web(options) => web::run(app::project::open()?, options),
     }
 }

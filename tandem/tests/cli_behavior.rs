@@ -121,7 +121,7 @@ fn process_help_version_usage_and_missing_project_contracts() {
     }
     for command in [
         "add", "move", "update", "complete", "cancel", "accord", "rules", "decision", "list",
-        "show", "search", "log", "init", "upgrade", "tui", "version",
+        "show", "search", "log", "init", "upgrade", "tui", "web", "version",
     ] {
         assert!(
             landing.stdout.lines().any(|line| {
@@ -163,6 +163,7 @@ fn process_help_version_usage_and_missing_project_contracts() {
             "  tandem rules list|add|edit|delete ...\n",
             "  tandem decision list|show|add ... [--status <status>] [--date <date>]\n",
             "  tandem tui\n",
+            "  tandem web [--port <port>] [--no-open]\n",
             "  tandem version\n",
             "  tandem --version\n",
         )
@@ -180,7 +181,7 @@ fn process_help_version_usage_and_missing_project_contracts() {
     let unknown_command = project.run(&["unknown-command"]);
     unknown_command.assert_exit(2);
     assert!(unknown_command.stdout.is_empty());
-    assert_eq!(unknown_command.stderr, "Error: unknown command `unknown-command`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version\n");
+    assert_eq!(unknown_command.stderr, "Error: unknown command `unknown-command`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, web, version\n");
 
     let unknown_flag = project.run(&["list", "--unknown"]);
     unknown_flag.assert_exit(2);

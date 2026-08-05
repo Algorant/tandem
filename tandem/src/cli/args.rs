@@ -72,6 +72,40 @@ pub(super) struct RuleDeleteOptions {
     pub(super) id: Option<usize>,
 }
 
+pub(super) fn parse_web_args(args: &[String]) -> Result<crate::web::Options, CliError> {
+    let mut port = None;
+    let mut no_open = false;
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--port" => {
+                index += 1;
+                let value = required_value(args, index, "--port")?;
+                port = Some(
+                    value
+                        .parse::<u16>()
+                        .ok()
+                        .filter(|port| *port > 0)
+                        .ok_or_else(|| {
+                            CliError::usage("--port must be an integer between 1 and 65535")
+                        })?,
+                );
+            }
+            "--no-open" => no_open = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!("unknown web flag `{flag}`")))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected web argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(crate::web::Options { port, no_open })
+}
+
 pub(super) fn parse_init_args(args: &[String]) -> Result<InitOptions, CliError> {
     let mut options = InitOptions::default();
     let mut index = 0;
@@ -926,6 +960,19 @@ pub(super) fn parse_decision_withdraw_args(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn web_parser_accepts_port_and_no_open_and_rejects_invalid_ports() {
+        assert_eq!(
+            parse_web_args(&["--port".into(), "4321".into(), "--no-open".into()]).unwrap(),
+            crate::web::Options {
+                port: Some(4321),
+                no_open: true
+            }
+        );
+        assert!(parse_web_args(&["--port".into(), "0".into()]).is_err());
+        assert!(parse_web_args(&["--host".into(), "0.0.0.0".into()]).is_err());
+    }
 
     #[test]
     fn list_parser_preserves_long_flags_and_rejects_unknown_flags() {

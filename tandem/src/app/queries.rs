@@ -1,17 +1,30 @@
 //! Canonical read/query composition shared by peer interfaces.
 
 use crate::app::support::hierarchy_from_project;
+use crate::project::rules::parse_rules_from_content;
 use crate::project::write::HierarchyLock;
 use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
-use crate::protocol::accord::status as accord_status;
+use crate::protocol::accord::{state_divergence_warning, status as accord_status};
+use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::review::status as review_status;
-use crate::protocol::workflow::state_matches_filter;
+use crate::protocol::workflow::{state_matches_filter, workflow_states};
 use crate::CliError;
 
 pub(crate) struct Snapshot {
     pub(crate) hierarchy: ProjectHierarchy,
+}
+
+/// One coherent, UI-neutral project read used by long-running peer interfaces.
+pub(crate) struct ReadSnapshot {
+    pub(crate) snapshot: Snapshot,
+    pub(crate) revision: String,
+    pub(crate) title: String,
+    pub(crate) protocol_version: String,
+    pub(crate) states: Vec<String>,
+    pub(crate) rules: RulesByCategory,
+    pub(crate) warnings: Vec<String>,
 }
 
 #[derive(Debug, Default)]
@@ -45,6 +58,69 @@ pub(crate) fn load(project: &TandemProject) -> Result<Snapshot, CliError> {
     let hierarchy = hierarchy_from_project(project)?;
     hierarchy.validate_all_task_hierarchies()?;
     Ok(Snapshot { hierarchy })
+}
+
+pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, CliError> {
+    let _lock = HierarchyLock::acquire(project)?;
+    let config = project.read_config_raw()?;
+    let documents = project.read_documents()?;
+    let hierarchy = ProjectHierarchy::from_documents(documents.clone())?;
+    hierarchy.validate_document_metadata()?;
+    hierarchy.validate_all_task_hierarchies()?;
+    let config_yaml = project.read_config_yaml()?;
+    let title = config_yaml
+        .as_ref()
+        .and_then(|root| crate::project::yaml_mapping_value(root, "title"))
+        .and_then(crate::project::yaml_scalar_to_string)
+        .unwrap_or_else(|| crate::app::project::default_title(project.root()));
+    let protocol_version = crate::app::project::protocol_version(project)?;
+    let states = workflow_states(config_yaml.as_ref());
+    let rules = parse_rules_from_content(&config, &project.config_path)?;
+    let revision = crate::project::snapshot_revision(&config, &documents);
+    let mut warnings = crate::app::project::warnings(project)?;
+    for document in hierarchy.documents.values() {
+        if let Some(warning) = state_divergence_warning(document) {
+            warnings.push(warning);
+        }
+        for reference in document
+            .field("references")
+            .map(parse_field_values)
+            .unwrap_or_default()
+        {
+            if hierarchy.document(&reference).is_none() {
+                warnings.push(format!(
+                    "{} references missing document {reference}.",
+                    document.id()
+                ));
+            }
+        }
+    }
+    for items in rules.values() {
+        for item in items {
+            if item
+                .source
+                .as_deref()
+                .is_some_and(|source| hierarchy.document(source).is_none())
+            {
+                warnings.push(format!(
+                    "Rule {} references missing source {}.",
+                    item.id,
+                    item.source.as_deref().expect("checked source")
+                ));
+            }
+        }
+    }
+    warnings.sort();
+    warnings.dedup();
+    Ok(ReadSnapshot {
+        snapshot: Snapshot { hierarchy },
+        revision,
+        title,
+        protocol_version,
+        states,
+        rules,
+        warnings,
+    })
 }
 
 impl Snapshot {

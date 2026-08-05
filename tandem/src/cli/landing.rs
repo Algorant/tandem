@@ -37,7 +37,8 @@ const GROUPS: &[(&str, &[(&str, &str)])] = &[
         &[
             ("init", "Create a Tandem workspace"),
             ("upgrade", "Upgrade the workspace protocol"),
-            ("tui", "Open the interactive interface"),
+            ("tui", "Open the terminal interface"),
+            ("web", "Open the local read-only web interface"),
             ("version", "Show the installed version"),
         ],
     ),
@@ -109,7 +110,7 @@ mod tests {
             rendered_commands,
             [
                 "add", "move", "update", "complete", "cancel", "accord", "rules", "decision",
-                "list", "show", "search", "log", "init", "upgrade", "tui", "version"
+                "list", "show", "search", "log", "init", "upgrade", "tui", "web", "version"
             ]
         );
     }

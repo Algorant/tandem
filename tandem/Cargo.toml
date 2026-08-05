@@ -19,7 +19,14 @@ inherits = "release"
 lto = "thin"
 
 [dependencies]
+axum = "0.8"
 crossterm = "0.28"
 ratatui = "0.29"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
 uuid = { version = "1", features = ["v4"] }
 yaml-rust2 = "0.11"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

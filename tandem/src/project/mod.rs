@@ -850,6 +850,42 @@ pub(crate) fn yaml_double_quote(value: &str) -> String {
             .replace('\t', "\\t")
     )
 }
+/// Computes an opaque revision from one already-read coherent project snapshot.
+/// The web adapter can compare this token but must not interpret its contents.
+pub(crate) fn snapshot_revision(config: &str, documents: &[StoredDocument]) -> String {
+    const OFFSET: u64 = 0xcbf29ce484222325;
+    const PRIME: u64 = 0x100000001b3;
+
+    fn add(hash: &mut u64, value: &[u8]) {
+        for byte in value {
+            *hash ^= u64::from(*byte);
+            *hash = hash.wrapping_mul(PRIME);
+        }
+        *hash ^= 0xff;
+        *hash = hash.wrapping_mul(PRIME);
+    }
+
+    let mut hash = OFFSET;
+    add(&mut hash, config.as_bytes());
+    let mut documents = documents.iter().collect::<Vec<_>>();
+    documents.sort_by(|a, b| {
+        a.id()
+            .cmp(b.id())
+            .then_with(|| a.location.as_str().cmp(b.location.as_str()))
+    });
+    for document in documents {
+        add(&mut hash, document.location.as_str().as_bytes());
+        let mut fields = document.fields.iter().collect::<Vec<_>>();
+        fields.sort_by(|a, b| a.0.cmp(b.0));
+        for (key, value) in fields {
+            add(&mut hash, key.as_bytes());
+            add(&mut hash, value.as_bytes());
+        }
+        add(&mut hash, document.body.as_bytes());
+    }
+    format!("r1-{hash:016x}")
+}
+
 pub(crate) fn display_path(path: &Path) -> String {
     match env::current_dir() {
         Ok(current_dir) => path
@@ -966,6 +1002,20 @@ mod tests {
             .iter()
             .any(|warning| warning.contains("non-monotonic or duplicate")));
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn snapshot_revision_is_stable_and_changes_with_content() {
+        let first = read_document_from(
+            "---\nid: task-1\ntitle: One\n---\nBody\n",
+            DocumentLocation::Board,
+        );
+        let mut changed = first.clone();
+        changed.body.push_str("changed");
+        let revision = snapshot_revision("config", std::slice::from_ref(&first));
+        assert_eq!(revision, snapshot_revision("config", &[first]));
+        assert_ne!(revision, snapshot_revision("config", &[changed]));
+        assert!(revision.starts_with("r1-"));
     }
 
     #[test]

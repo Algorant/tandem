@@ -18,6 +18,7 @@ const PACKAGE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) enum StartupRequest {
     Exit,
     Tui,
+    Web(crate::web::Options),
 }
 
 pub(crate) fn run(args: Vec<String>) -> Result<StartupRequest, CliError> {
@@ -47,11 +48,12 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "rules" => cmd_rules(&args)?,
         "decision" => cmd_decision(&args)?,
         "tui" => return parse_tui_request(&args),
+        "web" => return Ok(StartupRequest::Web(parse_web_args(&args)?)),
         "version" | "--version" => print_version(),
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, version"
+                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, web, version"
             )))
         }
     }
@@ -78,6 +80,7 @@ fn print_help() {
     println!("  tandem rules list|add|edit|delete ...");
     println!("  tandem decision list|show|add ... [--status <status>] [--date <date>]");
     println!("  tandem tui");
+    println!("  tandem web [--port <port>] [--no-open]");
     println!("  tandem version");
     println!("  tandem --version");
 }
