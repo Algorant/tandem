@@ -2,7 +2,7 @@
 id: task-219
 type: task
 title: "Add web refresh and local security safeguards"
-state: todo
+state: "in-progress"
 priority: "high"
 parentId: "task-216"
 blockers: ["task-217", "task-218"]
@@ -10,7 +10,13 @@ references: ["task-121"]
 relatedFiles: ["tandem/src"]
 tags: ["ui", "web", "security", "refresh"]
 createdAt: "2026-08-05T18:46:23Z"
-updatedAt: "2026-08-05T18:46:23Z"
+updatedAt: "2026-08-05T19:13:50Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-219-0596f986"
+  claimedAt: "2026-08-05T19:13:50Z"
+  updatedAt: "2026-08-05T19:13:50Z"
+assignee: "worker-task-219-0596f986"
 ---
 
 ## Description
