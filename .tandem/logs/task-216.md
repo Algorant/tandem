@@ -3,13 +3,18 @@ id: task-216
 type: task
 kind: "epic"
 title: "Ship the read-only Tandem web MVP"
-state: todo
 priority: "high"
 references: ["task-121", "task-120"]
 relatedFiles: ["plan/web-ui-research.md", "tandem/src", "tandem/Cargo.toml", "tandem/README.md", "docs"]
 tags: ["ui", "web"]
 createdAt: "2026-08-05T18:46:00Z"
-updatedAt: "2026-08-05T18:46:00Z"
+updatedAt: "2026-08-05T19:41:49Z"
+completedAt: "2026-08-05T19:41:49Z"
+completion:
+  summary: "Shipped the complete read-only Tandem web MVP: embedded loopback server, canonical read APIs, bundled responsive browser interface for all TUI views, revision polling, local security safeguards, accessibility, documentation, packaging, and comprehensive validation."
+  filesChanged: ["tandem/Cargo.toml", "tandem/Cargo.lock", "tandem/src/web.rs", "tandem/src/web/index.html", "tandem/src/web/app.css", "tandem/src/web/app.js", "tandem/src/web/api.js", "tandem/src/web/ui.js", "tandem/src/app/queries.rs", "tandem/src/project/mod.rs", "tandem/src/cli", "tandem/src/main.rs", "tandem/tests/cli_behavior.rs", "README.md", "tandem/README.md", "tandem/RELEASE.md", "docs/cli/index.md", "docs/web/index.md", "site/astro.config.mjs", "justfile"]
+  validation: "All four direct Tasks completed. Final integrated validation passed 241 unit and 11 integration tests, formatting, strict all-feature Clippy, release/dist builds, docs build and 896 links, audit, JS syntax, packaged-runtime isolation, API/security/parity checks, and desktop/narrow/zoom/accessibility/theme Chromium evidence."
+  reviewer: "orchestrator"
 ---
 
 ## Description
