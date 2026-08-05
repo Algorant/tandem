@@ -2,65 +2,99 @@
 title: TUI
 description: Using the Tandem terminal user interface.
 ---
-`tandem tui` opens the Ratatui-based terminal interface for a Tandem workspace.
+`tandem tui` opens Tandem's Ratatui terminal interface for a workspace. Use it for the daily task board, validation work, project rules, decisions, and completed work logs.
 
-## Views
+## Screen gallery
 
-The v0 TUI includes:
+The following placeholders mark the screens that should be represented by future renders, GIFs, or screenshots. Each screen is usable from `tandem tui`.
 
-- **Board** — active tasks grouped by configured workflow state, including the Validation state/subview.
-- **Logs** — completed and canceled Task history.
-- **Rules** — project coordination rules.
-- **Decisions** — ADR-compatible `decision` documents.
+| Screen placeholder | What it shows |
+| --- | --- |
+| **Board / State Board**<br>*[render or screenshot placeholder]* | Active tasks grouped by `todo`, `in-progress`, and `validation`. Use it to select tasks, inspect hierarchy, filter work, and move through the workflow. |
+| **Epic Board**<br>*[render or screenshot placeholder]* | Epics with their direct Tasks and leaf Subtasks. Use it to see the full delivery tree and state labels in one view. |
+| **Logs**<br>*[render or screenshot placeholder]* | Completed and canceled work. Use it to search history and inspect archived task details. |
+| **Rules**<br>*[render or screenshot placeholder]* | Workspace rules grouped by category. Use it to browse a compact list and open a full rule preview. |
+| **Decisions**<br>*[render or screenshot placeholder]* | ADR-compatible decisions with metadata, body, and path. Use it to inspect or add durable project choices. |
+| **Help and interaction states**<br>*[render or GIF placeholder]* | Key hints, selected-row previews, drawers, prompts, validation warnings, and mouse focus states. |
 
-## Navigation
+## Views and navigation
 
-Use `1` through `4` to switch top-level views, `j`/`k` or arrow keys to move selection, `h`/`l` for local pane or state navigation, `?` for help, and `q` to quit.
+The top-level views are Board, Logs, Rules, and Decisions. Press `1` through `4` to switch views, `j`/`k` or the arrow keys to move selection, `h`/`l` for local pane or state navigation, `?` for help, and `q` to quit. Press `Tab`/`BackTab` to cycle focus where a view has multiple panes. Press `e` in Board to edit the selected active task in `$EDITOR`.
 
-Board supports quick task creation, state movement, reloads, mouse selection/scrolling, inline task hierarchy, row previews, and opening active task Markdown in `$EDITOR`. Task children are collapsed under their nearest active task parent by default. Press `Enter` (or click an already-selected parent row) to expand/collapse children recursively one level at a time; on leaf rows, `Enter` retains the convenient preview behavior. Press `Space` to toggle the inline preview explicitly on any row. The Rules view keeps each rule in a dense one-line row with its category-colored ID, a short rule preview, and source metadata. Press `Enter` to open or close the full-width rule preview drawer. The drawer follows keyboard or mouse selection and wraps the complete selected rule without changing list row heights. The Decisions view lists active decision records, displays metadata/body/path, and supports a basic title/body add prompt with `a`; include ADR sections such as Status, Context, Decision, Consequences, and Supersession in the body when recording architecture decisions. Mouse hit regions are intentionally bounded: top tabs switch views, Board state tabs switch states, Board/Logs/Decisions rows select items, visible footer actions reuse the matching keyboard behavior where safe, wheel events scroll the pane under the pointer, and non-action regions no-op. Drag/drop is out of v0.
+Board supports quick task creation, state movement, reloads, mouse selection and scrolling, inline hierarchy, row previews, and task editing. Press `b` to switch between the State Board and Epic Board. Press `Enter` (or click an already-selected parent row) to expand or collapse children one level at a time. Press `Space` to toggle the inline preview on any row. On a leaf row, `Enter` keeps the normal preview behavior.
 
-## Task hierarchy and Epic Board
+Logs supports list/detail focus and `/` filtering. Rules supports category navigation and a full-width preview drawer: press `Enter` to open or close the selected rule. Decisions supports list/detail focus and an `a` prompt for a title and body. Include ADR sections such as Status, Context, Decision, Consequences, and Supersession when recording an architecture decision.
 
-The default State Board treats `parentId` links between tasks as a hierarchy rather than flat peers. Root tasks and tasks with decision/custom-document parents remain normal rows. Collapsed parents show concise active/logged descendant rollups; expanded descendants use compact, aligned tree guides and disclosure markers. Task IDs, relationship strings, and redundant `SUB` labels stay out of State Board rows; exact identity remains in the Selected header and detail context. Children keep their own workflow state, and expanded children from another state receive a compact state label while same-state children reserve that column for aligned titles. State-tab counts count matching active documents by their own state even when those documents are collapsed beneath a parent in another tab; expanding a tree changes visible rows, not tab counts.
+Mouse hit regions are bounded and mirror safe keyboard actions. Click top tabs to switch views, Board state tabs to switch states, and Board/Logs/Decisions rows to select items. Click an already-selected Board row to toggle its preview. Footer actions use the matching keyboard behavior where safe. The wheel scrolls the pane under the pointer; other regions are no-ops. Drag and drop is not supported in v0.
 
-Board tag/priority filters automatically reveal each matching descendant with its required active ancestor path in the descendant's own state tab, so a match is never silently hidden by a collapsed parent. Completed descendants stay in Logs and contribute `logged` rollups without becoming active rows. The rendered hierarchy follows the strict canonical roles: an Epic has global-ID Tasks, and each Task can have parent-derived leaf Subtasks. A task whose resolved parent is a decision or custom document remains a global-ID Task with a generic parent relationship.
+## Board, hierarchy, and filtering
 
-Press `b` from the Board to switch between State Board and Epic Board. Epic Board groups each active Epic with its direct global-ID Tasks and their parent-derived Subtasks. It keeps the ancestor path visible when filters match a Subtask. Direct Task rows use compact state labels such as `TODO`, `WIP`, and `VAL` without a misleading `SUB` marker; only leaf Subtask rows use `SUB`. Stable `<parentId> → <childId>` context remains visible where useful.
+The State Board treats `parentId` links between tasks as a hierarchy rather than flat peers. Root tasks and tasks whose parent is a decision or custom document remain normal rows. Collapsed parents show concise active and logged descendant rollups. Expanded descendants use aligned tree guides and disclosure markers. Exact identity remains in the Selected header and detail context, not redundant `SUB` labels in State Board rows.
 
-Completed and canceled Tasks/Subtasks stay in Logs rather than returning as active rows. Canceled Logs are visibly labeled and excluded from successful-completion rollups; Epic and Task rows otherwise show concise active/logged completion context such as `2 active · 3 logged`. Invalid nested Epics, children beneath Subtasks, direct Epic Tasks with hierarchical IDs, and global-ID Subtasks fail workspace validation instead of being rendered through compatibility behavior.
+Children keep their own workflow state. An expanded child from another state gets a compact state label; a same-state child reserves that column for an aligned title. State-tab counts count active documents by their own state, even when a document is collapsed under a parent in another tab. Expanding a tree changes visible rows, not tab counts.
 
-## Themes
+Board tag and priority filters reveal each matching descendant with its required active ancestor path in the descendant's own state tab. A match is never hidden only because its parent is collapsed. Completed descendants stay in Logs and contribute `logged` rollups without becoming active rows.
 
-The TUI includes built-in themes and can load user TOML themes from `~/.config/tandem/themes/` or `$XDG_CONFIG_HOME/tandem/themes/`. Set your normal theme in `~/.config/tandem/config.toml` or `$XDG_CONFIG_HOME/tandem/config.toml`:
+The Epic Board groups each active Epic with its direct global-ID Tasks and their parent-derived Subtasks. It keeps the ancestor path visible when a filter matches a Subtask. Direct Task rows use compact state labels such as `TODO`, `WIP`, and `VAL`; only leaf Subtask rows use `SUB`. Stable `<parentId> → <childId>` context remains visible where useful.
+
+The canonical hierarchy is strict: an Epic has global-ID Tasks, and a Task can have parent-derived leaf Subtasks. Invalid nested Epics, children beneath Subtasks, hierarchical IDs directly beneath Epics, and global-ID Subtasks fail workspace validation instead of using compatibility rendering. Completed and canceled Tasks/Subtasks stay in Logs. Canceled logs are labeled and excluded from successful-completion rollups.
+
+## Validation and workflow
+
+The Board presents the active `todo`, `in-progress`, and `validation` states. `validation` is the review queue; it is not a permanent completion state. Accord status and review metadata remain separate from workflow state. The TUI surfaces structural validation warnings and errors so invalid hierarchy or unresolved required references can be corrected before work is trusted. Completion archives a task to Logs rather than creating a persistent `done` state.
+
+## Themes and badges
+
+Theme loading uses this order: built-in defaults, a user TOML theme, user config, then workspace overrides. User themes live in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or, when `XDG_CONFIG_HOME` is unset, `~/.config/tandem/themes/*.toml`. User config is `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`. A workspace can override the selection in `.tandem/theme.toml`; use `.tandem/config.toml` for project Board display settings. Invalid user or workspace configuration is non-fatal and appears as a warning in the TUI status line.
+
+### Select a theme
+
+`theme` selects a built-in theme or a user theme by name. The default built-in theme is `default-dark`; `verdigris` is also supported. Put the selection in user config for a normal preference:
 
 ```toml
+# ~/.config/tandem/config.toml
 theme = "verdigris"
-transparent_background = true
-badge_style = "muted"
 ```
 
-Use workspace `.tandem/theme.toml` only when a project should override the user's global theme preference. Use workspace `.tandem/config.toml` for project display semantics such as Board tag badge opt-ins.
-
-Set `transparent_background = true` in a user theme, user config, or workspace `.tandem/theme.toml` to let the terminal default/transparent background show through for app and panel fills where practical. The default is `false`, so omitted themes preserve opaque rendering.
-
-Set `badge_style` to control Board priority/status/tag chips. The default, `muted`, keeps the compact badge shape with a softer fill for transparent and image-backed terminals. Other options are:
+Use a workspace selector only for a project-specific override:
 
 ```toml
-badge_style = "muted" # muted chip, default
-badge_style = "accent"  # small colored rail plus label
-badge_style = "text"    # colored label, no chip fill
-badge_style = "ghost"   # outlined/chip text with transparent fill
-badge_style = "solid"   # legacy saturated filled block
+# .tandem/theme.toml
+theme = "default-dark"
 ```
 
-The same key can also be written as `[badges] style = "ghost"` in user themes, user config, or `.tandem/theme.toml`. Rounded-edge badge rendering remains deferred.
+### Background and badge style
 
-Default Board badges are intentionally minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress such as `2/5`. Project/domain tags like `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in rather than global defaults.
+`transparent_background` is `false` by default. Set it to `true` in a user theme, user config, or `.tandem/theme.toml` to let the terminal or compositor background show through app and panel fills where practical:
 
-Configure extra tag badges or suppress badges in user config or workspace `.tandem/config.toml`:
+```toml
+transparent_background = true
+```
+
+`badge_style` controls priority, status, and tag chips. The default is `muted`. Supported styles are `muted` (soft fill), `accent` (colored rail), `text` (colored label without chip fill), `ghost` (transparent outlined chip), and `solid` (legacy saturated fill):
+
+```toml
+badge_style = "ghost"
+```
+
+The compatibility spelling `[badges] style` is also accepted in user themes, user config, and `.tandem/theme.toml`:
+
+```toml
+[badges]
+style = "ghost"
+```
+
+Rounded-edge badge rendering is not supported in v0.
+
+### Board badge configuration
+
+Default Board badges stay minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and Subtask progress such as `2/5`. Project tags such as `tui`, `cli`, `docs`, `spec`, and `protocol` are opt-in rather than global defaults.
+
+Use `.tandem/config.toml` for project badge choices:
 
 ```toml
 [board.badges]
+# Suppress built-in badge IDs or configured tag names.
 disabled = ["deliverable", "visual"]
 
 [board.badges.tags.tui]
@@ -68,8 +102,10 @@ label = "TUI"
 tone = "accent"
 
 [board.badges.tags.docs]
-# label defaults to "DOCS"
+# label defaults to the uppercase tag: DOCS.
 tone = "success"
 ```
 
-`label` and `tone` are optional for configured tags. `label` defaults to the uppercase tag, and `tone` defaults to `accent`; supported tones are `accent`, `success`, `warning`, `error`, and `muted`. `disabled` is a simple list of built-in badge IDs or configured tag names to suppress, not a regex/rule engine. Legacy `[badges]` / `[badges.tags.*]` sections in theme files are still read during migration, but new project badge config should live in `.tandem/config.toml`.
+`[board.badges] disabled` is a list, not a pattern or rule engine. For each `[board.badges.tags.<tag>]` entry, `label` is optional and defaults to the uppercase tag. `tone` is optional and defaults to `accent`. Supported tones are `accent`, `success`, `warning`, `error`, and `muted`.
+
+For compatibility, legacy `[badges] disabled` and `[badges.tags.<tag>]` settings are still read from theme/config files. New project badge settings should use `[board.badges]` and live in `.tandem/config.toml`; the newer sections make project display choices distinct from theme styling.
