@@ -20,7 +20,14 @@ badge_style = "muted"
 # Board workflow-state chips. TODO intentionally keeps the muted fallback.
 [aliases]
 burnt-copper = "#c96f3d"
+sand = "#e6bf86"
 heather = "#ad8294"
+
+# Named Board tag tones used by the built-in BUG, FEAT, and CHORE badges.
+[badges.tones]
+orange = "burnt-copper"
+sand = "sand"
+purple = "heather"
 
 [badges.states]
 in-progress = "burnt-copper"

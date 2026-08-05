@@ -58,6 +58,9 @@ pub(super) enum StatusTone {
     Warning,
     Error,
     Muted,
+    Orange,
+    Sand,
+    Purple,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +70,7 @@ pub(super) struct TuiTheme {
     priority: PriorityPalette,
     accord: AccordPalette,
     review: ReviewPalette,
+    badge_tones: BadgeTonePalette,
     state_badges: BTreeMap<String, Color>,
     badge_style: BadgeStyle,
     badge_config: BadgeConfig,
@@ -148,6 +152,13 @@ struct ReviewPalette {
     unknown: Color,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BadgeTonePalette {
+    orange: Color,
+    sand: Color,
+    purple: Color,
+}
+
 impl TuiTheme {
     pub(super) fn default_dark() -> Self {
         Self {
@@ -191,6 +202,11 @@ impl TuiTheme {
                 rejected: Color::Rgb(248, 113, 113),
                 failed: Color::Rgb(248, 113, 113),
                 unknown: Color::Rgb(107, 114, 128),
+            },
+            badge_tones: BadgeTonePalette {
+                orange: Color::Rgb(251, 146, 60),
+                sand: Color::Rgb(214, 185, 140),
+                purple: Color::Rgb(192, 132, 252),
             },
             state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
@@ -242,6 +258,11 @@ impl TuiTheme {
                 rejected: Color::Rgb(227, 111, 99),
                 failed: Color::Rgb(227, 111, 99),
                 unknown: Color::Rgb(146, 131, 116),
+            },
+            badge_tones: BadgeTonePalette {
+                orange: Color::Rgb(201, 111, 61),
+                sand: Color::Rgb(230, 191, 134),
+                purple: Color::Rgb(173, 130, 148),
             },
             state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
@@ -514,6 +535,9 @@ impl TuiTheme {
             StatusTone::Warning => self.colors.warning,
             StatusTone::Error => self.colors.error,
             StatusTone::Muted => self.colors.muted,
+            StatusTone::Orange => self.badge_tones.orange,
+            StatusTone::Sand => self.badge_tones.sand,
+            StatusTone::Purple => self.badge_tones.purple,
         };
         self.chip_style(color)
     }
@@ -597,6 +621,9 @@ impl TuiTheme {
             StatusTone::Warning => self.colors.warning,
             StatusTone::Error => self.colors.error,
             StatusTone::Muted => self.colors.muted,
+            StatusTone::Orange => self.badge_tones.orange,
+            StatusTone::Sand => self.badge_tones.sand,
+            StatusTone::Purple => self.badge_tones.purple,
         };
         self.style(color, self.panel_background(), Modifier::empty())
     }
@@ -745,6 +772,11 @@ impl TuiTheme {
             rejected: Color::Reset,
             failed: Color::Reset,
             unknown: Color::Reset,
+        };
+        theme.badge_tones = BadgeTonePalette {
+            orange: Color::Reset,
+            sand: Color::Reset,
+            purple: Color::Reset,
         };
         theme.no_color = true;
         theme
@@ -954,17 +986,17 @@ impl TuiTheme {
         let config = self
             .badge_config
             .tag_badges
-            .entry(tag_id)
+            .entry(tag_id.clone())
             .or_insert_with(|| TagBadgeConfig {
                 label: None,
-                tone: StatusTone::Accent,
+                tone: default_tag_tone(&tag_id),
             });
         match key {
             "label" => config.label = Some(value.trim().to_string()),
             "tone" => match parse_status_tone(value) {
                 Some(tone) => config.tone = tone,
                 None => warnings.push(format!(
-                    "Config warning line {line_number}: invalid badge tone for `{section}.{key}`: use accent, success, warning, error, or muted"
+                    "Config warning line {line_number}: invalid badge tone for `{section}.{key}`: use accent, success, warning, error, muted, orange, sand/beige, or purple"
                 )),
             },
             _ => warnings.push(format!(
@@ -1005,6 +1037,9 @@ impl TuiTheme {
             ("priority", "medium") => self.priority.medium = color,
             ("priority", "low") => self.priority.low = color,
             ("priority", "none") | ("priority", "unknown") => self.priority.none = color,
+            ("badges.tones", "orange") => self.badge_tones.orange = color,
+            ("badges.tones", "sand") => self.badge_tones.sand = color,
+            ("badges.tones", "purple") => self.badge_tones.purple = color,
             ("badges.accord", "ready") => self.accord.ready = color,
             ("badges.accord", "claimed") => self.accord.claimed = color,
             ("badges.accord", "delivered") => self.accord.delivered = color,
@@ -1363,6 +1398,15 @@ fn parse_badge_style(value: &str) -> Option<BadgeStyle> {
     }
 }
 
+pub(super) fn default_tag_tone(tag: &str) -> StatusTone {
+    match normalized_badge_id(tag).as_str() {
+        "bug" => StatusTone::Orange,
+        "feat" => StatusTone::Sand,
+        "chore" => StatusTone::Purple,
+        _ => StatusTone::Accent,
+    }
+}
+
 fn parse_status_tone(value: &str) -> Option<StatusTone> {
     match normalized(value).as_str() {
         "accent" | "default" | "tag" => Some(StatusTone::Accent),
@@ -1370,6 +1414,9 @@ fn parse_status_tone(value: &str) -> Option<StatusTone> {
         "warning" | "warn" => Some(StatusTone::Warning),
         "error" | "danger" | "failed" => Some(StatusTone::Error),
         "muted" | "none" => Some(StatusTone::Muted),
+        "orange" => Some(StatusTone::Orange),
+        "sand" | "beige" => Some(StatusTone::Sand),
+        "purple" => Some(StatusTone::Purple),
         _ => None,
     }
 }
@@ -1767,6 +1814,79 @@ tone = "warning"
         let docs = theme.tag_badge("docs").expect("docs badge config");
         assert_eq!(docs.label_for("docs"), "DOCS");
         assert_eq!(docs.tone(), StatusTone::Warning);
+    }
+
+    #[test]
+    fn built_in_work_tag_tones_use_theme_owned_palettes() {
+        let default_dark = TuiTheme::default_dark();
+        assert_eq!(default_dark.badge_tones.orange, Color::Rgb(251, 146, 60));
+        assert_eq!(default_dark.badge_tones.sand, Color::Rgb(214, 185, 140));
+        assert_eq!(default_dark.badge_tones.purple, Color::Rgb(192, 132, 252));
+
+        let verdigris = TuiTheme::verdigris();
+        assert_eq!(verdigris.badge_tones.orange, Color::Rgb(201, 111, 61));
+        assert_eq!(verdigris.badge_tones.sand, Color::Rgb(230, 191, 134));
+        assert_eq!(verdigris.badge_tones.purple, Color::Rgb(173, 130, 148));
+    }
+
+    #[test]
+    fn named_work_tag_tones_support_theme_overrides_and_config_selection() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_theme_content(
+            r##"
+[badges.tones]
+orange = "#010203"
+sand = "#040506"
+purple = "#070809"
+"##,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        let warnings = theme.apply_display_content(
+            r#"
+[board.badges.tags.hotfix]
+tone = "orange"
+
+[board.badges.tags.release]
+tone = "beige"
+
+[board.badges.tags.maintenance]
+tone = "purple"
+"#,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        assert_eq!(theme.badge_tones.orange, Color::Rgb(1, 2, 3));
+        assert_eq!(theme.badge_tones.sand, Color::Rgb(4, 5, 6));
+        assert_eq!(theme.badge_tones.purple, Color::Rgb(7, 8, 9));
+        assert_eq!(
+            theme.tag_badge("hotfix").unwrap().tone(),
+            StatusTone::Orange
+        );
+        assert_eq!(theme.tag_badge("release").unwrap().tone(), StatusTone::Sand);
+        assert_eq!(
+            theme.tag_badge("maintenance").unwrap().tone(),
+            StatusTone::Purple
+        );
+    }
+
+    #[test]
+    fn work_tag_tones_keep_all_badge_styles_and_no_color_behavior() {
+        for value in ["muted", "accent", "text", "ghost", "solid"] {
+            let mut theme = TuiTheme::default_dark();
+            assert!(theme
+                .apply_theme_content(&format!("badge_style = \"{value}\"\n"))
+                .is_empty());
+            for tone in [StatusTone::Orange, StatusTone::Sand, StatusTone::Purple] {
+                assert_ne!(theme.progress_chip_style(tone), Style::default());
+            }
+        }
+
+        let no_color = TuiTheme::no_color();
+        for tone in [StatusTone::Orange, StatusTone::Sand, StatusTone::Purple] {
+            let style = no_color.progress_chip_style(tone);
+            assert_eq!(style.fg, None);
+            assert_eq!(style.bg, None);
+            assert!(style.add_modifier.contains(Modifier::BOLD));
+        }
     }
 
     #[test]

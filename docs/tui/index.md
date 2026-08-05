@@ -88,7 +88,7 @@ Rounded-edge badge rendering is not supported in v0.
 
 ### Board badge configuration
 
-Default Board badges stay minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and Subtask progress such as `2/5`. Project tags such as `tui`, `cli`, `docs`, `spec`, and `protocol` are opt-in rather than global defaults.
+Default Board badges stay minimal: priority (`CRIT`, `HIGH`, `MED`, `LOW`), common repository work tags (`BUG`, `FEAT`, `CHORE`, `RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and Subtask progress such as `2/5`. `BUG`, `FEAT`, and `CHORE` are built in because they describe common work kinds across repositories. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, and `protocol` remain opt-in rather than global defaults.
 
 Use `.tandem/config.toml` for project badge choices:
 
@@ -106,6 +106,17 @@ tone = "accent"
 tone = "success"
 ```
 
-`[board.badges] disabled` is a list, not a pattern or rule engine. For each `[board.badges.tags.<tag>]` entry, `label` is optional and defaults to the uppercase tag. `tone` is optional and defaults to `accent`. Supported tones are `accent`, `success`, `warning`, `error`, and `muted`.
+`[board.badges] disabled` is a list, not a pattern or rule engine. It can suppress a built-in tag by name, such as `"bug"`. For each `[board.badges.tags.<tag>]` entry, `label` is optional and defaults to the uppercase tag. A configured entry overrides the label or tone of a built-in tag without rendering a duplicate. `tone` is optional. It keeps the built-in tone for a built-in tag and otherwise defaults to `accent`. Existing tones remain supported: `accent`, `success`, `warning`, `error`, and `muted`. Theme-owned work-tag tones add `orange`, `sand` (alias `beige`), and `purple`. The built-in `BUG`, `FEAT`, and `CHORE` badges use those three tones respectively.
+
+Themes can customize these named palette roles without changing Board rendering or project badge selection:
+
+```toml
+[badges.tones]
+orange = "#fb923c"
+sand = "#d6b98c"
+purple = "#c084fc"
+```
+
+The built-in `default-dark` palette uses rework orange, warm sand, and delivered purple. Verdigris uses burnt copper (`#c96f3d`), ready sand (`#e6bf86`), and validation heather (`#ad8294`). All tones use the selected `muted`, `accent`, `text`, `ghost`, or `solid` badge style. They also preserve labels in terminal/no-color mode.
 
 For compatibility, legacy `[badges] disabled` and `[badges.tags.<tag>]` settings are still read from theme/config files. New project badge settings should use `[board.badges]` and live in `.tandem/config.toml`; the newer sections make project display choices distinct from theme styling.

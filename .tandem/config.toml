@@ -2,6 +2,7 @@
 #
 # Project/domain Board tag badges live here so .tandem/theme.toml can stay
 # focused on theme selection, colors, transparency, and badge style.
+# Common repository work tags (bug, feat, chore) are built-in Board badges.
 
 [board.badges.tags.docs]
 label = "DOCS"
@@ -26,7 +27,3 @@ tone = "warning"
 [board.badges.tags.ci]
 label = "CI"
 tone = "muted"
-
-[board.badges.tags.bug]
-label = "BUG"
-tone = "error"

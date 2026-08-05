@@ -186,7 +186,8 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - `[priority]`: `critical`, `high`, `medium`, `low`, `none`
 - `[badges]`: `style` for visual badge styling; legacy `disabled` remains accepted during migration
 - `[board.badges]` or legacy `[badges]`: `disabled` (list of built-in badge IDs or configured tag names to suppress)
-- `[board.badges.tags.<tag>]` or legacy `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, or `muted`) for project/user opt-in tag badges
+- `[board.badges.tags.<tag>]` or legacy `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, `muted`, `orange`, `sand`/`beige`, or `purple`) for tag-badge overrides and project/user opt-ins
+- `[badges.tones]`: theme-owned `orange`, `sand`, and `purple` Board tag colors
 - `[badges.accord]`: legacy `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
 - `[aliases]`: named colors declared before their uses in the same file; aliases may reuse an earlier alias
 - `[badges.states]`: arbitrary configured workflow state IDs mapped to colors; IDs without an entry use the existing muted fallback
@@ -198,7 +199,7 @@ In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`
 
 `badge_style` controls Board priority/status/tag chips: `muted` (default softened fill), `accent` (small colored rail), `text` (colored label), `ghost` (transparent chip outline), or `solid` (legacy saturated fill). Rounded-edge badge rendering remains deferred.
 
-Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), work-type tags (`RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` are opt-in, not global defaults. Configure extra tag badges or suppress badges in user config or workspace `.tandem/config.toml`:
+Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), common repository work tags (`BUG`, `FEAT`, `CHORE`, `RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. `BUG`, `FEAT`, and `CHORE` are built in as common cross-repository work kinds. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` remain opt-in. Configure extra tag badges, override a built-in label/tone, or suppress badges in user config or workspace `.tandem/config.toml`:
 
 ```toml
 [board.badges]
@@ -214,6 +215,17 @@ tone = "success"
 ```
 
 User config applies before workspace `.tandem/config.toml`; workspace badge config is therefore the final override. Legacy `[badges]` / `[badges.tags.*]` sections in theme files are still read during migration, but `.tandem/theme.toml` should remain for theme selection/color/style behavior. `disabled` is a simple suppression list for built-ins or configured tag names, not a regex/rule engine.
+
+The built-in work badges use theme-owned named tones: `BUG` uses `orange`, `FEAT` uses `sand`, and `CHORE` uses `purple`. Existing config tones remain compatible. `beige` is accepted as an alias for `sand`. Theme authors can override the palette without hard-coding colors in Board rendering:
+
+```toml
+[badges.tones]
+orange = "#fb923c"
+sand = "#d6b98c"
+purple = "#c084fc"
+```
+
+Verdigris maps these roles to burnt copper (`#c96f3d`), ready sand (`#e6bf86`), and validation heather (`#ad8294`). The named tones preserve all badge styles and terminal/no-color behavior.
 
 `NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
 

@@ -12,3 +12,9 @@
 base = "default-dark"
 name = "default-dark"
 badge_style = "muted"
+
+# Named Board tag tones used by the built-in BUG, FEAT, and CHORE badges.
+[badges.tones]
+orange = "#fb923c"
+sand = "#d6b98c"
+purple = "#c084fc"

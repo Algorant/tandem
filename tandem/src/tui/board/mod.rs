@@ -1405,12 +1405,20 @@ pub(super) fn work_type_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(Stri
         ("research", "RESEARCH"),
         ("spike", "SPIKE"),
         ("deliverable", "DELIVERABLE"),
+        ("bug", "BUG"),
+        ("feat", "FEAT"),
+        ("chore", "CHORE"),
     ] {
         if tags.iter().any(|candidate| tag_matches(candidate, tag))
             && !theme.badge_disabled(tag)
             && !theme.badge_disabled(&format!("tag:{tag}"))
         {
-            chips.push(configured_or_default_tag_chip(tag, default_label, theme));
+            chips.push(configured_or_default_tag_chip(
+                tag,
+                default_label,
+                default_tag_tone(tag),
+                theme,
+            ));
         }
     }
     chips
@@ -1419,7 +1427,7 @@ pub(super) fn work_type_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(Stri
 pub(super) fn configured_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, StatusTone)> {
     document_tags(doc)
         .into_iter()
-        .filter(|tag| !is_builtin_work_type_tag(tag))
+        .filter(|tag| !is_builtin_board_tag(tag))
         .filter_map(|tag| {
             theme
                 .tag_badge(&tag)
@@ -1431,17 +1439,18 @@ pub(super) fn configured_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(Str
 pub(super) fn configured_or_default_tag_chip(
     tag: &str,
     default_label: &str,
+    default_tone: StatusTone,
     theme: &TuiTheme,
 ) -> (String, StatusTone) {
     if let Some(config) = theme.tag_badge(tag) {
         (chip_text(&config.label_for(tag), theme), config.tone())
     } else {
-        (chip_text(default_label, theme), StatusTone::Accent)
+        (chip_text(default_label, theme), default_tone)
     }
 }
 
-pub(super) fn is_builtin_work_type_tag(tag: &str) -> bool {
-    ["research", "spike", "deliverable"]
+pub(super) fn is_builtin_board_tag(tag: &str) -> bool {
+    ["research", "spike", "deliverable", "bug", "feat", "chore"]
         .iter()
         .any(|candidate| tag_matches(tag, candidate))
 }
@@ -2161,7 +2170,7 @@ pub(super) fn validation_visual_chip(
                 .iter()
                 .any(|expected| tag_matches(tag, expected))
         })
-        .then(|| configured_or_default_tag_chip("visual", "VISUAL", theme))
+        .then(|| configured_or_default_tag_chip("visual", "VISUAL", StatusTone::Accent, theme))
 }
 
 pub(super) fn board_should_surface_review_status(status: &str, theme: &TuiTheme) -> bool {

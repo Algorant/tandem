@@ -75,7 +75,7 @@ use rules::RulesState;
 use state::*;
 use terminal::TerminalSession;
 use text::markdownish_lines;
-use theme::{StatusTone, TuiTheme};
+use theme::{default_tag_tone, StatusTone, TuiTheme};
 use validation::ValidationPrompt;
 
 pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
@@ -1941,6 +1941,80 @@ tone = "success"
             "spans: {:?}",
             line.spans
         );
+    }
+
+    #[test]
+    fn board_row_renders_default_bug_feat_and_chore_badges_once() {
+        let theme = TuiTheme::default_dark();
+        let mut doc = doc_with_state("task-30", Some("todo"));
+        doc.fields.insert(
+            "title".to_string(),
+            "Render common repository work tags".to_string(),
+        );
+        doc.fields.insert(
+            "tags".to_string(),
+            "[\"bug\", \"BUG\", \"feat\", \"chore\"]".to_string(),
+        );
+
+        let line = board_item_lines_for_doc(&doc, &theme, 140, false, false, false)[0].clone();
+        let title = line_text(&line);
+        assert_eq!(title.matches(" BUG ").count(), 1, "rendered row: {title}");
+        assert_eq!(title.matches(" FEAT ").count(), 1, "rendered row: {title}");
+        assert_eq!(title.matches(" CHORE ").count(), 1, "rendered row: {title}");
+        for (label, tone) in [
+            ("BUG", StatusTone::Orange),
+            ("FEAT", StatusTone::Sand),
+            ("CHORE", StatusTone::Purple),
+        ] {
+            assert!(
+                line.spans.iter().any(|span| {
+                    span.content.trim() == label && span.style == theme.progress_chip_style(tone)
+                }),
+                "missing {label} style in spans: {:?}",
+                line.spans
+            );
+        }
+    }
+
+    #[test]
+    fn configured_work_tag_overrides_and_disabled_badges_apply_to_built_ins() {
+        let mut theme = TuiTheme::default_dark();
+        let warnings = theme.apply_display_content(
+            r#"
+[board.badges]
+disabled = ["feat"]
+
+[board.badges.tags.bug]
+label = "FIX"
+
+[board.badges.tags.chore]
+tone = "success"
+"#,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+
+        let mut doc = doc_with_state("task-31", Some("todo"));
+        doc.fields
+            .insert("title".to_string(), "Override work badges".to_string());
+        doc.fields.insert(
+            "tags".to_string(),
+            "[\"bug\", \"feat\", \"chore\"]".to_string(),
+        );
+
+        let line = board_item_lines_for_doc(&doc, &theme, 140, false, false, false)[0].clone();
+        let title = line_text(&line);
+        assert!(title.contains(" FIX "), "rendered row: {title}");
+        assert!(!title.contains(" BUG "), "rendered row: {title}");
+        assert!(!title.contains(" FEAT "), "rendered row: {title}");
+        assert!(title.contains(" CHORE "), "rendered row: {title}");
+        assert!(line.spans.iter().any(|span| {
+            span.content.trim() == "FIX"
+                && span.style == theme.progress_chip_style(StatusTone::Orange)
+        }));
+        assert!(line.spans.iter().any(|span| {
+            span.content.trim() == "CHORE"
+                && span.style == theme.progress_chip_style(StatusTone::Success)
+        }));
     }
 
     #[test]
