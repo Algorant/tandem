@@ -88,11 +88,11 @@ Search Tandem records before an ad hoc filesystem scan when the question concern
 
 ## Commit durable workspace data with judgment
 
-Tandem is local-first. Commit durable `.tandem/` workspace changes often enough to keep coordination visible to collaborators, portable across clones and worktrees, and safe from cleanup or reset. Active workspace rules can define a more specific cadence.
+Tandem is local-first. When `.tandem/` is tracked, commit durable coordination changes often enough to keep them visible to collaborators, portable across clones and worktrees, and safe from cleanup or reset. Active workspace rules can define a more specific cadence.
 
-Use coherent commit boundaries rather than one Git commit for every Tandem command or minor lifecycle mutation. When practical, include Tandem changes with the related project change or combine related coordination changes in one focused commit.
+Use coherent lifecycle boundaries rather than one Git commit for every Tandem command or minor mutation. Group coordination changes with related project work when they form one logical unit; otherwise combine related task, accord, event, rule, and Board-to-Logs changes in one focused coordination commit.
 
-Before handoff or integration, squash related local and unpublished Tandem commits when this improves the history and is prudent and possible. Do not rewrite shared or published history without explicit authority.
+Before integration, branch changes, session shutdown, handoff, or push, inspect pending changes and local-only commits. Squash related local and unshared Tandem commits when they represent one coordination unit and doing so preserves clear history. Never rewrite pushed or otherwise shared history without explicit authority. Never silently stash, discard, or partially commit Tandem state.
 
 ## Adapter boundary
 
