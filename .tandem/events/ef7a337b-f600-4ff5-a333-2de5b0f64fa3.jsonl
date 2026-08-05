@@ -171,3 +171,6 @@
 {"ts":"2026-08-05T16:19:55Z","event":"task.created","id":"task-210","summary":"Add `.tandem` commit hygiene to agent guidance","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":171}
 {"ts":"2026-08-05T16:20:55Z","event":"accord.claimed","id":"task-210","summary":"Accord claim for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":172}
 {"ts":"2026-08-05T16:20:55Z","event":"task.updated","id":"task-210","summary":"Updated task-210 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":173}
+{"ts":"2026-08-05T16:23:17Z","event":"accord.delivered","id":"task-210","summary":"Accord deliver for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":174}
+{"ts":"2026-08-05T16:23:22Z","event":"accord.accepted","id":"task-210","summary":"Accord accept for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":175}
+{"ts":"2026-08-05T16:23:25Z","event":"task.completed","id":"task-210","summary":"Added framework-neutral Git hygiene for durable `.tandem` data, including regular but coherent commits, prudent local squashing, and shared-history safety.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":176}
