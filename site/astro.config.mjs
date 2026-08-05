@@ -19,6 +19,9 @@ const verdigrisDark = ExpressiveCodeTheme.fromJSONString(
 export default defineConfig({
   site: siteUrl,
   base: '/',
+  redirects: {
+    '/protocol/': '/workspace/',
+  },
   integrations: [
     starlight({
       title: siteTitle,
@@ -85,10 +88,10 @@ export default defineConfig({
         {
           label: 'Overview',
           items: [
-            { label: 'Spec', link: '/protocol/' },
-            { label: 'CLI', link: '/cli/' },
-            { label: 'TUI', link: '/tui/' },
+            { label: 'Workspace', link: '/workspace/' },
             { label: 'Concepts', link: '/concepts/' },
+            { label: 'CLI Reference', link: '/cli/' },
+            { label: 'TUI', link: '/tui/' },
           ],
         },
         {

@@ -2,7 +2,7 @@
 
 [placeholder for tandem image]
 
-[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [CLI guide](https://trytandem.dev/cli/) · [TUI guide](https://trytandem.dev/tui/) · [Protocol](https://trytandem.dev/protocol/)
+[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [CLI guide](https://trytandem.dev/cli/) · [TUI guide](https://trytandem.dev/tui/) · [Workspace](https://trytandem.dev/workspace/)
 
 Tandem is a protocol for planning, coordination, and delegation of tasks/work between humans and agents:
 - It lives in git alongside your project.
