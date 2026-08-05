@@ -81,7 +81,7 @@ footer { display: flex; justify-content: space-between; gap: 1rem; border-top: 1
 input, select { min-height: 2.55rem; width: 100%; border: 1px solid var(--border); border-radius: .45rem; padding: .45rem .65rem; background: var(--surface); color: var(--text); }
 button { min-height: 2.55rem; border: 1px solid var(--accent); border-radius: .45rem; padding: .45rem .75rem; background: var(--accent); color: var(--surface); cursor: pointer; font-weight: 750; }
 button.secondary { background: var(--surface); color: var(--accent-strong); }
-.board { display: grid; grid-template-columns: repeat(var(--state-count, 3), minmax(15.5rem, 1fr)); gap: .8rem; align-items: start; overflow-x: auto; padding-bottom: .5rem; }
+.board { display: grid; grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr)); gap: .8rem; align-items: start; padding-bottom: .5rem; }
 .board-column { min-width: 15.5rem; border: 1px solid var(--border); border-radius: .7rem; background: color-mix(in srgb, var(--surface-alt) 58%, var(--surface)); }
 .column-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0; padding: .7rem .8rem; border-bottom: 1px solid var(--border); font-size: .9rem; text-transform: capitalize; }
 .card-list, .item-list, .relationship-list, .meta-list { list-style: none; margin: 0; padding: 0; }
@@ -99,6 +99,7 @@ button.secondary { background: var(--surface); color: var(--accent-strong); }
 .badge[data-tone="danger"] { border-color: var(--danger); color: var(--danger); }
 .empty { border: 1px dashed var(--border); border-radius: .55rem; padding: 1.2rem; color: var(--muted); text-align: center; }
 .split { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(16rem, .75fr); gap: 1rem; align-items: start; }
+.panel-gap { margin-top: 1rem; }
 .item-list > li { border-bottom: 1px solid var(--border); }
 .item-list > li:last-child { border-bottom: 0; }
 .item-link { display: block; padding: .85rem 1rem; color: var(--text); text-decoration: none; }

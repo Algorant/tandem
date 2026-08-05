@@ -26,7 +26,11 @@ const state = {
   boardFilters: { query: '', state: '', priority: '' },
   logQuery: '',
   request: 0,
+  pollInFlight: false,
+  pollTimer: null,
 };
+
+const REVISION_POLL_MS = 3000;
 
 function route() {
   const raw = location.hash.slice(1) || 'board';
@@ -77,7 +81,38 @@ async function loadProject() {
   return projectEnvelope;
 }
 
-async function renderRoute() {
+function captureTransientState() {
+  const boardQuery = document.querySelector('#board-query');
+  const logSearch = document.querySelector('#log-search');
+  if (boardQuery) state.boardFilters.query = boardQuery.value;
+  if (logSearch) state.logQuery = logSearch.value;
+}
+
+function captureViewport() {
+  const active = document.activeElement;
+  return {
+    x: window.scrollX,
+    y: window.scrollY,
+    focusId: active instanceof HTMLElement ? active.id : '',
+    selectionStart: active instanceof HTMLInputElement ? active.selectionStart : null,
+    selectionEnd: active instanceof HTMLInputElement ? active.selectionEnd : null,
+  };
+}
+
+function restoreViewport(saved) {
+  window.scrollTo(saved.x, saved.y);
+  if (!saved.focusId) return;
+  const target = document.getElementById(saved.focusId);
+  if (!(target instanceof HTMLElement)) return;
+  target.focus({ preventScroll: true });
+  if (target instanceof HTMLInputElement && saved.selectionStart != null) {
+    target.setSelectionRange(saved.selectionStart, saved.selectionEnd);
+  }
+}
+
+async function renderRoute({ preserveViewport = false, changed = false } = {}) {
+  captureTransientState();
+  const savedViewport = preserveViewport ? captureViewport() : null;
   const current = route();
   const request = ++state.request;
   setActiveNav(current.name);
@@ -137,8 +172,12 @@ async function renderRoute() {
     if (request !== state.request) return;
     applyEnvelope(envelope);
     replace(content);
-    status.textContent = `${current.name === 'validation' ? 'Validation' : current.name[0].toUpperCase() + current.name.slice(1)} loaded. Read-only.`;
-    requestAnimationFrame(() => document.querySelector('#view-title')?.focus({ preventScroll: true }));
+    const viewName = current.name === 'validation' ? 'Validation' : current.name[0].toUpperCase() + current.name.slice(1);
+    status.textContent = changed ? `${viewName} updated to the latest revision.` : `${viewName} loaded. Read-only.`;
+    requestAnimationFrame(() => {
+      if (savedViewport) restoreViewport(savedViewport);
+      else document.querySelector('#view-title')?.focus({ preventScroll: true });
+    });
   } catch (error) {
     if (request !== state.request) return;
     status.textContent = 'The requested view could not load.';
@@ -148,9 +187,40 @@ async function renderRoute() {
   }
 }
 
-window.addEventListener('hashchange', renderRoute);
+async function pollRevision() {
+  if (document.hidden || state.pollInFlight || !state.revision) return;
+  state.pollInFlight = true;
+  try {
+    const envelope = await api.project();
+    if (envelope.revision === state.revision) return;
+    state.project = envelope.data;
+    applyEnvelope(envelope);
+    await renderRoute({ preserveViewport: true, changed: true });
+  } catch {
+    // Keep the current canonical view. The next visible poll retries quietly.
+  } finally {
+    state.pollInFlight = false;
+  }
+}
+
+function updatePolling() {
+  if (state.pollTimer) {
+    clearInterval(state.pollTimer);
+    state.pollTimer = null;
+  }
+  if (document.hidden) return;
+  state.pollTimer = setInterval(pollRevision, REVISION_POLL_MS);
+}
+
+window.addEventListener('hashchange', () => renderRoute());
+document.addEventListener('visibilitychange', () => {
+  updatePolling();
+  if (!document.hidden) pollRevision();
+});
 refresh.addEventListener('click', async () => {
+  captureTransientState();
   state.project = null;
   await renderRoute();
 });
+updatePolling();
 renderRoute();

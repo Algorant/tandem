@@ -6,7 +6,6 @@ export function el(tag, attrs = {}, children = []) {
     if (value == null || value === false) continue;
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = String(value);
-    else if (key === 'html') node.innerHTML = value;
     else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
     else node.setAttribute(key, value === true ? '' : String(value));
   }
@@ -16,6 +15,14 @@ export function el(tag, attrs = {}, children = []) {
     node.append(child instanceof Node ? child : document.createTextNode(String(child)));
   }
   return node;
+}
+
+function safeMarkdown(html) {
+  const content = el('div', { class: 'prose' });
+  // `bodyHtml` comes only from the server's strict renderer. That renderer
+  // escapes project text and cannot emit links, images, or raw HTML.
+  content.innerHTML = html;
+  return content;
 }
 
 export function replace(content) {
@@ -161,7 +168,7 @@ export function renderBoard(data, filters, onFilter) {
   return el('div', {}, [
     heading('Board', 'Configured workflow states with canonical roles and relationships from the read API.'),
     form,
-    columns.length ? el('div', { class: 'board', style: `--state-count:${Math.max(1, columns.length)}` }, columns) : el('p', { class: 'empty', text: 'No configured state matches this filter.' }),
+    columns.length ? el('div', { class: 'board' }, columns) : el('p', { class: 'empty', text: 'No configured state matches this filter.' }),
   ]);
 }
 
@@ -245,7 +252,7 @@ export function renderDetail(detail, kind = 'document') {
       el('div', { class: 'split' }, [
         el('div', { class: 'detail-body' }, [
           el('h3', { text: 'Document body' }),
-          detail.bodyHtml ? el('div', { class: 'prose', html: detail.bodyHtml }) : el('p', { class: 'empty', text: 'This document has no body.' }),
+          detail.bodyHtml ? safeMarkdown(detail.bodyHtml) : el('p', { class: 'empty', text: 'This document has no body.' }),
         ]),
         el('aside', { class: 'metadata', 'aria-label': 'Document metadata' }, [
           el('h3', { text: 'Metadata' }),
@@ -299,7 +306,7 @@ export function renderHealth(project, warnings, revision) {
   return el('div', {}, [
     heading('Project health', 'Read API metadata, workflow totals, and snapshot warnings.'),
     el('div', { class: 'health-cards' }, cards.map(([label, value]) => el('section', { class: 'panel health-card' }, [el('strong', { text: value }), el('span', { text: label })]))),
-    el('div', { class: 'split', style: 'margin-top:1rem' }, [
+    el('div', { class: 'split panel-gap' }, [
       el('section', { class: 'panel panel-pad' }, [el('h3', { text: 'Project' }), el('dl', { class: 'health-grid' }, [
         el('dt', { text: 'Health status' }), el('dd', {}, badge('Status', health.status, statusTone(health.status))),
         el('dt', { text: 'Protocol version' }), el('dd', { text: project.protocolVersion }),
@@ -309,6 +316,6 @@ export function renderHealth(project, warnings, revision) {
       ])]),
       el('section', { class: 'panel panel-pad' }, [el('h3', { text: `Warnings (${warnings.length})` }), warnings.length ? el('ul', {}, warnings.map((warning) => el('li', { text: warning }))) : el('p', { text: 'No snapshot warnings.' })]),
     ]),
-    el('section', { class: 'panel panel-pad', style: 'margin-top:1rem' }, [el('h3', { text: 'Tasks by workflow state' }), el('dl', { class: 'health-grid' }, Object.entries(health.byState).flatMap(([state, count]) => [el('dt', { text: state }), el('dd', { text: count })]))]),
+    el('section', { class: 'panel panel-pad panel-gap' }, [el('h3', { text: 'Tasks by workflow state' }), el('dl', { class: 'health-grid' }, Object.entries(health.byState).flatMap(([state, count]) => [el('dt', { text: state }), el('dd', { text: count })]))]),
   ]);
 }

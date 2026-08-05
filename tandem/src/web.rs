@@ -7,11 +7,13 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Path, State};
-use axum::http::{header, Request, StatusCode, Uri};
+use axum::http::{header, Method, Request, StatusCode, Uri};
+use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use serde::Serialize;
+use tokio::sync::Semaphore;
 
 use crate::app;
 use crate::app::queries::{ListFilter, ReadSnapshot};
@@ -32,6 +34,10 @@ const APP_JS: &str = include_str!("web/app.js");
 const API_JS: &str = include_str!("web/api.js");
 const UI_JS: &str = include_str!("web/ui.js");
 
+const MAX_REQUEST_TARGET_BYTES: usize = 4 * 1024;
+const MAX_CONCURRENT_REQUESTS: usize = 64;
+const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'self'; img-src 'self'; script-src 'self'; style-src 'self'";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Options {
     pub(crate) port: Option<u16>,
@@ -41,6 +47,8 @@ pub(crate) struct Options {
 #[derive(Clone)]
 struct WebState {
     project: Arc<TandemProject>,
+    expected_host: Arc<str>,
+    request_slots: Arc<Semaphore>,
 }
 
 pub(crate) fn run(project: TandemProject, options: Options) -> Result<(), CliError> {
@@ -72,7 +80,7 @@ async fn serve(project: TandemProject, options: Options) -> Result<(), CliError>
         }
     }
 
-    axum::serve(listener, router(project))
+    axum::serve(listener, router(project, &address.to_string()))
         .with_graceful_shutdown(shutdown_signal())
         .await
         .map_err(|error| CliError::user(format!("web server failed: {error}")))
@@ -108,7 +116,12 @@ async fn shutdown_signal() {
     let _ = tokio::signal::ctrl_c().await;
 }
 
-fn router(project: TandemProject) -> Router {
+fn router(project: TandemProject, expected_host: &str) -> Router {
+    let state = WebState {
+        project: Arc::new(project),
+        expected_host: Arc::from(expected_host),
+        request_slots: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
+    };
     Router::new()
         .route("/", get(index))
         .route("/assets/app.css", get(styles))
@@ -125,9 +138,70 @@ fn router(project: TandemProject) -> Router {
         .route("/api/v1/decisions", get(decisions_api))
         .route("/api/v1/decisions/{id}", get(decision_api))
         .fallback(not_found)
-        .with_state(WebState {
-            project: Arc::new(project),
-        })
+        .with_state(state.clone())
+        .layer(middleware::from_fn_with_state(state, secure_request))
+}
+
+async fn secure_request(
+    State(state): State<WebState>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    let revision = || "unavailable".to_string();
+    let host_is_valid = request
+        .headers()
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|host| host == state.expected_host.as_ref());
+    if !host_is_valid {
+        return api_error(
+            StatusCode::BAD_REQUEST,
+            "invalid_host",
+            "the Host header does not match this local server".to_string(),
+            revision(),
+        );
+    }
+    if request.uri().to_string().len() > MAX_REQUEST_TARGET_BYTES {
+        return api_error(
+            StatusCode::URI_TOO_LONG,
+            "request_target_too_large",
+            "the request target is too large".to_string(),
+            revision(),
+        );
+    }
+    if request.method() != Method::GET && request.method() != Method::HEAD {
+        return api_error(
+            StatusCode::METHOD_NOT_ALLOWED,
+            "method_not_allowed",
+            "this local server provides read-only GET and HEAD routes".to_string(),
+            revision(),
+        );
+    }
+    let has_body = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value != "0")
+        || request.headers().contains_key(header::TRANSFER_ENCODING);
+    if has_body {
+        return api_error(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "request_body_not_allowed",
+            "request bodies are not accepted".to_string(),
+            revision(),
+        );
+    }
+    let Ok(_permit) = state.request_slots.clone().try_acquire_owned() else {
+        return api_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "server_busy",
+            "the local server is busy; retry shortly".to_string(),
+            revision(),
+        );
+    };
+    let mut response = next.run(request).await;
+    security_headers(&mut response);
+    response
 }
 
 async fn index() -> Response {
@@ -156,25 +230,18 @@ fn static_response(content: impl IntoResponse, content_type: &'static str) -> Re
         header::CONTENT_TYPE,
         header::HeaderValue::from_static(content_type),
     );
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        header::HeaderValue::from_static("no-store"),
-    );
+    security_headers(&mut response);
     response
 }
 
-async fn not_found(State(state): State<WebState>, request: Request<Body>) -> Response {
+async fn not_found(State(state): State<WebState>, _request: Request<Body>) -> Response {
     let revision = app::queries::load_read(&state.project)
         .map(|read| read.revision)
         .unwrap_or_else(|_| "unavailable".to_string());
     api_error(
         StatusCode::NOT_FOUND,
         "route_not_found",
-        format!(
-            "no read route for {} {}",
-            request.method(),
-            request.uri().path()
-        ),
+        "the requested read route does not exist".to_string(),
         revision,
     )
 }
@@ -440,13 +507,34 @@ fn api_error(
 }
 
 fn api_headers(response: &mut Response) {
-    response.headers_mut().insert(
+    security_headers(response);
+}
+
+fn security_headers(response: &mut Response) {
+    let headers = response.headers_mut();
+    headers.insert(
         header::CACHE_CONTROL,
         header::HeaderValue::from_static("no-store"),
     );
-    response.headers_mut().insert(
+    headers.insert(
+        header::CONTENT_SECURITY_POLICY,
+        header::HeaderValue::from_static(CONTENT_SECURITY_POLICY),
+    );
+    headers.insert(
+        header::X_FRAME_OPTIONS,
+        header::HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
         header::X_CONTENT_TYPE_OPTIONS,
         header::HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        header::REFERRER_POLICY,
+        header::HeaderValue::from_static("no-referrer"),
+    );
+    headers.insert(
+        header::HeaderName::from_static("permissions-policy"),
+        header::HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
     );
 }
 
@@ -460,9 +548,9 @@ fn parse_query(uri: &Uri) -> Result<BTreeMap<String, String>, ApiFailure> {
         let key = percent_decode(key)?;
         let value = percent_decode(value)?;
         if values.insert(key.clone(), value).is_some() {
-            return Err(ApiFailure::bad_request(format!(
-                "query parameter `{key}` must not be repeated"
-            )));
+            return Err(ApiFailure::bad_request(
+                "query parameters must not be repeated",
+            ));
         }
     }
     Ok(values)
@@ -517,10 +605,8 @@ fn reject_unknown_query(
     query: &BTreeMap<String, String>,
     allowed: &[&str],
 ) -> Result<(), ApiFailure> {
-    if let Some(key) = query.keys().find(|key| !allowed.contains(&key.as_str())) {
-        return Err(ApiFailure::bad_request(format!(
-            "unknown query parameter `{key}`"
-        )));
+    if query.keys().any(|key| !allowed.contains(&key.as_str())) {
+        return Err(ApiFailure::bad_request("unknown query parameter"));
     }
     Ok(())
 }
@@ -1044,6 +1130,8 @@ mod tests {
 
     use super::*;
 
+    const TEST_HOST: &str = "127.0.0.1:43123";
+
     fn test_project() -> (PathBuf, TandemProject) {
         let root = std::env::temp_dir().join(format!(
             "tandem-web-{}-{}",
@@ -1078,7 +1166,13 @@ mod tests {
 
     async fn json_request(app: Router, uri: &str) -> (StatusCode, Value) {
         let response = app
-            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri(uri)
+                    .header(header::HOST, TEST_HOST)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         let status = response.status();
@@ -1089,7 +1183,7 @@ mod tests {
     #[tokio::test]
     async fn read_routes_return_versioned_envelopes_and_canonical_relationship_data() {
         let (root, project) = test_project();
-        let app = router(project);
+        let app = router(project, TEST_HOST);
         for uri in [
             "/api/v1/project",
             "/api/v1/board?state=validation",
@@ -1123,7 +1217,7 @@ mod tests {
     #[tokio::test]
     async fn bundled_interface_has_semantic_landmarks_and_module_assets() {
         let (root, project) = test_project();
-        let app = router(project);
+        let app = router(project, TEST_HOST);
         for (uri, content_type, evidence) in [
             ("/", "text/html", "<main id=\"content\""),
             ("/assets/app.css", "text/css", ":focus-visible"),
@@ -1133,7 +1227,13 @@ mod tests {
         ] {
             let response = app
                 .clone()
-                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header(header::HOST, TEST_HOST)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
                 .await
                 .unwrap();
             assert_eq!(response.status(), StatusCode::OK, "{uri}");
@@ -1148,10 +1248,116 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[tokio::test]
+    async fn every_response_has_restrictive_browser_security_headers_and_no_cors() {
+        let (root, project) = test_project();
+        let app = router(project, TEST_HOST);
+        for uri in ["/", "/assets/app.js", "/api/v1/project", "/missing"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(uri)
+                        .header(header::HOST, TEST_HOST)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let headers = response.headers();
+            assert_eq!(headers[header::CACHE_CONTROL], "no-store", "{uri}");
+            assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff", "{uri}");
+            assert_eq!(headers[header::X_FRAME_OPTIONS], "DENY", "{uri}");
+            assert_eq!(headers[header::REFERRER_POLICY], "no-referrer", "{uri}");
+            let csp = headers[header::CONTENT_SECURITY_POLICY].to_str().unwrap();
+            assert!(csp.contains("default-src 'self'"), "{uri}: {csp}");
+            assert!(csp.contains("frame-ancestors 'none'"), "{uri}: {csp}");
+            assert!(
+                headers.get("access-control-allow-origin").is_none(),
+                "{uri}"
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn host_method_target_and_body_safeguards_reject_bad_requests() {
+        let (root, project) = test_project();
+        let app = router(project, TEST_HOST);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/project")
+                    .header(header::HOST, "attacker.example")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/api/v1/project")
+                    .header(header::HOST, TEST_HOST)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        let long_target = format!(
+            "/api/v1/logs?query={}",
+            "x".repeat(MAX_REQUEST_TARGET_BYTES)
+        );
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(long_target)
+                    .header(header::HOST, TEST_HOST)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::URI_TOO_LONG);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/project")
+                    .header(header::HOST, TEST_HOST)
+                    .header(header::CONTENT_LENGTH, "1")
+                    .body(Body::from("x"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundled_script_polls_only_visible_pages_and_refetches_changed_revisions() {
+        assert!(APP_JS.contains("const REVISION_POLL_MS = 3000"));
+        assert!(APP_JS.contains("document.hidden"));
+        assert!(APP_JS.contains("visibilitychange"));
+        assert!(APP_JS.contains("envelope.revision === state.revision"));
+        assert!(APP_JS.contains("renderRoute({ preserveViewport: true, changed: true })"));
+        assert!(APP_JS.contains("captureTransientState"));
+    }
+
     #[test]
     fn markdown_rendering_is_styled_but_never_emits_project_html() {
         let rendered = render_markdown(
-            "# Heading\n\n- one\n- <script>alert('x')</script>\n\n```html\n<img src=x>\n```\n",
+            "# Heading\n\n- one\n- <script>alert('x')</script>\n\n[remote](https://example.com)\n\n![pixel](https://example.com/pixel)\n\n```html\n<img src=x>\n```\n",
         );
         assert!(rendered.contains("<h1>Heading</h1>"));
         assert!(rendered.contains("<ul><li>one</li>"));
@@ -1159,12 +1365,14 @@ mod tests {
         assert!(rendered.contains("&lt;img src=x&gt;"));
         assert!(!rendered.contains("<script>"));
         assert!(!rendered.contains("<img"));
+        assert!(!rendered.contains("href=\""));
+        assert!(!rendered.contains("src=\""));
     }
 
     #[tokio::test]
     async fn route_errors_are_safe_and_machine_readable() {
         let (root, project) = test_project();
-        let app = router(project);
+        let app = router(project, TEST_HOST);
         let (status, missing) = json_request(app.clone(), "/api/v1/documents/task-999").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(missing["error"]["code"], "document_not_found");
@@ -1174,16 +1382,17 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(invalid["error"]["code"], "invalid_request");
 
-        let (status, mutation) = json_request(app, "/api/v1/tasks").await;
+        let (status, mutation) = json_request(app, "/api/v1/tasks?token=do-not-reflect").await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(mutation["error"]["code"], "route_not_found");
+        assert!(!mutation.to_string().contains("do-not-reflect"));
         fs::remove_dir_all(root).unwrap();
     }
 
     #[tokio::test]
     async fn project_read_failures_do_not_expose_source_paths() {
         let (root, project) = test_project();
-        let app = router(project.clone());
+        let app = router(project.clone(), TEST_HOST);
         fs::write(project.board_dir.join("task-1.md"), "not frontmatter").unwrap();
         let (status, error) = json_request(app, "/api/v1/project").await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
@@ -1199,7 +1408,7 @@ mod tests {
     #[tokio::test]
     async fn revision_changes_after_project_content_changes() {
         let (root, project) = test_project();
-        let app = router(project.clone());
+        let app = router(project.clone(), TEST_HOST);
         let (_, before) = json_request(app.clone(), "/api/v1/project").await;
         fs::write(
             project.board_dir.join("task-1.md"),
