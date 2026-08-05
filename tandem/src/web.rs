@@ -16,7 +16,7 @@ use serde::Serialize;
 use crate::app;
 use crate::app::queries::{ListFilter, ReadSnapshot};
 use crate::project::{StoredDocument as Document, TandemProject};
-use crate::protocol::accord::status as accord_status;
+use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::review::status as review_status;
@@ -29,6 +29,8 @@ use crate::CliError;
 const INDEX_HTML: &str = include_str!("web/index.html");
 const APP_CSS: &str = include_str!("web/app.css");
 const APP_JS: &str = include_str!("web/app.js");
+const API_JS: &str = include_str!("web/api.js");
+const UI_JS: &str = include_str!("web/ui.js");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Options {
@@ -111,6 +113,8 @@ fn router(project: TandemProject) -> Router {
         .route("/", get(index))
         .route("/assets/app.css", get(styles))
         .route("/assets/app.js", get(script))
+        .route("/assets/api.js", get(api_script))
+        .route("/assets/ui.js", get(ui_script))
         .route("/api/v1/project", get(project_api))
         .route("/api/v1/board", get(board_api))
         .route("/api/v1/attention", get(attention_api))
@@ -136,6 +140,14 @@ async fn styles() -> Response {
 
 async fn script() -> Response {
     static_response(APP_JS, "text/javascript; charset=utf-8")
+}
+
+async fn api_script() -> Response {
+    static_response(API_JS, "text/javascript; charset=utf-8")
+}
+
+async fn ui_script() -> Response {
+    static_response(UI_JS, "text/javascript; charset=utf-8")
 }
 
 fn static_response(content: impl IntoResponse, content_type: &'static str) -> Response {
@@ -194,7 +206,11 @@ async fn project_api(State(state): State<WebState>) -> Response {
             states: read.states.clone(),
             read_only: true,
             health: HealthDto {
-                status: "healthy",
+                status: if read.warnings.is_empty() {
+                    "healthy"
+                } else {
+                    "warnings"
+                },
                 board_documents: board.len(),
                 tasks,
                 decisions,
@@ -593,9 +609,26 @@ fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetail
             validation: completion_validation(document).map(str::to_string),
             reviewer: completion_reviewer(document).map(str::to_string),
         });
+    let accord = accord_status(document).map(|_| {
+        AccordDto::from(AccordRecord::from_document(
+            document,
+            document.field("updatedAt").unwrap_or(""),
+        ))
+    });
+    let review = review_status(document).map(|status| ReviewDto {
+        status: status.to_string(),
+        reviewer: document.field("review.reviewer").map(str::to_string),
+        requested_at: document.field("review.requestedAt").map(str::to_string),
+        decided_at: document.field("review.decidedAt").map(str::to_string),
+        note: document
+            .field("review.note")
+            .or_else(|| document.field("review.reason"))
+            .map(str::to_string),
+    });
     Ok(DocumentDetailDto {
         summary,
         body: document.body.clone(),
+        body_html: render_markdown(&document.body),
         due_date: document.field("dueDate").map(str::to_string),
         created_at: document.field("createdAt").map(str::to_string),
         updated_at: document.field("updatedAt").map(str::to_string),
@@ -605,6 +638,8 @@ fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetail
         related_files: values(document, "relatedFiles"),
         parent: parent.map(Box::new),
         children,
+        accord,
+        review,
         completion,
         decision: (document.doc_type() == "decision").then(|| decision_dto(document)),
     })
@@ -640,6 +675,98 @@ fn decision_dto(document: &Document) -> DecisionDto {
             .map(str::trim)
             .find(|line| !line.is_empty())
             .map(str::to_string),
+    }
+}
+
+/// Render a deliberately small, safe Markdown subset for the browser peer.
+///
+/// The web adapter receives an already separated document body. It does not
+/// parse Tandem files or infer protocol meaning. Project-controlled text is
+/// always escaped, and the renderer never emits links, images, or raw HTML.
+fn render_markdown(markdown: &str) -> String {
+    let mut html = String::new();
+    let mut in_code = false;
+    let mut in_list = false;
+
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            if in_list {
+                html.push_str("</ul>");
+                in_list = false;
+            }
+            if in_code {
+                html.push_str("</code></pre>");
+            } else {
+                html.push_str("<pre><code>");
+            }
+            in_code = !in_code;
+            continue;
+        }
+        if in_code {
+            escape_html_into(line, &mut html);
+            html.push('\n');
+            continue;
+        }
+        if trimmed.is_empty() {
+            if in_list {
+                html.push_str("</ul>");
+                in_list = false;
+            }
+            continue;
+        }
+        if let Some(item) = trimmed
+            .strip_prefix("- ")
+            .or_else(|| trimmed.strip_prefix("* "))
+        {
+            if !in_list {
+                html.push_str("<ul>");
+                in_list = true;
+            }
+            html.push_str("<li>");
+            escape_html_into(item, &mut html);
+            html.push_str("</li>");
+            continue;
+        }
+        if in_list {
+            html.push_str("</ul>");
+            in_list = false;
+        }
+        let hashes = trimmed.bytes().take_while(|byte| *byte == b'#').count();
+        if (1..=6).contains(&hashes) && trimmed.as_bytes().get(hashes) == Some(&b' ') {
+            let content = &trimmed[hashes + 1..];
+            html.push_str(&format!("<h{hashes}>"));
+            escape_html_into(content, &mut html);
+            html.push_str(&format!("</h{hashes}>"));
+        } else if let Some(quote) = trimmed.strip_prefix("> ") {
+            html.push_str("<blockquote><p>");
+            escape_html_into(quote, &mut html);
+            html.push_str("</p></blockquote>");
+        } else {
+            html.push_str("<p>");
+            escape_html_into(trimmed, &mut html);
+            html.push_str("</p>");
+        }
+    }
+    if in_list {
+        html.push_str("</ul>");
+    }
+    if in_code {
+        html.push_str("</code></pre>");
+    }
+    html
+}
+
+fn escape_html_into(value: &str, output: &mut String) {
+    for character in value.chars() {
+        match character {
+            '&' => output.push_str("&amp;"),
+            '<' => output.push_str("&lt;"),
+            '>' => output.push_str("&gt;"),
+            '"' => output.push_str("&quot;"),
+            '\'' => output.push_str("&#39;"),
+            character => output.push(character),
+        }
     }
 }
 
@@ -773,6 +900,7 @@ struct DocumentDetailDto {
     #[serde(flatten)]
     summary: DocumentSummaryDto,
     body: String,
+    body_html: String,
     due_date: Option<String>,
     created_at: Option<String>,
     updated_at: Option<String>,
@@ -782,8 +910,58 @@ struct DocumentDetailDto {
     related_files: Vec<String>,
     parent: Option<Box<DocumentSummaryDto>>,
     children: Vec<DocumentSummaryDto>,
+    accord: Option<AccordDto>,
+    review: Option<ReviewDto>,
     completion: Option<CompletionDto>,
     decision: Option<DecisionDto>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AccordDto {
+    status: String,
+    assignee: Option<String>,
+    claimed_at: Option<String>,
+    delivered_at: Option<String>,
+    deliverables: Vec<String>,
+    validations: Vec<String>,
+    constraints: Vec<String>,
+    summary: Option<String>,
+    evidence: Vec<String>,
+    files_changed: Vec<String>,
+    reviewer: Option<String>,
+    note: Option<String>,
+    reason: Option<String>,
+}
+
+impl From<AccordRecord> for AccordDto {
+    fn from(record: AccordRecord) -> Self {
+        Self {
+            status: record.status,
+            assignee: record.assignee,
+            claimed_at: record.claimed_at,
+            delivered_at: record.delivered_at,
+            deliverables: record.deliverables,
+            validations: record.validations,
+            constraints: record.constraints,
+            summary: record.summary,
+            evidence: record.evidence,
+            files_changed: record.files_changed,
+            reviewer: record.reviewer,
+            note: record.note,
+            reason: record.reason,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReviewDto {
+    status: String,
+    reviewer: Option<String>,
+    requested_at: Option<String>,
+    decided_at: Option<String>,
+    note: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -882,7 +1060,7 @@ mod tests {
         .unwrap();
         fs::write(
             project.board_dir.join("task-1.md"),
-            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\naccord:\n  status: delivered\n---\n\n## Body\n",
+            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\naccord:\n  status: delivered\n  assignee: worker\n  summary: Ready to inspect\n  validation:\n    commands: [cargo test]\nreview:\n  status: pending\n  reviewer: owner\n---\n\n## Body\n",
         )
         .unwrap();
         fs::write(
@@ -932,9 +1110,55 @@ mod tests {
         let (_, detail) = json_request(app, "/api/v1/documents/task-1").await;
         assert_eq!(detail["data"]["role"], "task");
         assert_eq!(detail["data"]["accordStatus"], "delivered");
+        assert_eq!(detail["data"]["accord"]["assignee"], "worker");
+        assert_eq!(detail["data"]["accord"]["validations"][0], "cargo test");
+        assert_eq!(detail["data"]["review"]["status"], "pending");
+        assert_eq!(detail["data"]["review"]["reviewer"], "owner");
         assert_eq!(detail["data"]["body"], "\n## Body\n");
+        assert_eq!(detail["data"]["bodyHtml"], "<h2>Body</h2>");
         assert!(detail["data"].get("path").is_none());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn bundled_interface_has_semantic_landmarks_and_module_assets() {
+        let (root, project) = test_project();
+        let app = router(project);
+        for (uri, content_type, evidence) in [
+            ("/", "text/html", "<main id=\"content\""),
+            ("/assets/app.css", "text/css", ":focus-visible"),
+            ("/assets/app.js", "text/javascript", "renderRoute"),
+            ("/assets/api.js", "text/javascript", "'/api/v1'"),
+            ("/assets/ui.js", "text/javascript", "renderBoard"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{uri}");
+            assert!(response.headers()[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with(content_type));
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+            assert!(String::from_utf8_lossy(&body).contains(evidence), "{uri}");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn markdown_rendering_is_styled_but_never_emits_project_html() {
+        let rendered = render_markdown(
+            "# Heading\n\n- one\n- <script>alert('x')</script>\n\n```html\n<img src=x>\n```\n",
+        );
+        assert!(rendered.contains("<h1>Heading</h1>"));
+        assert!(rendered.contains("<ul><li>one</li>"));
+        assert!(rendered.contains("&lt;script&gt;alert(&#39;x&#39;)&lt;/script&gt;"));
+        assert!(rendered.contains("&lt;img src=x&gt;"));
+        assert!(!rendered.contains("<script>"));
+        assert!(!rendered.contains("<img"));
     }
 
     #[tokio::test]

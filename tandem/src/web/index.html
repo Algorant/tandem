@@ -4,37 +4,52 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <title>Tandem</title>
+  <meta name="theme-color" content="#0f766e">
+  <title>Tandem · Read-only project browser</title>
   <link rel="stylesheet" href="/assets/app.css">
-  <script src="/assets/app.js" defer></script>
+  <script type="module" src="/assets/app.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#content">Skip to content</a>
-  <header>
-    <div>
-      <p class="eyebrow">Tandem</p>
-      <h1 id="project-title">Local project</h1>
+  <a class="skip-link" href="#content">Skip to main content</a>
+  <header class="site-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">T</span>
+      <div>
+        <p class="eyebrow">Tandem workspace</p>
+        <h1 id="project-title">Local project</h1>
+      </div>
     </div>
-    <span class="badge">Read-only</span>
+    <div class="header-meta">
+      <span class="status-badge status-readonly">Mode: Read-only</span>
+      <span id="revision" class="revision">Revision unavailable</span>
+      <button id="refresh" class="secondary" type="button">Refresh view</button>
+    </div>
   </header>
-  <nav aria-label="Project views">
-    <a href="#board">Board</a>
-    <a href="#validation">Validation</a>
-    <a href="#logs">Logs</a>
-    <a href="#rules">Rules</a>
-    <a href="#decisions">Decisions</a>
+
+  <nav class="view-nav" aria-label="Project views">
+    <a href="#board" data-route="board">Board</a>
+    <a href="#validation" data-route="validation">Validation <span id="attention-count" class="count" aria-label="items needing attention">–</span></a>
+    <a href="#logs" data-route="logs">Logs</a>
+    <a href="#rules" data-route="rules">Rules</a>
+    <a href="#decisions" data-route="decisions">Decisions</a>
+    <a href="#health" data-route="health">Project health</a>
   </nav>
+
+  <div class="notice-wrap">
+    <p id="app-status" class="app-status" role="status" aria-live="polite">Loading project…</p>
+    <div id="warning-banner" class="warning-banner" hidden></div>
+  </div>
+
   <main id="content" tabindex="-1">
-    <section aria-labelledby="status-title">
-      <h2 id="status-title">Web foundation ready</h2>
-      <p id="status" role="status">Connecting to the local read API…</p>
-      <dl id="health"></dl>
-    </section>
-    <section aria-labelledby="next-title">
-      <h2 id="next-title">Interface shell</h2>
-      <p>The complete browser views arrive in the next Tandem web task. This bundled shell verifies the one-binary server and API foundation.</p>
-    </section>
+    <noscript>
+      <section class="panel prose"><h2>JavaScript is required</h2><p>This local read-only interface uses JavaScript to request canonical project views from <code>/api/v1</code>.</p></section>
+    </noscript>
+    <div id="view" aria-live="off"></div>
   </main>
-  <footer>Served locally by <code>tandem web</code>.</footer>
+
+  <footer>
+    <span>Served locally by <code>tandem web</code>.</span>
+    <span>Data stays in the current workspace.</span>
+  </footer>
 </body>
 </html>

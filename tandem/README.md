@@ -193,6 +193,20 @@ Supported built-in presets are `default-dark` (conservative dark/default) and `v
 - `[badges.states]`: arbitrary configured workflow state IDs mapped to colors; IDs without an entry use the existing muted fallback
 - `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
 
+## Read-only web interface
+
+Open a bundled local browser view of the nearest Tandem workspace:
+
+```text
+cargo run --manifest-path tandem/Cargo.toml -- web
+```
+
+Use `cargo run --manifest-path tandem/Cargo.toml -- web --no-open` for a terminal-only preview that prints the selected loopback URL. Add `--port <port>` when a stable local port is useful. The interface is read-only and provides Board, Validation attention, document relationships and details, Logs search, Rules, Decisions, and project health over the versioned `/api/v1` read API. It uses no remote assets or separate JavaScript runtime.
+
+The browser interface keeps filters and selection in the current tab. Use its native links, forms, and refresh button with a keyboard or pointer. The layout supports narrow screens and browser zoom, uses visible focus indicators, and includes text in every status badge.
+
+## TUI interaction
+
 In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrow keys or `j`/`k` to move, `e` in Board to edit the selected active task in `$EDITOR`, `/` in Logs to filter, `?` for help, and `q` to quit. Mouse clicks use a hit-map: top tabs switch views, Board state tabs switch state subviews, Board/Logs rows select items, clicking an already-selected Board row toggles its inline preview, footer command labels run the same keyboard actions where safe, and non-action regions are safe no-ops. `h/l` stays local: Board state subviews, Logs/Decisions list-detail focus, and Rules categories. Tab/BackTab cycles focus only in views with focusable panes; in Rules it stays in view and shows a hint instead of switching top-level views. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
 
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
