@@ -162,3 +162,4 @@
 {"ts":"2026-08-05T02:56:47Z","event":"task.completed","id":"task-206","summary":"Shipped the simplified Extensions page.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":162}
 {"ts":"2026-08-05T02:56:54Z","event":"task.completed","id":"task-207","summary":"Shipped the Skills placeholder page.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":163}
 {"ts":"2026-08-05T02:56:58Z","event":"task.completed","id":"task-196","summary":"Completed the trytandem.dev site overhaul across all approved documentation pages, workflows, integrations, navigation, validation, and local preview setup.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":164}
+{"ts":"2026-08-05T02:58:33Z","event":"task.created","id":"task-208","summary":"Second-pass visual review of shipped docs site","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":165}
