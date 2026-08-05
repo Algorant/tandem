@@ -163,3 +163,11 @@
 {"ts":"2026-08-05T02:56:54Z","event":"task.completed","id":"task-207","summary":"Shipped the Skills placeholder page.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":163}
 {"ts":"2026-08-05T02:56:58Z","event":"task.completed","id":"task-196","summary":"Completed the trytandem.dev site overhaul across all approved documentation pages, workflows, integrations, navigation, validation, and local preview setup.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":164}
 {"ts":"2026-08-05T02:58:33Z","event":"task.created","id":"task-208","summary":"Second-pass visual review of shipped docs site","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":165}
+{"ts":"2026-08-05T15:04:12Z","event":"task.created","id":"task-209","summary":"Add and verify bug, feat, and chore Board badges","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":166}
+{"ts":"2026-08-05T15:06:25Z","event":"task.updated","id":"task-209","summary":"Updated task-209 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":167}
+{"ts":"2026-08-05T15:07:46Z","event":"task.updated","id":"task-209","summary":"Updated task-209 metadata: body","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":168}
+{"ts":"2026-08-05T16:18:29Z","event":"accord.claimed","id":"task-209","summary":"Accord claim for task-209","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":169}
+{"ts":"2026-08-05T16:18:29Z","event":"task.updated","id":"task-209","summary":"Updated task-209 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":170}
+{"ts":"2026-08-05T16:19:55Z","event":"task.created","id":"task-210","summary":"Add `.tandem` commit hygiene to agent guidance","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":171}
+{"ts":"2026-08-05T16:20:55Z","event":"accord.claimed","id":"task-210","summary":"Accord claim for task-210","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":172}
+{"ts":"2026-08-05T16:20:55Z","event":"task.updated","id":"task-210","summary":"Updated task-210 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":173}
