@@ -200,3 +200,8 @@
 {"ts":"2026-08-05T18:40:07Z","event":"accord.delivered","id":"task-215","summary":"Accord deliver for task-215","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":200}
 {"ts":"2026-08-05T18:40:10Z","event":"accord.accepted","id":"task-215","summary":"Accord accept for task-215","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":201}
 {"ts":"2026-08-05T18:40:14Z","event":"task.completed","id":"task-215","summary":"Published Tandem 0.8.4 with successful validation, GitHub Release assets, curated notes, and branded installer smoke. The AUR update did not publish because Arch temporarily disabled AUR Git access; by project-owner decision, this external outage is recorded but is not release-blocking.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":202}
+{"ts":"2026-08-05T18:46:00Z","event":"task.created","id":"task-216","summary":"Ship the read-only Tandem web MVP","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":203}
+{"ts":"2026-08-05T18:46:08Z","event":"task.created","id":"task-217","summary":"Add the embedded web server and read API","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":204}
+{"ts":"2026-08-05T18:46:16Z","event":"task.created","id":"task-218","summary":"Build the read-only Tandem browser interface","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":205}
+{"ts":"2026-08-05T18:46:23Z","event":"task.created","id":"task-219","summary":"Add web refresh and local security safeguards","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":206}
+{"ts":"2026-08-05T18:46:31Z","event":"task.created","id":"task-220","summary":"Validate and document the Tandem web MVP","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":207}
