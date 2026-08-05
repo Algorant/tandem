@@ -86,6 +86,14 @@ Use each Tandem record for its intended purpose:
 
 Search Tandem records before an ad hoc filesystem scan when the question concerns tasks, accords, reviews, Decisions, Rules, or Logs. Read raw Markdown only for inspection or repair that the Tandem implementation cannot perform.
 
+## Commit durable workspace data with judgment
+
+Tandem is local-first. Commit durable `.tandem/` workspace changes often enough to keep coordination visible to collaborators, portable across clones and worktrees, and safe from cleanup or reset. Active workspace rules can define a more specific cadence.
+
+Use coherent commit boundaries rather than one Git commit for every Tandem command or minor lifecycle mutation. When practical, include Tandem changes with the related project change or combine related coordination changes in one focused commit.
+
+Before handoff or integration, squash related local and unpublished Tandem commits when this improves the history and is prudent and possible. Do not rewrite shared or published history without explicit authority.
+
 ## Adapter boundary
 
 A conforming adapter can:

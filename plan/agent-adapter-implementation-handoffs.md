@@ -22,7 +22,7 @@ Existing adapter text was research input, not an authority. The table classifies
 | Use a non-interpolating process API and structured read output | Universal adapter requirement | Keep framework-neutral. The concrete process API belongs to each adapter. |
 | Tool names, prompt hooks, approval dialogs, renderers, startup events, and framework todo projection | Adapter implementation detail | Keep only in the adapter repository or in a labeled implementation handoff. |
 | Exact command and flag mappings | Adapter implementation detail | Generate or maintain from the supported CLI surface. Do not present one framework's schema as universal guidance. |
-| This repository's Bun, release, tags, Sideshow, delegation, preview-slot, and commit-frequency rules | Repository-specific policy | Keep in active `.tandem` rules. In particular, regular commits of durable `.tandem` changes are not a universal adapter rule. |
+| This repository's Bun, release, tags, Sideshow, delegation, preview-slot, and exact commit-cadence rules | Repository-specific policy | Keep the repository-specific policy in active `.tandem` rules. Generic guidance can explain why durable `.tandem` data needs coherent, regular commits without imposing this workspace's cadence on every adapter. |
 | Repeated hierarchy, decision, and lifecycle prose copied into several adapter prompt locations | Duplicate/obvious | Replace with concise operational statements and links or generated shared text. Test behavior, not incidental prose. |
 | Treat persisted `accord.status: ready` as a current command action | Obsolete | Preserve legacy reads only. New work claims from the missing/unclaimed state through Tandem's supported lifecycle operation. |
 | Parse frontmatter, construct IDs, infer roles from ID shape, bypass the CLI, or override actor identity | Unsupported | Do not implement in an adapter. These violate the Tandem ownership boundary. |
@@ -61,7 +61,7 @@ After review, the parent/orchestrator should apply these through Tandem rule ope
 8. Split `prefer:6` so the absolute local-runtime-state prohibition moves to `never`; keep commit cadence repository-specific under `prefer`.
 9. Migrate `context:1` and `context:2` to `always`, with optional descriptive facts retained separately as `context`.
 
-These are proposed repository-policy migrations only. They do not change universal Tandem semantics and must not be copied into generic adapter guidance.
+These are proposed repository-policy migrations only. They do not change universal Tandem semantics, and their repository-specific wording must not be copied into generic adapter guidance. Generic commit hygiene remains appropriate when it does not impose this workspace's exact cadence.
 
 ## Handoff A: `pi-tandem` adapter
 
@@ -80,7 +80,7 @@ The current adapter has useful command mappings, but its runtime and maintainer 
 - Guidance distinguishes command capability, validation evidence, and actor authority.
 - Workspace discovery does not initialize or upgrade implicitly.
 - Read operations consume Tandem JSON and preserve CLI-returned IDs, roles, relationships, warnings, and rule categories.
-- The adapter does not parse or mutate Tandem Markdown, manage actor identity, or reproduce repository-specific commit-frequency policy as universal guidance.
+- The adapter does not parse or mutate Tandem Markdown, manage actor identity, or reproduce repository-specific commit-frequency policy as universal guidance. It can link to Tandem's generic commit-hygiene guidance.
 - Shared runtime guidance has one adapter-owned source. Maintainer docs explain architecture and link to the Tandem contract instead of copying it verbatim.
 - Focused tests assert critical authority and category behavior without snapshotting incidental prose.
 
