@@ -2,95 +2,72 @@
 title: Concepts
 description: Core Tandem vocabulary and workflow model.
 ---
-Tandem is easiest to understand from the Board. A task starts in `todo`, moves to `in-progress` when someone starts or claims it, moves to `validation` when work is delivered, and is archived into logs when accepted work is completed.
+Tandem keeps work, agreements, expectations, and history visible in one local workspace. Start with the [Quickstart](/quick-start/) to create a workspace, then use the [Workspace](/workspace/) guide to learn how its pieces fit together.
 
-The CLI, TUI, and integrations all operate on the same local Markdown files under `.tandem/`.
+## A few questions Tandem keeps visible
 
-## Board task states
+- **What needs to happen?** Tasks, Epics, and Subtasks describe and organize work.
+- **Who agreed to do it?** Accords make ownership, delivery, validation, and acceptance explicit.
+- **How should it be done?** Rules provide workspace coordination expectations.
+- **What happened?** Decisions, Logs, and events preserve project history.
 
-Task workflow state answers: **where is this task right now?**
+## The active task lifecycle
 
-The default active states are:
+A task starts in `todo`, moves to `in-progress` when someone starts or claims it, and moves to `validation` when work is delivered. A reviewer or orchestrator can accept the delivery and complete the task, request rework, block it, or record a failure. Completion archives the task in Logs instead of leaving a permanent `done` state on the active Board.
 
-- `todo` — planned work that is not actively owned.
-- `in-progress` — work that has been started or claimed.
-- `validation` — delivered work waiting for acceptance, rework, blocking, failure, or completion.
+This lifecycle keeps current work separate from completed history while making review explicit. The [CLI Reference](/cli/) documents each command, and the [TUI](/tui/) provides the same workflow through an interactive interface.
 
-Completion is not a permanent `done` column. `tandem complete` archives accepted work into `.tandem/logs/` so the active board stays focused on work that can still change.
+## How work is organized
 
-Older workspaces may contain `review`; v0 readers treat it as a legacy alias for the preferred `validation` state where appropriate.
+Tandem uses a simple relationship between three kinds of work:
+
+```text
+task-103       Epic
+└── task-104   Task
+    └── task-104-1   Subtask
+```
+
+- An **Epic** is a broad outcome that groups related Tasks.
+- A **Task** is independently delegated work. It can stand alone or belong to an Epic.
+- A **Subtask** is a smaller, lifecycle-bearing item owned through its parent Task. It is not independently delegated.
+
+Epics and Tasks use the global `task-N` namespace. A direct Epic child is therefore a Task such as `task-104`. Only a direct child of a Task is a Subtask, using the parent-derived `task-N-M` form. Subtasks are leaves and cannot have children.
 
 ## Accords
 
-An accord is the explicit work agreement for a task. It answers: **who took responsibility, what did they deliver, and what happened to that delivery?**
+An accord is the explicit work agreement for a Task. It makes responsibility and review visible rather than implicit.
 
-Common accord statuses are:
+- **Purpose:** record who claimed the work, what they delivered, and the evidence for that delivery.
+- **Use:** move an accord through `ready`, `claimed`, `delivered`, `accepted`, `rework`, `blocked`, or `failed` as the work changes.
+- **Why it matters:** a worker can deliver evidence, while a human or orchestrator retains the decision to accept, request rework, or complete the Task.
 
-- `ready` — the task is ready to be claimed.
-- `claimed` — an actor has taken responsibility.
-- `delivered` — work was submitted with summary, deliverables, validation evidence, and changed files.
-- `accepted` — a reviewer or orchestrator accepted the delivery.
-- `rework` — changes were requested.
-- `blocked` — progress is blocked by an external condition.
-- `failed` — the scoped work cannot be completed as agreed.
-
-Accord actions can synchronize Board state. Claiming a `todo` task moves it to `in-progress`; delivering moves it to `validation`; requesting rework from validation moves it back to `in-progress`.
-
-This keeps agent workflows honest: a child worker can deliver evidence, while a human or parent orchestrator decides whether to accept, request rework, block, fail, or complete the task.
-
-## Epics, Tasks, Subtasks, and related work
-
-Tandem has one strict, three-tier task hierarchy:
-
-```text
-task-103       Epic (`type: task`, `kind: epic`)
-└── task-104   Task (`parentId: task-103`, relationship `epic-task`)
-    └── task-104-1   Subtask (`parentId: task-104`, relationship `subtask`)
-```
-
-Epics and Tasks use the global `task-N` namespace. A direct Epic child is therefore a Task such as `task-104`, never `task-103-1`. Only a direct child of a Task is a Subtask, and it must use the parent-derived `<Task ID>-M` form. Subtasks are leaves and cannot have children. Tandem allocates both global IDs and per-Task suffixes across the active Board and archived Logs, so completed or canceled IDs are never reused.
-
-Roles come from the resolved documents and `parentId`, then Tandem strictly validates the matching ID form. There is no compatibility exception for a hierarchical direct Epic child or a global-ID Subtask. IDs are immutable: reparenting is allowed only when it preserves both the role and the existing canonical ID.
-
-A Task whose `parentId` resolves to a decision or custom document remains a global-ID Task with generic relationship `parent`; it may own parent-derived Subtasks. Unresolved parents are errors, while `references` remain loose related links.
-
-Choose each relationship for its meaning:
-
-| Use | When |
-| --- | --- |
-| Epic (`kind: epic`) | A root-only broad outcome groups global-ID Tasks. An Epic is still a normal task document. |
-| Task | Independently delegated work. It can be standalone, directly beneath an Epic, or attached to a non-task parent. |
-| Subtask | A Task worker's first-class, lifecycle-bearing checklist item. It is not independently delegated. |
-| `blockers` | Another document must be resolved before this work can proceed. |
-| `references` | A decision, sibling task, log, or other document is useful context but not a dependency or parent. |
-| Inline `subtasks` checklist | Preserve an older checklist already in a task. Inline items are legacy data and should not be created for new tracked work. |
-
-Only Tasks are delegation roots in the initial worker model. Epics are split into independently delegated Tasks; one worker owns a delegated Task's direct Subtasks through its session todo projection and returns one Task-level handoff. Completed Subtasks move to Logs but remain in their Task's history and suffix allocation.
+Claiming a `todo` Task moves it to `in-progress`; delivering moves it to `validation`. See [Agents and adapters](/guides/agents-and-adapters/) for the framework-neutral accord contract.
 
 ## Rules
 
-Rules are workspace coordination expectations stored in `.tandem/tandem.md`. Read all categories before work starts. The stored category defines its operational effect:
+Rules are workspace coordination expectations stored in `.tandem/tandem.md`. They help people and agents apply the same repository policy.
 
-- `always` requires an action or invariant whenever the rule applies.
-- `never` prohibits an action or outcome whenever the rule applies.
-- `prefer` defines the default among valid choices but permits a justified deviation.
-- `context` supplies information and does not command an action by itself.
+- **Purpose:** define expectations such as validation, tagging, or delegation policy.
+- **Use:** classify each rule as `always`, `never`, `prefer`, or `context`.
+- **Why it matters:** applicability and strength stay explicit, so a narrow directive or prohibition is not mistaken for a general preference.
 
-Applicability and strength are separate. A directive with a narrow trigger still belongs in `always`, `never`, or `prefer`. A prohibition belongs in `never`. Do not infer the category from wording alone.
-
-Rules help humans and agents align on repository policy, such as validation expectations, tag conventions, or delegation policies. Use `tandem rules list` to inspect them. See [Agents and adapters](/guides/agents-and-adapters/) for classification examples and the framework-neutral consumption contract.
+Use `tandem rules list` to inspect the active rules before work starts.
 
 ## Decisions
 
-Decision documents record durable product, architecture, or project choices. They are ADR-compatible by convention: use `type: decision`, keep a clear title, and structure the body with sections such as Status, Context, Decision, Consequences, and Supersession when useful.
+Decision documents preserve durable product, architecture, or project choices.
 
-Decisions do not use task workflow state. They remain active records that tasks can reference.
+- **Purpose:** explain why the project chose a direction, not merely what a Task changed.
+- **Use:** create a `type: decision` record with Status, Context, Decision, Consequences, and Supersession sections when useful.
+- **Why it matters:** Tasks can reference a decision, and future work can understand the context without reconstructing it from conversation.
 
-## Logs
+Decisions do not use task workflow state. They remain active records until superseded or deprecated.
 
-Logs are completed or canceled Task documents stored in `.tandem/logs/`. They preserve the Task body, terminal summary, validation notes, changed files, relevant accord metadata, and event context. Missing `completion.outcome` means completed; cancellation records `canceled`, requires a reason, and remains auditable rather than deleting the file.
+## Logs and events
 
-Use logs when you need to answer “what changed?”, “why was it accepted?”, or “what evidence did we have?” later:
+Logs are completed or canceled Task documents stored in `.tandem/logs/`. They preserve the Task body, summary, validation notes, changed files, accord metadata, and event context. Cancellation records a reason and remains auditable rather than deleting the file.
+
+Events are append-only lifecycle records. Per-actor event files live in `.tandem/events/`; the legacy `.tandem/events.jsonl` file remains readable during transition. Together, Logs and events answer “what changed?”, “why was it accepted?”, and “what evidence did we have?”
 
 ```sh
 tandem log list
@@ -104,22 +81,22 @@ A Tandem workspace is a repository with a `.tandem/` directory:
 
 ```text
 .tandem/
-├── tandem.md        # workspace config, workflow states, and rules
-├── board/           # active task and decision documents
+├── tandem.md        # workspace config and rules
+├── board/           # active tasks and decisions
 ├── logs/            # completed task history
 ├── events/          # per-actor lifecycle event logs
-└── events.jsonl     # legacy global event log, still readable during transition
+└── events.jsonl     # legacy global event log
 ```
 
 Active tasks and decisions are Markdown files with YAML frontmatter. The files are the source of truth; the CLI and TUI provide safe, structured operations over them.
 
 ## The daily loop
 
-1. Read the Board in `tandem tui` or with `tandem list`.
-2. Add or inspect a task.
+1. Read the Board with `tandem tui` or `tandem list`.
+2. Add or inspect a Task.
 3. Start and claim it.
-4. Deliver summary, evidence, validation, and changed files through the accord.
+4. Deliver a summary, evidence, validation, and changed files through the accord.
 5. Validate the result.
-6. Accept and complete it into logs, or request rework and continue.
+6. Accept and complete it into Logs, or request rework and continue.
 
-That loop is small enough for a human, a terminal workflow, or an agent orchestrator to follow without hiding the project record outside the repository.
+For integration-specific guidance, see the [Workflows](/guides/) guides.
