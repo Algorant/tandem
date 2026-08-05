@@ -2,6 +2,23 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.9.0
+
+Tandem v0.9.0 adds a polished, read-only web interface for viewing a local workspace in the browser.
+
+### Web interface
+
+- `tandem web` serves the current workspace on an automatically selected loopback port and opens it in the default browser; `--port` and `--no-open` support explicit local workflows.
+- The browser includes Board and Validation views, task and relationship details, Logs with search, Rules, Decisions, and project health warnings.
+- Semantic HTML, a small dependency-free JavaScript client, responsive Verdigris styling, keyboard navigation, reduced-motion support, and light and dark palettes keep the interface fast and accessible.
+- Revision polling refreshes changed workspace data while preserving filters, focus, and scroll position.
+
+### Security and architecture
+
+- The server is read-only and loopback-only, validates the Host header, limits methods, targets, bodies, and concurrency, and sends restrictive browser security headers without permissive CORS.
+- The embedded server and bundled frontend reuse Tandem's canonical application, project, and protocol layers. They require no database, Node runtime, remote assets, or separate frontend build at runtime.
+- `just web` provides a one-command development shortcut from the repository checkout.
+
 ## 0.8.4
 
 Tandem v0.8.4 makes the documentation easier to follow and adds common repository work badges to the Board.
