@@ -192,3 +192,5 @@
 {"ts":"2026-08-05T18:04:59Z","event":"accord.delivered","id":"task-214","summary":"Accord deliver for task-214","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":192}
 {"ts":"2026-08-05T18:05:04Z","event":"accord.accepted","id":"task-214","summary":"Accord accept for task-214","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":193}
 {"ts":"2026-08-05T18:05:11Z","event":"task.completed","id":"task-214","summary":"Made `.tandem` commit grouping and squashing behavior explicit in framework-neutral and pi-tandem guidance, including lifecycle checkpoints and shared-history safeguards.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":194}
+{"ts":"2026-08-05T18:11:50Z","event":"accord.blocked","id":"task-215","summary":"Accord block for task-215","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":195}
+{"ts":"2026-08-05T18:11:57Z","event":"accord.blocked","id":"task-195","summary":"Accord block for task-195","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":196}

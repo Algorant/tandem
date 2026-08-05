@@ -7,14 +7,15 @@ priority: "high"
 relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "tandem/RELEASE.md"]
 tags: ["release"]
 createdAt: "2026-08-03T21:11:10Z"
-updatedAt: "2026-08-03T21:29:47Z"
+updatedAt: "2026-08-05T18:11:57Z"
 accord:
   status: "blocked"
   assignee: "orchestrator"
   claimedAt: "2026-08-03T21:11:14Z"
-  evidence: ["Official aur-general message: https://lists.archlinux.org/archives/list/aur-general@lists.archlinux.org/message/YPJ3FQYJTJXXY3RUXCYLMHUKHLIUNVFF/ says: We have now disabled pushes altogether as well for the moment, while we handle the situation.", "AUR workflow 30853877291 failed twice at SSH git clone with: The AUR is down due to maintenance. We will be back soon.", "https://aur.archlinux.org/ currently serves the read-only web interface, which is consistent with pushes being disabled rather than the whole service being offline.", "Hacker News discussion: https://news.ycombinator.com/item?id=49146238"]
-  reason: "AUR Git pushes are intentionally disabled by the Arch Linux DevOps team while it handles malicious package adoptions and follow-up commits. The public AUR web interface is online, but SSH push/clone for package publication returns the maintenance shutdown message. Retry only after Arch announces that pushes are enabled."
-  updatedAt: "2026-08-03T21:29:47Z"
+  evidence: ["0.8.4 GitHub Release workflow 31033177672 succeeded and the branded installer installed tandem 0.8.4.", "0.8.4 AUR workflow 31033480566 failed at SSH clone with the same maintenance shutdown message as 0.8.3.", "https://aur.archlinux.org/packages/tandem-bin reports version 0.8.1-1 and last update 2026-07-31."]
+  note: "Do not mark 0.8.3 successful yet. A successful 0.8.4 AUR publication can resolve this superseded release task because AUR only needs the latest package version."
+  reason: "The 0.8.4 retry confirms that the 0.8.3 release blocker remains external AUR maintenance. GitHub publishing and installers work, but AUR SSH Git access is still disabled and tandem-bin remains at 0.8.1-1."
+  updatedAt: "2026-08-05T18:11:57Z"
 assignee: "orchestrator"
 ---
 
