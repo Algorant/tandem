@@ -229,3 +229,6 @@
 {"ts":"2026-08-05T19:52:38Z","event":"task.created","id":"task-221","summary":"Release Tandem 0.9.0","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":229}
 {"ts":"2026-08-05T19:52:42Z","event":"accord.claimed","id":"task-221","summary":"Accord claim for task-221","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":230}
 {"ts":"2026-08-05T19:52:43Z","event":"task.updated","id":"task-221","summary":"Updated task-221 metadata: assignee","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":231}
+{"ts":"2026-08-05T20:00:25Z","event":"accord.delivered","id":"task-221","summary":"Accord deliver for task-221","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":232}
+{"ts":"2026-08-05T20:00:31Z","event":"accord.accepted","id":"task-221","summary":"Accord accept for task-221","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":233}
+{"ts":"2026-08-05T20:00:35Z","event":"task.completed","id":"task-221","summary":"Released Tandem v0.9.0 with the new local read-only web interface. Pushed main and the annotated tandem-v0.9.0 tag, published and verified the GitHub Release with 13 assets, and passed the full local and cargo-dist validation. The tandem-bin AUR update is temporarily pending because AUR explicitly reports maintenance; this is recorded as a non-blocking packaging-channel outage.","actor":"ef7a337b-f600-4ff5-a333-2de5b0f64fa3","seq":234}
