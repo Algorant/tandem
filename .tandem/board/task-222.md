@@ -2,12 +2,18 @@
 id: task-222
 type: task
 title: "Specify and implement the lightweight Papercuts inbox MVP"
-state: todo
+state: "in-progress"
 priority: "medium"
 relatedFiles: ["protocol/plan/spec.md", "protocol/plan/todo.md", "tandem/plan/spec.md", "tandem/plan/todo.md", "extensions/pi-tandem/plan/spec.md", "extensions/pi-tandem/plan/todo.md", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/tests/smoke.ts", "plan/papercuts.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/workspace/index.md", "docs/guides/agents-and-adapters.md", "docs/extensions/index.md", "docs/reference/index.md", "site/astro.config.mjs", "site/README.md"]
 tags: ["protocol", "papercuts", "pi-tandem"]
 createdAt: "2026-08-10T02:09:53Z"
-updatedAt: "2026-08-10T02:12:46Z"
+updatedAt: "2026-08-10T02:31:36Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-222-86fee578"
+  claimedAt: "2026-08-10T02:31:36Z"
+  updatedAt: "2026-08-10T02:31:36Z"
+assignee: "worker-task-222-86fee578"
 ---
 ## Description
 

@@ -1,2 +1,4 @@
 {"ts":"2026-08-10T02:09:54Z","event":"task.created","id":"task-222","summary":"Specify and implement the lightweight Papercuts inbox MVP","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":1}
 {"ts":"2026-08-10T02:12:46Z","event":"task.updated","id":"task-222","summary":"Updated task-222 metadata: relatedFiles, body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":2}
+{"ts":"2026-08-10T02:31:36Z","event":"accord.claimed","id":"task-222","summary":"Accord claim for task-222","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":3}
+{"ts":"2026-08-10T02:31:36Z","event":"task.updated","id":"task-222","summary":"Updated task-222 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":4}
