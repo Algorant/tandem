@@ -138,7 +138,7 @@ release VERSION:
 	trap 'rm -f "$notes_file" "$manifest_file" "$release_file" "$runs_file"' EXIT
 	python3 scripts/release_checks.py notes "$version" "$notes_file"
 	python3 scripts/release_checks.py cargo "$version"
-	cargo dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
+	dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
 	python3 scripts/release_checks.py manifest "$notes_file" "$manifest_file"
 
 	cd tandem
