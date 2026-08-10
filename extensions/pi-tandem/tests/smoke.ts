@@ -9,6 +9,7 @@ import {
 	buildDecisionArgs,
 	buildInitArgs,
 	buildLogArgs,
+	buildPapercutArgs,
 	buildRulesArgs,
 	buildSearchArgs,
 	buildTaskArgs,
@@ -168,6 +169,11 @@ assert(completeArgs.includes("--summary"), "tandem_task complete builder should 
 assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
 const cancelArgs = buildTaskArgs({ action: "cancel", id: "task-2", reason: "Created by mistake" });
 assert(cancelArgs.join(" ") === "cancel task-2 --reason Created by mistake", "tandem_task cancel builder should map id and reason");
+const papercutAddArgs = buildPapercutArgs({ action: "add", title: "Small friction", body: "Workaround", references: ["task-1"], tags: ["tooling"] });
+assert(papercutAddArgs.join(" ") === "papercut add --title Small friction --body Workaround --reference task-1 --tag tooling", "tandem_papercut add should map directly to CLI flags");
+assert(buildPapercutArgs({ action: "list" }).join(" ") === "papercut list --json", "tandem_papercut reads should default to JSON");
+assert(buildPapercutArgs({ action: "show", id: "papercut-1" }).join(" ") === "papercut show papercut-1 --json", "tandem_papercut show should map ID and JSON");
+assert(buildPapercutArgs({ action: "resolve", id: "papercut-1", note: "Fixed", references: ["task-1"] }).join(" ") === "papercut resolve papercut-1 --note Fixed --reference task-1", "tandem_papercut resolve should map note and references");
 
 const tandem = await ensureTandem();
 await runRepoReadSmoke(tandem);
@@ -277,8 +283,25 @@ try {
 	assert(decision.data.decision.status === "accepted", "decision show should expose ADR status");
 	assert(decision.data.decision.deciders.includes("pi-tandem-smoke"), "decision show should expose deciders");
 
+	const papercutOutput = await runTandem(tandem, buildPapercutArgs({
+		action: "add",
+		title: "Smoke friction",
+		body: "A workaround worth preserving.",
+		references: [taskId],
+		tags: ["smoke"],
+	}), workspace);
+	const papercutId = parseId(papercutOutput);
+	const openPapercuts = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "list" }), workspace));
+	assert(openPapercuts.data.items.some((item: any) => item.id === papercutId), "papercut list should include the open record");
+	const shownPapercut = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "show", id: papercutId }), workspace));
+	assert(shownPapercut.data.body.includes("workaround worth preserving"), "papercut show should expose the body through CLI JSON");
+	await runTandem(tandem, buildPapercutArgs({ action: "resolve", id: papercutId, note: "Smoke helper fixed it", references: [taskId] }), workspace);
+	const allPapercuts = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "list", all: true }), workspace));
+	assert(allPapercuts.data.items.find((item: any) => item.id === papercutId)?.status === "resolved", "papercut resolve should update status through the CLI");
+
 	const search = parseJson(await runTandem(tandem, buildSearchArgs({ query: "Smoke" }), workspace));
-	assert(search.data.results.length >= 2, "search should find smoke task and decision");
+	assert(search.data.results.length >= 3, "search should find smoke task, decision, and Papercut");
+	assert(search.data.results.some((item: any) => item.id === papercutId && item.location === "papercuts"), "global search should expose Papercut location");
 
 	const cancelOutput = await runTandem(tandem, buildTaskArgs({
 		action: "add",

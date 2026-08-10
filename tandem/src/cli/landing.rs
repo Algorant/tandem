@@ -28,7 +28,8 @@ const GROUPS: &[(&str, &[(&str, &str)])] = &[
         &[
             ("list", "List active work"),
             ("show", "Show a document"),
-            ("search", "Search active work and logs"),
+            ("search", "Search work, logs, and Papercuts"),
+            ("papercut", "Capture small non-blocking friction"),
             ("log", "Browse completed work"),
         ],
     ),
@@ -110,7 +111,8 @@ mod tests {
             rendered_commands,
             [
                 "add", "move", "update", "complete", "cancel", "accord", "rules", "decision",
-                "list", "show", "search", "log", "init", "upgrade", "tui", "web", "version"
+                "list", "show", "search", "papercut", "log", "init", "upgrade", "tui", "web",
+                "version"
             ]
         );
     }

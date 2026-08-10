@@ -5,9 +5,9 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app;
-use crate::app::queries::SearchResult;
+use crate::app::queries::{PapercutSearchResult, SearchResult};
 use crate::app::tasks::AddOutcome;
-use crate::project::StoredDocument as Document;
+use crate::project::{StoredDocument as Document, StoredPapercut};
 use crate::protocol::accord;
 use crate::protocol::accord::status as accord_status;
 use crate::protocol::config::RulesByCategory;
@@ -317,6 +317,78 @@ pub(super) fn print_search_table(
     Ok(())
 }
 
+pub(super) fn print_papercut_list(items: &[StoredPapercut]) {
+    if items.is_empty() {
+        println!("No matching Papercuts found.");
+        return;
+    }
+    println!(
+        "{:<14} {:<10} {:<40} {:<20} TAGS",
+        "ID", "STATUS", "TITLE", "UPDATED"
+    );
+    for item in items {
+        println!(
+            "{:<14} {:<10} {:<40} {:<20} {}",
+            truncate(item.id(), 14),
+            truncate(item.status(), 10),
+            truncate(item.title(), 40),
+            truncate(item.field("updatedAt").unwrap_or("-"), 20),
+            truncate(&item.values("tags").join(", "), 40)
+        );
+    }
+}
+
+pub(super) fn print_papercut_show(item: &StoredPapercut) {
+    println!("ID:        {}", item.id());
+    println!("Title:     {}", item.title());
+    println!("Status:    {}", item.status());
+    if let Some(created) = item.field("createdAt") {
+        println!("Created:   {created}");
+    }
+    if let Some(updated) = item.field("updatedAt") {
+        println!("Updated:   {updated}");
+    }
+    print_metadata_values("References", item.values("references"));
+    print_metadata_values("Tags", item.values("tags"));
+    if let Some(note) = item.field("resolution.note") {
+        println!("Resolution: {note}");
+    }
+    if let Some(at) = item.field("resolution.resolvedAt") {
+        println!("Resolved:  {at}");
+    }
+    println!("Location:  papercuts");
+    println!("Path:      {}", display_path(&item.path));
+    println!("\nBody:");
+    if item.body.trim().is_empty() {
+        println!("(empty)");
+    } else {
+        print!("{}", item.body);
+        if !item.body.ends_with('\n') {
+            println!();
+        }
+    }
+}
+
+pub(super) fn print_papercut_search(results: &[PapercutSearchResult]) {
+    if results.is_empty() {
+        return;
+    }
+    println!(
+        "{:<14} {:<10} {:<10} {:<36} MATCH",
+        "ID", "WHERE", "STATUS", "TITLE"
+    );
+    for result in results {
+        println!(
+            "{:<14} {:<10} {:<10} {:<36} {}",
+            truncate(result.papercut.id(), 14),
+            "papercuts",
+            truncate(result.papercut.status(), 10),
+            truncate(result.papercut.title(), 36),
+            truncate(&result.snippet, 80)
+        );
+    }
+}
+
 pub(super) fn print_log_table(docs: &[Document]) {
     if docs.is_empty() {
         println!("No archived Tandem logs found.");
@@ -579,6 +651,94 @@ pub(super) fn search_json(
         json_string(query),
         items.join(",")
     ))
+}
+
+pub(super) fn papercut_list_json(items: &[StoredPapercut], warnings: &[String]) -> String {
+    let rendered = items
+        .iter()
+        .map(papercut_summary_json)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "{{\"ok\":true,\"data\":{{\"items\":[{rendered}],\"count\":{}}},\"warnings\":{}}}",
+        items.len(),
+        json_array_strings(warnings)
+    )
+}
+
+pub(super) fn papercut_show_json(item: &StoredPapercut, warnings: &[String]) -> String {
+    format!("{{\"ok\":true,\"data\":{{\"papercut\":{},\"body\":{},\"path\":{},\"location\":\"papercuts\"}},\"warnings\":{}}}",
+        papercut_detail_json(item), json_string(&item.body), json_string(&display_path(&item.path)), json_array_strings(warnings))
+}
+
+pub(super) fn global_search_json(
+    query: &str,
+    documents: &[SearchResult],
+    papercuts: &[PapercutSearchResult],
+    relationships: &Relationships,
+    warnings: &[String],
+) -> Result<String, CliError> {
+    let document_json = search_json(query, documents, relationships)?;
+    let marker = "]},\"warnings\":[]}";
+    let prefix = document_json
+        .strip_suffix(marker)
+        .ok_or_else(|| CliError::user("internal search JSON composition failure"))?;
+    let extra = papercuts.iter().map(|result| format!("{{\"id\":{},\"title\":{},\"location\":\"papercuts\",\"status\":{},\"snippet\":{}}}",
+        json_string(result.papercut.id()), json_string(result.papercut.title()), json_string(result.papercut.status()), json_string(&result.snippet))).collect::<Vec<_>>();
+    let separator = if documents.is_empty() || extra.is_empty() {
+        ""
+    } else {
+        ","
+    };
+    Ok(format!(
+        "{prefix}{separator}{}]}},\"warnings\":{}}}",
+        extra.join(","),
+        json_array_strings(warnings)
+    ))
+}
+
+fn papercut_summary_json(item: &StoredPapercut) -> String {
+    let mut fields = Vec::new();
+    for key in ["id", "title", "status", "createdAt", "updatedAt"] {
+        push_optional_json_field(&mut fields, key, item.field(key));
+    }
+    for key in ["references", "tags"] {
+        if item.field(key).is_some() {
+            fields.push(format!(
+                "{}:{}",
+                json_string(key),
+                json_array_strings(&item.values(key))
+            ));
+        }
+    }
+    format!("{{{}}}", fields.join(","))
+}
+
+fn papercut_detail_json(item: &StoredPapercut) -> String {
+    let mut fields = Vec::new();
+    let mut keys = item.fields.keys().collect::<Vec<_>>();
+    keys.sort();
+    for key in keys {
+        if key == "references" || key == "tags" {
+            fields.push(format!(
+                "{}:{}",
+                json_string(key),
+                json_array_strings(&item.values(key))
+            ));
+        } else if key.starts_with("resolution.") {
+            continue;
+        } else {
+            push_json_field(&mut fields, key, item.field(key).unwrap_or(""));
+        }
+    }
+    if item.field("resolution.note").is_some() || item.field("resolution.resolvedAt").is_some() {
+        fields.push(format!(
+            "\"resolution\":{{\"note\":{},\"resolvedAt\":{}}}",
+            json_string(item.field("resolution.note").unwrap_or("")),
+            json_string(item.field("resolution.resolvedAt").unwrap_or(""))
+        ));
+    }
+    format!("{{{}}}", fields.join(","))
 }
 
 pub(super) fn rules_json(rules: &RulesByCategory, category_filter: Option<&str>) -> String {
@@ -955,5 +1115,34 @@ mod tests {
             json_string("quote \" slash \\ line\n\t\u{0001}"),
             "\"quote \\\" slash \\\\ line\\n\\t\\u0001\""
         );
+    }
+
+    #[test]
+    fn global_search_json_combines_papercuts_and_warnings() {
+        let papercut = StoredPapercut::new(
+            "papercut-1.md".into(),
+            std::collections::HashMap::from([
+                ("id".to_string(), "papercut-1".to_string()),
+                ("title".to_string(), "Friction".to_string()),
+                ("status".to_string(), "open".to_string()),
+                ("createdAt".to_string(), "now".to_string()),
+                ("updatedAt".to_string(), "now".to_string()),
+            ]),
+            String::new(),
+        );
+        let output = global_search_json(
+            "friction",
+            &[],
+            &[PapercutSearchResult {
+                papercut,
+                snippet: "Friction".to_string(),
+            }],
+            &BTreeMap::new(),
+            &["reference warning".to_string()],
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["data"]["results"][0]["location"], "papercuts");
+        assert_eq!(parsed["warnings"][0], "reference warning");
     }
 }

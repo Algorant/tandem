@@ -1,12 +1,12 @@
 # pi-tandem Todo
 
 Status: MVP implementation
-Last updated: 2026-07-22
+Last updated: 2026-08-10
 
 ## Accomplished
 
 - [x] Defined `pi-tandem` as a lightweight Pi adapter over installed `tandem`.
-- [x] Added `tandem_status`, `tandem_init`, `tandem_task`, `tandem_accord`, `tandem_log`, `tandem_rules`, `tandem_decision`, and `tandem_search` tools.
+- [x] Added `tandem_status`, `tandem_init`, `tandem_task`, `tandem_accord`, `tandem_log`, `tandem_rules`, `tandem_decision`, `tandem_papercut`, and `tandem_search` tools.
 - [x] Added `/tandem help|status` command.
 - [x] Added diagnostics for missing `tandem`, missing `.tandem`, unsupported CLI surface, timeout/abort, and command failures.
 - [x] Added prompt snippets/guidelines and workspace-aware prompt guidance.
@@ -16,6 +16,7 @@ Last updated: 2026-07-22
 - [x] Aligned relationship guidance and Bun smokes with strict Epic → global Task → parent-derived leaf Subtask roles; pi-tandem forwards kind/parent and consumes CLI-returned `epic-task`, `subtask`, and generic `parent` without reclassification.
 - [x] Documented Task-only delegation: one Task worker owns its Subtasks through the todo projection, while Epics and Subtasks are not delegation roots.
 - [x] Added strict invalid-structure smoke coverage for nested Epics, children beneath Subtasks, role-changing reparenting, erroneous hierarchical direct Epic children, and erroneous global-ID Subtasks.
+- [x] Added thin Papercut add/list/show/resolve mappings, runtime judgment guidance, and installed-CLI smoke coverage without direct protocol handling.
 
 ## Current tasks
 

@@ -1,7 +1,7 @@
 # Tandem CLI/TUI Todo
 
 Status: active TUI implementation
-Last updated: 2026-06-27
+Last updated: 2026-08-10
 
 This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI draft lives in `tandem/plan/spec.md`.
 
@@ -97,6 +97,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Defined clearer CLI error message categories for parse failures, validation failures, write conflicts/write failures, and event append failures.
 - [x] Added unit coverage for nested completion metadata, legacy completion reads, canonical accord validation metadata, and invalid review-status validation.
 - [x] Considered the current known v0 CLI surface complete; future CLI work should be explicit new features or bug fixes.
+- [x] Added the explicit Papercut inbox feature: add/list/show/resolve, open-by-default filters, JSON reads, atomic source-preserving resolution, events, and global search location `papercuts`, with no Board/TUI integration.
 - [x] Added the minimal Ratatui/crossterm dependency stack for `tandem tui` without adding theme/TOML/Markdown parser dependencies.
 - [x] Replaced the `tandem tui` stub with a read-only Board-first TUI shell in `src/tui.rs`.
 - [x] Implemented the initial direct crossterm event loop with alternate-screen setup, raw mode, mouse capture, reload, help, and safe cleanup on quit.

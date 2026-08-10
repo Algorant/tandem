@@ -124,6 +124,18 @@ export type SearchToolParams = CwdFlag & ReadJsonFlag & {
 	parent?: string;
 };
 
+export type PapercutToolParams = CwdFlag & ReadJsonFlag & {
+	action: "add" | "list" | "show" | "resolve";
+	id?: string;
+	title?: string;
+	body?: string;
+	status?: "open" | "resolved";
+	all?: boolean;
+	note?: string;
+	references?: string[];
+	tags?: string[];
+};
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 120_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -390,6 +402,35 @@ export function buildSearchArgs(params: SearchToolParams): string[] {
 	return args;
 }
 
+export function buildPapercutArgs(params: PapercutToolParams): string[] {
+	if (params.action === "add") {
+		const args = ["papercut", "add", "--title", requireString(params.title, "tandem_papercut add requires title")];
+		addPresentStringFlag(args, "--body", params.body);
+		addRepeatedFlag(args, "--reference", params.references);
+		addRepeatedFlag(args, "--tag", params.tags);
+		return args;
+	}
+	if (params.action === "list") {
+		if (params.all && params.status) throw new Error("tandem_papercut list cannot combine all and status");
+		const args = ["papercut", "list"];
+		addOptionalFlag(args, "--status", params.status);
+		if (params.all) args.push("--all");
+		if (wantsJson(params)) args.push("--json");
+		return args;
+	}
+	if (params.action === "show") {
+		const args = ["papercut", "show", requireString(params.id, "tandem_papercut show requires id")];
+		if (wantsJson(params)) args.push("--json");
+		return args;
+	}
+	if (params.action === "resolve") {
+		const args = ["papercut", "resolve", requireString(params.id, "tandem_papercut resolve requires id"), "--note", requireString(params.note, "tandem_papercut resolve requires note")];
+		addRepeatedFlag(args, "--reference", params.references);
+		return args;
+	}
+	throw new Error(`unsupported tandem_papercut action: ${String(params.action)}`);
+}
+
 function findWorkspaceRoot(startCwd: string): string | undefined {
 	let current = resolve(startCwd);
 	while (true) {
@@ -621,7 +662,7 @@ export const tandemAccordParameters = Type.Object({
 
 export function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update for supported active Task edits: body replaces the exact complete Markdown body; title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles edit metadata. State remains action=move, description remains an add-time convenience field, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Use tandem_task action=cancel only when the user or orchestrator explicitly asks to archive abandoned or mistaken work. Provide a reason; Tandem preserves an auditable canceled Log and rejects cancellation while active descendants remain.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_papercut, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update for supported active Task edits: body replaces the exact complete Markdown body; title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles edit metadata. State remains action=move, description remains an add-time convenience field, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Use tandem_task action=cancel only when the user or orchestrator explicitly asks to archive abandoned or mistaken work. Provide a reason; Tandem preserves an auditable canceled Log and rejects cancellation while active descendants remain.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Record a Papercut with tandem_papercut when small, non-blocking friction causes confusion, avoidable retries, or a workaround worth preserving. Then continue the current work. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts. Use the blocking lifecycle for blockers and create a Task when corrective work needs planning or ownership.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -808,6 +849,39 @@ export default function piTandem(pi: ExtensionAPI) {
 	});
 
 	pi.registerTool({
+		name: "tandem_papercut",
+		label: "Tandem Papercuts",
+		...createTandemToolRenderer("tandem_papercut", "Tandem Papercuts"),
+		description: "Record and inspect small, non-blocking friction through `tandem papercut`. Read actions default to JSON. The adapter does not parse Papercut files or implement IDs, status, references, or storage.",
+		promptSnippet: "Use tandem_papercut for small, non-blocking friction worth preserving while the current work continues.",
+		promptGuidelines: [
+			"Record a Papercut when small, non-blocking friction causes confusion, avoidable retries, or a workaround worth preserving. Then continue the current work.",
+			"Do not use Papercuts for blocked work, planned corrective work, Decisions, Rules, or general telemetry. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.",
+			"Use tandem_papercut as a thin CLI adapter. Do not parse or mutate `.tandem/papercuts` files directly.",
+		],
+		parameters: Type.Object({
+			...cwdSchema,
+			...jsonSchema,
+			action: StringEnum(["add", "list", "show", "resolve"] as const),
+			id: Type.Optional(Type.String()),
+			title: Type.Optional(Type.String()),
+			body: Type.Optional(Type.String()),
+			status: Type.Optional(StringEnum(["open", "resolved"] as const)),
+			all: Type.Optional(Type.Boolean()),
+			note: Type.Optional(Type.String()),
+			references: Type.Optional(Type.Array(Type.String())),
+			tags: Type.Optional(Type.Array(Type.String())),
+		}),
+		async execute(_toolCallId, params, signal, onUpdate, ctx) {
+			try {
+				return await executeTandemTool("tandem_papercut", buildPapercutArgs(params as PapercutToolParams), ctx.cwd, params, signal, onUpdate);
+			} catch (err) {
+				return { content: [{ type: "text", text: `tandem_papercut argument error: ${normalizeError(err)}` }], details: { error: normalizeError(err) }, isError: true };
+			}
+		},
+	});
+
+	pi.registerTool({
 		name: "tandem_search",
 		label: "Tandem Search",
 		...createTandemToolRenderer("tandem_search", "Tandem Search"),
@@ -843,7 +917,7 @@ export default function piTandem(pi: ExtensionAPI) {
 					"/tandem status  Diagnose tandem and the nearest .tandem workspace.",
 					"/tandem help    Show this help.",
 					"",
-					"LLM-callable tools: tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_search.",
+					"LLM-callable tools: tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_papercut, tandem_search.",
 					"Adapter rule: these tools call the installed tandem CLI; they do not reimplement Tandem protocol behavior.",
 				].join("\n");
 				ctx.ui.setWidget("pi-tandem", text.split("\n"));

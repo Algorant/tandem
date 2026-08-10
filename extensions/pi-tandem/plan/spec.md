@@ -39,7 +39,8 @@ Current MVP tools:
 - `tandem_log` — `list`, `show`, `search`.
 - `tandem_rules` — `list`, `add`, `edit`, `delete`.
 - `tandem_decision` — `list`, `show`, `add` for first-class decisions, including ADR-compatible durable records that stay `type: decision`.
-- `tandem_search` — active/log search.
+- `tandem_papercut` — `add`, `list`, `show`, and `resolve` over the installed CLI. Read actions default to JSON. The adapter forwards title/body/status/all/note/reference/tag parameters as argument arrays and does not parse Markdown, allocate IDs, resolve references, or implement status behavior.
+- `tandem_search` — active/log/Papercut search.
 
 Read actions default `json: true` and append `--json` only where the current CLI supports it. Mutation actions do not invent structured output; they return the CLI text plus captured details. The adapter neither allocates IDs nor classifies relationships. Tandem assigns global IDs to Epics and Tasks (including direct Epic Tasks and decision/custom-parented Tasks), assigns `<Task ID>-M` only to Subtasks, scans active/log history for sequence continuity, validates strict leaf depth, and rejects role-changing or ID-invalidating reparenting. Tandem's JSON supplies `parentId` plus stable `epic-task`, `subtask`, or generic `parent` relationships; show supplies `tasks` for Epics and `subtasks` for Tasks. Erroneous hierarchical direct Epic children receive no compatibility exception.
 
@@ -65,6 +66,8 @@ The extension provides:
 - a small `before_agent_start` system-prompt addendum when a Tandem workspace is present or the prompt asks for durable coordination;
 - `pi-tandem.md` as human-readable guidance for agents/config promotion.
 
+Guidance says to record a Papercut when small, non-blocking friction causes confusion, avoidable retries, unnecessary effort, or a workaround worth preserving, then continue current work. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts. Blocked work uses the blocking lifecycle, and corrective work needing ownership uses a Task.
+
 Guidance emphasizes using `tandem_*` tools rather than direct `.tandem` edits; passing parent directly to Tandem; consuming canonical Epic → global Task → parent-derived leaf Subtask output; and never reclassifying relationships in TypeScript. Only Tasks are initial delegation roots: one Task worker owns its Subtasks through the todo projection, while Epics and Subtasks are not delegated. Guidance also preserves lifecycle/review/accord separation and ADR-compatible decisions.
 
 ## Testing
@@ -78,7 +81,7 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repository's `.tandem` board when the checkout has one, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, search, complete, and log coverage. Without `TANDEM_BIN`, it first builds the current repository CLI so a stale debug binary cannot mask source changes.
+`smoke.ts` performs read-only checks against this repository's `.tandem` board when the checkout has one, then creates a temporary Tandem workspace for mutating task, validation-state move, accord, rule, decision, Papercut add/list/show/resolve, global search, complete, and log coverage. Without `TANDEM_BIN`, it first builds the current repository CLI so a stale debug binary cannot mask source changes.
 
 `pi-runtime-smoke.ts` exercises Pi's project-local extension discovery without committing runtime state: it creates `.pi/extensions/pi-tandem/index.ts` and, when the checkout lacks one, a temporary ignored `.tandem` workspace with an Epic, global Task, completed Subtask, and sequence-continuing active Subtask. It verifies CLI-returned `epic-task`/`subtask` output before fresh Pi startup, then confirms `/tandem` registration/status and cleans up all temporary state.
 

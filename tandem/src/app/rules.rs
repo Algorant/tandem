@@ -191,6 +191,17 @@ mod tests {
             "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\nunknown: retain\n---\nbody\n",
         )
         .unwrap();
+        let papercut_id = crate::app::papercuts::add(
+            &project,
+            crate::app::papercuts::AddOptions {
+                title: Some("Rule source boundary".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .papercut
+        .id()
+        .to_string();
         let added = add(&project, "always", "Keep it", Some(" missing ".to_string())).unwrap();
         assert_eq!(added.id, 1);
         assert_eq!(
@@ -207,6 +218,26 @@ mod tests {
         assert!(!fs::read_to_string(&project.config_path)
             .unwrap()
             .contains("Keep all"));
+
+        let papercut_source = add(
+            &project,
+            "always",
+            "Papercuts are not Rule source documents",
+            Some(papercut_id.clone()),
+        )
+        .unwrap();
+        assert_eq!(
+            papercut_source.warning,
+            Some(format!("rule source not found: {papercut_id}"))
+        );
+        let read = crate::app::queries::load_read(&project).unwrap();
+        assert!(read.warnings.iter().any(|warning| {
+            warning
+                == &format!(
+                    "Rule {} references missing source {papercut_id}.",
+                    papercut_source.id
+                )
+        }));
         fs::remove_dir_all(root).unwrap();
     }
 }

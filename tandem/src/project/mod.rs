@@ -19,6 +19,7 @@ use crate::protocol::hierarchy::{
     DocumentLocation, HierarchyDocument, HierarchyIndex as ProtocolHierarchyIndex,
     ParentRelationship, TaskRole,
 };
+use crate::protocol::papercut::Papercut as ProtocolPapercut;
 use crate::CliError;
 
 pub(crate) mod events;
@@ -27,7 +28,8 @@ pub(crate) mod rules;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
     frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,
-    patch_completion_content, patch_frontmatter_content, replace_markdown_body,
+    patch_completion_content, patch_frontmatter_content, patch_papercut_resolution_content,
+    replace_markdown_body,
 };
 pub(crate) use write::write_atomic;
 
@@ -138,6 +140,10 @@ impl TandemProject {
         self.data_dir().join("events")
     }
 
+    pub(crate) fn papercuts_dir(&self) -> PathBuf {
+        self.data_dir().join("papercuts")
+    }
+
     pub(crate) fn actor_events_path(&self, actor: &str) -> PathBuf {
         self.events_dir().join(format!("{actor}.jsonl"))
     }
@@ -152,6 +158,41 @@ impl TandemProject {
 
     pub(crate) fn read_log_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
         read_documents(&self.logs_dir, DocumentLocation::Logs)
+    }
+
+    pub(crate) fn read_papercuts(&self) -> Result<Vec<StoredPapercut>, CliError> {
+        let dir = self.papercuts_dir();
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut paths = fs::read_dir(&dir)?
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
+            .collect::<Vec<_>>();
+        paths.sort();
+        paths.into_iter().map(|path| read_papercut(&path)).collect()
+    }
+
+    pub(crate) fn find_papercut(&self, id: &str) -> Result<Option<StoredPapercut>, CliError> {
+        Ok(self
+            .read_papercuts()?
+            .into_iter()
+            .find(|item| item.id() == id))
+    }
+
+    /// Loose references may target Papercuts without making them documents.
+    /// Filename inspection keeps unrelated Board operations independent from a
+    /// malformed Papercut record.
+    pub(crate) fn reference_target_exists(&self, id: &str) -> Result<bool, CliError> {
+        if self.find_document(id)?.is_some() {
+            return Ok(true);
+        }
+        if crate::protocol::papercut::papercut_number(id).is_none() {
+            return Ok(false);
+        }
+        Ok(self.papercuts_dir().join(format!("{id}.md")).is_file())
     }
 
     pub(crate) fn read_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
@@ -553,6 +594,66 @@ fn skip_json_whitespace(line: &str, mut cursor: usize) -> usize {
         cursor += 1;
     }
     cursor
+}
+
+/// Raw project source paired with its protocol-level Papercut value.
+#[derive(Debug, Clone)]
+pub(crate) struct StoredPapercut {
+    pub(crate) path: PathBuf,
+    papercut: ProtocolPapercut,
+}
+
+impl StoredPapercut {
+    pub(crate) fn new(path: PathBuf, fields: HashMap<String, String>, body: String) -> Self {
+        Self {
+            path,
+            papercut: ProtocolPapercut::new(fields, body),
+        }
+    }
+}
+
+impl Deref for StoredPapercut {
+    type Target = ProtocolPapercut;
+    fn deref(&self) -> &Self::Target {
+        &self.papercut
+    }
+}
+
+pub(crate) fn read_papercut(path: &Path) -> Result<StoredPapercut, CliError> {
+    let content = fs::read_to_string(path).map_err(|error| {
+        CliError::user(format!("failed to read {}: {error}", display_path(path)))
+    })?;
+    let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
+        CliError::user(format!(
+            "Papercut parse failure: {}: {message}",
+            display_path(path)
+        ))
+    })?;
+    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
+        CliError::user(format!(
+            "Papercut parse failure: {} frontmatter YAML: {message}",
+            display_path(path)
+        ))
+    })?;
+    let papercut = StoredPapercut::new(path.to_path_buf(), fields, body);
+    papercut.validate().map_err(|message| {
+        CliError::user(format!(
+            "Papercut validation failed for {}: {message}",
+            display_path(path)
+        ))
+    })?;
+    let filename = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    if filename != papercut.id() {
+        return Err(CliError::user(format!(
+            "Papercut validation failed for {}: filename must match immutable ID `{}`",
+            display_path(path),
+            papercut.id()
+        )));
+    }
+    Ok(papercut)
 }
 
 /// Raw project source paired with its protocol-level document value.

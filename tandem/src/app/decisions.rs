@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use crate::app::support::{
     append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
-    document_exists,
+    reference_target_exists,
 };
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
@@ -235,7 +235,7 @@ pub(crate) fn diagnostics(
 ) -> Result<Vec<String>, CliError> {
     let mut warnings = Vec::new();
     for reference in &options.references {
-        if !document_exists(project, reference)? {
+        if !reference_target_exists(project, reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
@@ -314,13 +314,24 @@ mod tests {
             "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
+        let papercut_id = crate::app::papercuts::add(
+            &project,
+            crate::app::papercuts::AddOptions {
+                title: Some("Decision friction".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .papercut
+        .id()
+        .to_string();
         let outcome = add(
             &project,
             AddOptions {
                 title: Some("Choose seam".to_string()),
                 body: Some("## Decision\nKeep bytes.  ".to_string()),
                 deciders: vec!["A".to_string()],
-                references: vec!["missing-task".to_string()],
+                references: vec![papercut_id.clone(), "missing-task".to_string()],
                 supersedes: vec!["missing-decision".to_string()],
                 ..Default::default()
             },
@@ -336,7 +347,9 @@ mod tests {
         );
         let source = fs::read_to_string(outcome.path).unwrap();
         assert!(source.contains("deciders: [\"A\"]"));
-        assert!(source.contains("references: [\"missing-task\"]"));
+        assert!(source.contains(&format!(
+            "references: [\"{papercut_id}\", \"missing-task\"]"
+        )));
         assert!(source.contains("## Decision\nKeep bytes.  \n"));
         fs::remove_dir_all(root).unwrap();
     }

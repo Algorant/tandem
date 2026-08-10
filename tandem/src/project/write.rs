@@ -114,6 +114,18 @@ pub(crate) fn create_new_sequential_document_after<F>(
     project: &TandemProject,
     prefix: &str,
     last_allocated: usize,
+    content_for_id: F,
+) -> Result<CreatedDocument, CliError>
+where
+    F: FnMut(&str) -> String,
+{
+    create_new_sequential_file_after(&project.board_dir, prefix, last_allocated, content_for_id)
+}
+
+pub(crate) fn create_new_sequential_file_after<F>(
+    dir: &Path,
+    prefix: &str,
+    last_allocated: usize,
     mut content_for_id: F,
 ) -> Result<CreatedDocument, CliError>
 where
@@ -124,7 +136,7 @@ where
     })?;
     for _ in 0..MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS {
         let id = format!("{prefix}-{next_number}");
-        let path = project.board_dir.join(format!("{id}.md"));
+        let path = dir.join(format!("{id}.md"));
         if write_new_atomic(&path, &content_for_id(&id))? {
             return Ok(CreatedDocument { id, path });
         }
@@ -133,7 +145,7 @@ where
         })?;
     }
     Err(CliError::user(format!(
-        "ID allocation failure: could not reserve a new {prefix} document after {MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS} attempts; concurrent writers may be too active, rerun the command"
+        "ID allocation failure: could not reserve a new {prefix} record after {MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS} attempts; concurrent writers may be too active, rerun the command"
     )))
 }
 

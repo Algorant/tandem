@@ -200,6 +200,100 @@ pub(super) fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
     Ok(())
 }
 
+pub(super) fn cmd_papercut(args: &[String]) -> Result<(), CliError> {
+    let Some((subcommand, rest)) = args.split_first() else {
+        return Err(CliError::usage(
+            "tandem papercut requires add, list, show, or resolve",
+        ));
+    };
+    match subcommand.as_str() {
+        "add" => {
+            let options = parse_papercut_add_args(rest)?;
+            let workspace = discover_workspace()?;
+            let outcome = app::papercuts::add(
+                &workspace,
+                app::papercuts::AddOptions {
+                    title: options.title,
+                    body: options.body,
+                    references: options.references,
+                    tags: options.tags,
+                },
+            )?;
+            for warning in &outcome.warnings {
+                println!("Warning: {warning}");
+            }
+            println!(
+                "Created Papercut\nID:     {}\nStatus: {}\nTitle:  {}\nPath:   {}",
+                outcome.papercut.id(),
+                outcome.papercut.status(),
+                outcome.papercut.title(),
+                display_path(&outcome.papercut.path)
+            );
+            Ok(())
+        }
+        "list" => {
+            let options = parse_papercut_list_args(rest)?;
+            let workspace = discover_workspace()?;
+            let (items, warnings) = app::papercuts::list(
+                &workspace,
+                app::papercuts::ListOptions {
+                    status: options.status.as_deref(),
+                    all: options.all,
+                },
+            )?;
+            if options.json {
+                println!("{}", papercut_list_json(&items, &warnings));
+            } else {
+                print_papercut_list(&items);
+                for warning in warnings {
+                    println!("Warning: {warning}");
+                }
+            }
+            Ok(())
+        }
+        "show" => {
+            let options = parse_show_args(rest)?;
+            let workspace = discover_workspace()?;
+            let (item, warnings) = app::papercuts::show(&workspace, &options.id)?;
+            if options.json {
+                println!("{}", papercut_show_json(&item, &warnings));
+            } else {
+                print_papercut_show(&item);
+                for warning in warnings {
+                    println!("Warning: {warning}");
+                }
+            }
+            Ok(())
+        }
+        "resolve" => {
+            let options = parse_papercut_resolve_args(rest)?;
+            let workspace = discover_workspace()?;
+            let outcome = app::papercuts::resolve(
+                &workspace,
+                app::papercuts::ResolveOptions {
+                    id: options.id,
+                    note: options.note,
+                    references: options.references,
+                },
+            )?;
+            for warning in &outcome.warnings {
+                println!("Warning: {warning}");
+            }
+            println!(
+                "Resolved Papercut\nID:     {}\nStatus: {}\nNote:   {}\nPath:   {}",
+                outcome.papercut.id(),
+                outcome.papercut.status(),
+                outcome.papercut.field("resolution.note").unwrap_or(""),
+                display_path(&outcome.papercut.path)
+            );
+            Ok(())
+        }
+        other => Err(CliError::usage(format!(
+            "unknown papercut subcommand `{other}`; use add, list, show, or resolve"
+        ))),
+    }
+}
+
 pub(super) fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
     let workspace = discover_workspace()?;
     let snapshot = app::queries::load(&workspace)?;
@@ -219,18 +313,52 @@ pub(super) fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
             .map(|result| result.doc.clone())
             .collect::<Vec<_>>(),
     )?;
+    // Papercuts participate only in unfiltered global search. Document filters
+    // describe Board/Log taxonomy and hierarchy, which Papercuts do not join.
+    let papercut_results =
+        if options.state.is_none() && options.doc_type.is_none() && options.parent.is_none() {
+            app::queries::search_papercuts(workspace.read_papercuts()?, &options.query)
+        } else {
+            Vec::new()
+        };
+    let papercut_warnings = app::papercuts::warnings_for_items(
+        &workspace,
+        &papercut_results
+            .iter()
+            .map(|result| result.papercut.clone())
+            .collect::<Vec<_>>(),
+    )?;
 
     if options.json {
-        println!("{}", search_json(&options.query, &results, &relationships)?);
+        println!(
+            "{}",
+            global_search_json(
+                &options.query,
+                &results,
+                &papercut_results,
+                &relationships,
+                &papercut_warnings,
+            )?
+        );
     } else {
         print_workspace_deprecation_warnings(&workspace)?;
-        print_search_table(&results, &relationships)?;
+        if results.is_empty() && papercut_results.is_empty() {
+            println!("No matching Tandem records found.");
+        } else {
+            if !results.is_empty() {
+                print_search_table(&results, &relationships)?;
+            }
+            print_papercut_search(&papercut_results);
+        }
         print_document_warnings(
             &results
                 .iter()
                 .map(|result| result.doc.clone())
                 .collect::<Vec<_>>(),
         );
+        for warning in papercut_warnings {
+            println!("Warning: {warning}");
+        }
     }
     Ok(())
 }

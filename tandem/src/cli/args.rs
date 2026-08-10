@@ -40,6 +40,28 @@ pub(super) struct SearchOptions {
 }
 
 #[derive(Debug, Default)]
+pub(super) struct PapercutAddOptions {
+    pub(super) title: Option<String>,
+    pub(super) body: Option<String>,
+    pub(super) references: Vec<String>,
+    pub(super) tags: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct PapercutListOptions {
+    pub(super) status: Option<String>,
+    pub(super) all: bool,
+    pub(super) json: bool,
+}
+
+#[derive(Debug, Default)]
+pub(super) struct PapercutResolveOptions {
+    pub(super) id: String,
+    pub(super) note: Option<String>,
+    pub(super) references: Vec<String>,
+}
+
+#[derive(Debug, Default)]
 pub(super) struct LogListOptions {
     pub(super) limit: Option<usize>,
     pub(super) json: bool,
@@ -479,6 +501,106 @@ pub(super) fn parse_search_args(args: &[String]) -> Result<SearchOptions, CliErr
     }
     if options.query.is_empty() {
         return Err(CliError::usage("search requires a <query>"));
+    }
+    Ok(options)
+}
+
+pub(super) fn parse_papercut_add_args(args: &[String]) -> Result<PapercutAddOptions, CliError> {
+    let mut options = PapercutAddOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--title" => {
+                index += 1;
+                options.title = Some(required_value(args, index, "--title")?.to_string());
+            }
+            "--body" => {
+                index += 1;
+                options.body = Some(required_raw_value(args, index, "--body")?.to_string());
+            }
+            "--reference" => {
+                index += 1;
+                options
+                    .references
+                    .push(required_value(args, index, "--reference")?.to_string());
+            }
+            "--tag" => {
+                index += 1;
+                options
+                    .tags
+                    .push(required_value(args, index, "--tag")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown papercut add flag `{flag}`"
+                )))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected papercut add argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+pub(super) fn parse_papercut_list_args(args: &[String]) -> Result<PapercutListOptions, CliError> {
+    let mut options = PapercutListOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--status" => {
+                index += 1;
+                options.status = Some(required_value(args, index, "--status")?.to_string());
+            }
+            "--all" => options.all = true,
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown papercut list flag `{flag}`"
+                )))
+            }
+            value => {
+                return Err(CliError::usage(format!(
+                    "unexpected papercut list argument `{value}`"
+                )))
+            }
+        }
+        index += 1;
+    }
+    Ok(options)
+}
+
+pub(super) fn parse_papercut_resolve_args(
+    args: &[String],
+) -> Result<PapercutResolveOptions, CliError> {
+    let mut options = PapercutResolveOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--note" => {
+                index += 1;
+                options.note = Some(required_value(args, index, "--note")?.to_string());
+            }
+            "--reference" => {
+                index += 1;
+                options
+                    .references
+                    .push(required_value(args, index, "--reference")?.to_string());
+            }
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown papercut resolve flag `{flag}`"
+                )))
+            }
+            value => set_single_positional(&mut options.id, value, "papercut resolve")?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage("papercut resolve requires an <id>"));
     }
     Ok(options)
 }

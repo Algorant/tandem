@@ -78,6 +78,7 @@ tandem update <id> ...
 tandem complete <id>
 tandem cancel <id> --reason <text>
 tandem log list|show|search
+tandem papercut add|list|show|resolve
 tandem search <query>
 tandem accord ready|claim|deliver|accept|rework|block|fail
 tandem rules list|add|edit|delete
@@ -580,6 +581,25 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
   "warnings": []
 }
 ```
+
+### `tandem papercut`
+
+Purpose: capture and inspect small, non-blocking friction without creating Board work.
+
+```text
+tandem papercut add --title <text> [--body <markdown>] [--reference <id>]... [--tag <tag>]...
+tandem papercut list [--status <open|resolved>] [--all] [--json]
+tandem papercut show <id> [--json]
+tandem papercut resolve <id> --note <text> [--reference <id>]...
+```
+
+`add` requires a non-empty title, creates `.tandem/papercuts/` lazily, prints ID/status/title/path, and prints unresolved-reference warnings. `list` returns open records by default; `--status` selects one status, `--all` returns both, and combining the two is a usage error. Human list output is a compact ID/status/title/updated/tags table. JSON list uses the normal envelope with `data.items`, `data.count`, and warnings.
+
+`show` requires a canonical `papercut-N` ID. Human output is a labeled detail block with body and path. JSON returns `data.papercut` as the full frontmatter projection, plus `body`, `path`, and `location: papercuts`. `resolve` requires a concise non-empty note, rejects already resolved records, appends new unique references, updates the file in place, preserves unknown fields/body, and writes nested resolution metadata.
+
+Malformed required structure, invalid IDs/status, missing records, write conflicts, and event failures exit `1`. Missing flags, incompatible `--all`/`--status`, and unknown arguments exit `2`. Empty reads succeed with empty arrays. Mutations use atomic writes, conflict checks, UTC timestamps, and `papercut.created`/`papercut.resolved` per-actor events.
+
+Global `tandem search` includes Papercuts only when document taxonomy/hierarchy filters are absent. Search covers title, body, status, tags, references, and resolution note. Human and JSON results identify `location` as `papercuts`. Papercuts are intentionally absent from `list`, `log`, Board/TUI, hierarchy, progress, review, and Accord surfaces.
 
 ### `tandem accord`
 

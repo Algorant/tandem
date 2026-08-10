@@ -3,7 +3,7 @@
 use crate::app::support::hierarchy_from_project;
 use crate::project::rules::parse_rules_from_content;
 use crate::project::write::HierarchyLock;
-use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
+use crate::project::{ProjectHierarchy, StoredDocument as Document, StoredPapercut, TandemProject};
 use crate::protocol::accord::{state_divergence_warning, status as accord_status};
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
@@ -42,6 +42,12 @@ pub(crate) struct ListFilter<'a> {
 #[derive(Debug)]
 pub(crate) struct SearchResult {
     pub(crate) doc: Document,
+    pub(crate) snippet: String,
+}
+
+#[derive(Debug)]
+pub(crate) struct PapercutSearchResult {
+    pub(crate) papercut: StoredPapercut,
     pub(crate) snippet: String,
 }
 
@@ -87,9 +93,9 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, CliErro
             .map(parse_field_values)
             .unwrap_or_default()
         {
-            if hierarchy.document(&reference).is_none() {
+            if !project.reference_target_exists(&reference)? {
                 warnings.push(format!(
-                    "{} references missing document {reference}.",
+                    "{} references missing target {reference}.",
                     document.id()
                 ));
             }
@@ -249,6 +255,39 @@ pub(crate) fn search_documents(
         .filter_map(|doc| search_match(doc, filter.query))
         .collect::<Vec<_>>();
     results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    results
+}
+
+pub(crate) fn search_papercuts(
+    items: Vec<StoredPapercut>,
+    query: &str,
+) -> Vec<PapercutSearchResult> {
+    let lowered_query = query.to_lowercase();
+    let mut results = items
+        .into_iter()
+        .filter_map(|papercut| {
+            let mut haystacks = vec![
+                papercut.id().to_string(),
+                papercut.title().to_string(),
+                papercut.body.clone(),
+            ];
+            for key in ["status", "tags", "references", "resolution.note"] {
+                if let Some(value) = papercut.field(key) {
+                    haystacks.push(value.to_string());
+                }
+            }
+            haystacks
+                .into_iter()
+                .find(|value| value.to_lowercase().contains(&lowered_query))
+                .map(|matched| PapercutSearchResult {
+                    papercut,
+                    snippet: snippet_for_match(&matched, query),
+                })
+        })
+        .collect::<Vec<_>>();
+    results.sort_by_key(|result| {
+        crate::protocol::papercut::papercut_number(result.papercut.id()).unwrap_or(usize::MAX)
+    });
     results
 }
 

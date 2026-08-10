@@ -326,6 +326,18 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 | `createdAt` | no | warning if malformed | Timestamp for creation. |
 | `updatedAt` | no | warning if malformed | Timestamp for last mutation. |
 
+### Papercut inbox records
+
+Papercuts are small, non-blocking friction records. They are protocol-owned inbox records, not general Tandem documents. They do not add a document type, enter `.tandem/board/` or `.tandem/logs/`, participate in hierarchy, workflow, Accord, review, completion progress, or appear in the TUI.
+
+A workspace may omit `.tandem/papercuts/`. The first add creates it lazily, so this additive feature needs no migration. Each file is `.tandem/papercuts/papercut-N.md`. IDs are immutable, sequential, allocated by scanning existing Papercuts, and are not intentionally reused.
+
+Required fields are `id`, `title`, `status`, `createdAt`, and `updatedAt`. Status is `open` or `resolved`. Optional `references` are loose links and warn when unresolved; optional `tags` classify the friction. The Markdown body holds context, evidence, impact, or a workaround. A resolved record also requires `resolution.note` and `resolution.resolvedAt`. Duplicate titles are valid. There is no delete, dismiss, reopen, severity, assignment, due date, or Accord lifecycle in the MVP.
+
+Compliant mutation preserves unknown frontmatter and body content. Malformed Papercuts fail Papercut reads and global search, but must not prevent unrelated Board and Log operations. Current state comes from Papercut files. `papercut.created` and `papercut.resolved` use the normal per-actor audit event mechanism.
+
+Global search includes title, body, status, tags, references, and resolution note and reports location `papercuts`. Papercuts remain excluded from normal list, log, hierarchy, Board, review, completion, and Accord behavior. Promotion uses existing commands: create a Task that references the Papercut, then resolve the Papercut with a note and Task reference.
+
 ### Accord object fields
 
 `accord` is optional on a task. If present, it must be an object with a canonical status.
@@ -1219,6 +1231,10 @@ tandem update <id> --body <markdown> --kind epic --priority high --tag cli --par
 tandem complete <id> --summary ...
 tandem cancel <id> --reason <text>
 tandem log list|show|search
+tandem papercut add --title <text> [--body <markdown>] [--reference <id>]... [--tag <tag>]...
+tandem papercut list [--status <open|resolved>] [--all] [--json]
+tandem papercut show <id> [--json]
+tandem papercut resolve <id> --note <text> [--reference <id>]...
 tandem search <query>
 tandem accord claim|deliver|accept|rework|block|fail
 tandem rules list|add|edit|delete

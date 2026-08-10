@@ -43,6 +43,7 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "complete" => cmd_complete(parse_complete_args(&args)?)?,
         "cancel" => cmd_cancel(parse_cancel_args(&args)?)?,
         "search" => cmd_search(parse_search_args(&args)?)?,
+        "papercut" => cmd_papercut(&args)?,
         "log" => cmd_log(&args)?,
         "accord" => cmd_accord(&args)?,
         "rules" => cmd_rules(&args)?,
@@ -54,7 +55,7 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, log, accord, rules, decision, tui, web, version"
+                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, papercut, log, accord, rules, decision, tui, web, version"
             )))
         }
     }
@@ -76,6 +77,7 @@ fn print_help() {
     println!("  tandem complete <id> --summary <text>");
     println!("  tandem cancel <id> --reason <text>");
     println!("  tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]");
+    println!("  tandem papercut add|list|show|resolve ...");
     println!("  tandem log list|show|search ...");
     println!("  tandem accord {} ...", accord_actions_help());
     println!("  tandem rules list|add|edit|delete ...");

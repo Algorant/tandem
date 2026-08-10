@@ -37,6 +37,7 @@ From a local checkout, use `cargo install --path tandem --locked`.
 
 - Workspace: [`init`](#tandem-init), [`upgrade`](#tandem-upgrade)
 - Board documents: [`list`](#tandem-list), [`show`](#tandem-show), [`add`](#tandem-add), [`move`](#tandem-move), [`update`](#tandem-update), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel), [`search`](#tandem-search)
+- Friction inbox: [`papercut`](#tandem-papercut)
 - History: [`log`](#tandem-log)
 - Work agreements: [`accord`](#tandem-accord)
 - Coordination rules: [`rules`](#tandem-rules)
@@ -538,6 +539,29 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
   "warnings": []
 }
 ```
+
+### `tandem papercut`
+
+Papercuts record small, non-blocking friction without creating Tasks or entering Board workflow. Use a Task instead when corrective work needs planning or ownership. Use the blocking lifecycle when work cannot continue.
+
+```sh
+tandem papercut add --title "Edit errors hide ambiguous matches" \
+  --body "The workaround is to search for each source location first." \
+  --tag tooling \
+  --reference task-173
+
+tandem papercut list
+tandem papercut list --status resolved --json
+tandem papercut list --all
+tandem papercut show papercut-1 --json
+tandem papercut resolve papercut-1 \
+  --note "The error now lists all ambiguous source locations." \
+  --reference task-201
+```
+
+`list` shows open Papercuts by default. Use one `--status open|resolved` filter or `--all`; do not combine them. `show` returns metadata, body, path, and `location: papercuts`. `resolve` updates the same file, requires a note, and can append references. Duplicate titles are valid, and the MVP has no delete or reopen command.
+
+`list` and `show` support the standard JSON envelope. Global `tandem search` finds Papercut title, body, status, tags, references, and resolution note and reports `location: papercuts`. Papercuts never appear in `tandem list`, Logs, hierarchy, Accord, review, completion progress, or the TUI.
 
 ### `tandem accord`
 

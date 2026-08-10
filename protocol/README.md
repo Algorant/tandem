@@ -18,6 +18,7 @@ The protocol area owns:
 - `.tandem/tandem.md` workspace config shape
 - active work documents in `.tandem/board/`
 - completed and canceled work-history documents in `.tandem/logs/`
+- optional lightweight Papercut inbox records in `.tandem/papercuts/`, outside the general document taxonomy and Board workflow
 - tracked per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with ignored checkout/worktree-local `.tandem/actor-id` identity and legacy `.tandem/events.jsonl` reads during transition
 - `accord` work-agreement model
 - review and completion semantics

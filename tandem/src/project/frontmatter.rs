@@ -65,6 +65,51 @@ pub(crate) fn patch_frontmatter_content(
     Ok(format!("---\n{}---\n{}", output_frontmatter, body))
 }
 
+/// Replaces the canonical Papercut resolution block while preserving unknown
+/// frontmatter and the Markdown body exactly.
+pub(crate) fn patch_papercut_resolution_content(
+    content: &str,
+    note: &str,
+    resolved_at: &str,
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let block = format!(
+        "resolution:\n  note: {}\n  resolvedAt: {}\n",
+        yaml_double_quote(note),
+        yaml_double_quote(resolved_at)
+    );
+    let mut output = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0;
+    let mut replaced = false;
+    while index < lines.len() {
+        let raw = lines[index];
+        let line = raw.trim_end_matches('\n').trim_end_matches('\r');
+        if frontmatter_line_key(line) == Some("resolution") {
+            output.push_str(&block);
+            replaced = true;
+            index += 1;
+            while index < lines.len() {
+                let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                if is_top_level_frontmatter_boundary(next) {
+                    break;
+                }
+                index += 1;
+            }
+            continue;
+        }
+        output.push_str(raw);
+        index += 1;
+    }
+    if !output.is_empty() && !output.ends_with('\n') {
+        output.push('\n');
+    }
+    if !replaced {
+        output.push_str(&block);
+    }
+    Ok(format!("---\n{}---\n{}", output, body))
+}
+
 /// Replaces the canonical accord block while preserving unrelated source bytes.
 pub(crate) fn patch_accord_content(
     content: &str,

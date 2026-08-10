@@ -107,6 +107,12 @@ tandem decision add --title <title> [--body <markdown>] [--status <status>] [--d
 
 Use this tool for ADR-compatible durable decisions. The document remains `type: decision`; ADR status and supersession belong in decision metadata/body sections, not task workflow `state` or a separate `adr` type.
 
+### `tandem_papercut`
+
+Maps `add`, `list`, `show`, and `resolve` to the matching `tandem papercut` CLI commands. Reads default to `--json`. Use it for small, non-blocking friction worth preserving, then continue current work. Do not use it for blockers or planned corrective work.
+
+The adapter does not read `.tandem/papercuts/`, allocate IDs, validate references, or implement status transitions.
+
 ### `tandem_search`
 
 Maps to:
@@ -146,7 +152,7 @@ bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 bun extensions/pi-tandem/tests/relationship-smoke.ts
 ```
 
-`smoke.ts` performs read-only checks against this repo's `.tandem` board when the checkout has one, then mutating add/move/accord/rules/decision/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts` and, when needed, a disposable repository `.tandem` workspace containing an Epic, global Task, and parent-derived Subtask; it starts `pi --mode rpc --approve --offline`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes all temporary state. `relationship-smoke.ts` verifies generated Task-only/thin-adapter guidance, canonical Epic → Task → Subtask IDs, Board+Logs Task summaries, CLI-returned `epic-task`/`subtask`/generic `parent` output, completed-log sequence continuity, exact-parent reads, and rejection of nested Epics, children beneath Subtasks, role-changing reparenting, erroneous hierarchical Epic children, and erroneous global-ID Subtasks.
+`smoke.ts` performs read-only checks against this repo's `.tandem` board when the checkout has one, then mutating add/move/accord/rules/decision/Papercut/search/log coverage in a temporary Tandem workspace. `pi-runtime-smoke.ts` temporarily creates an ignored project-local loader at `.pi/extensions/pi-tandem/index.ts` and, when needed, a disposable repository `.tandem` workspace containing an Epic, global Task, and parent-derived Subtask; it starts `pi --mode rpc --approve --offline`, verifies fresh startup discovers `/tandem`, runs `/tandem status`, and removes all temporary state. `relationship-smoke.ts` verifies generated Task-only/thin-adapter guidance, canonical Epic → Task → Subtask IDs, Board+Logs Task summaries, CLI-returned `epic-task`/`subtask`/generic `parent` output, completed-log sequence continuity, exact-parent reads, and rejection of nested Epics, children beneath Subtasks, role-changing reparenting, erroneous hierarchical Epic children, and erroneous global-ID Subtasks.
 
 Manual project-local Pi smoke:
 

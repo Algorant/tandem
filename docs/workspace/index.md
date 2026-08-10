@@ -16,6 +16,8 @@ A Tandem workspace is the `.tandem/` directory in a repository. It stores active
 │   ├── task-197-1.md                 # Subtask (parentId: task-197)
 │   └── decision-3.md                 # Decision
 ├── logs/                             # completed or canceled documents
+├── papercuts/                        # optional friction inbox, created lazily
+│   └── papercut-1.md
 ├── actor-id                           # local checkout identity
 ├── events/                            # timestamped event logs
 │   └── <actor_id>.jsonl
@@ -77,6 +79,29 @@ The page now explains the Board workflow and workspace files.
 ```
 
 Canceled work uses `completion.outcome: canceled` and keeps its reason for later audit.
+
+## `papercuts/`
+
+`papercuts/` is optional and appears only after the first `tandem papercut add`. Each `papercut-N.md` is an inbox record, not a Board or Log document. Existing workspaces need no migration.
+
+```markdown
+---
+id: papercut-12
+title: Edit errors do not identify ambiguous replacements
+status: resolved
+createdAt: 2026-08-01T12:00:00Z
+updatedAt: 2026-08-03T09:30:00Z
+references: [task-173]
+tags: [tooling]
+resolution:
+  note: The error now lists the ambiguous source locations.
+  resolvedAt: 2026-08-03T09:30:00Z
+---
+
+The earlier workaround was to search each source location first.
+```
+
+Required fields are `id`, `title`, `status`, `createdAt`, and `updatedAt`. Resolved records also require `resolution.note` and `resolution.resolvedAt`. References are loose and unresolved targets warn. Papercuts are searchable, but they do not join the document type taxonomy, Board, Logs, hierarchy, Accord, review, completion, or TUI.
 
 ## `actor-id`
 

@@ -8,6 +8,7 @@ Use `pi-tandem` when a project has `.tandem/tandem.md` or when the user asks for
 - Use `tandem_task` for task list/show/add/move/update/complete.
 - Use `tandem_accord` for claim/deliver/accept/rework/block/fail transitions. Existing persisted `accord.status: ready` records are legacy reads; claim them directly when an owner is known.
 - Use `tandem_log` and `tandem_search` for completed-work history and project search.
+- Use `tandem_papercut` when small, non-blocking friction causes confusion, avoidable retries, or a workaround worth preserving. Then continue current work. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.
 - Use `tandem_rules` for project rules.
 - Use `tandem_decision` for first-class decision documents, including ADR-compatible durable records.
 

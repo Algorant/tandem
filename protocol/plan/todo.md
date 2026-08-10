@@ -1,7 +1,7 @@
 # Tandem Protocol Todo
 
 Status: v0 draft accepted for implementation
-Last updated: 2026-07-13
+Last updated: 2026-08-10
 
 This todo tracks protocol-specific tasks. The current protocol draft lives in `protocol/plan/spec.md`.
 
@@ -53,6 +53,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Defined completed-log document expectations.
 - [x] Defined mutation semantics for adding tasks/decisions, moving state, updating accords, review decisions, complete/archive, and post-v0 restore/reopen boundaries.
 - [x] Accepted protocol v0 draft for implementation.
+- [x] Specified and implemented the optional project-local Papercut inbox, including independent record validation, lazy storage, sequential IDs, loose references, global search, and audit events without expanding the general document taxonomy.
 
 ## Current tasks
 

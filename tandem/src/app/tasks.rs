@@ -190,7 +190,7 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
 
     let mut warnings = Vec::new();
     for reference in &options.references {
-        if hierarchy.document(reference).is_none() {
+        if !workspace.reference_target_exists(reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
@@ -401,7 +401,7 @@ pub(crate) fn update(
 
     let mut warnings = Vec::new();
     for reference in &options.references {
-        if hierarchy.document(reference).is_none() {
+        if !workspace.reference_target_exists(reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
     }
@@ -857,6 +857,93 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+
+    #[test]
+    fn task_references_accept_papercuts_while_parent_and_blockers_remain_documents() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-task-papercut-reference-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let papercut = crate::app::papercuts::add(
+            &project,
+            crate::app::papercuts::AddOptions {
+                title: Some("Small friction".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let papercut_id = papercut.papercut.id().to_string();
+        let update_papercut_id = crate::app::papercuts::add(
+            &project,
+            crate::app::papercuts::AddOptions {
+                title: Some("More friction".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap()
+        .papercut
+        .id()
+        .to_string();
+
+        let created = add(
+            &project,
+            AddOptions {
+                title: Some("Fix the friction".to_string()),
+                references: vec![papercut_id.clone()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(created.warnings.is_empty());
+        assert!(fs::read_to_string(&created.path)
+            .unwrap()
+            .contains(&format!("references: [\"{papercut_id}\"]")));
+
+        let updated = update(
+            &project,
+            UpdateOptions {
+                id: created.id.clone(),
+                references: vec![update_papercut_id.clone()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(updated.warnings.is_empty());
+        let updated_source = fs::read_to_string(&updated.path).unwrap();
+        assert!(updated_source.contains(&papercut_id));
+        assert!(updated_source.contains(&update_papercut_id));
+
+        let parent_error = add(
+            &project,
+            AddOptions {
+                title: Some("Invalid parent".to_string()),
+                parent: Some(papercut_id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(parent_error.message.contains("parent document not found"));
+
+        let blocker_error = add(
+            &project,
+            AddOptions {
+                title: Some("Invalid blocker".to_string()),
+                blockers: vec![papercut_id],
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(blocker_error.message.contains("blocker document not found"));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
 
     #[test]
     fn completion_preserves_unknown_source_and_returns_policy_warning() {

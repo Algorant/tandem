@@ -33,6 +33,13 @@ pub(crate) fn document_exists(project: &TandemProject, id: &str) -> Result<bool,
     Ok(project.find_document(id)?.is_some())
 }
 
+/// Loose `references` may target either a general Tandem document or a
+/// Papercut inbox record. Strict relationships and Rule sources must use
+/// `document_exists` instead.
+pub(crate) fn reference_target_exists(project: &TandemProject, id: &str) -> Result<bool, CliError> {
+    project.reference_target_exists(id)
+}
+
 pub(crate) fn current_timestamp() -> String {
     let seconds = SystemTime::now()
         .duration_since(UNIX_EPOCH)
