@@ -20,3 +20,10 @@
 {"ts":"2026-08-10T17:43:35Z","event":"accord.accepted","id":"task-224","summary":"Accord accept for task-224","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":20}
 {"ts":"2026-08-10T17:43:45Z","event":"task.completed","id":"task-224","summary":"Added and visually validated the read-only global Papercuts utility panel. The TUI now shows an open-count indicator in the global gutter and opens a responsive list/detail inbox with `P`, while preserving the four main views and excluding mutation actions.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":21}
 {"ts":"2026-08-10T17:44:24Z","event":"task.created","id":"task-225","summary":"Overhaul and rationalize the fixed TUI keybindings","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":22}
+{"ts":"2026-08-10T18:41:19Z","event":"task.updated","id":"task-225","summary":"Updated task-225 metadata: title, priority, tags, relatedFiles, body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":23}
+{"ts":"2026-08-10T18:41:34Z","event":"task.created","id":"task-225-1","summary":"Establish the canonical semantic action and binding inventory","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":24}
+{"ts":"2026-08-10T18:41:43Z","event":"task.created","id":"task-225-2","summary":"Apply the global and navigation keymap standard","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":25}
+{"ts":"2026-08-10T18:41:52Z","event":"task.created","id":"task-225-3","summary":"Build consistent Board filter, move, and Validation pickers","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":26}
+{"ts":"2026-08-10T18:41:59Z","event":"task.created","id":"task-225-4","summary":"Close cross-view keyboard and mouse parity gaps","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":27}
+{"ts":"2026-08-10T18:42:14Z","event":"task.created","id":"task-225-5","summary":"Design the universal sectioned keybinding reference","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":28}
+{"ts":"2026-08-10T18:42:23Z","event":"task.created","id":"task-225-6","summary":"Complete full regression and real-TUI interaction validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":29}
