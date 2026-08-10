@@ -35,7 +35,7 @@ With Rust and Cargo, you can instead install the current tagged source:
 
 ```sh
 cargo install --git https://github.com/Algorant/tandem.git \
-  --tag tandem-v0.9.0 --path tandem --locked
+  --tag tandem-v0.10.0 --path tandem --locked
 ```
 ### AUR
 Released binary through `tandem-bin` in the AUR.

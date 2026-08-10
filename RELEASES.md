@@ -2,6 +2,28 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.10.0
+
+Tandem v0.10.0 introduces Papercuts: a lightweight project inbox for preserving small, non-blocking friction without interrupting active work.
+
+### Features
+
+- New `tandem papercut add|list|show|resolve` commands record and manage project-local Papercuts.
+- Papercuts use lightweight Markdown records under `.tandem/papercuts/` with stable IDs, optional tags and references, free-form context, and resolution notes.
+- Global `tandem search` finds Papercut titles, bodies, tags, references, statuses, and resolution notes.
+- Tasks and Decisions can reference Papercuts without adding Papercuts to Tandem's document hierarchy.
+- The bundled `pi-tandem` adapter exposes `tandem_papercut` for agent-driven capture, inspection, and resolution.
+
+### Improvements
+
+- Agent guidance distinguishes notable workflow friction from expected failures, blockers, planned work, Decisions, Rules, and telemetry.
+- CLI, workspace, concepts, extensions, adapter, and reference documentation now explain the complete Papercut workflow.
+
+### Compatibility
+
+- Existing workspaces require no migration. `.tandem/papercuts/` is optional and created only when the first Papercut is added.
+- Papercuts remain outside the Board, Logs, hierarchy, Accord, review, completion progress, and TUI.
+
 ## 0.9.0
 
 Tandem v0.9.0 adds a polished, read-only web interface for viewing a local workspace in the browser.
