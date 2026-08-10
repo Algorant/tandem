@@ -35,6 +35,26 @@ impl ValidationPrompt {
 }
 
 impl TuiApp {
+    pub(super) fn activate_confirmation(&mut self) {
+        if self.validation_prompt.is_some() {
+            self.handle_validation_prompt_key(KeyEvent::from(KeyCode::Enter));
+        } else if self.rules_prompt_active() {
+            self.handle_rules_prompt_key(KeyEvent::from(KeyCode::Enter));
+        }
+    }
+
+    pub(super) fn cancel_top_modal(&mut self) {
+        if self.board_picker.is_some() {
+            self.handle_picker_key(KeyEvent::from(KeyCode::Esc));
+        } else if self.validation_prompt.is_some() {
+            self.handle_validation_prompt_key(KeyEvent::from(KeyCode::Esc));
+        } else if self.rules_prompt_active() {
+            self.handle_rules_prompt_key(KeyEvent::from(KeyCode::Esc));
+        } else if self.decision_prompt_active() {
+            self.handle_decision_prompt_key(KeyEvent::from(KeyCode::Esc));
+        }
+    }
+
     pub(super) fn selected_validation_doc_summary(
         &self,
     ) -> Result<(String, String, String), String> {

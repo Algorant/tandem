@@ -10,7 +10,7 @@ use ratatui::{
 use super::theme::{StatusTone, TuiTheme};
 use super::{
     centered_rect, detail_field_line, detail_section_heading, is_decision_doc, markdownish_lines,
-    FocusPane, TuiApp,
+    FocusPane, HitAction, HitRegion, TuiApp,
 };
 use crate::app;
 use crate::project::{display_path, StoredDocument as Document};
@@ -189,7 +189,7 @@ impl TuiApp {
         self.draw_decision_detail(frame, chunks[1]);
     }
 
-    pub(super) fn draw_decision_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
+    pub(super) fn draw_decision_prompt(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let Some(prompt) = self.decisions_view.prompt.as_ref() else {
             return;
         };
@@ -206,6 +206,16 @@ impl TuiApp {
             )
             .wrap(Wrap { trim: false });
         frame.render_widget(prompt_view, popup);
+        let controls = Rect::new(
+            popup.x.saturating_add(2),
+            popup.bottom().saturating_sub(2),
+            popup.width.saturating_sub(4),
+            1,
+        );
+        self.hits.push(HitRegion {
+            rect: controls,
+            action: HitAction::ShowHelp,
+        });
     }
 
     pub(super) fn decisions_context(&self) -> String {
@@ -235,6 +245,10 @@ impl TuiApp {
     }
 
     fn draw_decision_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusDecisionList,
+        });
         let decisions = self.sorted_decision_docs();
         let selected_index = self.decisions_view.selected;
         let expanded_id = self.decisions_view.expanded_doc_id.as_deref();
@@ -275,9 +289,24 @@ impl TuiApp {
             .highlight_style(Style::default())
             .highlight_symbol("");
         frame.render_stateful_widget(list, area, &mut state);
+        let inner = Block::default().borders(Borders::ALL).inner(area);
+        for index in state.offset()..decisions.len() {
+            let y = inner.y.saturating_add((index - state.offset()) as u16);
+            if y >= inner.bottom() {
+                break;
+            }
+            self.hits.push(HitRegion {
+                rect: Rect::new(inner.x, y, inner.width, 1),
+                action: HitAction::SelectDecision(index),
+            });
+        }
     }
 
-    fn draw_decision_detail(&self, frame: &mut Frame<'_>, area: Rect) {
+    fn draw_decision_detail(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusDecisionDetail,
+        });
         let (title, lines) = match self.selected_decision_doc() {
             Some(doc) => (
                 format!(" Decision {} ", doc.id()),
@@ -334,6 +363,14 @@ impl TuiApp {
             .unwrap_or(false)
     }
 
+    pub(super) fn select_decision(&mut self, index: usize) {
+        self.decisions_view.selected =
+            index.min(self.sorted_decision_docs().len().saturating_sub(1));
+        self.decisions_view.detail_scroll = 0;
+        self.decisions_view.expanded_doc_id = None;
+        self.focus = FocusPane::Board;
+    }
+
     fn toggle_decision_expansion(&mut self) {
         let Some(doc) = self.selected_decision_doc() else {
             self.status = "No decision selected; press a to add one.".to_string();
@@ -368,12 +405,12 @@ impl TuiApp {
         }
     }
 
-    fn scroll_decision_detail_up(&mut self, amount: u16) {
+    pub(super) fn scroll_decision_detail_up(&mut self, amount: u16) {
         self.decisions_view.detail_scroll =
             self.decisions_view.detail_scroll.saturating_sub(amount);
     }
 
-    fn scroll_decision_detail_down(&mut self, amount: u16) {
+    pub(super) fn scroll_decision_detail_down(&mut self, amount: u16) {
         let max_scroll = self.decision_detail_line_count().saturating_sub(1) as u16;
         self.decisions_view.detail_scroll = self
             .decisions_view

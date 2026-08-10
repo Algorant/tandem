@@ -45,6 +45,7 @@ use crate::protocol::workflow::{
 };
 use crate::CliError;
 
+mod bindings;
 mod board;
 mod chrome;
 mod decisions;
@@ -52,6 +53,7 @@ mod editor;
 mod input;
 mod logs;
 mod papercuts;
+mod pickers;
 mod reload;
 #[allow(
     dead_code,
@@ -65,6 +67,7 @@ mod text;
 mod theme;
 mod validation;
 
+use bindings::{bindings_for, BindingScope};
 use board::*;
 #[cfg(test)]
 use chrome::status_tone_for_message;
@@ -72,6 +75,7 @@ use chrome::{centered_rect, rect_contains};
 use decisions::DecisionsState;
 use editor::{editor_command_from_env, editor_target_for_doc, run_editor_command, EditorTarget};
 use papercuts::PapercutsState;
+use pickers::BoardPicker;
 use reload::{ReloadFingerprint, ReloadOutcome};
 use rules::RulesState;
 use state::*;
@@ -180,11 +184,22 @@ enum HitAction {
     ToggleBoardDetail,
     ToggleBoardArrangement,
     StartQuickAdd,
-    CycleBoardTagFilter,
-    CycleBoardPriorityFilter,
-    ClearBoardFilters,
-    MoveSelectedTask(isize),
-    ShowValidationAction(&'static str),
+    OpenFilterPicker,
+    OpenMovePicker,
+    OpenValidationPicker,
+    SelectPickerOption(usize),
+    ActivatePicker,
+    CancelPicker,
+    SelectDecision(usize),
+    FocusDecisionList,
+    FocusDecisionDetail,
+    ToggleRulePreview,
+    FocusRuleList,
+    FocusRulePreview,
+    ConfirmModal,
+    CancelModal,
+    HelpSection(usize),
+    CloseHelp,
     OpenEditor,
     ShowHelp,
     FocusDetail,
@@ -249,7 +264,10 @@ struct TuiApp {
     log_search_input: Option<String>,
     status: String,
     show_help: bool,
+    help_scroll: u16,
+    help_section: usize,
     quick_add: Option<QuickAddInput>,
+    board_picker: Option<BoardPicker>,
     validation_prompt: Option<ValidationPrompt>,
     rules_view: RulesState,
     decisions_view: DecisionsState,
@@ -301,6 +319,9 @@ impl TuiApp {
             hits: Vec::new(),
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
+            help_scroll: 0,
+            help_section: 0,
+            board_picker: None,
         };
         app.reload();
         Ok(app)
@@ -367,6 +388,10 @@ impl TuiApp {
 
         if self.papercuts_open() {
             self.draw_papercuts_panel(frame, chunks[1]);
+        }
+
+        if self.board_picker.is_some() {
+            self.draw_board_picker(frame, area);
         }
 
         if self.validation_prompt.is_some() {
@@ -2073,17 +2098,25 @@ tone = "success"
             .fields
             .insert("priority".to_string(), "low".to_string());
 
-        app.handle_key(key(KeyCode::Char('t'))).unwrap();
+        app.handle_key(key(KeyCode::Char('f'))).unwrap();
+        assert!(matches!(
+            app.board_picker.as_ref().map(|picker| picker.kind),
+            Some(pickers::PickerKind::Filter)
+        ));
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert_eq!(app.board_filters.tag.as_deref(), Some("research"));
         assert_eq!(app.selected_state_count(), 1);
 
-        app.handle_key(key(KeyCode::Char('p'))).unwrap();
+        app.handle_key(key(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert_eq!(app.board_filters.priority.as_deref(), Some("high"));
         assert_eq!(app.selected_state_count(), 1);
 
-        app.handle_key(key(KeyCode::Char('F'))).unwrap();
-        assert_eq!(app.board_filters, BoardFilters::default());
-        assert!(app.status.contains("cleared"));
+        for removed in ['t', 'p', 'F', 'H', 'L', 'A', 'R', 'C', 'P', 'n'] {
+            app.handle_key(key(KeyCode::Char(removed))).unwrap();
+        }
+        assert_eq!(app.board_filters.tag.as_deref(), Some("research"));
     }
 
     #[test]
@@ -2101,7 +2134,7 @@ tone = "success"
         };
 
         let footer = app.board_footer_text();
-        assert!(footer.contains("F clear"));
+        assert!(footer.contains("f filter"));
         assert!(!footer.contains("#research"));
         assert!(!footer.contains("priority high"));
 
@@ -2119,7 +2152,7 @@ tone = "success"
         assert!(rendered.contains("#research"));
         assert!(rendered.contains("priority"));
         assert!(rendered.contains("high"));
-        assert!(rendered.contains("F clear"));
+        assert!(rendered.contains("f change or clear"));
     }
 
     #[test]
@@ -2538,7 +2571,10 @@ tone = "success"
             log_search_input: None,
             status: String::new(),
             show_help: false,
+            help_scroll: 0,
+            help_section: 0,
             quick_add: None,
+            board_picker: None,
             validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
@@ -2593,7 +2629,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 row · Enter expand/preview · Space preview · a add · t tag · p priority · b Epic Board · ? help"
+            "board · TODO · 1 row · Enter open · Space preview · a add · f filter · m move · v validate · b Epic Board · ? help"
         );
         assert!(!app.board_footer_text().contains("1/"));
         assert!(!app.board_footer_text().contains("1..4"));
@@ -2601,7 +2637,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "detail · TODO · 1 row · Tab board · j/k scroll · e edit · b Epic Board · ? help"
+            "detail · TODO · 1 row · Shift-Tab board · j/k scroll · e edit · b Epic Board · ? help"
         );
 
         app.switch_view(TuiView::Logs);
@@ -2615,7 +2651,7 @@ tone = "success"
         app.status.clear();
         assert_eq!(
             app.rules_footer_text(),
-            "Rules · h/l category · j/k select · Enter preview · n new · e edit · d delete · ? help"
+            "Rules list · h/l category · j/k select · Enter preview · a add · e edit · d delete · ? help"
         );
     }
 
@@ -2655,11 +2691,11 @@ tone = "success"
             let detail_scroll = app.detail_scroll;
             let arrangement = app.board_arrangement;
 
-            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+            app.handle_key(key(KeyCode::Char('i'))).unwrap();
             assert!(app.papercuts_open());
             assert_eq!(app.view, view);
             assert_eq!(app.focus, FocusPane::Detail);
-            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+            app.handle_key(key(KeyCode::Char('i'))).unwrap();
             assert!(!app.papercuts_open());
             assert_eq!(app.view, view);
             assert_eq!(app.focus, FocusPane::Detail);
@@ -2694,7 +2730,7 @@ tone = "success"
                 .expect("global header should expose a Papercuts hit target");
             app.handle_mouse(left_click(hit.rect.x, hit.rect.y));
             assert!(app.papercuts_open());
-            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+            app.handle_key(key(KeyCode::Char('i'))).unwrap();
         }
     }
 
@@ -3016,23 +3052,24 @@ tone = "success"
         for heading in [
             "Global",
             "Navigation",
-            "Board",
+            "Current view",
+            "Board actions",
             "Validation",
             "Logs",
             "Rules",
             "Decisions",
-            "Prompts",
+            "Utility inbox",
+            "Dialogs and text input",
+            "Mouse",
         ] {
             assert!(text.contains(heading), "missing help heading {heading}");
         }
-        assert!(text.contains("1 2 3 4"));
-        assert!(text.contains("b           toggle State/Epic Board arrangement"));
-        assert!(!text.contains("E           toggle State/Epic Board arrangement"));
-        assert!(text.contains("A           open accept confirmation"));
-        assert!(text.contains("/           search id, title"));
-        assert!(text.contains("e / d       edit or delete"));
-        assert!(text.contains("use CLI decision update/withdraw; editor actions are deferred"));
-        assert!(!text.contains("Review actions"));
+        for keys in ["1–4", "f", "m", "v", "Ctrl-U/D · PgUp/PgDn", "a/e/d", "/"] {
+            assert!(text.contains(keys), "missing help binding {keys}");
+        }
+        for removed in ["t/p/F", "H/L", "A/R/C", "a or n"] {
+            assert!(!text.contains(removed), "stale help binding {removed}");
+        }
     }
 
     #[test]
@@ -3087,19 +3124,26 @@ tone = "success"
     }
 
     #[test]
-    fn tab_has_no_top_level_fallback_without_focusable_panes() {
+    fn rules_tab_and_shift_tab_change_preview_focus_only() {
         let mut app = keyboard_test_app();
+        app.rules
+            .get_mut("always")
+            .unwrap()
+            .push(crate::protocol::config::RuleItem {
+                id: 1,
+                rule: "A long preview".into(),
+                source: None,
+            });
         app.switch_view(TuiView::Rules);
+        app.handle_key(key(KeyCode::Enter)).unwrap();
 
         app.handle_key(key(KeyCode::Tab)).unwrap();
         assert_eq!(app.view, TuiView::Rules);
-        assert_eq!(app.focus, FocusPane::Board);
-        assert!(app.status.contains("Tab stays in Rules"));
+        assert_eq!(app.rules_view.focus, rules::RuleFocus::Preview);
 
         app.handle_key(key(KeyCode::BackTab)).unwrap();
         assert_eq!(app.view, TuiView::Rules);
-        assert_eq!(app.focus, FocusPane::Board);
-        assert!(app.status.contains("Tab stays in Rules"));
+        assert_eq!(app.rules_view.focus, rules::RuleFocus::List);
     }
 
     #[test]
@@ -3157,7 +3201,7 @@ tone = "success"
             app.handle_key(key(KeyCode::Char('e'))).unwrap(),
             KeyAction::Continue
         );
-        assert!(app.status.contains("deferred"));
+        assert!(app.status.contains("CLI"));
     }
 
     #[test]
@@ -3180,7 +3224,8 @@ tone = "success"
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
 
-        app.handle_key(key(KeyCode::Char('A'))).unwrap();
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert!(matches!(
             app.validation_prompt,
             Some(ValidationPrompt::Accept { ref id, .. }) if id == "task-2"
@@ -3188,7 +3233,9 @@ tone = "success"
         assert!(app.status.contains("Confirm acceptance"));
 
         app.handle_key(key(KeyCode::Esc)).unwrap();
-        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert!(matches!(
             app.validation_prompt,
             Some(ValidationPrompt::Rework { ref id, .. }) if id == "task-2"
@@ -3196,8 +3243,11 @@ tone = "success"
         assert!(app.status.contains("type feedback"));
 
         app.handle_key(key(KeyCode::Esc)).unwrap();
-        app.handle_key(key(KeyCode::Char('C'))).unwrap();
-        assert!(app.status.contains("No accepted Validation tasks"));
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("no accepted tasks"));
         assert!(!app.status.contains("tandem complete"));
     }
 
@@ -3209,7 +3259,9 @@ tone = "success"
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
 
-        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         for ch in ['n', 'a', 'e', '/'] {
             app.handle_key(key(KeyCode::Char(ch))).unwrap();
         }
@@ -3269,7 +3321,9 @@ tone = "success"
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         assert!(app.select_document_by_id("task-1"));
 
-        app.handle_key(key(KeyCode::Char('R'))).unwrap();
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         app.handle_key(key(KeyCode::Char('x'))).unwrap();
         app.handle_key(key(KeyCode::Esc)).unwrap();
 
@@ -3317,7 +3371,10 @@ tone = "success"
             .position(|state| state == "validation")
             .unwrap();
 
-        app.handle_key(key(KeyCode::Char('C'))).unwrap();
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert!(matches!(
             app.validation_prompt,
             Some(ValidationPrompt::ApplyAccepted { .. })
@@ -3651,30 +3708,6 @@ tone = "success"
     }
 
     #[test]
-    fn adjacent_configured_state_moves_left_and_right() {
-        let states = vec![
-            "todo".to_string(),
-            "in-progress".to_string(),
-            "review".to_string(),
-        ];
-        assert_eq!(
-            adjacent_configured_state(&states, Some("in-progress"), -1).unwrap(),
-            "todo"
-        );
-        assert_eq!(
-            adjacent_configured_state(&states, Some("in-progress"), 1).unwrap(),
-            "review"
-        );
-    }
-
-    #[test]
-    fn adjacent_configured_state_rejects_unconfigured_state() {
-        let states = vec!["todo".to_string(), "review".to_string()];
-        let error = adjacent_configured_state(&states, Some("blocked"), 1).unwrap_err();
-        assert!(error.contains("not a configured state"));
-    }
-
-    #[test]
     fn board_subview_tabs_count_visible_states() {
         let mut decision = decision_doc("decision-1");
         decision
@@ -3710,6 +3743,298 @@ tone = "success"
             ]
         );
         assert_eq!(state_tab_title("in-progress", 3), " IN PROGRESS 3 ");
+    }
+
+    #[test]
+    fn fixed_keymap_precedence_and_removed_aliases_are_safe() {
+        let mut app = keyboard_test_app();
+        for removed in ['P', 't', 'p', 'F', 'H', 'L', 'A', 'R', 'C', 'n', 'u', 'd'] {
+            assert_eq!(
+                app.handle_key(key(KeyCode::Char(removed))).unwrap(),
+                KeyAction::Continue
+            );
+            assert!(app.board_picker.is_none());
+            assert!(!app.papercuts_open());
+        }
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        for printable in ['q', '?', 'i'] {
+            app.handle_key(key(KeyCode::Char(printable))).unwrap();
+        }
+        assert_eq!(
+            app.quick_add.as_ref().map(|input| input.title.as_str()),
+            Some("q?i")
+        );
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(app.hits.iter().any(|hit| hit.action == HitAction::ShowHelp));
+        assert_eq!(
+            app.handle_key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL))
+                .unwrap(),
+            KeyAction::Quit
+        );
+    }
+
+    #[test]
+    fn help_preserves_picker_and_q_quits_non_text_context() {
+        let mut app = keyboard_test_app();
+        app.handle_key(key(KeyCode::Char('f'))).unwrap();
+        app.handle_key(key(KeyCode::Char('?'))).unwrap();
+        assert!(app.show_help);
+        assert!(app.board_picker.is_some());
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert!(!app.show_help);
+        assert!(app.board_picker.is_some());
+        app.handle_key(key(KeyCode::Char('?'))).unwrap();
+        assert_eq!(
+            app.handle_key(key(KeyCode::Char('q'))).unwrap(),
+            KeyAction::Quit
+        );
+    }
+
+    #[test]
+    fn control_and_page_keys_page_while_plain_u_d_do_not() {
+        let mut app = keyboard_test_app();
+        for index in 3..12 {
+            app.docs
+                .push(doc_with_state(&format!("task-{index}"), Some("todo")));
+        }
+        refresh_test_hierarchy(&mut app);
+        app.handle_key(key(KeyCode::Char('d'))).unwrap();
+        assert_eq!(app.selected_item, 0);
+        app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL))
+            .unwrap();
+        assert_eq!(app.selected_item, 5);
+        app.handle_key(key(KeyCode::PageDown)).unwrap();
+        assert!(app.selected_item > 5);
+        app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL))
+            .unwrap();
+        assert!(app.selected_item < 10);
+    }
+
+    #[test]
+    fn picker_mouse_controls_are_bounded_and_non_mutating_until_apply() {
+        let mut app = keyboard_test_app();
+        app.docs[0]
+            .fields
+            .insert("tags".into(), "[\"research\"]".into());
+        app.start_filter_picker();
+        let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let row = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::SelectPickerOption(_)))
+            .unwrap()
+            .clone();
+        app.handle_mouse(left_click(row.rect.x, row.rect.y));
+        assert!(app.board_picker.is_some());
+        assert_eq!(app.board_filters, BoardFilters::default());
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let apply = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::ActivatePicker)
+            .unwrap()
+            .clone();
+        let cancel = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::CancelPicker)
+            .unwrap()
+            .clone();
+        assert!(apply.rect.right() <= cancel.rect.x || cancel.rect.right() <= apply.rect.x);
+        app.handle_mouse(left_click(cancel.rect.x, cancel.rect.y));
+        assert!(app.board_picker.is_none());
+        assert_eq!(app.board_filters, BoardFilters::default());
+
+        app.start_filter_picker();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let help = app
+            .hits
+            .iter()
+            .rev()
+            .find(|hit| hit.action == HitAction::ShowHelp)
+            .unwrap()
+            .clone();
+        let apply = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::ActivatePicker)
+            .unwrap();
+        assert!(apply.rect.right() <= help.rect.x || help.rect.right() <= apply.rect.x);
+        app.handle_mouse(left_click(help.rect.x, help.rect.y));
+        assert!(app.show_help);
+        assert!(app.board_picker.is_some());
+        assert_eq!(app.board_filters, BoardFilters::default());
+    }
+
+    #[test]
+    fn pickers_start_on_the_first_enabled_option() {
+        let mut app = keyboard_test_app();
+        app.docs[0]
+            .fields
+            .insert("tags".into(), "[\"research\"]".into());
+        app.docs[1]
+            .fields
+            .insert("tags".into(), "[\"spike\"]".into());
+        app.board_filters.tag = Some("research".into());
+        app.start_filter_picker();
+        assert_eq!(app.board_picker.as_ref().unwrap().selected, 1);
+
+        app.board_picker = None;
+        app.board_filters = BoardFilters::default();
+        app.selected_state = 0;
+        app.start_move_picker();
+        assert_eq!(app.board_picker.as_ref().unwrap().selected, 1);
+
+        app.board_picker = None;
+        app.selected_state = 1;
+        app.docs[1]
+            .fields
+            .insert("accord.status".into(), "accepted".into());
+        app.docs[1]
+            .fields
+            .insert("review.status".into(), "accepted".into());
+        app.start_validation_picker();
+        assert_eq!(app.board_picker.as_ref().unwrap().selected, 2);
+    }
+
+    #[test]
+    fn scrolled_picker_mouse_hits_follow_visible_options() {
+        let mut app = keyboard_test_app();
+        for (index, tag) in [
+            "alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf", "hotel", "india",
+            "juliet", "kilo", "lima",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            app.docs.push(doc_with_state(
+                &format!("task-{}", index + 20),
+                Some("todo"),
+            ));
+            app.docs
+                .last_mut()
+                .unwrap()
+                .fields
+                .insert("tags".into(), format!("[\"{tag}\"]"));
+        }
+        app.start_filter_picker();
+        app.handle_picker_key(key(KeyCode::End));
+        let mut terminal = Terminal::new(TestBackend::new(80, 18)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| matches!(hit.action, HitAction::SelectPickerOption(index) if index > 9)));
+    }
+
+    #[test]
+    fn papercuts_enter_opens_detail_without_returning_to_list() {
+        let mut app = keyboard_test_app();
+        app.papercuts_view
+            .set_items(vec![papercut_item("papercut-1", "One", "Body")]);
+        app.toggle_papercuts();
+        app.handle_papercuts_key(key(KeyCode::Enter));
+        assert!(app.papercuts_footer_text().contains("Shift-Tab list"));
+        app.handle_papercuts_key(key(KeyCode::Enter));
+        assert!(app.papercuts_footer_text().contains("Shift-Tab list"));
+        app.handle_papercuts_key(key(KeyCode::BackTab));
+        assert!(app.papercuts_footer_text().contains("Enter open detail"));
+    }
+
+    #[test]
+    fn rules_preview_scrolls_with_focused_keys_and_pointer_pane() {
+        let mut app = keyboard_test_app();
+        app.switch_view(TuiView::Rules);
+        app.rules
+            .get_mut("always")
+            .unwrap()
+            .push(crate::protocol::config::RuleItem {
+                id: 1,
+                rule: (0..80)
+                    .map(|index| format!("long rule word {index}"))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                source: None,
+            });
+        app.handle_rules_key(key(KeyCode::Enter));
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL))
+            .unwrap();
+        let keyboard_scroll = app.rules_view.preview_scroll;
+        assert!(keyboard_scroll > 0);
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let preview = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::FocusRulePreview)
+            .unwrap()
+            .clone();
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: preview.rect.x.saturating_add(1),
+            row: preview.rect.y.saturating_add(1),
+            modifiers: KeyModifiers::NONE,
+        });
+        assert!(app.rules_view.preview_scroll > keyboard_scroll);
+
+        app.rules.get_mut("always").unwrap()[0].rule = "short".into();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert_eq!(app.rules_view.preview_scroll, 0);
+    }
+
+    #[test]
+    fn decision_rows_rules_preview_and_modal_controls_have_mouse_hits() {
+        let mut app = keyboard_test_app();
+        app.switch_view(TuiView::Decisions);
+        let mut terminal = Terminal::new(TestBackend::new(100, 28)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| matches!(hit.action, HitAction::SelectDecision(0))));
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| hit.action == HitAction::FocusDecisionDetail));
+
+        app.switch_view(TuiView::Rules);
+        app.rules
+            .get_mut("always")
+            .unwrap()
+            .push(crate::protocol::config::RuleItem {
+                id: 1,
+                rule: "Keep controls coherent".into(),
+                source: None,
+            });
+        app.rules_view.preview_open = true;
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| hit.action == HitAction::ToggleRulePreview));
+
+        app.switch_view(TuiView::Board);
+        app.selected_state = 1;
+        app.docs[1]
+            .fields
+            .insert("accord.status".into(), "delivered".into());
+        app.start_validation_accept();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| hit.action == HitAction::ConfirmModal));
+        assert!(app
+            .hits
+            .iter()
+            .any(|hit| hit.action == HitAction::CancelModal));
     }
 
     #[test]

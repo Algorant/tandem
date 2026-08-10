@@ -1485,7 +1485,7 @@ pub(super) fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) ->
         ));
         spans.push(Span::raw(" "));
     }
-    spans.push(Span::styled(" t/p cycle · F clear ", theme.muted_style()));
+    spans.push(Span::styled(" f change or clear ", theme.muted_style()));
     Line::from(spans)
 }
 
@@ -1533,14 +1533,6 @@ pub(super) fn board_filter_priorities(docs: &[Document]) -> Vec<String> {
         .collect::<Vec<_>>();
     priorities.sort_by_key(|priority| priority_filter_sort_key(priority));
     priorities
-}
-
-pub(super) fn next_filter_value(current: Option<&str>, values: &[String]) -> Option<String> {
-    let next_index = current
-        .and_then(|current| values.iter().position(|value| value == current))
-        .map(|index| index + 1)
-        .unwrap_or(0);
-    values.get(next_index).cloned()
 }
 
 pub(super) fn priority_filter_sort_key(priority: &str) -> (usize, String) {

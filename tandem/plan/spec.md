@@ -865,13 +865,13 @@ tandem tui
   - renders top-level Board, Logs, Rules, and Decisions tabs in the target Validation workflow; legacy Review-queue code may exist only as transitional implementation detail while task-25/task-30 remove it.
   - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns. The default State Board resolves the strict Epic → Task → Subtask graph from one locked board-plus-logs snapshot, collapses valid descendants beneath roots, expands them inline with `Enter`/mouse, and keeps explicit `Space` preview access. Structural hierarchy failures replace both Board arrangements with a persistent actionable diagnostic panel and disable graph-sensitive TUI mutations until reload succeeds.
   - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, sparse one-line rows, reload, help, and safe quit.
-  - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `H`/`L` moves the selected task to the previous/next configured state. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
+  - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `m` opens an explicit configured-state picker for the selected task. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
   - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows minimal.
   - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
   - renders the Logs view as a first-class terminal work-history browser: recency-sorted `.tandem/logs/` list, explicit completed/canceled outcome labels, local list/detail focus, selected-log completion/cancellation summary and timestamp, files/validation/reviewer where present, accord/review metadata, Markdown body, raw path, event context, safe per-log load warnings, and `/` search filtering across ID/title/outcome/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - renders a secondary read-only Papercuts utility inbox over the current main view. The global header reports the open count; `P` or the header hit target opens and closes it. The panel keeps its own list/detail focus, selection, list offset, and detail scroll so the underlying Board, Logs, Rules, or Decisions state is not changed. It lists only valid open Papercuts, renders protocol-owned ID/title/status/tags/references/timestamps plus the Markdown body, treats a missing directory as empty, isolates malformed records as panel warnings, and reloads through the normal manual and external-change path. TUI add/edit/resolve/reopen/delete/promotion actions are not available.
+  - renders a secondary read-only Papercuts utility inbox over the current main view. The global header reports the open count; `i` or the header hit target opens and closes it. The panel keeps its own list/detail focus, selection, list offset, and detail scroll so the underlying Board, Logs, Rules, or Decisions state is not changed. It lists only valid open Papercuts, renders protocol-owned ID/title/status/tags/references/timestamps plus the Markdown body, treats a missing directory as empty, isolates malformed records as panel warnings, and reloads through the normal manual and external-change path. TUI add/edit/resolve/reopen/delete/promotion actions are not available.
   - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, Decisions, and the Papercuts utility panel across headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies user/workspace theme selection and overrides using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active fallback palette remains in use.
   - enables crossterm mouse capture for basic view tabs, the Papercuts header indicator and panel rows/panes, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
@@ -896,7 +896,7 @@ tandem tui
 
 ## First TUI MVP
 
-The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Logs/Rules/Decisions view state, support Board state subview navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task left/right between configured states with `H`/`L`. Board Validation now carries delivered-work inspection and approve/rework/complete action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
+The first TUI MVP is not read-only. The current starter slices establish the Ratatui/crossterm event loop, render top-level Board/Logs/Rules/Decisions view state, support Board state subview navigation/details/reload/quit, and include small Board mutations: quick-add a basic task with `a`, and move the selected task through the explicit `m` configured-state picker. Board Validation now carries delivered-work inspection and approve/rework/complete action hints, Logs now has list/show/search behavior over completed work, Rules now supports grouped browse/add/edit/delete flows, and Decisions now supports browse/detail plus a basic title/body add flow.
 
 The full first TUI MVP should include:
 
@@ -915,7 +915,7 @@ The full first TUI MVP should include:
 
 ### Global Papercuts utility panel
 
-Papercuts remain lightweight project friction records outside task workflow. Every main view shows a compact `Papercuts N` header indicator for the valid open count. A zero count uses muted styling. `P` or the indicator opens a temporary themed surface over the current view; `P` or `Esc` closes it without changing the prior main view, selection, focus, filters, arrangement, or scroll state.
+Papercuts remain lightweight project friction records outside task workflow. Every main view shows a compact `Papercuts N` header indicator for the valid open count. A zero count uses muted styling. `i` or the indicator opens a temporary themed surface over the current view; `i` or `Esc` closes it without changing the prior main view, selection, focus, filters, arrangement, or scroll state.
 
 The panel has an open-only selectable list and a detail pane. `j`/`k`, arrows, `g`/`G`, page keys, `h`/`l`, `Enter`, and `Tab` follow the established local list/detail navigation model. Mouse row selection, pane focus, and wheel navigation use frame-local hit regions. Detail renders the protocol-owned ID, title, status, optional tags and references, created/updated timestamps, path, and styled-basic Markdown body.
 
@@ -1340,52 +1340,47 @@ Mouse events resolve against the topmost matching region.
 
 This avoids scattering coordinate math through the app.
 
-## Keyboard model
+## Fixed TUI input model
 
-Support both vim-like and conventional keys.
+V0 uses one fixed semantic keymap. It does not expose runtime rebinding, chords, or keymap configuration. Input precedence is: `Ctrl-C`; active text input; active confirmation/menu/picker controls; `Esc`; non-text `q`; universal actions; view-local actions; pane navigation; safe no-op.
 
-Global:
+Global keys:
 
 | Key | Action |
 | --- | --- |
-| `q` | quit |
-| `?` | help |
-| `:` | command palette / command line |
-| `/` | search current view |
-| `r` | reload, including Papercuts |
-| `P` | open/close the read-only Papercuts utility inbox |
-| `1..4` | switch major view: Board, Logs, Rules, Decisions |
-| `tab` / `shift-tab` | cycle focus only within views that have meaningful focusable panes; no top-level fallback |
-| `esc` | close modal/clear filter/return detail focus to list where supported |
+| `q` | Quit from every non-text context, including help and the utility inbox. |
+| `Ctrl-C` | Emergency safe quit, including prompts. |
+| `?` | Open the universal keybinding reference from every non-text surface. |
+| `r` | Reload project, theme, and utility data. |
+| `1` through `4` | Switch Board, Logs, Rules, and Decisions. Temporary pickers or the utility panel close first. |
+| `i` | Open or close the global utility inbox, currently Papercuts. |
+| `Esc` | Close or leave the top temporary layer. |
 
 Navigation:
 
 | Key | Action |
 | --- | --- |
-| `j/k` or arrows | move selection or scroll the focused detail/body pane |
-| `h/l` or left/right | local movement only: Board state subview, Logs/Decisions list-detail focus, or Rules category |
-| `g/G` | top/bottom in the active local list/detail |
-| `ctrl-d/u` | half-page down/up |
-| `enter` | expand/open |
+| `j/k` or Up/Down | Move selection or scroll the focused pane. |
+| `h/l` or Left/Right | Move between local tabs, categories, or panes. |
+| `g/G` or Home/End | Move to the beginning or end. |
+| `Ctrl-U/Ctrl-D` or PageUp/PageDown | Page movement. Plain `u/d` are unbound outside text input. |
+| `Tab`/`Shift-Tab` | Change pane focus only. |
+| `Enter` | Open, expand, confirm, or activate the selected item. |
 
-Work actions:
+View actions:
 
-| Key | Action |
+| Surface | Keys |
 | --- | --- |
-| `a` | quick-add task in the selected/default configured state (current slice) |
-| `n` | new item quick add (planned keymap may be reconciled with `a`) |
-| `N` | new item in editor |
-| `e` | edit selected item in `$EDITOR` |
-| `m` | move/change state |
-| `p` | change priority |
-| `A` | accord action menu (assign/claim/deliver; planned) |
-| `v` | validation/review action menu |
-| `c` | complete/archive, if allowed |
-| `R` | reopen/restore in logs, if enabled after v0 |
-| `d` | delete with confirmation |
-| `y` | copy ID/link |
+| Board | `a` add, `e` edit, `b` State/Epic Board, `f` filter picker, `m` move picker, `v` Validation picker, `Space` inline preview |
+| Logs | `/` search; standard pane navigation |
+| Rules | `a` add, `e` edit, `d` delete, `Enter` preview; Tab/Shift-Tab focuses list/preview and standard navigation scrolls the focused preview |
+| Decisions | `a` add, `Enter` expand/open |
+| Utility inbox | `i`/`Esc` close, Tab/Shift-Tab focus, Enter opens selected detail, standard navigation; Enter does not return to list |
+| Dialogs and text input | Enter advances/confirms, Esc cancels, Ctrl-U clears a text field; printable `?`, `q`, and `i` remain text |
 
-V0 uses fixed default keybindings. Keymap configuration is deferred until after the first MVP.
+The `f`, `m`, and `v` Board actions open a shared picker family with contextual title, enabled and disabled choices, disabled reasons, Enter activation, Esc cancellation, mouse targets, and no obscured-view input leakage. Filter changes preserve the selected hierarchy context when it remains visible. Moves use the shared graph-safe application mutation. Validation choices route through the existing accept, rework-feedback, and apply/archive operations.
+
+The universal `?` reference is sectioned into Global, Navigation, Current view, Board actions, Validation, Logs, Rules, Decisions, Utility inbox, Dialogs and text input, and Mouse. It prioritizes the current context, supports keyboard and wheel scrolling plus section selection, uses theme-owned styles, adapts to narrow and short terminals, and restores the exact underlying layer when closed. Footer hints and mouse hit labels use the same semantic inventory where practical.
 
 ## Command palette
 
@@ -1778,7 +1773,7 @@ Manual smoke:
 
 - Launch through `tandem tui`.
 - Started with a Ratatui/crossterm shell that renders top-level Board, Logs, Rules, and Decisions tabs.
-- Board renders active board documents as count-labeled state subviews with a full-width selected-state list, sparse one-line rows with real chip/badge styling, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark`/`verdigris` theme styling, user theme discovery and global selection from config dirs, workspace `.tandem/theme.toml` selection/color overrides, and workspace `.tandem/config.toml` Board display settings.
+- Board renders active board documents as count-labeled state subviews with a full-width selected-state list, sparse one-line rows with real chip/badge styling, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via the `m` picker, built-in `default-dark`/`verdigris` theme styling, user theme discovery and global selection from config dirs, workspace `.tandem/theme.toml` selection/color overrides, and workspace `.tandem/config.toml` Board display settings.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.
 - The global header opens a read-only Papercuts utility list/detail panel with tolerant loading, count, themed rendering, keyboard/mouse navigation, and reload support while retaining the four main views.

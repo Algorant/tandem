@@ -31,12 +31,22 @@ fn rule_category_tab_width(index: usize, category: &str, count: usize) -> u16 {
         .count() as u16
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum RuleFocus {
+    #[default]
+    List,
+    Preview,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct RulesState {
     pub(super) selected_category: usize,
     pub(super) selected_item: usize,
     pub(super) list_offset: usize,
     pub(super) preview_open: bool,
+    pub(super) preview_scroll: u16,
+    preview_max_scroll: u16,
+    pub(super) focus: RuleFocus,
     prompt: Option<RulePrompt>,
 }
 
@@ -115,10 +125,15 @@ enum RulePromptAction {
 impl TuiApp {
     pub(super) fn clamp_rules_state(&mut self) {
         self.rules_view.clamp(&self.rules);
+        self.clamp_rule_preview_scroll();
     }
 
     pub(super) fn rules_prompt_active(&self) -> bool {
         self.rules_view.has_prompt()
+    }
+
+    pub(super) fn rules_text_prompt_active(&self) -> bool {
+        matches!(self.rules_view.prompt, Some(RulePrompt::Text { .. }))
     }
 
     pub(super) fn selected_rule_anchor_for_reload(&self) -> Option<(String, Option<usize>)> {
@@ -133,7 +148,7 @@ impl TuiApp {
         anchor: Option<(String, Option<usize>)>,
     ) {
         let Some((category, id)) = anchor else {
-            self.rules_view.clamp(&self.rules);
+            self.clamp_rules_state();
             return;
         };
         let restored = id
@@ -142,7 +157,7 @@ impl TuiApp {
         if !restored {
             self.select_rule_category(&category);
         }
-        self.rules_view.clamp(&self.rules);
+        self.clamp_rules_state();
     }
 
     pub(super) fn rules_prompt_status(&self) -> Option<String> {
@@ -191,19 +206,59 @@ impl TuiApp {
     }
 
     pub(super) fn handle_rules_key(&mut self, key: KeyEvent) {
+        let preview_focused =
+            self.rules_view.focus == RuleFocus::Preview && self.rules_view.preview_open;
         match key.code {
+            KeyCode::Left | KeyCode::Char('h') if preview_focused => self.focus_rule_list(),
+            KeyCode::Right | KeyCode::Char('l') if self.rules_view.preview_open => {
+                self.focus_rule_preview()
+            }
             KeyCode::Left | KeyCode::Char('h') => self.previous_rule_category(),
             KeyCode::Right | KeyCode::Char('l') => self.next_rule_category(),
+            KeyCode::Up | KeyCode::Char('k') if preview_focused => self.scroll_rule_preview_up(1),
+            KeyCode::Down | KeyCode::Char('j') if preview_focused => {
+                self.scroll_rule_preview_down(1)
+            }
             KeyCode::Up | KeyCode::Char('k') => self.previous_rule_selection(),
             KeyCode::Down | KeyCode::Char('j') => self.next_rule_selection(),
+            KeyCode::Home | KeyCode::Char('g') if preview_focused => {
+                self.rules_view.preview_scroll = 0
+            }
+            KeyCode::End | KeyCode::Char('G') if preview_focused => {
+                self.rules_view.preview_scroll = u16::MAX
+            }
             KeyCode::Home | KeyCode::Char('g') => self.first_rule_selection(),
             KeyCode::End | KeyCode::Char('G') => self.last_rule_selection(),
-            KeyCode::Char('n') | KeyCode::Char('a') => self.start_rule_add_prompt(),
+            KeyCode::PageUp if preview_focused => self.scroll_rule_preview_up(6),
+            KeyCode::PageDown if preview_focused => self.scroll_rule_preview_down(6),
+            KeyCode::PageUp => self.move_rule_selection(-5),
+            KeyCode::PageDown => self.move_rule_selection(5),
+            KeyCode::Char('u')
+                if key.modifiers.contains(KeyModifiers::CONTROL) && preview_focused =>
+            {
+                self.scroll_rule_preview_up(6)
+            }
+            KeyCode::Char('d')
+                if key.modifiers.contains(KeyModifiers::CONTROL) && preview_focused =>
+            {
+                self.scroll_rule_preview_down(6)
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.move_rule_selection(-5)
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.move_rule_selection(5)
+            }
+            KeyCode::Char('a') => self.start_rule_add_prompt(),
             KeyCode::Char('e') => self.start_rule_edit_prompt(),
             KeyCode::Char('d') => self.start_rule_delete_prompt(),
             KeyCode::Enter => {
                 if self.selected_rule().is_some() {
                     self.rules_view.preview_open = !self.rules_view.preview_open;
+                    self.rules_view.preview_scroll = 0;
+                    if !self.rules_view.preview_open {
+                        self.rules_view.focus = RuleFocus::List;
+                    }
                     self.status = if self.rules_view.preview_open {
                         "Rule preview opened; selection changes update it.".to_string()
                     } else {
@@ -211,7 +266,7 @@ impl TuiApp {
                     };
                 } else {
                     self.status = format!(
-                        "No {} rules defined. Press n to add one.",
+                        "No {} rules defined. Press a to add one.",
                         self.selected_rule_category()
                     );
                 }
@@ -228,8 +283,40 @@ impl TuiApp {
         self.move_rule_selection(1);
     }
 
+    pub(super) fn focus_rule_list(&mut self) {
+        self.rules_view.focus = RuleFocus::List;
+    }
+
+    pub(super) fn focus_rule_preview(&mut self) {
+        if self.rules_view.preview_open {
+            self.rules_view.focus = RuleFocus::Preview;
+        }
+    }
+
+    pub(super) fn scroll_rule_preview_up(&mut self, amount: u16) {
+        self.rules_view.preview_scroll = self.rules_view.preview_scroll.saturating_sub(amount);
+    }
+
+    pub(super) fn scroll_rule_preview_down(&mut self, amount: u16) {
+        self.rules_view.preview_scroll = self
+            .rules_view
+            .preview_scroll
+            .saturating_add(amount)
+            .min(self.rules_view.preview_max_scroll);
+    }
+
+    fn clamp_rule_preview_scroll(&mut self) {
+        self.rules_view.preview_scroll = self
+            .rules_view
+            .preview_scroll
+            .min(self.rules_view.preview_max_scroll);
+        if !self.rules_view.preview_open {
+            self.rules_view.focus = RuleFocus::List;
+        }
+    }
+
     pub(super) fn draw_rules_view(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        self.rules_view.clamp(&self.rules);
+        self.clamp_rules_state();
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(3)])
@@ -252,7 +339,7 @@ impl TuiApp {
         }
     }
 
-    pub(super) fn draw_rules_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
+    pub(super) fn draw_rules_prompt(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let Some(prompt) = self.rules_view.prompt.as_ref() else {
             return;
         };
@@ -269,6 +356,32 @@ impl TuiApp {
             )
             .wrap(Wrap { trim: false });
         frame.render_widget(prompt_view, popup);
+        let buttons = Rect::new(
+            popup.x.saturating_add(2),
+            popup.bottom().saturating_sub(2),
+            popup.width.saturating_sub(4),
+            1,
+        );
+        let halves = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(buttons);
+        frame.render_widget(
+            Paragraph::new("[ Confirm / next ]").style(self.theme.status_style(StatusTone::Accent)),
+            halves[0],
+        );
+        frame.render_widget(
+            Paragraph::new("[ Cancel ]").style(self.theme.muted_style()),
+            halves[1],
+        );
+        self.hits.push(HitRegion {
+            rect: halves[0],
+            action: HitAction::ConfirmModal,
+        });
+        self.hits.push(HitRegion {
+            rect: halves[1],
+            action: HitAction::CancelModal,
+        });
     }
 
     pub(super) fn rules_context(&self) -> String {
@@ -293,9 +406,16 @@ impl TuiApp {
     }
 
     pub(super) fn rules_footer_text(&self) -> String {
-        self.with_status(
-            "Rules · h/l category · j/k select · Enter preview · n new · e edit · d delete · ? help".to_string(),
-        )
+        let controls = if self.rules_view.focus == RuleFocus::Preview
+            && self.rules_view.preview_open
+        {
+            "Rules preview · j/k scroll · Ctrl-U/D page · Shift-Tab list · Enter close · ? help"
+        } else if self.rules_view.preview_open {
+            "Rules list · j/k select · Tab preview · Enter close · a add · e edit · d delete · ? help"
+        } else {
+            "Rules list · h/l category · j/k select · Enter preview · a add · e edit · d delete · ? help"
+        };
+        self.with_status(controls.to_string())
     }
 
     fn draw_rule_category_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -350,6 +470,10 @@ impl TuiApp {
     }
 
     fn draw_rules_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusRuleList,
+        });
         let category = self.selected_rule_category();
         let list_area = Block::default().borders(Borders::ALL).inner(area);
         let row_width = list_area.width.max(12) as usize;
@@ -364,37 +488,44 @@ impl TuiApp {
         let list = List::new(items)
             .style(self.theme.panel_style())
             .highlight_style(self.theme.rule_selected_row_style())
-            .block(rule_list_block(&self.theme, category));
+            .block(rule_list_block(
+                &self.theme,
+                category,
+                self.rules_view.focus == RuleFocus::List,
+            ));
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
         self.register_rule_row_hits(list_area, &rows);
     }
 
-    fn draw_rule_preview(&self, frame: &mut Frame<'_>, area: Rect) {
-        let Some((category, rule)) = self.selected_rule() else {
+    fn draw_rule_preview(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.hits.push(HitRegion {
+            rect: area,
+            action: HitAction::FocusRulePreview,
+        });
+        self.hits.push(HitRegion {
+            rect: Rect::new(area.x, area.y, area.width, area.height.min(1)),
+            action: HitAction::ToggleRulePreview,
+        });
+        let Some((category, rule)) = self
+            .selected_rule()
+            .map(|(category, rule)| (category.to_string(), rule.clone()))
+        else {
             return;
         };
-        let source = rule
-            .source
-            .as_deref()
-            .filter(|source| !source.trim().is_empty())
-            .unwrap_or("project config");
-        let mut lines = vec![
-            Line::from(vec![
-                Span::styled(
-                    title_case(category),
-                    self.theme.rule_row_accent_style(category),
-                ),
-                Span::styled(format!("  Rule #{}", rule.id), self.theme.label_style()),
-                Span::styled(format!("  ·  {source}"), self.theme.muted_style()),
-            ]),
-            Line::from(""),
-        ];
-        lines.extend(
-            wrap_words(&rule.rule, area.width.saturating_sub(2).max(8) as usize)
-                .into_iter()
-                .map(|line| Line::from(Span::styled(line, self.theme.text_style()))),
+        let lines = rule_preview_lines(
+            &rule,
+            &category,
+            area.width.saturating_sub(2).max(8),
+            &self.theme,
         );
+        self.rules_view.preview_max_scroll =
+            (lines.len() as u16).saturating_sub(area.height.saturating_sub(2));
+        self.rules_view.preview_scroll = self
+            .rules_view
+            .preview_scroll
+            .min(self.rules_view.preview_max_scroll);
+        let focused = self.rules_view.focus == RuleFocus::Preview;
         frame.render_widget(
             Paragraph::new(lines)
                 .style(self.theme.panel_style())
@@ -402,8 +533,13 @@ impl TuiApp {
                     Block::default()
                         .borders(Borders::ALL)
                         .title(" Preview · Enter to close ")
-                        .border_style(self.theme.rule_row_accent_style(category)),
+                        .border_style(if focused {
+                            self.theme.border_style(true)
+                        } else {
+                            self.theme.rule_row_accent_style(&category)
+                        }),
                 )
+                .scroll((self.rules_view.preview_scroll, 0))
                 .wrap(Wrap { trim: false }),
             area,
         );
@@ -436,6 +572,7 @@ impl TuiApp {
             self.rules_view.selected_category -= 1;
             self.rules_view.selected_item = 0;
             self.rules_view.list_offset = 0;
+            self.rules_view.preview_scroll = 0;
             self.rules_view.clamp(&self.rules);
         }
     }
@@ -445,6 +582,7 @@ impl TuiApp {
             self.rules_view.selected_category += 1;
             self.rules_view.selected_item = 0;
             self.rules_view.list_offset = 0;
+            self.rules_view.preview_scroll = 0;
             self.rules_view.clamp(&self.rules);
         }
     }
@@ -463,12 +601,14 @@ impl TuiApp {
         let (category, item) = positions[next as usize];
         self.rules_view.selected_category = category;
         self.rules_view.selected_item = item;
+        self.rules_view.preview_scroll = 0;
     }
 
     fn first_rule_selection(&mut self) {
         if let Some((category, item)) = self.rule_positions().first().copied() {
             self.rules_view.selected_category = category;
             self.rules_view.selected_item = item;
+            self.rules_view.preview_scroll = 0;
         }
     }
 
@@ -476,6 +616,7 @@ impl TuiApp {
         if let Some((category, item)) = self.rule_positions().last().copied() {
             self.rules_view.selected_category = category;
             self.rules_view.selected_item = item;
+            self.rules_view.preview_scroll = 0;
         }
     }
 
@@ -505,7 +646,7 @@ impl TuiApp {
                 item_index: None,
                 empty_marker: true,
                 lines: vec![Line::from(Span::styled(
-                    format!("No {category} rules defined. Press n to add one."),
+                    format!("No {category} rules defined. Press a to add one."),
                     self.theme.muted_style(),
                 ))],
             });
@@ -689,15 +830,13 @@ impl RulePrompt {
     fn handle_key(&mut self, key: KeyEvent) -> RulePromptAction {
         match self {
             Self::Delete { category, id, .. } => match key.code {
-                KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                KeyCode::Esc | KeyCode::Char('n') => {
                     RulePromptAction::Cancel("Rule delete canceled.".to_string())
                 }
-                KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    RulePromptAction::Delete {
-                        category: category.clone(),
-                        id: *id,
-                    }
-                }
+                KeyCode::Enter | KeyCode::Char('y') => RulePromptAction::Delete {
+                    category: category.clone(),
+                    id: *id,
+                },
                 _ => RulePromptAction::None,
             },
             Self::Text {
@@ -885,6 +1024,33 @@ struct RuleDisplayRow {
     lines: Vec<Line<'static>>,
 }
 
+fn rule_preview_lines(
+    rule: &RuleItem,
+    category: &str,
+    width: u16,
+    theme: &TuiTheme,
+) -> Vec<Line<'static>> {
+    let source = rule
+        .source
+        .as_deref()
+        .filter(|source| !source.trim().is_empty())
+        .unwrap_or("project config");
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled(title_case(category), theme.rule_row_accent_style(category)),
+            Span::styled(format!("  Rule #{}", rule.id), theme.label_style()),
+            Span::styled(format!("  ·  {source}"), theme.muted_style()),
+        ]),
+        Line::from(""),
+    ];
+    lines.extend(
+        wrap_words(&rule.rule, width.max(8) as usize)
+            .into_iter()
+            .map(|line| Line::from(Span::styled(line, theme.text_style()))),
+    );
+    lines
+}
+
 fn rule_row_line(
     item: &RuleItem,
     category: &str,
@@ -921,11 +1087,15 @@ fn rule_row_line(
     ])
 }
 
-fn rule_list_block<'a>(theme: &TuiTheme, category: &str) -> Block<'a> {
+fn rule_list_block<'a>(theme: &TuiTheme, category: &str, focused: bool) -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
         .title(format!(" {} rules ", title_case(category)))
-        .border_style(theme.rule_row_accent_style(category))
+        .border_style(if focused {
+            theme.rule_row_accent_style(category)
+        } else {
+            theme.border_style(false)
+        })
         .style(theme.panel_style())
 }
 
@@ -1163,7 +1333,7 @@ mod tests {
         let mut terminal = Terminal::new(TestBackend::new(30, 3)).unwrap();
         terminal
             .draw(|frame| {
-                frame.render_widget(rule_list_block(&theme, "context"), frame.area());
+                frame.render_widget(rule_list_block(&theme, "context", true), frame.area());
             })
             .unwrap();
         let border = terminal.backend().buffer().cell((0, 0)).unwrap();

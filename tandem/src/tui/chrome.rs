@@ -355,17 +355,15 @@ impl TuiApp {
             BoardArrangement::Epic => "b State Board",
         };
         let enter_hint = match self.board_arrangement {
-            BoardArrangement::State => "Enter expand/preview · Space preview",
+            BoardArrangement::State => "Enter open · Space preview",
             BoardArrangement::Epic => "Enter/Space preview",
         };
         let commands = if self.focus == FocusPane::Detail {
-            format!("Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
+            format!("Shift-Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
         } else if selected_is_validation {
-            format!("{enter_hint} · A accept · R rework · C apply accepted · {arrangement_hint} · ? help")
-        } else if self.board_filters.is_active() {
-            format!("{enter_hint} · F clear filter · H prev · L next · {arrangement_hint} · ? help")
+            format!("{enter_hint} · v validate · f filter · m move · {arrangement_hint} · ? help")
         } else {
-            format!("{enter_hint} · a add · t tag · p priority · {arrangement_hint} · ? help")
+            format!("{enter_hint} · a add · f filter · m move · v validate · {arrangement_hint} · ? help")
         };
         self.with_status(format!(
             "{context} · {} · {commands}",
@@ -388,7 +386,7 @@ impl TuiApp {
     }
 
     pub(super) fn draw_footer(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let footer_line = if let Some(input) = self.quick_add.as_ref() {
+        let mut footer_line = if let Some(input) = self.quick_add.as_ref() {
             Line::from(Span::styled(
                 quick_add_status(input),
                 self.theme.status_style(StatusTone::Warning),
@@ -421,6 +419,12 @@ impl TuiApp {
                 TuiView::Decisions => self.decisions_footer_text(),
             })
         };
+        if self.text_input_active() {
+            footer_line.spans.push(Span::styled(
+                " · [Help]",
+                self.theme.status_style(StatusTone::Accent),
+            ));
+        }
         let footer_text = footer_line
             .spans
             .iter()
@@ -454,8 +458,12 @@ impl TuiApp {
         if area.width == 0 || area.height == 0 {
             return;
         }
+        if self.text_input_active() {
+            self.register_footer_hit(area, text, "[Help]", HitAction::ShowHelp);
+            return;
+        }
         if self.papercuts_open() {
-            self.register_footer_hit(area, text, "P/Esc close", HitAction::TogglePapercuts);
+            self.register_footer_hit(area, text, "i/Esc close", HitAction::TogglePapercuts);
             return;
         }
         match self.view {
@@ -480,39 +488,9 @@ impl TuiApp {
                     HitAction::ToggleBoardArrangement,
                 );
                 self.register_footer_hit(area, text, "a add", HitAction::StartQuickAdd);
-                self.register_footer_hit(area, text, "t tag", HitAction::CycleBoardTagFilter);
-                self.register_footer_hit(
-                    area,
-                    text,
-                    "p priority",
-                    HitAction::CycleBoardPriorityFilter,
-                );
-                self.register_footer_hit(
-                    area,
-                    text,
-                    "F clear filter",
-                    HitAction::ClearBoardFilters,
-                );
-                self.register_footer_hit(area, text, "H prev", HitAction::MoveSelectedTask(-1));
-                self.register_footer_hit(area, text, "L next", HitAction::MoveSelectedTask(1));
-                self.register_footer_hit(
-                    area,
-                    text,
-                    "A accept",
-                    HitAction::ShowValidationAction("accept"),
-                );
-                self.register_footer_hit(
-                    area,
-                    text,
-                    "R rework",
-                    HitAction::ShowValidationAction("rework"),
-                );
-                self.register_footer_hit(
-                    area,
-                    text,
-                    "C apply accepted",
-                    HitAction::ShowValidationAction("apply"),
-                );
+                self.register_footer_hit(area, text, "f filter", HitAction::OpenFilterPicker);
+                self.register_footer_hit(area, text, "m move", HitAction::OpenMovePicker);
+                self.register_footer_hit(area, text, "v validate", HitAction::OpenValidationPicker);
                 self.register_footer_hit(area, text, "e edit", HitAction::OpenEditor);
             }
             TuiView::Logs => {
@@ -559,164 +537,71 @@ impl TuiApp {
 
     pub(super) fn help_lines(&self) -> Vec<Line<'static>> {
         let mut lines = vec![
-            Line::from(Span::styled("Tandem TUI help", self.theme.title_style())),
             Line::from(Span::styled(
-                "Keyboard-first commands grouped by view. Press ? / Esc / q to close.",
+                "Universal keybinding reference",
+                self.theme.title_style(),
+            )),
+            Line::from(Span::styled(
+                format!(
+                    "Current context: {} · Tab/Shift-Tab or h/l changes section",
+                    self.help_context_label()
+                ),
                 self.theme.muted_style(),
             )),
             Line::from(""),
         ];
-        self.push_help_section(&mut lines, "Global");
-        self.push_help_command(&mut lines, "q, Ctrl-C", "quit safely");
-        self.push_help_command(
-            &mut lines,
-            "r",
-            "reload board/config/log/papercut/theme data",
+        let selected = BindingScope::ALL[self.help_section.min(BindingScope::ALL.len() - 1)];
+        let order = std::iter::once(selected).chain(
+            BindingScope::ALL
+                .into_iter()
+                .filter(|scope| *scope != selected),
         );
-        self.push_help_command(
-            &mut lines,
-            "1 2 3 4",
-            "switch Board, Logs, Rules, Decisions",
-        );
-        self.push_help_command(&mut lines, "P", "open or close the Papercuts inbox");
-        self.push_help_command(
-            &mut lines,
-            "mouse",
-            "click tabs/lists/panes; wheel selects or scrolls",
-        );
-
-        self.push_help_section(&mut lines, "Navigation");
-        self.push_help_command(
-            &mut lines,
-            "j/k, ↑/↓",
-            "move selection; scroll detail when focused",
-        );
-        self.push_help_command(&mut lines, "h/l, ←/→", "move within the active view");
-        self.push_help_command(
-            &mut lines,
-            "g/G",
-            "first/last item in the active list or detail",
-        );
-        self.push_help_command(
-            &mut lines,
-            "Tab",
-            "Board detail toggle; Logs/Decisions focus toggle",
-        );
-
-        self.push_help_section(&mut lines, "Board");
-        self.push_help_command(
-            &mut lines,
-            "Enter",
-            "expand/collapse task children; preview leaf rows",
-        );
-        self.push_help_command(&mut lines, "Space", "toggle inline row preview");
-        self.push_help_command(&mut lines, "b", "toggle State/Epic Board arrangement");
-        self.push_help_command(&mut lines, "a", "quick-add a task in the selected state");
-        self.push_help_command(&mut lines, "e", "open the selected active task in $EDITOR");
-        self.push_help_command(
-            &mut lines,
-            "t / p / F",
-            "cycle tag filter, priority filter, clear filters",
-        );
-        self.push_help_command(
-            &mut lines,
-            "H / L",
-            "move selected task to previous/next state",
-        );
-
-        self.push_help_section(&mut lines, "Validation");
-        self.push_help_command(
-            &mut lines,
-            "A",
-            "open accept confirmation for delivered work",
-        );
-        self.push_help_command(&mut lines, "R", "open feedback dialog and request rework");
-        self.push_help_command(
-            &mut lines,
-            "C",
-            "open Apply accepted dialog to archive accepted Validation tasks",
-        );
-
-        self.push_help_section(&mut lines, "Papercuts inbox");
-        self.push_help_command(
-            &mut lines,
-            "P / Esc",
-            "close and restore the current main view",
-        );
-        self.push_help_command(&mut lines, "Enter / Tab", "toggle list/detail focus");
-        self.push_help_command(&mut lines, "j/k, ↑/↓", "select records or scroll detail");
-        self.push_help_command(
-            &mut lines,
-            "read-only",
-            "use CLI or integration tools for Papercut actions",
-        );
-
-        self.push_help_section(&mut lines, "Logs");
-        self.push_help_command(&mut lines, "Enter", "toggle list/detail focus");
-        self.push_help_command(
-            &mut lines,
-            "/",
-            "search id, title, summary, body, validation, files",
-        );
-        self.push_help_command(&mut lines, "Esc", "clear search filter or return to list");
-        self.push_help_command(
-            &mut lines,
-            "e",
-            "read-only; generated history is not edited here",
-        );
-
-        self.push_help_section(&mut lines, "Rules");
-        self.push_help_command(
-            &mut lines,
-            "h/l",
-            "switch always/never/prefer/context categories",
-        );
-        self.push_help_command(&mut lines, "a or n", "add a rule");
-        self.push_help_command(&mut lines, "e / d", "edit or delete the selected rule");
-
-        self.push_help_section(&mut lines, "Decisions");
-        self.push_help_command(&mut lines, "Enter", "toggle list/body focus");
-        self.push_help_command(&mut lines, "a", "add a decision document");
-        self.push_help_command(&mut lines, "PgUp/PgDn", "scroll selected decision body");
-        self.push_help_command(
-            &mut lines,
-            "e",
-            "use CLI decision update/withdraw; editor actions are deferred",
-        );
-
-        self.push_help_section(&mut lines, "Prompts");
-        self.push_help_command(&mut lines, "Enter", "advance/save prompt input");
-        self.push_help_command(&mut lines, "Esc", "cancel prompt or close help");
-        self.push_help_command(&mut lines, "Ctrl-U", "clear current prompt field");
+        for scope in order {
+            lines.push(Line::from(Span::styled(
+                if scope == selected {
+                    format!("◆ {}", scope.label())
+                } else {
+                    scope.label().to_string()
+                },
+                if scope == selected {
+                    self.theme
+                        .status_style(StatusTone::Accent)
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    self.theme.label_style().add_modifier(Modifier::BOLD)
+                },
+            )));
+            for binding in bindings_for(scope) {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {:<22}", binding.keys),
+                        self.theme.status_style(StatusTone::Accent),
+                    ),
+                    Span::styled(binding.description, self.theme.text_style()),
+                ]));
+            }
+            lines.push(Line::from(""));
+        }
         lines
     }
 
-    fn push_help_section(&self, lines: &mut Vec<Line<'static>>, title: &'static str) {
-        if lines.last().is_some_and(|line| !line.spans.is_empty()) {
-            lines.push(Line::from(""));
+    fn help_context_label(&self) -> &'static str {
+        if self.board_picker.is_some() {
+            return "Board action picker";
         }
-        lines.push(Line::from(Span::styled(
-            title,
-            self.theme.label_style().add_modifier(Modifier::BOLD),
-        )));
+        if self.validation_prompt.is_some()
+            || self.rules_prompt_active()
+            || self.decision_prompt_active()
+        {
+            return "dialog";
+        }
+        if self.papercuts_open() {
+            return "Utility inbox";
+        }
+        self.view.label()
     }
 
-    fn push_help_command(
-        &self,
-        lines: &mut Vec<Line<'static>>,
-        keys: &'static str,
-        detail: &'static str,
-    ) {
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("  {keys:<12}"),
-                self.theme.status_style(StatusTone::Accent),
-            ),
-            Span::styled(detail.to_string(), self.theme.text_style()),
-        ]));
-    }
-
-    pub(super) fn draw_validation_prompt(&self, frame: &mut Frame<'_>, area: Rect) {
+    pub(super) fn draw_validation_prompt(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let Some(prompt) = self.validation_prompt.as_ref() else {
             return;
         };
@@ -738,22 +623,112 @@ impl TuiApp {
             )
             .wrap(Wrap { trim: false });
         frame.render_widget(prompt_view, popup);
+        let buttons = Rect::new(
+            popup.x.saturating_add(2),
+            popup.bottom().saturating_sub(2),
+            popup.width.saturating_sub(4),
+            1,
+        );
+        let halves = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(buttons);
+        frame.render_widget(
+            Paragraph::new("[ Confirm ]").style(self.theme.status_style(StatusTone::Accent)),
+            halves[0],
+        );
+        frame.render_widget(
+            Paragraph::new("[ Cancel ]").style(self.theme.muted_style()),
+            halves[1],
+        );
+        self.hits.push(HitRegion {
+            rect: halves[0],
+            action: HitAction::ConfirmModal,
+        });
+        self.hits.push(HitRegion {
+            rect: halves[1],
+            action: HitAction::CancelModal,
+        });
     }
 
-    pub(super) fn draw_help(&self, frame: &mut Frame<'_>, area: Rect) {
-        let popup = centered_rect(78, 72, area);
+    pub(super) fn draw_help(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let popup = centered_rect(
+            if area.width < 80 { 94 } else { 88 },
+            if area.height < 24 { 94 } else { 86 },
+            area,
+        );
         frame.render_widget(Clear, popup);
-        let help = Paragraph::new(self.help_lines())
-            .style(self.theme.panel_style())
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(" Help ")
-                    .border_style(self.theme.border_style(true))
-                    .style(self.theme.panel_style()),
-            )
-            .wrap(Wrap { trim: true });
-        frame.render_widget(help, popup);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .title(" Key reference ")
+            .border_style(self.theme.border_style(true))
+            .style(self.theme.panel_style());
+        let inner = block.inner(popup);
+        frame.render_widget(block, popup);
+        let footer = Rect::new(inner.x, inner.bottom().saturating_sub(1), inner.width, 1);
+        let content_height = inner.height.saturating_sub(1);
+        let content = Rect::new(inner.x, inner.y, inner.width, content_height);
+        if content.width >= 72 {
+            let panes = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Length(22), Constraint::Min(30)])
+                .split(content);
+            let sections = BindingScope::ALL
+                .into_iter()
+                .enumerate()
+                .map(|(index, scope)| {
+                    ListItem::new(Line::from(Span::styled(
+                        scope.label(),
+                        if index == self.help_section {
+                            self.theme.tab_selected_style()
+                        } else {
+                            self.theme.text_style()
+                        },
+                    )))
+                })
+                .collect::<Vec<_>>();
+            let mut state = ListState::default();
+            state.select(Some(self.help_section));
+            frame.render_stateful_widget(
+                List::new(sections)
+                    .block(Block::default().borders(Borders::RIGHT).title(" Sections "))
+                    .highlight_style(self.theme.selected_style()),
+                panes[0],
+                &mut state,
+            );
+            for index in 0..BindingScope::ALL.len().min(panes[0].height as usize) {
+                self.hits.push(HitRegion {
+                    rect: Rect::new(panes[0].x, panes[0].y + index as u16, panes[0].width, 1),
+                    action: HitAction::HelpSection(index),
+                });
+            }
+            frame.render_widget(
+                Paragraph::new(self.help_lines())
+                    .scroll((self.help_scroll, 0))
+                    .wrap(Wrap { trim: false }),
+                panes[1],
+            );
+        } else {
+            frame.render_widget(
+                Paragraph::new(self.help_lines())
+                    .scroll((self.help_scroll, 0))
+                    .wrap(Wrap { trim: false }),
+                content,
+            );
+        }
+        let footer_text = format!(
+            "Esc close · q quit · j/k scroll · section {}/{} · click here to close",
+            self.help_section + 1,
+            BindingScope::ALL.len()
+        );
+        frame.render_widget(
+            Paragraph::new(Span::styled(footer_text, self.theme.muted_style())),
+            footer,
+        );
+        self.hits.push(HitRegion {
+            rect: footer,
+            action: HitAction::CloseHelp,
+        });
     }
 }
 

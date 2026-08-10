@@ -19,7 +19,7 @@ impl TuiApp {
         }
         self.status = match view {
             TuiView::Board => {
-                "Board view active. Use b to switch State/Epic Board arrangement, h/l for states, j/k for rows, t/p filters, F clear.".to_string()
+                "Board view active. Use b for State/Epic Board, h/l for states, j/k for rows, and f/m/v for Board actions.".to_string()
             }
             TuiView::Logs => self.logs_status_message(),
             TuiView::Rules => format!(
@@ -39,14 +39,52 @@ impl TuiApp {
         };
     }
 
-    pub(super) fn cycle_focus_or_hint(&mut self) {
-        match self.view {
-            TuiView::Board => self.toggle_board_detail(),
-            TuiView::Logs | TuiView::Decisions => self.toggle_focus(),
-            TuiView::Rules => {
-                self.status = "Rules has a single category/list focus area; Tab stays in Rules. Use h/l for categories and 1..4 for views.".to_string();
-            }
+    pub(super) fn open_help(&mut self) {
+        self.show_help = true;
+        self.help_scroll = 0;
+        self.help_section = match self.view {
+            TuiView::Board => 3,
+            TuiView::Logs => 5,
+            TuiView::Rules => 6,
+            TuiView::Decisions => 7,
+        };
+        if self.papercuts_open() {
+            self.help_section = 8;
         }
+        if let Some(picker) = self.board_picker.as_ref() {
+            self.help_section = if picker.kind == pickers::PickerKind::Validation {
+                4
+            } else {
+                3
+            };
+        }
+    }
+
+    pub(super) fn select_help_section(&mut self, delta: isize) {
+        self.help_section = (self.help_section as isize + delta)
+            .clamp(0, BindingScope::ALL.len().saturating_sub(1) as isize)
+            as usize;
+        self.help_scroll = 0;
+    }
+
+    pub(super) fn focus_next(&mut self) {
+        match self.view {
+            TuiView::Board if self.show_board_detail => self.focus = FocusPane::Detail,
+            TuiView::Logs | TuiView::Decisions => self.focus = FocusPane::Detail,
+            TuiView::Rules => self.focus_rule_preview(),
+            _ => {}
+        }
+    }
+
+    pub(super) fn focus_previous(&mut self) {
+        match self.view {
+            TuiView::Board | TuiView::Logs | TuiView::Decisions => self.focus = FocusPane::Board,
+            TuiView::Rules => self.focus_rule_list(),
+        }
+    }
+
+    pub(super) fn activate_logs_selection(&mut self) {
+        self.focus = FocusPane::Detail;
     }
 
     pub(super) fn focus_previous_pane(&mut self) {
@@ -69,52 +107,19 @@ impl TuiApp {
             KeyCode::Down | KeyCode::Char('j') => self.next_item(),
             KeyCode::Home | KeyCode::Char('g') => self.selected_item = 0,
             KeyCode::End | KeyCode::Char('G') => self.last_item(),
+            KeyCode::PageUp => self.selected_item = self.selected_item.saturating_sub(5),
+            KeyCode::PageDown => {
+                self.selected_item =
+                    (self.selected_item + 5).min(self.selected_state_count().saturating_sub(1))
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.selected_item = self.selected_item.saturating_sub(5)
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.selected_item =
+                    (self.selected_item + 5).min(self.selected_state_count().saturating_sub(1))
+            }
             _ => {}
-        }
-    }
-
-    pub(super) fn cycle_board_tag_filter(&mut self) {
-        let tags = board_filter_tags(&self.docs);
-        if tags.is_empty() {
-            self.status = "No Board tags are available to filter.".to_string();
-            return;
-        }
-        self.board_filters.tag = next_filter_value(self.board_filters.tag.as_deref(), &tags);
-        self.selected_item = 0;
-        self.detail_scroll = 0;
-        self.clamp_selection();
-        self.status = format!(
-            "Board {}. Press t to cycle tags, F to clear.",
-            self.board_filters.summary()
-        );
-    }
-
-    pub(super) fn cycle_board_priority_filter(&mut self) {
-        let priorities = board_filter_priorities(&self.docs);
-        if priorities.is_empty() {
-            self.status = "No Board priorities are available to filter.".to_string();
-            return;
-        }
-        self.board_filters.priority =
-            next_filter_value(self.board_filters.priority.as_deref(), &priorities);
-        self.selected_item = 0;
-        self.detail_scroll = 0;
-        self.clamp_selection();
-        self.status = format!(
-            "Board {}. Press p to cycle priorities, F to clear.",
-            self.board_filters.summary()
-        );
-    }
-
-    pub(super) fn clear_board_filters(&mut self) {
-        if self.board_filters.is_active() {
-            self.board_filters = BoardFilters::default();
-            self.selected_item = 0;
-            self.detail_scroll = 0;
-            self.clamp_selection();
-            self.status = "Board filters cleared.".to_string();
-        } else {
-            self.status = "No Board filters are active.".to_string();
         }
     }
 
@@ -122,8 +127,14 @@ impl TuiApp {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => self.scroll_detail_up(1),
             KeyCode::Down | KeyCode::Char('j') => self.scroll_detail_down(1),
-            KeyCode::PageUp | KeyCode::Char('u') => self.scroll_detail_up(6),
-            KeyCode::PageDown | KeyCode::Char('d') => self.scroll_detail_down(6),
+            KeyCode::PageUp => self.scroll_detail_up(6),
+            KeyCode::PageDown => self.scroll_detail_down(6),
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.scroll_detail_up(6)
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.scroll_detail_down(6)
+            }
             KeyCode::Home | KeyCode::Char('g') => self.detail_scroll = 0,
             KeyCode::End | KeyCode::Char('G') => self.detail_scroll_to_end(),
             KeyCode::Left | KeyCode::Char('h') => self.previous_state(),
@@ -177,11 +188,21 @@ impl TuiApp {
                 FocusPane::Board => self.next_log(),
                 FocusPane::Detail => self.scroll_log_detail_down(1),
             },
-            KeyCode::PageUp | KeyCode::Char('u') => match self.focus {
+            KeyCode::PageUp => match self.focus {
                 FocusPane::Board => self.previous_log_page(),
                 FocusPane::Detail => self.scroll_log_detail_up(6),
             },
-            KeyCode::PageDown | KeyCode::Char('d') => match self.focus {
+            KeyCode::PageDown => match self.focus {
+                FocusPane::Board => self.next_log_page(),
+                FocusPane::Detail => self.scroll_log_detail_down(6),
+            },
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => match self.focus
+            {
+                FocusPane::Board => self.previous_log_page(),
+                FocusPane::Detail => self.scroll_log_detail_up(6),
+            },
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => match self.focus
+            {
                 FocusPane::Board => self.next_log_page(),
                 FocusPane::Detail => self.scroll_log_detail_down(6),
             },
@@ -385,31 +406,7 @@ impl TuiApp {
         }
     }
 
-    pub(super) fn move_selected_task_by_delta(&mut self, delta: isize) {
-        let Some((doc_id, current_state)) = self
-            .selected_doc()
-            .map(|doc| (doc.id().to_string(), doc.field("state").map(str::to_string)))
-        else {
-            self.status = "No selected item to move.".to_string();
-            return;
-        };
-
-        let target_state = match adjacent_configured_state(
-            &self.configured_states,
-            current_state.as_deref(),
-            delta,
-        ) {
-            Ok(state) => state,
-            Err(message) => {
-                self.status = message;
-                return;
-            }
-        };
-
-        self.move_selected_task_to_state(&doc_id, &target_state);
-    }
-
-    fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
+    pub(super) fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
         match app::tasks::move_to_state(&self.workspace, doc_id, target_state) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
@@ -1578,46 +1575,6 @@ pub(super) fn quick_add_status(input: &QuickAddInput) -> String {
         "Add task in {}{}: {} · Enter create · Esc cancel",
         input.state, fallback, title
     )
-}
-
-pub(super) fn adjacent_configured_state(
-    configured_states: &[String],
-    current_state: Option<&str>,
-    delta: isize,
-) -> Result<String, String> {
-    if configured_states.is_empty() {
-        return Err("No configured states are available for task moves.".to_string());
-    }
-    if configured_states.len() == 1 {
-        return Err(format!(
-            "Only one configured state (`{}`); selected task cannot move left/right.",
-            configured_states[0]
-        ));
-    }
-
-    let current = current_state
-        .map(str::trim)
-        .filter(|state| !state.is_empty())
-        .unwrap_or("unfiled");
-    let Some(current_index) = configured_states.iter().position(|state| state == current) else {
-        return Err(format!(
-            "Selected item is in `{current}`, which is not a configured state ({}).",
-            configured_states.join(", ")
-        ));
-    };
-
-    let target_index = current_index as isize + delta;
-    if target_index < 0 {
-        Err(format!(
-            "Selected item is already in the first configured state `{current}`."
-        ))
-    } else if target_index >= configured_states.len() as isize {
-        Err(format!(
-            "Selected item is already in the last configured state `{current}`."
-        ))
-    } else {
-        Ok(configured_states[target_index as usize].clone())
-    }
 }
 
 pub(super) fn validation_prompt_lines(

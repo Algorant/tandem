@@ -39,6 +39,12 @@ pub(super) struct PapercutsState {
 }
 
 impl PapercutsState {
+    #[cfg(test)]
+    pub(super) fn set_items(&mut self, items: Vec<StoredPapercut>) {
+        self.items = items;
+        self.clamp();
+    }
+
     fn replace_load(&mut self, load: InboxLoad) {
         self.items = load.items;
         self.warnings = load.warnings;
@@ -113,7 +119,7 @@ impl TuiApp {
             self.papercuts_view.items.len(),
             self.papercuts_view.warnings.len(),
         ) {
-            (0, 0) => "Papercuts inbox is empty; press P or Esc to close.".to_string(),
+            (0, 0) => "Papercuts inbox is empty; press i or Esc to close.".to_string(),
             (count, 0) => format!(
                 "Papercuts inbox open: {count} open record{} · read-only.",
                 if count == 1 { "" } else { "s" }
@@ -133,12 +139,14 @@ impl TuiApp {
 
     pub(super) fn handle_papercuts_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Char('P') | KeyCode::Esc => self.close_papercuts(),
+            KeyCode::Char('i') | KeyCode::Esc => self.close_papercuts(),
             KeyCode::Char('r') => {
                 self.reload();
             }
             KeyCode::Char('?') => self.show_help = true,
-            KeyCode::Tab | KeyCode::BackTab | KeyCode::Enter => self.toggle_papercut_focus(),
+            KeyCode::Tab => self.papercuts_view.focus = PapercutFocus::Detail,
+            KeyCode::BackTab => self.papercuts_view.focus = PapercutFocus::List,
+            KeyCode::Enter => self.papercuts_view.focus = PapercutFocus::Detail,
             KeyCode::Left | KeyCode::Char('h') => self.papercuts_view.focus = PapercutFocus::List,
             KeyCode::Right | KeyCode::Char('l') => {
                 self.papercuts_view.focus = PapercutFocus::Detail
@@ -151,14 +159,34 @@ impl TuiApp {
                 PapercutFocus::List => self.next_papercut(),
                 PapercutFocus::Detail => self.scroll_papercut_detail_down(1),
             },
-            KeyCode::PageUp | KeyCode::Char('u') => match self.papercuts_view.focus {
+            KeyCode::PageUp => match self.papercuts_view.focus {
                 PapercutFocus::List => self.move_papercut_selection(-5),
                 PapercutFocus::Detail => self.scroll_papercut_detail_up(6),
             },
-            KeyCode::PageDown | KeyCode::Char('d') => match self.papercuts_view.focus {
+            KeyCode::PageDown => match self.papercuts_view.focus {
                 PapercutFocus::List => self.move_papercut_selection(5),
                 PapercutFocus::Detail => self.scroll_papercut_detail_down(6),
             },
+            KeyCode::Char('u')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                match self.papercuts_view.focus {
+                    PapercutFocus::List => self.move_papercut_selection(-5),
+                    PapercutFocus::Detail => self.scroll_papercut_detail_up(6),
+                }
+            }
+            KeyCode::Char('d')
+                if key
+                    .modifiers
+                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
+            {
+                match self.papercuts_view.focus {
+                    PapercutFocus::List => self.move_papercut_selection(5),
+                    PapercutFocus::Detail => self.scroll_papercut_detail_down(6),
+                }
+            }
             KeyCode::Home | KeyCode::Char('g') => match self.papercuts_view.focus {
                 PapercutFocus::List => self.select_first_papercut(),
                 PapercutFocus::Detail => self.papercuts_view.detail_scroll = 0,
@@ -215,20 +243,11 @@ impl TuiApp {
         }
     }
 
-    fn toggle_papercut_focus(&mut self) {
-        self.papercuts_view.focus = match self.papercuts_view.focus {
-            PapercutFocus::List => PapercutFocus::Detail,
-            PapercutFocus::Detail => PapercutFocus::List,
-        };
-    }
-
     fn select_papercut(&mut self, index: usize) {
-        if self.papercuts_view.items.is_empty() {
-            self.papercuts_view.selected = 0;
-        } else {
+        if !self.papercuts_view.items.is_empty() {
             self.papercuts_view.selected = index.min(self.papercuts_view.items.len() - 1);
+            self.papercuts_view.detail_scroll = 0;
         }
-        self.papercuts_view.detail_scroll = 0;
     }
 
     fn previous_papercut(&mut self) {
@@ -326,10 +345,10 @@ impl TuiApp {
 
     pub(super) fn papercuts_footer_text(&self) -> String {
         let commands = match self.papercuts_view.focus {
-            PapercutFocus::List => "j/k · Enter detail",
-            PapercutFocus::Detail => "j/k scroll · Enter list",
+            PapercutFocus::List => "j/k · Enter open detail",
+            PapercutFocus::Detail => "j/k scroll · Shift-Tab list",
         };
-        format!("Papercuts · read-only · P/Esc close · {commands}")
+        format!("Papercuts · read-only · i/Esc close · {commands}")
     }
 
     pub(super) fn draw_papercuts_panel(&mut self, frame: &mut Frame<'_>, area: Rect) {
