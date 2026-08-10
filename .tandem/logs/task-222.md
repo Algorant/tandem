@@ -2,18 +2,31 @@
 id: task-222
 type: task
 title: "Specify and implement the lightweight Papercuts inbox MVP"
-state: "in-progress"
 priority: "medium"
 relatedFiles: ["protocol/plan/spec.md", "protocol/plan/todo.md", "tandem/plan/spec.md", "tandem/plan/todo.md", "extensions/pi-tandem/plan/spec.md", "extensions/pi-tandem/plan/todo.md", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/tests/smoke.ts", "plan/papercuts.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/workspace/index.md", "docs/guides/agents-and-adapters.md", "docs/extensions/index.md", "docs/reference/index.md", "site/astro.config.mjs", "site/README.md"]
 tags: ["protocol", "papercuts", "pi-tandem"]
 createdAt: "2026-08-10T02:09:53Z"
-updatedAt: "2026-08-10T02:31:36Z"
+updatedAt: "2026-08-10T03:02:36Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "worker-task-222-86fee578"
   claimedAt: "2026-08-10T02:31:36Z"
-  updatedAt: "2026-08-10T02:31:36Z"
+  deliveredAt: "2026-08-10T03:02:21Z"
+  validation:
+    commands: ["cargo test --manifest-path tandem/Cargo.toml --no-fail-fast (246 unit and 11 integration tests passed)", "cargo clippy --manifest-path tandem/Cargo.toml --all-targets -- -D warnings (passed in Worker checkout)", "cargo fmt --manifest-path tandem/Cargo.toml -- --check (passed in Worker checkout)", "bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts (passed)", "bun extensions/pi-tandem/tests/smoke.ts (passed after integration)", "cd site && bun run check:docs (19 pages and 912 links passed in Worker checkout)"]
+  summary: "Implemented and integrated the lightweight Papercuts inbox MVP across core Tandem, pi-tandem, protocol specifications, user documentation, and site content."
+  evidence: ["Integrated Worktrunk squash commit c7f682a", "Parent review found and Worker corrected Task/Decision/Rule reference boundaries in commit 3ea9d1b before integration", "Integrated checkout is clean and full Rust plus pi-tandem smoke validation passed"]
+  filesChanged: ["README.md", "protocol/README.md", "protocol/plan/spec.md", "protocol/plan/todo.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/src/protocol/papercut.rs", "tandem/src/project/mod.rs", "tandem/src/app/papercuts.rs", "tandem/src/app/queries.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/rules.rs", "tandem/src/cli/args.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/output.rs", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/tests/smoke.ts", "docs/cli/index.md", "docs/concepts/index.md", "docs/workspace/index.md", "docs/guides/agents-and-adapters.md", "docs/extensions/index.md", "docs/reference/index.md"]
+  reviewer: "pi-orchestrator"
+  note: "Accepted after parent diff review, targeted rework of Papercut reference boundaries, Worktrunk integration, 246 unit and 11 integration tests, and passing pi-tandem smoke validation."
+  updatedAt: "2026-08-10T03:02:27Z"
 assignee: "worker-task-222-86fee578"
+completedAt: "2026-08-10T03:02:36Z"
+completion:
+  summary: "Implemented the Papercuts inbox MVP with protocol-owned records, CLI add/list/show/resolve, global search and audit events, thin pi-tandem support, tests, specifications, and website documentation."
+  filesChanged: ["README.md", "protocol/README.md", "protocol/plan/spec.md", "protocol/plan/todo.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/src/protocol/papercut.rs", "tandem/src/project/mod.rs", "tandem/src/app/papercuts.rs", "tandem/src/app/queries.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/rules.rs", "tandem/src/cli/args.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/output.rs", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/tests/smoke.ts", "docs/cli/index.md", "docs/concepts/index.md", "docs/workspace/index.md", "docs/guides/agents-and-adapters.md", "docs/extensions/index.md", "docs/reference/index.md"]
+  validation: "Parent review completed; Worker full validation passed; integrated cargo test passed 246 unit and 11 integration tests; pi-tandem Bun check and smoke passed."
+  reviewer: "pi-orchestrator"
 ---
 ## Description
 
