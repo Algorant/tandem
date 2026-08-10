@@ -158,11 +158,6 @@ pub(super) const BINDINGS: &[Binding] = &[
         description: "open context-aware Validation actions",
     },
     Binding {
-        scope: BindingScope::Board,
-        keys: "Space",
-        description: "toggle selected row inline preview",
-    },
-    Binding {
         scope: BindingScope::Validation,
         keys: "v",
         description: "choose accept, rework, or apply/archive when valid",

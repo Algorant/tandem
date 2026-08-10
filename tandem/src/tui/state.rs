@@ -581,7 +581,7 @@ impl TuiApp {
         self.status = if self.show_board_detail {
             "Board detail pane shown; Tab or Esc returns to the list.".to_string()
         } else {
-            "Board detail pane hidden; Space toggles the selected row preview.".to_string()
+            "Board detail pane hidden; Enter activates the selected row.".to_string()
         };
     }
 
@@ -661,7 +661,7 @@ impl TuiApp {
             self.status = format!("Closed preview for {doc_id}.");
         } else {
             self.expanded_board_doc_id = Some(doc_id.clone());
-            self.status = format!("Previewing {doc_id} inline; press Space to close.");
+            self.status = format!("Previewing {doc_id} inline; press Enter to close.");
         }
     }
 
@@ -916,41 +916,6 @@ impl TuiApp {
             .get(self.selected_state)
             .map(|state| self.state_board_entries(state).len())
             .unwrap_or(0)
-    }
-
-    pub(super) fn selected_state_summary(&self) -> String {
-        if self.board_arrangement == BoardArrangement::Epic {
-            let count = self.selected_state_count();
-            return format!("EPIC · {} row{}", count, if count == 1 { "" } else { "s" });
-        }
-        let Some(state) = self.states.get(self.selected_state) else {
-            return "No state · 0 items".to_string();
-        };
-        let visible_rows = self.selected_state_count();
-        let state_tasks = self
-            .docs
-            .iter()
-            .filter(|doc| is_board_visible_doc(doc))
-            .filter(|doc| document_state_label(doc) == state.as_str())
-            .filter(|doc| board_filters_match(doc, &self.board_filters))
-            .count();
-        if visible_rows == state_tasks {
-            format!(
-                "{} · {} row{}",
-                display_state_label(state),
-                visible_rows,
-                if visible_rows == 1 { "" } else { "s" }
-            )
-        } else {
-            format!(
-                "{} · {} task{} · {} row{}",
-                display_state_label(state),
-                state_tasks,
-                if state_tasks == 1 { "" } else { "s" },
-                visible_rows,
-                if visible_rows == 1 { "" } else { "s" }
-            )
-        }
     }
 
     pub(super) fn selected_doc(&self) -> Option<&Document> {

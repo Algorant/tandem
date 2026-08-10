@@ -1674,7 +1674,7 @@ pub(super) fn inline_preview_lines_for_doc_with_context(
         lines.push(Line::from(""));
     }
     lines.push(Line::from(Span::styled(
-        "   Space close preview · Tab detail pane · e edit",
+        "   Enter close preview · Tab detail pane · e edit",
         theme.muted_style(),
     )));
     lines

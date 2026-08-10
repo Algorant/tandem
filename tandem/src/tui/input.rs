@@ -141,7 +141,6 @@ impl TuiApp {
             KeyCode::Tab => self.focus_next(),
             KeyCode::BackTab => self.focus_previous(),
             KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
-            KeyCode::Char(' ') if self.view == TuiView::Board => self.toggle_board_preview(),
             KeyCode::Enter if self.view == TuiView::Logs => self.activate_logs_selection(),
             _ => match self.view {
                 TuiView::Board => match self.focus {

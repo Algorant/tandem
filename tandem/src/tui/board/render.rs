@@ -122,7 +122,7 @@ impl TuiApp {
         let preview_line_limit = inline_preview_line_limit_for_area(area);
         let items = if entries.is_empty() {
             let empty_text = if self.board_filters.is_active() {
-                "No Epic Board rows match the active filters. Press F to clear filters."
+                "No Epic Board rows match the active filters. Press f to adjust filters."
             } else {
                 "No epic groups are available. Press b for State Board."
             };
@@ -149,17 +149,11 @@ impl TuiApp {
                 .collect::<Vec<_>>()
         };
 
-        let title = format!(
-            " Epic Board · {} row{} ",
-            count,
-            if count == 1 { "" } else { "s" }
-        );
         let list = List::new(items)
             .style(self.theme.panel_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(title)
                     .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )
@@ -270,7 +264,7 @@ impl TuiApp {
         let preview_line_limit = inline_preview_line_limit_for_area(area);
         let items = if entries.is_empty() {
             let empty_text = if self.board_filters.is_active() {
-                "No hierarchy matches the active Board filters. Press F to clear filters."
+                "No hierarchy matches the active Board filters. Press f to adjust filters."
             } else if state_task_count > 0 {
                 "Tasks in this state are nested under parents in other state tabs."
             } else {
@@ -303,29 +297,11 @@ impl TuiApp {
                 .collect::<Vec<_>>()
         };
 
-        let title = if row_count == state_task_count {
-            format!(
-                " {} · {} row{} ",
-                display_state_label(state_name),
-                row_count,
-                if row_count == 1 { "" } else { "s" }
-            )
-        } else {
-            format!(
-                " {} · {} task{} · {} visible row{} ",
-                display_state_label(state_name),
-                state_task_count,
-                if state_task_count == 1 { "" } else { "s" },
-                row_count,
-                if row_count == 1 { "" } else { "s" }
-            )
-        };
         let list = List::new(items)
             .style(self.theme.panel_style())
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(title)
                     .border_style(self.theme.border_style(self.focus == FocusPane::Board))
                     .style(self.theme.panel_style()),
             )

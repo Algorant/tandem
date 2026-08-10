@@ -263,6 +263,8 @@ struct TuiApp {
     log_search_filter: String,
     log_search_input: Option<String>,
     status: String,
+    observed_status: String,
+    status_updated_at: Instant,
     show_help: bool,
     help_scroll: u16,
     help_section: usize,
@@ -310,6 +312,8 @@ impl TuiApp {
             log_search_filter: String::new(),
             log_search_input: None,
             status: String::new(),
+            observed_status: String::new(),
+            status_updated_at: Instant::now(),
             show_help: false,
             quick_add: None,
             validation_prompt: None,
@@ -330,6 +334,7 @@ impl TuiApp {
     fn run(&mut self, session: &mut TerminalSession) -> Result<(), CliError> {
         loop {
             self.reload_if_changed();
+            self.expire_transient_status();
             session.terminal_mut().draw(|frame| self.draw(frame))?;
             if event::poll(Duration::from_millis(200))? {
                 match event::read()? {
@@ -1346,7 +1351,7 @@ in-progress = "active"
     }
 
     #[test]
-    fn state_board_enter_and_mouse_expand_children_while_space_controls_preview() {
+    fn state_board_enter_and_mouse_activate_rows_while_space_is_unbound() {
         let mut app = keyboard_test_app();
         let mut child = doc_with_state("task-1-1", Some("validation"));
         child
@@ -1363,6 +1368,8 @@ in-progress = "active"
         app.next_item();
         assert_eq!(app.selected_doc().map(Document::id), Some("task-1-1"));
         app.handle_key(key(KeyCode::Char(' '))).unwrap();
+        assert_eq!(app.expanded_board_doc_id, None);
+        app.handle_key(key(KeyCode::Enter)).unwrap();
         assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1-1"));
 
         app.selected_item = 0;
@@ -1404,7 +1411,7 @@ in-progress = "active"
         assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1"));
         assert!(app.status.contains("press Enter to close"));
         assert!(!app.status.contains("Expanded Tasks"));
-        assert!(app.board_footer_text().contains("Enter/Space preview"));
+        assert!(!app.board_footer_text().contains("Space"));
     }
 
     #[test]
@@ -2134,7 +2141,7 @@ tone = "success"
         };
 
         let footer = app.board_footer_text();
-        assert!(footer.contains("f filter"));
+        assert!(footer.contains("f Filter"));
         assert!(!footer.contains("#research"));
         assert!(!footer.contains("priority high"));
 
@@ -2153,6 +2160,8 @@ tone = "success"
         assert!(rendered.contains("priority"));
         assert!(rendered.contains("high"));
         assert!(rendered.contains("f change or clear"));
+        assert!(!rendered.contains("TODO · 1 task"));
+        assert!(!rendered.contains("visible row"));
     }
 
     #[test]
@@ -2570,6 +2579,8 @@ tone = "success"
             log_search_filter: String::new(),
             log_search_input: None,
             status: String::new(),
+            observed_status: String::new(),
+            status_updated_at: Instant::now(),
             show_help: false,
             help_scroll: 0,
             help_section: 0,
@@ -2629,16 +2640,15 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "board · TODO · 1 row · Enter open · Space preview · a add · f filter · m move · v validate · b Epic Board · ? help"
+            "a Add · e Edit · f Filter · m Move · v Validate · b Epic Board · ? Help"
         );
-        assert!(!app.board_footer_text().contains("1/"));
+        assert!(!app.board_footer_text().contains("TODO"));
+        assert!(!app.board_footer_text().contains("row"));
+        assert!(!app.board_footer_text().contains("Space"));
         assert!(!app.board_footer_text().contains("1..4"));
 
         app.focus = FocusPane::Detail;
-        assert_eq!(
-            app.board_footer_text(),
-            "detail · TODO · 1 row · Shift-Tab board · j/k scroll · e edit · b Epic Board · ? help"
-        );
+        assert_eq!(app.board_footer_text(), "e Edit · b Epic Board · ? Help");
 
         app.switch_view(TuiView::Logs);
         app.status.clear();
@@ -3027,6 +3037,22 @@ tone = "success"
     }
 
     #[test]
+    fn transient_footer_status_expires() {
+        let mut app = keyboard_test_app();
+        app.status = "Papercuts inbox closed; previous view restored.".to_string();
+        app.expire_transient_status();
+        assert!(!app.status.is_empty());
+
+        app.status_updated_at = Instant::now() - Duration::from_secs(4);
+        app.expire_transient_status();
+        assert!(app.status.is_empty());
+        assert_eq!(
+            app.board_footer_text(),
+            "a Add · e Edit · f Filter · m Move · v Validate · b Epic Board · ? Help"
+        );
+    }
+
+    #[test]
     fn footer_status_style_does_not_leak_into_hotkey_hints() {
         let mut app = keyboard_test_app();
         app.status = "Logs view active: 0 archived logs loaded.".to_string();
@@ -3067,7 +3093,7 @@ tone = "success"
         for keys in ["1–4", "f", "m", "v", "Ctrl-U/D · PgUp/PgDn", "a/e/d", "/"] {
             assert!(text.contains(keys), "missing help binding {keys}");
         }
-        for removed in ["t/p/F", "H/L", "A/R/C", "a or n"] {
+        for removed in ["t/p/F", "H/L", "A/R/C", "a or n", "Space"] {
             assert!(!text.contains(removed), "stale help binding {removed}");
         }
     }

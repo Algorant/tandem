@@ -165,7 +165,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Decide initial Ratatui event loop approach.
 - [x] Define exact TOML theme keys for workspace override in the current theme foundation.
 - [x] Add full user theme discovery from `~/.config/tandem/themes/*.toml` and `$XDG_CONFIG_HOME/tandem/themes/*.toml`.
-- [x] Implemented the final fixed TUI input model, shared f/m/v picker family, universal `?` reference, and keyboard/mouse parity coverage.
+- [x] Implemented the final fixed TUI input model, shared f/m/v picker family, universal `?` reference, and keyboard/mouse parity coverage; Enter is the sole Board row activation key, Board chrome does not repeat state/count context, and transient footer status expires.
 - [ ] Define styled-basic Markdown rendering details.
 
 ## Next recommended steps

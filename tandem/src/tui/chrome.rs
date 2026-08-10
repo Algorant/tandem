@@ -2,6 +2,8 @@
 
 use super::*;
 
+const TRANSIENT_STATUS_TTL: Duration = Duration::from_secs(4);
+
 impl TuiApp {
     pub(super) fn draw_tiny(&self, frame: &mut Frame<'_>, area: Rect) {
         let message = Paragraph::new(vec![
@@ -337,38 +339,44 @@ impl TuiApp {
         }
     }
 
+    pub(super) fn expire_transient_status(&mut self) {
+        if self.status != self.observed_status {
+            self.observed_status.clone_from(&self.status);
+            self.status_updated_at = Instant::now();
+            return;
+        }
+        if self.status.is_empty()
+            || self.text_input_active()
+            || self.board_picker.is_some()
+            || self.validation_prompt.is_some()
+            || self.rules_prompt_active()
+            || self.decision_prompt_active()
+            || self.papercuts_open()
+            || self.show_help
+        {
+            return;
+        }
+        if self.status_updated_at.elapsed() >= TRANSIENT_STATUS_TTL {
+            self.status.clear();
+            self.observed_status.clear();
+        }
+    }
+
     pub(super) fn board_footer_text(&self) -> String {
         if !self.hierarchy.errors.is_empty() {
             return "board · HIERARCHY INVALID · fix referenced documents and reload · ? help"
                 .to_string();
         }
-        let context = match self.focus {
-            FocusPane::Board => "board",
-            FocusPane::Detail => "detail",
-        };
-        let selected_is_validation = self
-            .selected_doc()
-            .map(|doc| document_state_label(doc) == "validation")
-            .unwrap_or(false);
         let arrangement_hint = match self.board_arrangement {
             BoardArrangement::State => "b Epic Board",
             BoardArrangement::Epic => "b State Board",
         };
-        let enter_hint = match self.board_arrangement {
-            BoardArrangement::State => "Enter open · Space preview",
-            BoardArrangement::Epic => "Enter/Space preview",
-        };
         let commands = if self.focus == FocusPane::Detail {
-            format!("Shift-Tab board · j/k scroll · e edit · {arrangement_hint} · ? help")
-        } else if selected_is_validation {
-            format!("{enter_hint} · v validate · f filter · m move · {arrangement_hint} · ? help")
+            format!("e Edit · {arrangement_hint} · ? Help")
         } else {
-            format!("{enter_hint} · a add · f filter · m move · v validate · {arrangement_hint} · ? help")
+            format!("a Add · e Edit · f Filter · m Move · v Validate · {arrangement_hint} · ? Help")
         };
-        self.with_status(format!(
-            "{context} · {} · {commands}",
-            self.selected_state_summary()
-        ))
+        self.with_status(commands)
     }
 
     pub(super) fn logs_footer_text(&self) -> String {
@@ -487,11 +495,11 @@ impl TuiApp {
                     "b State Board",
                     HitAction::ToggleBoardArrangement,
                 );
-                self.register_footer_hit(area, text, "a add", HitAction::StartQuickAdd);
-                self.register_footer_hit(area, text, "f filter", HitAction::OpenFilterPicker);
-                self.register_footer_hit(area, text, "m move", HitAction::OpenMovePicker);
-                self.register_footer_hit(area, text, "v validate", HitAction::OpenValidationPicker);
-                self.register_footer_hit(area, text, "e edit", HitAction::OpenEditor);
+                self.register_footer_hit(area, text, "a Add", HitAction::StartQuickAdd);
+                self.register_footer_hit(area, text, "f Filter", HitAction::OpenFilterPicker);
+                self.register_footer_hit(area, text, "m Move", HitAction::OpenMovePicker);
+                self.register_footer_hit(area, text, "v Validate", HitAction::OpenValidationPicker);
+                self.register_footer_hit(area, text, "e Edit", HitAction::OpenEditor);
             }
             TuiView::Logs => {
                 self.register_footer_hit(area, text, "Enter detail", HitAction::ToggleFocus);
@@ -500,6 +508,7 @@ impl TuiApp {
             }
             TuiView::Rules | TuiView::Decisions => {}
         }
+        self.register_footer_hit(area, text, "? Help", HitAction::ShowHelp);
         self.register_footer_hit(area, text, "? help", HitAction::ShowHelp);
     }
 
