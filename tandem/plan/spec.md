@@ -599,7 +599,7 @@ tandem papercut resolve <id> --note <text> [--reference <id>]...
 
 Malformed required structure, invalid IDs/status, missing records, write conflicts, and event failures exit `1`. Missing flags, incompatible `--all`/`--status`, and unknown arguments exit `2`. Empty reads succeed with empty arrays. Mutations use atomic writes, conflict checks, UTC timestamps, and `papercut.created`/`papercut.resolved` per-actor events.
 
-Global `tandem search` includes Papercuts only when document taxonomy/hierarchy filters are absent. Search covers title, body, status, tags, references, and resolution note. Human and JSON results identify `location` as `papercuts`. Papercuts are intentionally absent from `list`, `log`, Board/TUI, hierarchy, progress, review, and Accord surfaces.
+Global `tandem search` includes Papercuts only when document taxonomy/hierarchy filters are absent. Search covers title, body, status, tags, references, and resolution note. Human and JSON results identify `location` as `papercuts`. Papercuts are intentionally absent from `list`, `log`, Board workflow, hierarchy, progress, review, and Accord surfaces. The TUI exposes open Papercuts only through the read-only global utility panel described below; it does not make them Board items or a fifth main view.
 
 ### `tandem accord`
 
@@ -871,9 +871,10 @@ tandem tui
   - renders the Logs view as a first-class terminal work-history browser: recency-sorted `.tandem/logs/` list, explicit completed/canceled outcome labels, local list/detail focus, selected-log completion/cancellation summary and timestamp, files/validation/reviewer where present, accord/review metadata, Markdown body, raw path, event context, safe per-log load warnings, and `/` search filtering across ID/title/outcome/summary/body/validation/files.
   - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
   - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
+  - renders a secondary read-only Papercuts utility inbox over the current main view. The global header reports the open count; `P` or the header hit target opens and closes it. The panel keeps its own list/detail focus, selection, list offset, and detail scroll so the underlying Board, Logs, Rules, or Decisions state is not changed. It lists only valid open Papercuts, renders protocol-owned ID/title/status/tags/references/timestamps plus the Markdown body, treats a missing directory as empty, isolates malformed records as panel warnings, and reloads through the normal manual and external-change path. TUI add/edit/resolve/reopen/delete/promotion actions are not available.
+  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, Decisions, and the Papercuts utility panel across headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
   - applies user/workspace theme selection and overrides using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active fallback palette remains in use.
-  - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
+  - enables crossterm mouse capture for basic view tabs, the Papercuts header indicator and panel rows/panes, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
   - keeps CLI command behavior unchanged outside the TUI entry point.
 - Exit/error notes:
   - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
@@ -900,6 +901,7 @@ The first TUI MVP is not read-only. The current starter slices establish the Rat
 The full first TUI MVP should include:
 
 - Top-level views: Board, Logs, Rules, Decisions. Validation is a Board state/subview, not a top-level pane.
+- Global utility inbox: the header opens a temporary read-only Papercuts list/detail panel without adding a main view or workflow state.
 - Board mutations: add item, move state, edit item, complete to logs, update priority/tags/assignee where supported, and toggle subtasks.
 - Accord actions: ready, claim, deliver, accept, rework, block, fail.
 - Rules actions: list, add, edit, delete.
@@ -910,6 +912,16 @@ The full first TUI MVP should include:
 - Progress/health metrics that do not require a persistent `done` state.
 
 ## TUI views
+
+### Global Papercuts utility panel
+
+Papercuts remain lightweight project friction records outside task workflow. Every main view shows a compact `Papercuts N` header indicator for the valid open count. A zero count uses muted styling. `P` or the indicator opens a temporary themed surface over the current view; `P` or `Esc` closes it without changing the prior main view, selection, focus, filters, arrangement, or scroll state.
+
+The panel has an open-only selectable list and a detail pane. `j`/`k`, arrows, `g`/`G`, page keys, `h`/`l`, `Enter`, and `Tab` follow the established local list/detail navigation model. Mouse row selection, pane focus, and wheel navigation use frame-local hit regions. Detail renders the protocol-owned ID, title, status, optional tags and references, created/updated timestamps, path, and styled-basic Markdown body.
+
+The panel is read-only. It does not expose add, edit, resolve, reopen, delete, or task-promotion actions. Missing `.tandem/papercuts/` storage is an empty inbox. Tolerant project reads keep valid records visible when another record is malformed; load warnings appear in the panel and do not block Board, Logs, Rules, or Decisions. Manual and watched reloads include Papercut files and preserve the selected Papercut by ID where possible.
+
+Deferred Papercut TUI ideas include every mutation/resolution workflow, task promotion, filters/search, resolved history, configurable placement/shortcuts, Board subviews, a dedicated main view, and dashboards or metrics.
 
 ### 1. Board view
 
@@ -1296,7 +1308,8 @@ Mouse support should be built into the event model.
 Required interactions:
 
 - click tabs/views
-- click cards/rows to select
+- click the global Papercuts count to open or close its utility panel
+- click Papercut, Board, Log, Rule, and Decision rows to select
 - enter/click the selected Board row to expand or collapse inline detail
 - scroll lists/details with the mouse wheel, using the pane under the pointer
 - click visible footer/action labels for safe keyboard-equivalent actions
@@ -1339,7 +1352,8 @@ Global:
 | `?` | help |
 | `:` | command palette / command line |
 | `/` | search current view |
-| `r` | reload |
+| `r` | reload, including Papercuts |
+| `P` | open/close the read-only Papercuts utility inbox |
 | `1..4` | switch major view: Board, Logs, Rules, Decisions |
 | `tab` / `shift-tab` | cycle focus only within views that have meaningful focusable panes; no top-level fallback |
 | `esc` | close modal/clear filter/return detail focus to list where supported |
@@ -1767,6 +1781,7 @@ Manual smoke:
 - Board renders active board documents as count-labeled state subviews with a full-width selected-state list, sparse one-line rows with real chip/badge styling, navigation, details, reload, help, safe quit, quick-add via `a`, move-state mutation via `H`/`L`, built-in `default-dark`/`verdigris` theme styling, user theme discovery and global selection from config dirs, workspace `.tandem/theme.toml` selection/color overrides, and workspace `.tandem/config.toml` Board display settings.
 - Review renders a read-only filtered queue and inspection detail; Logs renders a completed-work browser with recency list, detail pane, `/` search/filter, empty/no-match states, load warnings, and event context.
 - Rules renders grouped categories and supports add/edit/delete prompts from `src/tui/rules.rs`; Decisions renders active decisions with detail and supports a basic title/body add prompt from `src/tui/decisions.rs`.
+- The global header opens a read-only Papercuts utility list/detail panel with tolerant loading, count, themed rendering, keyboard/mouse navigation, and reload support while retaining the four main views.
 - Render safe Review action buttons/mutations and remaining Board/accord/completion workflows on top of the existing view shell.
 - Include board mutations immediately: add, move state, edit, complete, accord actions, rules actions, and supported decision actions.
 - Include built-in theme support and user-selectable theme loading.

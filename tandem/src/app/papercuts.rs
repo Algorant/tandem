@@ -45,6 +45,34 @@ pub(crate) struct MutationOutcome {
     pub(crate) warnings: Vec<String>,
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct InboxLoad {
+    pub(crate) items: Vec<StoredPapercut>,
+    pub(crate) warnings: Vec<String>,
+}
+
+/// Loads the read-only open inbox without allowing one malformed record to
+/// hide valid Papercuts or affect unrelated project reads.
+pub(crate) fn load_open_inbox(project: &TandemProject) -> InboxLoad {
+    let mut warnings = Vec::new();
+    let mut items = project
+        .read_papercuts_tolerant(&mut warnings)
+        .into_iter()
+        .filter(|item| item.status() == "open")
+        .collect::<Vec<_>>();
+    items.sort_by_key(|item| papercut_number(item.id()).unwrap_or(usize::MAX));
+    match warnings_for_items(project, &items) {
+        Ok(reference_warnings) => warnings.extend(reference_warnings),
+        Err(error) => warnings.push(format!(
+            "Papercut reference warnings unavailable: {}",
+            error.message
+        )),
+    }
+    warnings.sort();
+    warnings.dedup();
+    InboxLoad { items, warnings }
+}
+
 pub(crate) fn add(
     project: &TandemProject,
     options: AddOptions,
@@ -386,6 +414,52 @@ mod tests {
             .unwrap_err()
             .message
             .contains("Papercut validation failed"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn open_inbox_load_is_empty_when_missing_and_isolates_malformed_records() {
+        let (project, root) = project();
+        let empty = load_open_inbox(&project);
+        assert!(empty.items.is_empty());
+        assert!(empty.warnings.is_empty());
+
+        let open = add(
+            &project,
+            AddOptions {
+                title: Some("Open friction".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let resolved = add(
+            &project,
+            AddOptions {
+                title: Some("Fixed friction".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        resolve(
+            &project,
+            ResolveOptions {
+                id: resolved.papercut.id().to_string(),
+                note: Some("fixed".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        fs::write(
+            project.papercuts_dir().join("papercut-3.md"),
+            "not frontmatter",
+        )
+        .unwrap();
+
+        let inbox = load_open_inbox(&project);
+        assert_eq!(inbox.items.len(), 1);
+        assert_eq!(inbox.items[0].id(), open.papercut.id());
+        assert_eq!(inbox.warnings.len(), 1);
+        assert!(inbox.warnings[0].contains("papercut-3.md"));
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -233,6 +233,52 @@ impl TandemProject {
         read_documents_tolerant(&self.logs_dir, DocumentLocation::Logs, "Logs", warnings)
     }
 
+    pub(crate) fn read_papercuts_tolerant(
+        &self,
+        warnings: &mut Vec<String>,
+    ) -> Vec<StoredPapercut> {
+        let dir = self.papercuts_dir();
+        if !dir.exists() {
+            return Vec::new();
+        }
+        let entries = match fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(error) => {
+                warnings.push(format!(
+                    "Papercuts load failed: could not read {}: {error}",
+                    display_path(&dir)
+                ));
+                return Vec::new();
+            }
+        };
+        let mut paths = Vec::new();
+        for entry in entries {
+            match entry {
+                Ok(entry)
+                    if entry.path().extension().and_then(|value| value.to_str()) == Some("md") =>
+                {
+                    paths.push(entry.path());
+                }
+                Ok(_) => {}
+                Err(error) => warnings.push(format!(
+                    "Papercuts load warning: could not inspect entry in {}: {error}",
+                    display_path(&dir)
+                )),
+            }
+        }
+        paths.sort();
+        paths
+            .into_iter()
+            .filter_map(|path| match read_papercut(&path) {
+                Ok(papercut) => Some(papercut),
+                Err(error) => {
+                    warnings.push(format!("Papercuts load warning: {}", error.message));
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub(crate) fn read_events_tolerant(&self, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
         let mut events = read_event_file_tolerant(&self.events_path, warnings);
         let events_dir = self.events_dir();
@@ -1050,6 +1096,39 @@ mod tests {
             .read_board_documents_tolerant(&mut warnings)
             .is_empty());
         assert_eq!(warnings.len(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn tolerant_papercut_reads_keep_valid_records_and_isolate_malformed_ones() {
+        let root = env::temp_dir().join(format!(
+            "tandem-project-papercuts-read-{}",
+            std::process::id()
+        ));
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
+        fs::create_dir_all(project.papercuts_dir()).unwrap();
+        fs::write(
+            project.papercuts_dir().join("papercut-1.md"),
+            "---\nid: papercut-1\ntitle: Valid\nstatus: open\ncreatedAt: now\nupdatedAt: now\n---\nBody\n",
+        )
+        .unwrap();
+        fs::write(
+            project.papercuts_dir().join("papercut-2.md"),
+            "not frontmatter",
+        )
+        .unwrap();
+
+        assert!(project.read_papercuts().is_err());
+        let mut warnings = Vec::new();
+        let items = project.read_papercuts_tolerant(&mut warnings);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id(), "papercut-1");
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("papercut-2.md"));
         fs::remove_dir_all(root).unwrap();
     }
 

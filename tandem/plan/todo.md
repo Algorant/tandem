@@ -97,7 +97,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Defined clearer CLI error message categories for parse failures, validation failures, write conflicts/write failures, and event append failures.
 - [x] Added unit coverage for nested completion metadata, legacy completion reads, canonical accord validation metadata, and invalid review-status validation.
 - [x] Considered the current known v0 CLI surface complete; future CLI work should be explicit new features or bug fixes.
-- [x] Added the explicit Papercut inbox feature: add/list/show/resolve, open-by-default filters, JSON reads, atomic source-preserving resolution, events, and global search location `papercuts`, with no Board/TUI integration.
+- [x] Added the explicit Papercut inbox feature: add/list/show/resolve, open-by-default filters, JSON reads, atomic source-preserving resolution, events, and global search location `papercuts`, outside Board workflow and hierarchy.
 - [x] Added the minimal Ratatui/crossterm dependency stack for `tandem tui` without adding theme/TOML/Markdown parser dependencies.
 - [x] Replaced the `tandem tui` stub with a read-only Board-first TUI shell in `src/tui.rs`.
 - [x] Implemented the initial direct crossterm event loop with alternate-screen setup, raw mode, mouse capture, reload, help, and safe cleanup on quit.
@@ -106,6 +106,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 - [x] Implemented top-level TUI view switching: Board, Logs, Rules, and Decisions tabs; `1`..`4` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows. Validation now lives as a Board state/subview.
+- [x] Added the read-only global Papercuts utility inbox without a fifth main view:
+  - compact open-count indicator in every main-view header, with muted zero state and mouse hit target
+  - `P`/`Esc` open-close behavior that preserves the underlying view, selection, focus, filters, arrangement, and scroll
+  - responsive open-only list/detail panel with keyboard and mouse selection, focus, and scrolling
+  - protocol-owned metadata and styled-basic Markdown body rendering
+  - tolerant missing/malformed storage handling, selection-preserving manual/watched reloads, and no mutation actions
 - [x] Folded the prior read-only Review queue direction into Board Validation:
   - filters active items needing attention: delivered accords, pending/in-review items, changes-requested/rejected/failed reviews, blocked/failed/rework accords, accepted active accords, validation failures, and blockers
   - sorts priority first, then most recently delivered/updated
@@ -137,7 +143,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - keeps invalid theme files non-fatal with status warnings
   - documents `default-dark` and `verdigris` examples under `tandem/examples/themes/`
 - [x] Tightened default TUI keyboard/focus semantics:
-  - `1`..`5` are the keyboard top-level view switchers; local keys no longer switch top-level views.
+  - `1`..`4` are the keyboard top-level view switchers; local keys no longer switch top-level views.
   - `h/j/k/l` stay inside the active view: Board state/items, Logs/Decisions list-detail focus or scroll, and Rules category/list movement.
   - Tab/BackTab cycle focus only in views with meaningful focusable panes and show a Rules hint instead of falling back to top-level view cycling.
   - Added unit coverage for numeric switching, local `h/j/k/l`, and Tab no-fallback behavior.
@@ -183,12 +189,13 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Add/edit/delete rules.
 - [x] Browse active decisions and add basic title/body decisions.
 - [x] Show and search logs.
+- [x] Show open Papercuts in a read-only global utility list/detail panel without adding a main view or Board state.
 - [x] Load and apply built-in, user-discovered, plus workspace selector/override themes.
 - [x] Support mouse selection, scrolling, and tab/subview switching by default.
 - [ ] Add action-button click interactions.
 - [ ] Confirm drag/drop is absent from v0 interactions.
-- [ ] Watch/reload file changes.
-- [ ] Surface parse and write errors safely.
+- [x] Watch/reload file changes, including Papercuts.
+- [x] Surface parse and write errors safely; malformed Papercuts remain isolated from other views.
 
 ## Acceptance criteria for first usable TUI
 

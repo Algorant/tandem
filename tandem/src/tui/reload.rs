@@ -55,6 +55,7 @@ pub(super) struct ReloadSelection {
     log_doc_id: Option<String>,
     rule_anchor: Option<(String, Option<usize>)>,
     decision_doc_id: Option<String>,
+    papercut_id: Option<String>,
 }
 
 impl TuiApp {
@@ -105,6 +106,7 @@ impl TuiApp {
 
         let theme_load = TuiTheme::load_for_workspace(&self.workspace);
         let log_load = logs::load_logs(&self.workspace);
+        let papercut_load = app::papercuts::load_open_inbox(&self.workspace);
         let hierarchy = TuiHierarchySnapshot::from_documents(&docs, &log_load.docs);
         load_errors.extend(log_load.warnings);
         let (log_events, event_warnings) = logs::load_log_events(&self.workspace);
@@ -149,6 +151,7 @@ impl TuiApp {
         self.theme = theme_load.theme;
         self.theme_source = theme_load.source;
         self.theme_warnings = theme_load.warnings;
+        self.load_papercuts(papercut_load);
         self.restore_reload_selection(selection);
         self.clamp_selection();
         self.clamp_rules_state();
@@ -171,10 +174,12 @@ impl TuiApp {
         };
         let load_note = runtime_warning_status_note(&outcome);
         self.status = format!(
-            "Reloaded {} active document{} from {} · {}{}",
+            "Reloaded {} active document{} from {} · {} open Papercut{} · {}{}",
             self.docs.len(),
             if self.docs.len() == 1 { "" } else { "s" },
             display_path(&self.workspace.board_dir),
+            self.papercut_count(),
+            if self.papercut_count() == 1 { "" } else { "s" },
             theme_note,
             load_note
         );
@@ -190,6 +195,7 @@ impl TuiApp {
             log_doc_id: self.selected_log().map(|doc| doc.id().to_string()),
             rule_anchor: self.selected_rule_anchor_for_reload(),
             decision_doc_id: self.selected_decision_id_for_reload(),
+            papercut_id: self.selected_papercut_id_for_reload(),
         }
     }
 
@@ -212,12 +218,14 @@ impl TuiApp {
         }
         self.restore_rule_selection_after_reload(selection.rule_anchor);
         self.restore_decision_selection_after_reload(selection.decision_doc_id);
+        self.restore_papercut_selection_after_reload(selection.papercut_id);
     }
 
     pub(super) fn runtime_warnings(&self) -> Vec<String> {
         self.load_errors
             .iter()
             .chain(self.theme_warnings.iter())
+            .chain(self.papercut_warnings().iter())
             .cloned()
             .collect()
     }

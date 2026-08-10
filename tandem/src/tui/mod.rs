@@ -51,6 +51,7 @@ mod decisions;
 mod editor;
 mod input;
 mod logs;
+mod papercuts;
 mod reload;
 #[allow(
     dead_code,
@@ -70,6 +71,7 @@ use chrome::status_tone_for_message;
 use chrome::{centered_rect, rect_contains};
 use decisions::DecisionsState;
 use editor::{editor_command_from_env, editor_target_for_doc, run_editor_command, EditorTarget};
+use papercuts::PapercutsState;
 use reload::{ReloadFingerprint, ReloadOutcome};
 use rules::RulesState;
 use state::*;
@@ -196,6 +198,10 @@ enum HitAction {
     FocusLogDetail,
     StartLogSearch,
     ToggleFocus,
+    TogglePapercuts,
+    FocusPapercutList,
+    SelectPapercut(usize),
+    FocusPapercutDetail,
 }
 
 #[derive(Debug, Clone)]
@@ -247,6 +253,7 @@ struct TuiApp {
     validation_prompt: Option<ValidationPrompt>,
     rules_view: RulesState,
     decisions_view: DecisionsState,
+    papercuts_view: PapercutsState,
     hits: Vec<HitRegion>,
     reload_fingerprint: ReloadFingerprint,
     last_reload_check: Instant,
@@ -290,6 +297,7 @@ impl TuiApp {
             validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
+            papercuts_view: PapercutsState::default(),
             hits: Vec::new(),
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
@@ -356,6 +364,10 @@ impl TuiApp {
             }
         }
         self.draw_footer(frame, chunks[2]);
+
+        if self.papercuts_open() {
+            self.draw_papercuts_panel(frame, chunks[1]);
+        }
 
         if self.validation_prompt.is_some() {
             self.draw_validation_prompt(frame, area);
@@ -2439,6 +2451,44 @@ tone = "success"
         .unwrap();
     }
 
+    fn papercut_item(id: &str, title: &str, body: &str) -> crate::project::StoredPapercut {
+        crate::project::StoredPapercut::new(
+            PathBuf::from(format!(".tandem/papercuts/{id}.md")),
+            HashMap::from([
+                ("id".to_string(), id.to_string()),
+                ("title".to_string(), title.to_string()),
+                ("status".to_string(), "open".to_string()),
+                ("createdAt".to_string(), "2026-08-10T00:00:00Z".to_string()),
+                ("updatedAt".to_string(), "2026-08-10T01:00:00Z".to_string()),
+                ("tags".to_string(), "[\"tui\", \"friction\"]".to_string()),
+                ("references".to_string(), "[\"task-1\"]".to_string()),
+            ]),
+            body.to_string(),
+        )
+    }
+
+    fn write_papercut(workspace: &TandemProject, id: &str, title: &str, body: &str) {
+        fs::create_dir_all(workspace.papercuts_dir()).unwrap();
+        fs::write(
+            workspace.papercuts_dir().join(format!("{id}.md")),
+            format!(
+                "---\nid: {id}\ntitle: {title}\nstatus: open\ncreatedAt: 2026-08-10T00:00:00Z\nupdatedAt: 2026-08-10T01:00:00Z\ntags: [tui, friction]\nreferences: [task-1]\n---\n{body}\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    fn terminal_text(terminal: &Terminal<TestBackend>) -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<Vec<_>>()
+            .join("")
+    }
+
     fn refresh_test_hierarchy(app: &mut TuiApp) {
         app.hierarchy = TuiHierarchySnapshot::from_documents(&app.docs, &app.logs);
     }
@@ -2492,6 +2542,7 @@ tone = "success"
             validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
+            papercuts_view: PapercutsState::default(),
             hits: Vec::new(),
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
@@ -2584,6 +2635,208 @@ tone = "success"
             row,
             modifiers: KeyModifiers::NONE,
         }
+    }
+
+    #[test]
+    fn papercuts_shortcut_opens_from_each_main_view_without_changing_main_state() {
+        let mut app = keyboard_test_app();
+        app.selected_item = 0;
+        app.detail_scroll = 3;
+        app.board_arrangement = BoardArrangement::Epic;
+        app.load_papercuts(crate::app::papercuts::InboxLoad {
+            items: vec![papercut_item("papercut-1", "First", "Body")],
+            warnings: Vec::new(),
+        });
+
+        for view in TuiView::ALL {
+            app.view = view;
+            app.focus = FocusPane::Detail;
+            let selected_item = app.selected_item;
+            let detail_scroll = app.detail_scroll;
+            let arrangement = app.board_arrangement;
+
+            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+            assert!(app.papercuts_open());
+            assert_eq!(app.view, view);
+            assert_eq!(app.focus, FocusPane::Detail);
+            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+            assert!(!app.papercuts_open());
+            assert_eq!(app.view, view);
+            assert_eq!(app.focus, FocusPane::Detail);
+            assert_eq!(app.selected_item, selected_item);
+            assert_eq!(app.detail_scroll, detail_scroll);
+            assert_eq!(app.board_arrangement, arrangement);
+        }
+    }
+
+    #[test]
+    fn papercut_header_count_and_hit_target_are_global() {
+        let mut app = keyboard_test_app();
+        app.load_papercuts(crate::app::papercuts::InboxLoad {
+            items: vec![
+                papercut_item("papercut-1", "First", "Body"),
+                papercut_item("papercut-2", "Second", "Body"),
+                papercut_item("papercut-3", "Third", "Body"),
+            ],
+            warnings: Vec::new(),
+        });
+        let mut terminal = Terminal::new(TestBackend::new(120, 28)).unwrap();
+
+        for view in TuiView::ALL {
+            app.view = view;
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            assert!(terminal_text(&terminal).contains("Papercuts 3"));
+            let hit = app
+                .hits
+                .iter()
+                .find(|hit| hit.action == HitAction::TogglePapercuts)
+                .cloned()
+                .expect("global header should expose a Papercuts hit target");
+            app.handle_mouse(left_click(hit.rect.x, hit.rect.y));
+            assert!(app.papercuts_open());
+            app.handle_key(key(KeyCode::Char('P'))).unwrap();
+        }
+    }
+
+    #[test]
+    fn empty_papercut_indicator_is_muted_and_reports_zero() {
+        let app = keyboard_test_app();
+        let line = app.papercut_indicator_line();
+        assert_eq!(line_text(&line), "Papercuts 0");
+        assert_eq!(line.spans[0].style, app.theme.muted_style());
+    }
+
+    #[test]
+    fn papercut_panel_renders_metadata_and_supports_keyboard_and_mouse_navigation() {
+        let mut app = keyboard_test_app();
+        let long_body = (0..30)
+            .map(|index| format!("- body line {index}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        app.load_papercuts(crate::app::papercuts::InboxLoad {
+            items: vec![
+                papercut_item("papercut-1", "First", "Body"),
+                papercut_item("papercut-2", "Second", &long_body),
+                papercut_item("papercut-3", "Third", "Body"),
+            ],
+            warnings: vec!["Papercuts load warning: malformed record".to_string()],
+        });
+        app.toggle_papercuts();
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let second = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::SelectPapercut(1))
+            .cloned()
+            .expect("visible Papercut row should have a mouse target");
+        app.handle_mouse(left_click(second.rect.x, second.rect.y));
+        assert_eq!(
+            app.selected_papercut_id_for_reload().as_deref(),
+            Some("papercut-2")
+        );
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        app.handle_key(key(KeyCode::Char('j'))).unwrap();
+        assert!(app.papercuts_view.detail_scroll > 0);
+
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = terminal_text(&terminal);
+        assert!(text.contains("Detail papercut-2"));
+        assert!(text.contains("Status: open"));
+        assert!(text.contains("Tags: tui, friction"));
+        assert!(text.contains("1 load warning"));
+
+        let detail = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::FocusPapercutDetail)
+            .cloned()
+            .expect("detail pane should have a mouse target");
+        let before = app.papercuts_view.detail_scroll;
+        app.handle_mouse(scroll_down(detail.rect.x, detail.rect.y));
+        assert!(app.papercuts_view.detail_scroll > before);
+    }
+
+    #[test]
+    fn papercut_mouse_rows_follow_the_scrolled_list_offset() {
+        let mut app = keyboard_test_app();
+        app.load_papercuts(crate::app::papercuts::InboxLoad {
+            items: (1..=20)
+                .map(|index| {
+                    papercut_item(
+                        &format!("papercut-{index}"),
+                        &format!("Friction {index}"),
+                        "Body",
+                    )
+                })
+                .collect(),
+            warnings: Vec::new(),
+        });
+        app.papercuts_view.selected = 19;
+        app.toggle_papercuts();
+        let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let first_visible = app
+            .hits
+            .iter()
+            .filter_map(|hit| match hit.action {
+                HitAction::SelectPapercut(index) => Some((index, hit.rect)),
+                _ => None,
+            })
+            .min_by_key(|(_, rect)| rect.y)
+            .expect("scrolled Papercut list should expose visible row hits");
+        assert!(first_visible.0 > 0);
+        app.handle_mouse(left_click(first_visible.1.x, first_visible.1.y));
+        assert_eq!(app.papercuts_view.selected, first_visible.0);
+    }
+
+    #[test]
+    fn papercut_reload_is_tolerant_updates_count_and_preserves_selection() {
+        let root = unique_test_dir("tandem-tui-papercuts-reload");
+        let workspace = temp_workspace(&root);
+        write_task_doc(&workspace, "task-1", "Board remains available", "todo");
+        write_papercut(&workspace, "papercut-1", "First", "Body one");
+        write_papercut(&workspace, "papercut-2", "Second", "Body two");
+        fs::write(
+            workspace.papercuts_dir().join("papercut-3.md"),
+            "not frontmatter",
+        )
+        .unwrap();
+        let papercut_path = workspace.papercuts_dir().join("papercut-2.md");
+        let source_before = fs::read_to_string(&papercut_path).unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        assert_eq!(app.papercut_count(), 2);
+        assert_eq!(app.docs.len(), 1);
+        assert_eq!(app.papercut_warnings().len(), 1);
+        app.papercuts_view.selected = 1;
+        app.toggle_papercuts();
+
+        write_papercut(&workspace, "papercut-4", "Fourth", "Body four");
+        app.handle_key(key(KeyCode::Char('r'))).unwrap();
+        assert!(app.papercuts_open());
+        assert_eq!(app.papercut_count(), 3);
+        assert_eq!(
+            app.selected_papercut_id_for_reload().as_deref(),
+            Some("papercut-2")
+        );
+        assert_eq!(app.docs.len(), 1);
+
+        write_papercut(&workspace, "papercut-5", "Fifth", "Body five");
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        app.reload_if_changed();
+        assert_eq!(app.papercut_count(), 4);
+        assert_eq!(
+            app.selected_papercut_id_for_reload().as_deref(),
+            Some("papercut-2")
+        );
+
+        app.handle_papercuts_key(key(KeyCode::Char('j')));
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert!(!app.papercuts_open());
+        assert_eq!(fs::read_to_string(papercut_path).unwrap(), source_before);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

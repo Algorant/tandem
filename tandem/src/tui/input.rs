@@ -44,6 +44,19 @@ impl TuiApp {
             return Ok(KeyAction::Continue);
         }
 
+        if self.papercuts_open() {
+            if key.code == KeyCode::Char('q') {
+                return Ok(KeyAction::Quit);
+            }
+            self.handle_papercuts_key(key);
+            return Ok(KeyAction::Continue);
+        }
+
+        if key.code == KeyCode::Char('P') {
+            self.toggle_papercuts();
+            return Ok(KeyAction::Continue);
+        }
+
         if let KeyCode::Char(ch) = key.code {
             if let Some(view) = TuiView::from_digit(ch) {
                 self.switch_view(view);
@@ -123,6 +136,10 @@ impl TuiApp {
 
     pub(super) fn handle_mouse(&mut self, mouse: MouseEvent) -> KeyAction {
         if self.input_overlay_active() {
+            return KeyAction::Continue;
+        }
+        if self.papercuts_open() {
+            self.handle_papercuts_mouse(mouse);
             return KeyAction::Continue;
         }
 
@@ -242,6 +259,10 @@ impl TuiApp {
                         }
                         HitAction::StartLogSearch => {}
                         HitAction::ToggleFocus => self.toggle_focus(),
+                        HitAction::TogglePapercuts => self.toggle_papercuts(),
+                        HitAction::FocusPapercutList
+                        | HitAction::SelectPapercut(_)
+                        | HitAction::FocusPapercutDetail => {}
                     }
                 }
             }

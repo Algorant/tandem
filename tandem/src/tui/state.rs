@@ -1462,6 +1462,7 @@ pub(super) fn collect_reload_fingerprint(workspace: &TandemProject) -> ReloadFin
     }
     insert_directory_fingerprints(&mut files, &workspace.board_dir, "md");
     insert_directory_fingerprints(&mut files, &workspace.logs_dir, "md");
+    insert_directory_fingerprints(&mut files, &workspace.papercuts_dir(), "md");
     insert_directory_fingerprints(&mut files, &workspace.events_dir(), "jsonl");
     if let Some(user_theme_dir) = theme::user_theme_dir_from_env() {
         insert_directory_fingerprints(&mut files, &user_theme_dir, "toml");
