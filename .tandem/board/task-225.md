@@ -2,13 +2,19 @@
 id: task-225
 type: task
 title: "Implement a coherent TUI input model and universal keybinding reference"
-state: todo
+state: "in-progress"
 priority: "high"
 references: ["task-224"]
 relatedFiles: ["tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md", "tandem/src/tui/state.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/README.md"]
 tags: ["tui", "keyboard", "papercuts", "mouse"]
 createdAt: "2026-08-10T17:44:24Z"
-updatedAt: "2026-08-10T18:41:19Z"
+updatedAt: "2026-08-10T18:44:04Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-225-f987003a"
+  claimedAt: "2026-08-10T18:44:04Z"
+  updatedAt: "2026-08-10T18:44:04Z"
+assignee: "worker-task-225-f987003a"
 ---
 ## Outcome
 
