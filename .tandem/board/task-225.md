@@ -2,22 +2,26 @@
 id: task-225
 type: task
 title: "Implement a coherent TUI input model and universal keybinding reference"
-state: "in-progress"
+state: "validation"
 priority: "high"
 references: ["task-224"]
 relatedFiles: ["tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md", "tandem/src/tui/state.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/README.md"]
 tags: ["tui", "keyboard", "papercuts", "mouse"]
 createdAt: "2026-08-10T17:44:24Z"
-updatedAt: "2026-08-10T20:25:18Z"
+updatedAt: "2026-08-10T20:34:43Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-225-684911b8"
   claimedAt: "2026-08-10T20:25:18Z"
-  deliverables: ["Integrated squash commit c47d336 from Worker commits 8f17897 and a31179c.", "Static semantic binding inventory and consistent input precedence.", "Global i utility inbox and removal of P, t/p/F, H/L, A/R/C, plain u/d paging, and Rules n alias.", "Responsive f filter, m move, and v Validation pickers with bounded Apply/Cancel/Help mouse controls and first-enabled selection.", "Universal sectioned ? keybinding reference with context prioritization, responsive scrolling, theme styling, and mouse controls.", "Decision row hits, Rules preview focus/scroll, pane-aware wheel behavior, modal controls, documentation, specifications, and regression coverage.", "Safe `just dev` preview route now targets integrated main code and the retained task-225 visual fixture."]
+  deliveredAt: "2026-08-10T20:34:43Z"
+  deliverables: ["Integrated commit fcca152 (`fix(tui): simplify board chrome and activation`).", "Board state/count context appears in state tabs and is no longer repeated in list borders or footer metadata.", "Enter is the sole Board row activation key; Space is an unbound safe no-op.", "Board footer is a concise local command strip for Add, Edit, Filter, Move, Validate, arrangement, and Help.", "Transient status messages expire after four seconds; persistent Papercuts count remains in the upper utility/status gutter.", "Runtime help, documentation, specifications, hit labels, and tests reflect the revised behavior."]
   validation:
-    commands: ["Orchestrator rerun: cargo fmt --check passed.", "Orchestrator rerun: cargo test passed with 265 unit tests and 11 CLI integration tests.", "Orchestrator rerun: cargo clippy --all-targets --all-features -- -D warnings passed.", "Orchestrator rerun: cd site && bun run check:docs passed; 19 pages and 915 internal links.", "git diff --check passed.", "Worker real-TUI review covered wide, narrow, short, populated, empty, warning, Validation, default-dark, and custom light contexts.", "Worker physically exercised picker Apply/Cancel/Help clicks, long Rules preview wheel scrolling, keyboard paging, Decision rows, Rules preview, and confirmation controls after rework."]
-  constraints: ["Keep parent and all six child Subtasks in Validation until final human visual and interaction approval.", "No configurable keymap, command palette, notification center, warning/error gutter feature, or Papercut mutations were added."]
-  updatedAt: "2026-08-10T20:25:18Z"
+    commands: ["Orchestrator rerun: cargo fmt --check passed.", "Orchestrator rerun: cargo test passed with 266 unit tests and 11 CLI integration tests.", "Orchestrator rerun: cargo clippy --all-targets --all-features -- -D warnings passed.", "Orchestrator rerun: just site-build passed with 19 pages generated.", "git diff --check passed.", "Worker real-TUI review covered wide, narrow, and short layouts; Space no-op, Enter activation, f/m/v pickers, help overlay restoration, and four-second Papercuts close-message expiry were exercised."]
+  constraints: ["Keep task-225 and its six child Subtasks in Validation until final human visual approval.", "Very narrow terminals may clip the trailing Help label but retain the ? key indicator.", "Do not expand this correction into a general cross-view status-bar redesign."]
+  summary: "Integrated focused Board chrome rework as fcca152. Removed duplicate list-border and footer state/count summaries, made Enter the sole Board row activation path, removed the Space binding and hint, reduced the Board footer to local commands, and added four-second expiry for transient footer status. Updated runtime help, mouse hints, docs, specs, and tests. Automated checks and Worker wide/narrow/short real-TUI review passed. Final human visual acceptance remains required."
+  evidence: ["Worker handoff handoff-b860a330-5550-431c-95bf-1dbf5cadb3bf.", "Worker source commit 149aeb5 rebased and integrated as fcca152.", "Run `just dev` from /home/ivan/Projects/tandem using the task-225 visual fixture."]
+  filesChanged: ["tandem/src/tui/bindings.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "docs/cli/index.md", "docs/tui/index.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
+  updatedAt: "2026-08-10T20:34:43Z"
 assignee: "worker-task-225-684911b8"
 ---
 ## Outcome
