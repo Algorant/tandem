@@ -2,18 +2,24 @@
 id: task-223
 type: task
 title: "Prepare Tandem v0.10.0 Papercuts release"
-state: "in-progress"
+state: "validation"
 priority: "high"
 references: ["task-222", "decision-5"]
-relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "README.md", "tandem/RELEASE.md", "justfile", "scripts/release_checks.py"]
+relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "README.md", "tandem/RELEASE.md", "justfile", "scripts/release_checks.py", "site/package.json", "site/bun.lock"]
 tags: ["chore", "release", "papercuts"]
 createdAt: "2026-08-10T12:46:07Z"
-updatedAt: "2026-08-10T12:46:12Z"
+updatedAt: "2026-08-10T13:00:00Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "pi"
   claimedAt: "2026-08-10T12:46:12Z"
-  updatedAt: "2026-08-10T12:46:12Z"
+  deliveredAt: "2026-08-10T13:00:00Z"
+  validation:
+    commands: ["cargo fmt --check passed", "cargo test passed: 246 unit and 11 integration tests", "cargo build --release and cargo build --profile dist passed", "cargo clippy --all-targets --all-features -- -D warnings passed", "Release and debug binaries report tandem 0.10.0", "Release binary Papercut add/list/show/search/resolve dogfood passed in a temporary workspace", "pi-tandem static check, smoke, relationship smoke, and project-local Pi runtime smoke passed against the release binary", "Docs build produced 19 pages and link check passed 912 internal links", "Bun audit passed after updating docs dependencies and overriding patched nanoid/js-yaml versions", "Web JavaScript syntax checks passed", "release_checks.py tests and 0.10.0 notes/version checks passed", "cargo-dist 0.32.0 manifest includes the curated 0.10.0 notes", "just release 0.10.0 dry run uses the installed dist binary and contains the expected validation/publication workflow", "GitHub auth and repository target verified; tandem-v0.10.0 does not exist locally or remotely", "AUR is currently reachable; tandem-bin remains at 0.8.1-1 after prior maintenance-related workflow failures"]
+  summary: "Prepared and fully validated the Tandem v0.10.0 Papercuts release candidate without tagging, pushing, or publishing."
+  evidence: ["Release preparation commit 6a25eb3", "Secure docs dependency refresh commit e589d7c", "Release command fix commit a19ec9a", "Working tree was clean before delivery", "No tag, push, GitHub Release, AUR update, or published install occurred"]
+  filesChanged: ["README.md", "RELEASES.md", "tandem/Cargo.toml", "tandem/Cargo.lock", "tandem/RELEASE.md", "site/package.json", "site/bun.lock", "justfile"]
+  updatedAt: "2026-08-10T13:00:00Z"
 assignee: "pi"
 ---
 
