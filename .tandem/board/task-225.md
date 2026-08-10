@@ -8,7 +8,7 @@ references: ["task-224"]
 relatedFiles: ["tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md", "tandem/src/tui/state.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/README.md"]
 tags: ["tui", "keyboard", "papercuts", "mouse"]
 createdAt: "2026-08-10T17:44:24Z"
-updatedAt: "2026-08-10T20:34:43Z"
+updatedAt: "2026-08-10T20:35:15Z"
 accord:
   status: "delivered"
   assignee: "worker-task-225-684911b8"
@@ -82,7 +82,9 @@ Remove plain `u/d` page movement. Uppercase action keys are not used except esta
 | `f` | Open Board filter controls. |
 | `m` | Open the task state-movement picker. |
 | `v` | Open context-aware Validation actions. |
-| `Space` | Toggle the selected row's inline preview. |
+| `Enter` | Activate the selected row: expand or collapse hierarchy parents, or toggle an inline preview for leaf and Epic Board rows. |
+
+`Space` is intentionally unbound on the Board. It must remain a safe no-op unless a later Task defines a distinct action.
 
 Replace the old direct groups:
 
