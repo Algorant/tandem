@@ -2,13 +2,19 @@
 id: task-224
 type: task
 title: "Add a read-only Papercuts utility panel to the TUI"
-state: todo
+state: "in-progress"
 priority: "medium"
 references: ["task-222"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/project/mod.rs", "tandem/src/app/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md"]
 tags: ["tui", "papercuts", "keyboard", "mouse"]
 createdAt: "2026-08-10T17:07:31Z"
-updatedAt: "2026-08-10T17:09:16Z"
+updatedAt: "2026-08-10T17:09:42Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-224-55226d73"
+  claimedAt: "2026-08-10T17:09:41Z"
+  updatedAt: "2026-08-10T17:09:41Z"
+assignee: "worker-task-224-55226d73"
 ---
 
 ## Description
