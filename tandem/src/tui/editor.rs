@@ -204,7 +204,8 @@ mod tests {
         )
         .unwrap();
 
-        let command = EditorCommand::from_value(&script.to_string_lossy(), "test editor").unwrap();
+        let editor = format!("/bin/sh {}", script.display());
+        let command = EditorCommand::from_value(&editor, "test editor").unwrap();
         let status = run_editor_command(&command, &doc).unwrap();
         assert!(status.success());
         assert!(fs::read_to_string(&doc)
