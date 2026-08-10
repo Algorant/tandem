@@ -8,7 +8,7 @@ references: ["task-222"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/project/mod.rs", "tandem/src/app/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md"]
 tags: ["tui", "papercuts", "keyboard", "mouse"]
 createdAt: "2026-08-10T17:07:31Z"
-updatedAt: "2026-08-10T17:07:31Z"
+updatedAt: "2026-08-10T17:09:16Z"
 ---
 
 ## Description
@@ -112,4 +112,15 @@ Keep these out of this MVP and record them as later Tasks only if usage supports
 - a Board `Work | Papercuts` subview;
 - a dedicated Papercuts main view;
 - dashboards, metrics, grouping, or trends.
+## Worker visual self-evaluation before delivery
 
+The implementing Worker must evaluate the rendered TUI itself before delivery, not rely only on unit tests or the orchestrator. It must:
+
+- create or reuse a safe fixture with several open Papercuts, optional metadata, a long body, and empty/error states;
+- configure the delegated `just dev` preview route to its worktree and fixture;
+- run the real TUI in its retained terminal and inspect the actual rendered frame;
+- review the panel from Board, Logs, Rules, and Decisions, at practical narrow and wide terminal sizes, with keyboard and mouse-relevant hit targets, and in available light/dark theme variants;
+- correct visible clipping, overlap, weak hierarchy, inconsistent focus, or excessive visual weight before delivery;
+- include a concise visual self-review in the handoff with what it inspected, what it changed after inspection, any remaining uncertainty, and exact `just dev` reproduction steps.
+
+Automated render tests are required evidence but do not replace this visual self-evaluation. The orchestrator and user still retain final visual acceptance.
