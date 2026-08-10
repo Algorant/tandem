@@ -8,9 +8,9 @@ references: ["task-222", "decision-5"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "README.md", "tandem/RELEASE.md", "justfile", "scripts/release_checks.py", "site/package.json", "site/bun.lock"]
 tags: ["chore", "release", "papercuts"]
 createdAt: "2026-08-10T12:46:07Z"
-updatedAt: "2026-08-10T13:00:00Z"
+updatedAt: "2026-08-10T15:03:29Z"
 accord:
-  status: "delivered"
+  status: "blocked"
   assignee: "pi"
   claimedAt: "2026-08-10T12:46:12Z"
   deliveredAt: "2026-08-10T13:00:00Z"
@@ -19,7 +19,8 @@ accord:
   summary: "Prepared and fully validated the Tandem v0.10.0 Papercuts release candidate without tagging, pushing, or publishing."
   evidence: ["Release preparation commit 6a25eb3", "Secure docs dependency refresh commit e589d7c", "Release command fix commit a19ec9a", "Working tree was clean before delivery", "No tag, push, GitHub Release, AUR update, or published install occurred"]
   filesChanged: ["README.md", "RELEASES.md", "tandem/Cargo.toml", "tandem/Cargo.lock", "tandem/RELEASE.md", "site/package.json", "site/bun.lock", "justfile"]
-  updatedAt: "2026-08-10T13:00:00Z"
+  reason: "GitHub Release v0.10.0 and all 13 assets are published and verified, but the required tandem-bin AUR update cannot clone ssh://aur@aur.archlinux.org/tandem-bin.git because AUR SSH reports scheduled maintenance. Automatic workflow 31401300611 and manual retry 31401441667 both failed at the same upstream maintenance response. Keep the release Task open until the AUR workflow succeeds."
+  updatedAt: "2026-08-10T15:03:29Z"
 assignee: "pi"
 ---
 
