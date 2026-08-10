@@ -17,3 +17,6 @@
 {"ts":"2026-08-10T17:09:41Z","event":"accord.claimed","id":"task-224","summary":"Accord claim for task-224","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":17}
 {"ts":"2026-08-10T17:09:42Z","event":"task.updated","id":"task-224","summary":"Updated task-224 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":18}
 {"ts":"2026-08-10T17:39:01Z","event":"accord.delivered","id":"task-224","summary":"Accord deliver for task-224","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":19}
+{"ts":"2026-08-10T17:43:35Z","event":"accord.accepted","id":"task-224","summary":"Accord accept for task-224","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":20}
+{"ts":"2026-08-10T17:43:45Z","event":"task.completed","id":"task-224","summary":"Added and visually validated the read-only global Papercuts utility panel. The TUI now shows an open-count indicator in the global gutter and opens a responsive list/detail inbox with `P`, while preserving the four main views and excluding mutation actions.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":21}
+{"ts":"2026-08-10T17:44:24Z","event":"task.created","id":"task-225","summary":"Overhaul and rationalize the fixed TUI keybindings","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":22}

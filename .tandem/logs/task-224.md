@@ -2,15 +2,14 @@
 id: task-224
 type: task
 title: "Add a read-only Papercuts utility panel to the TUI"
-state: "validation"
 priority: "medium"
 references: ["task-222"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/project/mod.rs", "tandem/src/app/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md"]
 tags: ["tui", "papercuts", "keyboard", "mouse"]
 createdAt: "2026-08-10T17:07:31Z"
-updatedAt: "2026-08-10T17:39:01Z"
+updatedAt: "2026-08-10T17:43:45Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-224-55226d73"
   claimedAt: "2026-08-10T17:09:41Z"
   deliveredAt: "2026-08-10T17:39:01Z"
@@ -18,11 +17,18 @@ accord:
   validation:
     commands: ["Orchestrator rerun: cargo fmt --check passed.", "Orchestrator rerun: cargo test passed with 257 unit tests and 11 CLI integration tests.", "Orchestrator rerun: cargo clippy --all-targets --all-features -- -D warnings passed.", "Orchestrator rerun: cd site && bun run check:docs passed; 19 pages and 912 internal links.", "git diff --check passed.", "Worker visually inspected the real TUI on Board, Logs, Rules, and Decisions; wide 139x48 and narrow 63-column layouts; default-dark and custom light palettes; populated, empty, long-body, resolved-exclusion, and malformed states; keyboard, reload, focus, scrolling, and hit geometry."]
   constraints: ["Keep task in Validation until human visual acceptance.", "Papercut mutations and resolution behavior remain deferred and excluded from this TUI MVP.", "Physical mouse interaction has automated coverage but was not manually clicked during Worker self-review."]
-  summary: "Implemented and integrated the read-only global Papercuts TUI utility panel. The four primary views remain unchanged; a global open-count indicator opens a keyboard- and mouse-navigable list/detail panel. Loading is tolerant of missing and malformed records, reload preserves selection, and the panel has no mutation actions. Automated and Worker visual self-review passed. Final human visual acceptance remains required."
+  summary: "User visually reviewed the integrated `just dev` preview and confirmed that the Papercuts utility panel looks great."
   evidence: ["Worker handoff handoff-895b34cb-ef89-474b-814d-492937f82b4b reported no blockers and a clean source branch.", "Worker corrected header spacing, border collisions, narrow-list visual weight, short-layout row visibility, and narrow footer text after visual inspection.", "Run `just dev` from /home/ivan/Projects/tandem, then press P and inspect each underlying view with 1-4."]
   filesChanged: ["tandem/src/tui/papercuts.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs", "tandem/src/app/papercuts.rs", "tandem/src/project/mod.rs", "docs/tui/index.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
-  updatedAt: "2026-08-10T17:39:01Z"
+  reviewer: "user"
+  updatedAt: "2026-08-10T17:43:35Z"
 assignee: "worker-task-224-55226d73"
+completedAt: "2026-08-10T17:43:45Z"
+completion:
+  summary: "Added and visually validated the read-only global Papercuts utility panel. The TUI now shows an open-count indicator in the global gutter and opens a responsive list/detail inbox with `P`, while preserving the four main views and excluding mutation actions."
+  filesChanged: ["tandem/src/tui/papercuts.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs", "tandem/src/app/papercuts.rs", "tandem/src/project/mod.rs", "docs/tui/index.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
+  validation: "257 unit tests and 11 CLI integration tests passed; cargo fmt passed; strict Clippy passed; documentation built with 912 internal links; Worker completed real-TUI visual self-review; user visually reviewed `just dev` and approved the result."
+  reviewer: "user"
 ---
 
 ## Description
