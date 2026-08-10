@@ -29,3 +29,10 @@
 {"ts":"2026-08-10T18:42:23Z","event":"task.created","id":"task-225-6","summary":"Complete full regression and real-TUI interaction validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":29}
 {"ts":"2026-08-10T18:44:04Z","event":"accord.claimed","id":"task-225","summary":"Accord claim for task-225","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":30}
 {"ts":"2026-08-10T18:44:04Z","event":"task.updated","id":"task-225","summary":"Updated task-225 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":31}
+{"ts":"2026-08-10T19:13:34Z","event":"task.moved","id":"task-225-1","summary":"Moved task-225-1 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":32}
+{"ts":"2026-08-10T19:13:41Z","event":"task.moved","id":"task-225-2","summary":"Moved task-225-2 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":33}
+{"ts":"2026-08-10T19:13:47Z","event":"task.moved","id":"task-225-3","summary":"Moved task-225-3 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":34}
+{"ts":"2026-08-10T19:13:51Z","event":"task.moved","id":"task-225-4","summary":"Moved task-225-4 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":35}
+{"ts":"2026-08-10T19:13:54Z","event":"task.moved","id":"task-225-5","summary":"Moved task-225-5 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":36}
+{"ts":"2026-08-10T19:14:02Z","event":"task.moved","id":"task-225-6","summary":"Moved task-225-6 from todo to validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":37}
+{"ts":"2026-08-10T19:14:15Z","event":"accord.delivered","id":"task-225","summary":"Accord deliver for task-225","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":38}

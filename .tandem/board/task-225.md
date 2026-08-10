@@ -2,18 +2,26 @@
 id: task-225
 type: task
 title: "Implement a coherent TUI input model and universal keybinding reference"
-state: "in-progress"
+state: "validation"
 priority: "high"
 references: ["task-224"]
 relatedFiles: ["tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md", "tandem/src/tui/state.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/README.md"]
 tags: ["tui", "keyboard", "papercuts", "mouse"]
 createdAt: "2026-08-10T17:44:24Z"
-updatedAt: "2026-08-10T18:44:04Z"
+updatedAt: "2026-08-10T19:14:15Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-225-f987003a"
   claimedAt: "2026-08-10T18:44:04Z"
-  updatedAt: "2026-08-10T18:44:04Z"
+  deliveredAt: "2026-08-10T19:14:15Z"
+  deliverables: ["Integrated squash commit c47d336 from Worker commits 8f17897 and a31179c.", "Static semantic binding inventory and consistent input precedence.", "Global i utility inbox and removal of P, t/p/F, H/L, A/R/C, plain u/d paging, and Rules n alias.", "Responsive f filter, m move, and v Validation pickers with bounded Apply/Cancel/Help mouse controls and first-enabled selection.", "Universal sectioned ? keybinding reference with context prioritization, responsive scrolling, theme styling, and mouse controls.", "Decision row hits, Rules preview focus/scroll, pane-aware wheel behavior, modal controls, documentation, specifications, and regression coverage.", "Safe `just dev` preview route now targets integrated main code and the retained task-225 visual fixture."]
+  validation:
+    commands: ["Orchestrator rerun: cargo fmt --check passed.", "Orchestrator rerun: cargo test passed with 265 unit tests and 11 CLI integration tests.", "Orchestrator rerun: cargo clippy --all-targets --all-features -- -D warnings passed.", "Orchestrator rerun: cd site && bun run check:docs passed; 19 pages and 915 internal links.", "git diff --check passed.", "Worker real-TUI review covered wide, narrow, short, populated, empty, warning, Validation, default-dark, and custom light contexts.", "Worker physically exercised picker Apply/Cancel/Help clicks, long Rules preview wheel scrolling, keyboard paging, Decision rows, Rules preview, and confirmation controls after rework."]
+  constraints: ["Keep parent and all six child Subtasks in Validation until final human visual and interaction approval.", "No configurable keymap, command palette, notification center, warning/error gutter feature, or Papercut mutations were added."]
+  summary: "Implemented and integrated the coherent fixed TUI input model, semantic binding inventory, f/m/v Board pickers, universal sectioned key reference, and cross-view keyboard/mouse parity. Parent review found and the retained Worker corrected unsafe picker hit geometry, disabled default selections, Papercuts Enter/footer drift, and missing Rules preview scrolling. Automated validation and Worker real-TUI keyboard/mouse self-review pass. Final human visual and interaction acceptance remains required."
+  evidence: ["Initial handoff handoff-fc4e40ae-1c05-45cd-a77b-17d382979879 was reviewed and returned for objective rework.", "Corrected handoff handoff-7b0ec329-33de-4c5d-8b7d-d81051c812b9 addressed all parent findings with commit a31179c.", "Picker tests prove row clicks only select and bounded Cancel/Help controls do not mutate.", "Rules preview tests prove keyboard and pointer-pane scrolling plus clamp behavior.", "Run `just dev` from /home/ivan/Projects/tandem for the integrated rich fixture."]
+  filesChanged: ["tandem/src/tui/bindings.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/papercuts.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/reload.rs", "docs/tui/index.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
+  updatedAt: "2026-08-10T19:14:15Z"
 assignee: "worker-task-225-f987003a"
 ---
 ## Outcome
