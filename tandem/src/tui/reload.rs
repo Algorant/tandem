@@ -2,6 +2,8 @@
 
 use super::*;
 
+const RELOAD_CHECK_INTERVAL: Duration = Duration::from_millis(250);
+
 #[derive(Debug, Clone, Default)]
 pub(super) struct ReloadOutcome {
     pub(super) warning_count: usize,
@@ -251,21 +253,33 @@ impl TuiApp {
             || self.show_help
     }
 
-    pub(super) fn reload_if_changed(&mut self) {
-        if self.input_overlay_active()
-            || self.last_reload_check.elapsed() < Duration::from_millis(250)
-        {
-            return;
+    pub(super) fn reload_if_changed(&mut self) -> bool {
+        if self.input_overlay_active() || self.last_reload_check.elapsed() < RELOAD_CHECK_INTERVAL {
+            return false;
         }
         self.last_reload_check = Instant::now();
         let current = collect_reload_fingerprint(&self.workspace);
         if self.reload_fingerprint.is_empty() {
             self.reload_fingerprint = current;
-            return;
+            return false;
         }
         if current != self.reload_fingerprint {
             self.reload();
             self.status = format!("External changes detected; {}", self.status);
+            return true;
         }
+        false
+    }
+
+    pub(super) fn next_wake_timeout(&self) -> Duration {
+        let reload_timeout = if self.input_overlay_active() {
+            RELOAD_CHECK_INTERVAL
+        } else {
+            RELOAD_CHECK_INTERVAL.saturating_sub(self.last_reload_check.elapsed())
+        };
+        self.transient_status_timeout()
+            .map_or(reload_timeout, |status_timeout| {
+                reload_timeout.min(status_timeout)
+            })
     }
 }

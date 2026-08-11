@@ -260,6 +260,7 @@ struct TuiApp {
     detail_scroll: u16,
     review_detail_scroll: u16,
     log_detail_scroll: u16,
+    log_list_offset: usize,
     log_search_filter: String,
     log_search_input: Option<String>,
     status: String,
@@ -309,6 +310,7 @@ impl TuiApp {
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
+            log_list_offset: 0,
             log_search_filter: String::new(),
             log_search_input: None,
             status: String::new(),
@@ -332,11 +334,16 @@ impl TuiApp {
     }
 
     fn run(&mut self, session: &mut TerminalSession) -> Result<(), CliError> {
+        let mut redraw = true;
         loop {
-            self.reload_if_changed();
-            self.expire_transient_status();
-            session.terminal_mut().draw(|frame| self.draw(frame))?;
-            if event::poll(Duration::from_millis(200))? {
+            redraw |= self.reload_if_changed();
+            redraw |= self.expire_transient_status();
+            if redraw {
+                session.terminal_mut().draw(|frame| self.draw(frame))?;
+                redraw = false;
+            }
+            if event::poll(self.next_wake_timeout())? {
+                redraw = true;
                 match event::read()? {
                     Event::Key(key) => match self.handle_key(key)? {
                         KeyAction::Continue => {}
@@ -2576,6 +2583,7 @@ tone = "success"
             detail_scroll: 0,
             review_detail_scroll: 0,
             log_detail_scroll: 0,
+            log_list_offset: 0,
             log_search_filter: String::new(),
             log_search_input: None,
             status: String::new(),
@@ -3040,16 +3048,49 @@ tone = "success"
     fn transient_footer_status_expires() {
         let mut app = keyboard_test_app();
         app.status = "Papercuts inbox closed; previous view restored.".to_string();
-        app.expire_transient_status();
+        assert!(!app.expire_transient_status());
         assert!(!app.status.is_empty());
 
         app.status_updated_at = Instant::now() - Duration::from_secs(4);
-        app.expire_transient_status();
+        assert!(app.expire_transient_status());
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
             "a Add · e Edit · f Filter · m Move · v Validate · b Epic Board · ? Help"
         );
+    }
+
+    #[test]
+    fn idle_schedule_waits_for_reload_or_status_deadline_without_redraw() {
+        let mut app = keyboard_test_app();
+        app.last_reload_check = Instant::now() - Duration::from_millis(100);
+        let reload_wait = app.next_wake_timeout();
+        assert!(reload_wait > Duration::from_millis(100));
+        assert!(reload_wait <= Duration::from_millis(150));
+
+        app.status = "Transient".to_string();
+        app.observed_status = app.status.clone();
+        app.status_updated_at = Instant::now() - Duration::from_millis(3_950);
+        assert!(app.next_wake_timeout() <= Duration::from_millis(50));
+        assert!(!app.reload_if_changed());
+    }
+
+    #[test]
+    fn logs_viewport_bounds_projection_and_preserves_absolute_mouse_indices() {
+        assert_eq!(log_list_viewport(250, 0, 20, 0), 0..20);
+        assert_eq!(log_list_viewport(250, 19, 20, 0), 0..20);
+        assert_eq!(log_list_viewport(250, 20, 20, 0), 1..21);
+        assert_eq!(log_list_viewport(250, 249, 20, 1), 230..250);
+        assert_eq!(log_list_viewport(10, 9, 20, 0), 0..10);
+        assert_eq!(log_list_viewport(0, 0, 20, 0), 0..0);
+
+        let mut app = keyboard_test_app();
+        app.hits.clear();
+        app.register_log_row_hits(Rect::new(2, 3, 40, 22), 230..250);
+        assert_eq!(app.hits.len(), 20);
+        assert!(matches!(app.hits[0].action, HitAction::SelectLog(230)));
+        assert!(matches!(app.hits[19].action, HitAction::SelectLog(249)));
+        assert_eq!(app.hits[19].rect.y, 23);
     }
 
     #[test]
@@ -3539,7 +3580,7 @@ tone = "success"
         app.last_reload_check = Instant::now() - Duration::from_secs(1);
         write_task_doc(&workspace, "task-2", "Task two", "review");
 
-        app.reload_if_changed();
+        assert!(app.reload_if_changed());
 
         assert!(app.docs.iter().any(|doc| doc.id() == "task-2"));
         assert!(app.status.contains("External changes detected"));

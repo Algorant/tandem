@@ -68,6 +68,18 @@ cargo run -- tui
 
 Use `cargo run -- <command>` during early development. The package binary name is `tandem`.
 
+### TUI idle benchmark
+
+From the repository root, run:
+
+```text
+just bench-tui-idle
+```
+
+This recipe builds the release binary. It then generates temporary workspaces with 10, 50, 100, and 250 Logs. A dependency-free Python script runs the real `tandem tui` through a drained 150×46 PTY. It reports Board and Logs idle CPU, Logs selection redraw latency, and external-change redraw latency. The default Linux `/proc` assertion requires at most 5% idle CPU at the largest Logs count, a selection redraw within 250 ms, and external-change rendering within one second. Use `just bench-tui-idle --report-only` to collect data without enforcing thresholds in a noisy environment. CPU sampling and its threshold are Linux-only. On other platforms, `--report-only` acknowledges this limit and exits without claiming portable CPU data.
+
+For a focused debug-build comparison, first run `cargo build --manifest-path tandem/Cargo.toml`, then run `python3 scripts/benchmark_tui_idle.py --binary tandem/target/debug/tandem --counts 250 --report-only`. To create a persistent visual-review fixture, use `--prepare-workspace <new-path>`. The target must not exist; the script refuses to replace any caller-supplied path. Run `python3 scripts/benchmark_tui_idle.py --check-prepare-refusal` to validate this safety boundary.
+
 ## Epic, Task, and Subtask hierarchy
 
 The CLI derives roles from resolved documents and enforces one strict three-tier hierarchy:

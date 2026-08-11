@@ -339,12 +339,24 @@ impl TuiApp {
         }
     }
 
-    pub(super) fn expire_transient_status(&mut self) {
+    pub(super) fn expire_transient_status(&mut self) -> bool {
         if self.status != self.observed_status {
             self.observed_status.clone_from(&self.status);
             self.status_updated_at = Instant::now();
-            return;
+            return false;
         }
+        if self.transient_status_timeout().is_none() {
+            return false;
+        }
+        if self.status_updated_at.elapsed() >= TRANSIENT_STATUS_TTL {
+            self.status.clear();
+            self.observed_status.clear();
+            return true;
+        }
+        false
+    }
+
+    pub(super) fn transient_status_timeout(&self) -> Option<Duration> {
         if self.status.is_empty()
             || self.text_input_active()
             || self.board_picker.is_some()
@@ -354,11 +366,9 @@ impl TuiApp {
             || self.papercuts_open()
             || self.show_help
         {
-            return;
-        }
-        if self.status_updated_at.elapsed() >= TRANSIENT_STATUS_TTL {
-            self.status.clear();
-            self.observed_status.clear();
+            None
+        } else {
+            Some(TRANSIENT_STATUS_TTL.saturating_sub(self.status_updated_at.elapsed()))
         }
     }
 

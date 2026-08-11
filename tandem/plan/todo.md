@@ -132,6 +132,11 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - selected-log detail pane with completion summary, completed timestamp, files changed, validation, reviewer, accord/review status, accord detail/evidence, body, path, and event context
   - `/` search prompt with Enter apply and Esc cancel/clear
   - empty/no-match states and safe per-log/event load warnings
+- [x] Eliminated Logs idle busy rendering at project scale:
+  - redraws now occur only for input, resize, reload, or transient-status expiry
+  - reload fingerprints remain deadline-polled without forcing frames
+  - Logs row projection and mouse-hit registration are bounded to the visible viewport while preserving absolute selection and scroll behavior
+  - `just bench-tui-idle` generates temporary 10/50/100/250-Log workspaces and measures the real release TUI through a drained fixed-size PTY
 - [x] Reworked the Board from simultaneous columns into Brainfile-style state subviews:
   - configured states render as count-labeled tabs with mouse selection
   - the active state gets the full Board list area

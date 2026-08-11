@@ -389,6 +389,7 @@ impl TuiApp {
             .to_string();
         self.log_search_filter = query;
         self.selected_log = 0;
+        self.log_list_offset = 0;
         self.log_detail_scroll = 0;
         self.clamp_selection();
         self.status = self.logs_status_message();
@@ -398,6 +399,7 @@ impl TuiApp {
         if !self.log_search_filter.is_empty() {
             self.log_search_filter.clear();
             self.selected_log = 0;
+            self.log_list_offset = 0;
             self.log_detail_scroll = 0;
             self.status = "Cleared Logs search filter.".to_string();
             self.clamp_selection();
@@ -1137,6 +1139,8 @@ impl TuiApp {
                 self.logs.len()
             )
         };
+        let capacity = area.height.saturating_sub(2) as usize;
+        let viewport = log_list_viewport(count, self.selected_log, capacity, self.log_list_offset);
         let items = if self.logs.is_empty() {
             vec![ListItem::new(Line::from(Span::styled(
                 format!(
@@ -1154,7 +1158,7 @@ impl TuiApp {
                 self.theme.muted_style(),
             )))]
         } else {
-            filtered
+            filtered[viewport.clone()]
                 .iter()
                 .map(|doc| {
                     logs::list_item_for_log(
@@ -1166,6 +1170,8 @@ impl TuiApp {
                 })
                 .collect::<Vec<_>>()
         };
+        drop(filtered);
+        self.log_list_offset = viewport.start;
 
         let list = List::new(items)
             .style(self.theme.panel_style())
@@ -1181,32 +1187,30 @@ impl TuiApp {
 
         if count > 0 {
             let mut state = ListState::default();
-            state.select(Some(self.selected_log.min(count - 1)));
+            state.select(Some(
+                self.selected_log
+                    .min(count - 1)
+                    .saturating_sub(viewport.start),
+            ));
             frame.render_stateful_widget(list, area, &mut state);
-            drop(filtered);
-            self.register_log_row_hits(area, count);
+            self.register_log_row_hits(area, viewport);
         } else {
             frame.render_widget(list, area);
         }
     }
 
-    fn register_log_row_hits(&mut self, area: Rect, count: usize) {
+    pub(super) fn register_log_row_hits(&mut self, area: Rect, viewport: std::ops::Range<usize>) {
         if area.width <= 2 || area.height <= 2 {
             return;
         }
         let left = area.x.saturating_add(1);
         let top = area.y.saturating_add(1);
         let width = area.width.saturating_sub(2);
-        let bottom = area.y.saturating_add(area.height).saturating_sub(1);
-        for index in 0..count {
-            let y = top.saturating_add(index as u16);
-            if y >= bottom {
-                break;
-            }
+        for (row, index) in viewport.enumerate() {
             self.hits.push(HitRegion {
                 rect: Rect {
                     x: left,
-                    y,
+                    y: top.saturating_add(row as u16),
                     width,
                     height: 1,
                 },
@@ -1260,6 +1264,26 @@ impl TuiApp {
             .wrap(Wrap { trim: false });
         frame.render_widget(detail, area);
     }
+}
+
+pub(super) fn log_list_viewport(
+    count: usize,
+    selected: usize,
+    capacity: usize,
+    previous_offset: usize,
+) -> std::ops::Range<usize> {
+    if count == 0 || capacity == 0 {
+        return 0..0;
+    }
+    let capacity = capacity.min(count);
+    let selected = selected.min(count - 1);
+    let mut offset = previous_offset.min(count - capacity);
+    if selected < offset {
+        offset = selected;
+    } else if selected >= offset + capacity {
+        offset = selected + 1 - capacity;
+    }
+    offset..(offset + capacity)
 }
 
 pub(super) fn workspace_title_from_root(root: Option<&Yaml>) -> Option<String> {

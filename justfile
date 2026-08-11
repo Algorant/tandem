@@ -38,6 +38,12 @@ dev:
 	fi
 	exec cargo run --manifest-path "$manifest" -- tui
 
+# Measure Board and Logs idle CPU through a fixed 150x46 PTY.
+# Linux /proc supplies CPU data. Pass --report-only to disable thresholds.
+bench-tui-idle *ARGS:
+	cargo build --manifest-path tandem/Cargo.toml --release
+	python3 scripts/benchmark_tui_idle.py {{ARGS}}
+
 # Start the local read-only Tandem web interface and open it in the browser.
 web:
 	#!/usr/bin/env bash
