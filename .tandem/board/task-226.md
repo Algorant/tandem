@@ -2,13 +2,19 @@
 id: task-226
 type: task
 title: "Eliminate Logs TUI idle CPU and interaction lag at project scale"
-state: todo
+state: "in-progress"
 priority: "high"
 references: ["task-225"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/logs.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/chrome.rs", "tandem/Justfile", "Justfile", "docs/tui/index.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
 tags: ["tui", "logs", "performance", "validation"]
 createdAt: "2026-08-11T02:53:24Z"
-updatedAt: "2026-08-11T02:53:24Z"
+updatedAt: "2026-08-11T02:55:58Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-226-4c2f3a06"
+  claimedAt: "2026-08-11T02:55:58Z"
+  updatedAt: "2026-08-11T02:55:58Z"
+assignee: "worker-task-226-4c2f3a06"
 ---
 
 ## Description
