@@ -40,6 +40,9 @@ rules:
     - id: 5
       rule: "Never commit checkout-local identity, caches, credentials, or other runtime state."
       source: "User guidance 2026-07-31"
+    - id: 6
+      rule: "Do not treat an AUR publication or update failure as blocking a Tandem release after the tagged GitHub Release, curated notes, required assets, checksums, and primary installer are published and verified. Record the AUR outcome as a downstream packaging issue and complete the release lifecycle."
+      source: "User release policy 2026-08-11"
   prefer:
     - id: 1
       rule: "Use one primary area tag first: `protocol`, `tui`, `pi-tandem`, `docs`, `config`, `rules`, or `ui`."

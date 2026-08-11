@@ -2,26 +2,32 @@
 id: task-223
 type: task
 title: "Prepare Tandem v0.10.0 Papercuts release"
-state: "validation"
 priority: "high"
 references: ["task-222", "decision-5"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "README.md", "tandem/RELEASE.md", "justfile", "scripts/release_checks.py", "site/package.json", "site/bun.lock"]
 tags: ["chore", "release", "papercuts"]
 createdAt: "2026-08-10T12:46:07Z"
-updatedAt: "2026-08-10T15:03:29Z"
+updatedAt: "2026-08-11T12:17:36Z"
 accord:
-  status: "blocked"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-08-10T12:46:12Z"
-  deliveredAt: "2026-08-10T13:00:00Z"
+  deliveredAt: "2026-08-11T12:17:21Z"
   validation:
     commands: ["cargo fmt --check passed", "cargo test passed: 246 unit and 11 integration tests", "cargo build --release and cargo build --profile dist passed", "cargo clippy --all-targets --all-features -- -D warnings passed", "Release and debug binaries report tandem 0.10.0", "Release binary Papercut add/list/show/search/resolve dogfood passed in a temporary workspace", "pi-tandem static check, smoke, relationship smoke, and project-local Pi runtime smoke passed against the release binary", "Docs build produced 19 pages and link check passed 912 internal links", "Bun audit passed after updating docs dependencies and overriding patched nanoid/js-yaml versions", "Web JavaScript syntax checks passed", "release_checks.py tests and 0.10.0 notes/version checks passed", "cargo-dist 0.32.0 manifest includes the curated 0.10.0 notes", "just release 0.10.0 dry run uses the installed dist binary and contains the expected validation/publication workflow", "GitHub auth and repository target verified; tandem-v0.10.0 does not exist locally or remotely", "AUR is currently reachable; tandem-bin remains at 0.8.1-1 after prior maintenance-related workflow failures"]
-  summary: "Prepared and fully validated the Tandem v0.10.0 Papercuts release candidate without tagging, pushing, or publishing."
+  summary: "Tandem v0.10.0 was published and verified with its GitHub Release and assets. Its AUR maintenance failure is now explicitly non-blocking under project rule never:6, so the release task is ready for acceptance."
   evidence: ["Release preparation commit 6a25eb3", "Secure docs dependency refresh commit e589d7c", "Release command fix commit a19ec9a", "Working tree was clean before delivery", "No tag, push, GitHub Release, AUR update, or published install occurred"]
   filesChanged: ["README.md", "RELEASES.md", "tandem/Cargo.toml", "tandem/Cargo.lock", "tandem/RELEASE.md", "site/package.json", "site/bun.lock", "justfile"]
-  reason: "GitHub Release v0.10.0 and all 13 assets are published and verified, but the required tandem-bin AUR update cannot clone ssh://aur@aur.archlinux.org/tandem-bin.git because AUR SSH reports scheduled maintenance. Automatic workflow 31401300611 and manual retry 31401441667 both failed at the same upstream maintenance response. Keep the release Task open until the AUR workflow succeeds."
-  updatedAt: "2026-08-10T15:03:29Z"
+  reviewer: "user"
+  note: "Accepted under the project policy that downstream AUR failures do not block a verified GitHub release."
+  updatedAt: "2026-08-11T12:17:26Z"
 assignee: "pi"
+completedAt: "2026-08-11T12:17:36Z"
+completion:
+  summary: "Released and verified Tandem v0.10.0 with Papercuts, curated notes, and all expected GitHub Release assets. The downstream AUR maintenance failure is recorded as non-blocking under project rule never:6."
+  filesChanged: ["README.md", "RELEASES.md", "tandem/Cargo.toml", "tandem/Cargo.lock", "tandem/RELEASE.md", "site/package.json", "site/bun.lock", "justfile"]
+  validation: "GitHub Release v0.10.0 and 13 assets were published and verified; full release candidate validation passed. AUR failures were caused by explicit upstream maintenance and are non-blocking by user-approved project policy."
+  reviewer: "user"
 ---
 
 ## Description
