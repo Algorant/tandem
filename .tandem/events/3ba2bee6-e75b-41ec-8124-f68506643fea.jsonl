@@ -45,3 +45,5 @@
 {"ts":"2026-08-11T02:55:58Z","event":"accord.claimed","id":"task-226","summary":"Accord claim for task-226","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":45}
 {"ts":"2026-08-11T02:55:58Z","event":"task.updated","id":"task-226","summary":"Updated task-226 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":46}
 {"ts":"2026-08-11T03:18:28Z","event":"accord.delivered","id":"task-226","summary":"Accord deliver for task-226","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":47}
+{"ts":"2026-08-11T03:36:24Z","event":"accord.accepted","id":"task-226","summary":"Accord accept for task-226","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":48}
+{"ts":"2026-08-11T03:36:30Z","event":"task.completed","id":"task-226","summary":"Eliminated Logs TUI idle busy rendering through event/deadline-driven redraws and visible-viewport row projection. Added a safe repeatable fixed-PTY benchmark. At 250 logs, integrated release validation measured about 1% Logs CPU, 55 ms input rendering, and 300 ms external reload. Automated checks and user real-TUI validation passed.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":49}
