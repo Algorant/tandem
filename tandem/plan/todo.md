@@ -103,12 +103,12 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented the initial direct crossterm event loop with alternate-screen setup, raw mode, mouse capture, reload, help, and safe cleanup on quit.
 - [x] Rendered active `.tandem/board` documents by configured state, including an `unfiled` bucket for state-less active documents.
 - [x] Added keyboard navigation across states/items, selected-item detail scrolling, basic mouse click/wheel handling, and unit coverage for state bucket behavior.
-- [x] Implemented the first in-TUI Board mutation: `H`/`L` moves the selected task to the previous/next configured state, reloads after mutation, and surfaces move errors in the status line.
+- [x] Implemented Board state movement, later standardized as the explicit `m` picker with valid configured targets, graph-safe mutation, reload, and visible errors.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 - [x] Implemented top-level TUI view switching: Board, Logs, Rules, and Decisions tabs; `1`..`4` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows. Validation now lives as a Board state/subview.
 - [x] Added the read-only global Papercuts utility inbox without a fifth main view:
   - compact open-count indicator in every main-view header, with muted zero state and mouse hit target
-  - `P`/`Esc` open-close behavior that preserves the underlying view, selection, focus, filters, arrangement, and scroll
+  - global `i`/`Esc` open-close behavior that preserves the underlying view, selection, focus, filters, arrangement, and scroll
   - responsive open-only list/detail panel with keyboard and mouse selection, focus, and scrolling
   - protocol-owned metadata and styled-basic Markdown body rendering
   - tolerant missing/malformed storage handling, selection-preserving manual/watched reloads, and no mutation actions
@@ -141,7 +141,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
   - configured states render as count-labeled tabs with mouse selection
   - the active state gets the full Board list area
   - rows include richer priority, title, accord/review, checklist, tag, assignee, updated, file-count, path, and right-ish ID metadata
-  - quick-add, `H`/`L` task moves, detail focus, theme styling, and mouse wheel/click behavior remain active
+  - quick-add, explicit `m` task movement, detail focus, theme styling, and mouse wheel/click behavior remain active
 - [x] Added first-class user theme discovery and preset examples:
   - discovers `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`
   - lets `.tandem/theme.toml` select built-in or user themes with `theme = "name"` before applying workspace overrides

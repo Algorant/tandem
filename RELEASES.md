@@ -2,6 +2,28 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.10.1
+
+Tandem v0.10.1 makes Papercuts visible during terminal work and improves the consistency and responsiveness of the TUI.
+
+### TUI
+
+- A compact global `Papercuts N` indicator opens a read-only Papercuts list and detail panel without adding another main view or Board state.
+- A coherent fixed input model replaces conflicting case-sensitive shortcuts with explicit Board filter, move, and Validation pickers.
+- The universal `?` reference groups global, navigation, view, dialog, utility, and mouse controls and is available from every non-text surface.
+- Board chrome uses one concise command footer, avoids repeated state and row counts, and uses `Enter` as the single row activation key.
+
+### Fixed
+
+- The Logs view no longer continuously redraws and rebuilds every archived row while idle. Event-driven rendering and visible-viewport projection reduce idle CPU from the previous project-scale growth to about 1% with 250 Logs in the release benchmark.
+- Logs keyboard and mouse selection retain absolute filtered-result positions while only visible rows are projected.
+- External-change reloads and transient status expiry continue to wake and redraw the TUI on their deadlines.
+
+### Developer validation
+
+- `just bench-tui-idle` generates temporary 10, 50, 100, and 250-Log workspaces and measures the real release TUI through a drained fixed-size PTY on Linux.
+- Caller-supplied benchmark preview paths are never replaced or deleted when they already exist.
+
 ## 0.10.0
 
 Tandem v0.10.0 introduces Papercuts: a lightweight project inbox for preserving small, non-blocking friction without interrupting active work.

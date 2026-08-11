@@ -561,7 +561,7 @@ tandem papercut resolve papercut-1 \
 
 `list` shows open Papercuts by default. Use one `--status open|resolved` filter or `--all`; do not combine them. `show` returns metadata, body, path, and `location: papercuts`. `resolve` updates the same file, requires a note, and can append references. Duplicate titles are valid, and the MVP has no delete or reopen command.
 
-`list` and `show` support the standard JSON envelope. Global `tandem search` finds Papercut title, body, status, tags, references, and resolution note and reports `location: papercuts`. Papercuts never appear in `tandem list`, Logs, hierarchy, Accord, review, completion progress, or the TUI.
+`list` and `show` support the standard JSON envelope. Global `tandem search` finds Papercut title, body, status, tags, references, and resolution note and reports `location: papercuts`. Papercuts never appear in `tandem list`, Logs, hierarchy, Accord, review, or completion progress. The TUI exposes open Papercuts only through its read-only utility panel; they are not Board items or a fifth main view.
 
 ### `tandem accord`
 

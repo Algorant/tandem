@@ -328,7 +328,7 @@ Decision documents are first-class v0 documents. They live in `.tandem/board/` a
 
 ### Papercut inbox records
 
-Papercuts are small, non-blocking friction records. They are protocol-owned inbox records, not general Tandem documents. They do not add a document type, enter `.tandem/board/` or `.tandem/logs/`, participate in hierarchy, workflow, Accord, review, completion progress, or appear in the TUI.
+Papercuts are small, non-blocking friction records. They are protocol-owned inbox records, not general Tandem documents. They do not add a document type, enter `.tandem/board/` or `.tandem/logs/`, or participate in hierarchy, workflow, Accord, review, or completion progress. Interfaces may inspect them through a separate inbox surface; the Tandem TUI provides a read-only utility panel rather than treating them as Board items or a main view.
 
 A workspace may omit `.tandem/papercuts/`. The first add creates it lazily, so this additive feature needs no migration. Each file is `.tandem/papercuts/papercut-N.md`. IDs are immutable, sequential, allocated by scanning existing Papercuts, and are not intentionally reused.
 

@@ -23,9 +23,10 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 - Conservative state/accord synchronization for common CLI transitions.
 - Ratatui/crossterm TUI with top-level Board, Logs, Rules, and Decisions tabs.
 - Board Validation flow for delivered work, with action hints for approve, request changes, and complete/log flows.
-- Board state subviews with task metadata, local navigation, quick-add (`a`), previous/next state moves (`H`/`L`), manual reload (`r`), inline expanded row previews (`Enter`), optional detail pane (`Tab`), and `$EDITOR` open for selected active tasks (`e`).
-- Idle file-change hot reload with selection preservation where possible and safe warning/error surfacing for reload parse/load issues.
-- Completed-log browser with search filtering, grouped rules management prompts, and basic decision browsing/add prompts.
+- Board state subviews with task metadata, local navigation, quick-add (`a`), filter (`f`), state-move (`m`), Validation (`v`), arrangement (`b`), manual reload (`r`), inline row activation (`Enter`), optional detail pane (`Tab`), and `$EDITOR` open for selected active tasks (`e`).
+- A universal sectioned `?` keybinding reference plus a global read-only Papercuts utility inbox opened with `i`.
+- Event/deadline-driven rendering, idle file-change hot reload with selection preservation, and safe warning/error surfacing for reload parse/load issues.
+- Completed-log browser with search filtering, visible-viewport row projection, grouped rules management prompts, and basic decision browsing/add prompts.
 - Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user theme selection from `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, workspace selection/overrides from `.tandem/theme.toml`, and workspace Board display settings from `.tandem/config.toml`.
 - Mouse tab/click/scroll support and fixed keyboard defaults.
 - Read-only `tandem web [--port <port>] [--no-open]` interface with embedded assets, loopback-only one-workspace serving, Board/Validation/details/Logs/Rules/Decisions/health views, revision polling, responsive Verdigris light/dark styling, keyboard focus support, safe Markdown, and restrictive browser security headers.
@@ -40,7 +41,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 - No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
 - Most mutation commands remain human-readable; `tandem add --json` now provides structured creation output, while broader structured mutation output is deferred.
 - The web interface is local and read-only. Web mutations, remote/LAN access and authentication, SSE/WebSockets, database/sync providers, multi-workspace serving, and agent feedback remain deferred.
-- TUI gaps remain for richer Board mutations, richer Validation mutation prompts, mouse action buttons, keybinding/help final polish, decision reference/tag prompt parity, and state/accord divergence warning surfaces.
+- TUI gaps remain for configurable keymaps, Papercut mutation actions, decision reference/tag prompt parity, richer action buttons, and state/accord divergence warning surfaces.
 - Keybindings are fixed defaults; custom keymap config is deferred.
 - Markdown rendering is styled basics only.
 - Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope for v0.
@@ -73,7 +74,7 @@ GitHub Pages cannot express this redirect from the repository, and `site/public/
 After the release tag exists, install from git with:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.5 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.10.1 --path tandem --locked
 tandem --version
 ```
 

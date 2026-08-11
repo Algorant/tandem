@@ -101,7 +101,7 @@ resolution:
 The earlier workaround was to search each source location first.
 ```
 
-Required fields are `id`, `title`, `status`, `createdAt`, and `updatedAt`. Resolved records also require `resolution.note` and `resolution.resolvedAt`. References are loose and unresolved targets warn. Papercuts are searchable, but they do not join the document type taxonomy, Board, Logs, hierarchy, Accord, review, completion, or TUI.
+Required fields are `id`, `title`, `status`, `createdAt`, and `updatedAt`. Resolved records also require `resolution.note` and `resolution.resolvedAt`. References are loose and unresolved targets warn. Papercuts are searchable, but they do not join the document type taxonomy, Board, Logs, hierarchy, Accord, review, or completion. The TUI can inspect open Papercuts through a read-only utility panel.
 
 ## `actor-id`
 

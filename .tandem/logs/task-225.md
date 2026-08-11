@@ -2,15 +2,14 @@
 id: task-225
 type: task
 title: "Implement a coherent TUI input model and universal keybinding reference"
-state: "validation"
 priority: "high"
 references: ["task-224"]
 relatedFiles: ["tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/papercuts.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "docs/tui/index.md", "tandem/src/tui/state.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/README.md"]
 tags: ["tui", "keyboard", "papercuts", "mouse"]
 createdAt: "2026-08-10T17:44:24Z"
-updatedAt: "2026-08-10T20:35:15Z"
+updatedAt: "2026-08-11T03:51:10Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "worker-task-225-684911b8"
   claimedAt: "2026-08-10T20:25:18Z"
   deliveredAt: "2026-08-10T20:34:43Z"
@@ -21,8 +20,16 @@ accord:
   summary: "Integrated focused Board chrome rework as fcca152. Removed duplicate list-border and footer state/count summaries, made Enter the sole Board row activation path, removed the Space binding and hint, reduced the Board footer to local commands, and added four-second expiry for transient footer status. Updated runtime help, mouse hints, docs, specs, and tests. Automated checks and Worker wide/narrow/short real-TUI review passed. Final human visual acceptance remains required."
   evidence: ["Worker handoff handoff-b860a330-5550-431c-95bf-1dbf5cadb3bf.", "Worker source commit 149aeb5 rebased and integrated as fcca152.", "Run `just dev` from /home/ivan/Projects/tandem using the task-225 visual fixture."]
   filesChanged: ["tandem/src/tui/bindings.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "docs/cli/index.md", "docs/tui/index.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
-  updatedAt: "2026-08-10T20:34:43Z"
+  reviewer: "user"
+  note: "User approved the integrated TUI keybinding, help, picker, mouse, utility gutter, and Board chrome result during final release review."
+  updatedAt: "2026-08-11T03:51:02Z"
 assignee: "worker-task-225-684911b8"
+completedAt: "2026-08-11T03:51:10Z"
+completion:
+  summary: "Implemented a coherent fixed TUI input model, semantic binding inventory, safe Board action pickers, universal sectioned keybinding reference, cross-view keyboard/mouse parity, and simplified Board chrome. Integrated rework removed duplicate Board counts and the redundant Space action. Automated validation and user real-TUI approval passed."
+  filesChanged: ["tandem/src/tui/bindings.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/papercuts.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/reload.rs", "docs/cli/index.md", "docs/tui/index.md", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
+  validation: "Full Rust tests, strict Clippy, docs checks, diff checks, Worker wide/narrow/short keyboard and mouse review, and user integrated TUI approval passed."
+  reviewer: "user"
 ---
 ## Outcome
 
