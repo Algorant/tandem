@@ -2,18 +2,26 @@
 id: task-226
 type: task
 title: "Eliminate Logs TUI idle CPU and interaction lag at project scale"
-state: "in-progress"
+state: "validation"
 priority: "high"
 references: ["task-225"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/logs.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/chrome.rs", "tandem/Justfile", "Justfile", "docs/tui/index.md", "tandem/plan/spec.md", "tandem/plan/todo.md"]
 tags: ["tui", "logs", "performance", "validation"]
 createdAt: "2026-08-11T02:53:24Z"
-updatedAt: "2026-08-11T02:55:58Z"
+updatedAt: "2026-08-11T03:18:28Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-226-4c2f3a06"
   claimedAt: "2026-08-11T02:55:58Z"
-  updatedAt: "2026-08-11T02:55:58Z"
+  deliveredAt: "2026-08-11T03:18:28Z"
+  deliverables: ["Integrated squash commit 8bd0b7e from Worker commits b28c539 and b28bb89.", "Event/deadline-driven redraw scheduling for input, resize, reload, and transient-status expiry.", "Visible-viewport Logs row projection with absolute selection and mouse indices.", "`just bench-tui-idle` release benchmark using generated temporary workspaces and a drained 150x46 PTY.", "Safe `--prepare-workspace` behavior that refuses existing paths and a built-in refusal check.", "Updated Tandem README, TUI specification, and implementation todo.", "Integrated-main `just dev` route targeting the retained 250-log `/tmp/tandem-task226-preview` fixture."]
+  validation:
+    commands: ["Orchestrator rerun: cargo fmt --manifest-path tandem/Cargo.toml --check passed.", "Orchestrator rerun: cargo test --manifest-path tandem/Cargo.toml passed with 268 unit tests and 11 CLI integration tests.", "Orchestrator rerun: cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings passed.", "Orchestrator integrated-main benchmark at 250 logs passed: Board 0.50% CPU, Logs 1.00% CPU, input frame 54.9 ms, external reload 299.9 ms.", "Prepare-workspace refusal check passed; an existing-directory probe returned exit 2 and preserved marker content.", "git diff --check passed.", "Worker real-TUI review covered wide, narrow, and short layouts plus rapid navigation, paging, focus, detail scrolling, filtering, mouse selection/wheel, external reload, and four-second status expiry."]
+  constraints: ["Keep task-226 in Validation until final human visual and interaction approval.", "Linux `/proc` supplies benchmark CPU assertions; report-only mode documents unsupported/noisy environments.", "Retain the `/tmp/tandem-task226-preview` fixture and Git-local preview route until human validation, then remove both during final cleanup."]
+  summary: "Integrated task-226 as squash commit 8bd0b7e. Replaced continuous TUI redraws with event/deadline-driven rendering, bounded Logs row projection and mouse hits to the visible viewport, and added a dependency-free fixed-PTY idle benchmark. The benchmark helper now refuses every existing caller-supplied preview path instead of deleting it. Release idle Logs CPU at 250 generated logs improved from the Worker baseline of 33.9% to about 1.0% and passed the task threshold. Automated validation and Worker real-TUI review passed. Final human visual and interaction acceptance remains required."
+  evidence: ["Worker handoff handoff-031e2309-2809-41b4-800f-eb90a7ea4a6a.", "Worker source commits b28c539 and b28bb89 integrated as 8bd0b7e.", "Run `just dev` from /home/ivan/Projects/tandem for visual validation.", "Run `just bench-tui-idle` for the full release benchmark."]
+  filesChanged: ["justfile", "scripts/benchmark_tui_idle.py", "tandem/README.md", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs"]
+  updatedAt: "2026-08-11T03:18:28Z"
 assignee: "worker-task-226-4c2f3a06"
 ---
 
