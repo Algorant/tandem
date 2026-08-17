@@ -2,19 +2,24 @@
 id: task-230
 type: task
 title: "Make orphaned Board documents impossible at the protocol level"
-state: "in-progress"
 priority: "high"
 references: ["task-228", "decision-7"]
 relatedFiles: ["protocol/plan/spec.md", "tandem/src/app/tasks.rs", "tandem/src/app/support.rs", "tandem/src/cli/mod.rs"]
 tags: ["protocol", "cli", "completion", "hierarchy", "bug"]
 createdAt: "2026-08-17T12:19:27Z"
-updatedAt: "2026-08-17T20:34:32Z"
+updatedAt: "2026-08-17T20:58:08Z"
 accord:
   status: "claimed"
   assignee: "worker-task-230-0def6a42"
   claimedAt: "2026-08-17T20:34:32Z"
   updatedAt: "2026-08-17T20:34:32Z"
 assignee: "worker-task-230-0def6a42"
+completedAt: "2026-08-17T20:58:08Z"
+completion:
+  summary: "Orphaned Board documents are now prevented at both mutation entry points. `app::tasks::complete` refuses while any active task descendant remains, mirroring the existing `cancel` guard, and covers Epics with active child Tasks as well as Tasks with active Subtasks. `add` refuses a parentId that resolves only in `.tandem/logs/`. Enforcement sits at the entry points rather than in `validate_task_document_against_hierarchy`, so a pre-existing orphan can still be completed or canceled and older workspaces stay repairable. Protocol spec states the invariant, renumbers the completion steps, adds error codes E065 and E066, updates the `add` and `complete` command tables, and rewords the Epic completion rule to describe what Tandem refuses rather than assigning a manual chore to the project owner. No detection diagnostic, listing filter, auto-repair, cascade, reparenting change, or migration was added."
+  filesChanged: ["protocol/plan/spec.md", "tandem/src/app/tasks.rs", "tandem/src/cli/mod.rs"]
+  validation: "cargo fmt --check, cargo clippy --all-targets -- -D warnings, and cargo test all pass on merged main: 272 unit tests and 11 integration tests. Targeted tests verified by name: completion_rejects_active_task_descendants, completion_rejects_epic_with_active_child_task, add_rejects_archived_parent, completion_repairs_a_preexisting_orphan. Integrated to main via wt merge as commit 60fe03f."
+  reviewer: "pi-orchestrator"
 ---
 
 ## Description
