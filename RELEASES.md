@@ -2,6 +2,19 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.10.2
+
+Tandem v0.10.2 stops active work from being stranded under archived parents.
+
+### Protocol
+
+- Completing or archiving a task now requires every descendant to be resolved first. This covers both an Epic with active child Tasks and a Task with active Subtasks, and matches the behavior `tandem cancel` already had.
+- Creating a task under a parent that already lives in `.tandem/logs/` is rejected.
+
+### Fixed
+
+- `tandem complete` no longer archives a parent while its Subtasks stay active on the Board. Those children previously remained on the Board with no warning and no reachable parent, and could contradict the parent's own completion summary. Documents already in that state remain completable and cancelable, so existing workspaces stay repairable.
+
 ## 0.10.1
 
 Tandem v0.10.1 makes Papercuts visible during terminal work and improves the consistency and responsiveness of the TUI.

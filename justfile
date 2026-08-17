@@ -107,8 +107,11 @@ site-build: _check-docs-node
 	bun install --frozen-lockfile
 	bun run build
 
-# Validate a prepared VERSION, tag it, publish it, and verify the GitHub Release
-# and AUR update.
+# Validate a prepared VERSION, tag it, publish it, and verify the GitHub Release.
+#
+# TEMPORARY: the AUR verification step is skipped while the AUR is read-only and
+# rejects package updates. Restore `wait_for_workflow aur "Update tandem-bin AUR
+# package"` below once the AUR accepts pushes again.
 # Usage: just release 0.6.5
 # Before running, add one meaningful ## VERSION section to RELEASES.md.
 release VERSION:
@@ -201,5 +204,11 @@ release VERSION:
 
 	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
 	python3 scripts/release_checks.py published "$notes_file" "$release_file"
-	wait_for_workflow aur "Update tandem-bin AUR package"
-	echo "Release $tag, GitHub assets/notes, and the tandem-bin AUR workflow verified."
+	# TEMPORARY: AUR is read-only and cannot accept package updates, so waiting on
+	# the tandem-bin workflow would fail or hang for 30 minutes after the release
+	# has already published and verified successfully. Tandem rule 6 requires that
+	# an AUR failure not block the release lifecycle at this point. Restore the
+	# line below when the AUR is writable again.
+	# wait_for_workflow aur "Update tandem-bin AUR package"
+	echo "Release $tag and GitHub assets/notes verified."
+	echo "SKIPPED: tandem-bin AUR verification (AUR read-only). Record the AUR outcome as a downstream packaging issue."
