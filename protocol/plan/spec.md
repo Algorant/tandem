@@ -567,7 +567,7 @@ Tandem retains one task schema and lifecycle, then derives hierarchy roles from 
 - **Task**: a normal global-ID `task-N` document with no parent, a resolved non-task parent, or a resolved Epic parent. A direct Epic child has relationship `epic-task`; a non-task link has generic relationship `parent`.
 - **Subtask**: a normal `task-N-M` document whose resolved parent is exactly `task-N` with the Task role. It has relationship `subtask`, keeps its own state, assignee, blockers, accord, review, and completion record, and cannot have children.
 
-A generic-parent Task may have Subtasks. Tandem does not persist a role field or add `subtask`/`epic` document types; classifiers resolve `parentId`, document type, and `kind`, then validate the role-specific ID shape. Decision-7 supersedes decision-4 completely: wrong role/ID combinations are errors, not legacy forms.
+A generic-parent Task may have Subtasks. No Board document may have a parent that resides in `.tandem/logs/`; archived Logs are terminal history and cannot parent active work. Tandem enforces this invariant at the mutations that can create it: completion/archive rejects active task descendants, and task creation rejects a parent resolved in Logs. Existing historical orphans remain repairable because terminating an orphan does not validate its archived parent as a creation precondition. Tandem does not persist a role field or add `subtask`/`epic` document types; classifiers resolve `parentId`, document type, and `kind`, then validate the role-specific ID shape. Decision-7 supersedes decision-4 completely: wrong role/ID combinations are errors, not legacy forms.
 
 Example standalone Task and Subtask:
 
@@ -652,7 +652,7 @@ Guidance:
 - Reject children beneath Subtasks and reparenting that would make a Task with children into a Subtask. Generic-parent Tasks may have Subtasks.
 - Reject invalid deeper structures, nested/parented Epics, global-ID Subtasks, hierarchical-ID Epic Tasks, and role-changing or ID-invalidating reparenting; there is no compatibility migration exception.
 - Existing inline `subtasks` remain legacy data and are deprecated. Canonical Worker A checklists project first-class Subtask documents into `pi-todos`; they are not inline strings.
-- Complete/archive an Epic with the normal task completion flow only when its Tasks are completed, intentionally canceled/superseded, or the human/project owner decides the Epic is done. Completion moves the Epic task to `.tandem/logs/`; it does not create a persistent `done` state or special Epic archive.
+- Complete/archive an Epic with the normal task completion flow only when its Tasks are completed or intentionally canceled/superseded. Tandem refuses to complete an Epic while any child Task is still active; each remaining child must first be resolved, and cancellation records its reason. Completing the Epic cannot silently discard active child work. Completion moves the Epic task to `.tandem/logs/`; it does not create a persistent `done` state or special Epic archive.
 - Do not model epics as `type: decision`, ADRs, custom protocol folders, or separate lifecycle states. Decisions remain for durable choices; epics remain task coordination records.
 
 ## Decision document
@@ -821,10 +821,11 @@ In v0, completion should warn if `review.status` is not `accepted`, but it shoul
 Completion is a mutation that:
 
 1. Runs built-in structural validation.
-2. Warns when review or accord acceptance is missing.
-3. Appends a completion event to the current actor's per-actor event log under `.tandem/events/<actor_id>.jsonl`.
-4. Sets `completedAt` and `completion` metadata on the document.
-5. Moves the document from `.tandem/board/` to `.tandem/logs/`.
+2. Refuses completion while any active task descendant remains, including direct Tasks beneath an Epic and Subtasks beneath a Task. Each descendant must first be completed, canceled, or otherwise resolved.
+3. Warns when review or accord acceptance is missing.
+4. Appends a completion event to the current actor's per-actor event log under `.tandem/events/<actor_id>.jsonl`.
+5. Sets `completedAt` and `completion` metadata on the document.
+6. Moves the document from `.tandem/board/` to `.tandem/logs/`.
 
 Example completed document frontmatter:
 
@@ -1043,6 +1044,8 @@ Errors fail validation and should block normal mutations.
 | `E062` | parented Epic | A `kind: epic` task has `parentId`; Epics are root-only. |
 | `E063` | child beneath Subtask | A task targets a resolved Subtask. |
 | `E064` | invalid role transition | Reparenting changes Epic/Task/Subtask role or leaves the immutable ID invalid for the prospective relationship. |
+| `E065` | active descendants prevent completion | A task has one or more active task descendants and cannot be archived until each descendant is resolved. |
+| `E066` | archived parent target | A new Board task targets a parent document in `.tandem/logs/`. |
 | `E070` | invalid archived log | A Log Task lacks `completedAt` or `completion.summary`, or has an unsupported `completion.outcome`. |
 
 ### Warning categories
@@ -1095,7 +1098,7 @@ Event records use the v0 audit envelope: `ts`, `event`, `id`, `summary`, `actor`
 | Required inputs | `title`; optional `state`, `kind`, body/description, priority, effort, tags, assignee, `parentId`, `blockers`, `references`, `relatedFiles`, accord, and review. New inline checklist `subtasks:` are not accepted; Task-owned checklist work uses first-class Subtask documents. |
 | Files read | `.tandem/tandem.md`, `.tandem/board/*.md`, `.tandem/logs/*.md` for ID allocation and reference validation. |
 | Files written | New `.tandem/board/<task-id>*.md`; Epics/Tasks receive global `task-N`, while only a Subtask beneath a Task receives `task-N-M`. Append the current actor event log under `.tandem/events/<actor_id>.jsonl`. Resolved role determines the valid ID grammar. |
-| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, an Epic would have a parent, a child would be attached beneath a Subtask, role and ID shape disagree, new inline `subtasks:` are requested, or nested accord/review data is malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
+| Validation/errors/warnings | Error if workspace is invalid, generated ID would duplicate, requested `state` is not configured, requested `kind` is unsupported, `parentId`/`blockers` are unresolved, `parentId` resolves only in `.tandem/logs/`, an Epic would have a parent, a child would be attached beneath a Subtask, role and ID shape disagree, new inline `subtasks:` are requested, or nested accord/review data is malformed. Warn for unresolved `references`, unresolved rule sources, malformed optional metadata, or omitted default state. |
 | Event | `task.created`. |
 | Resulting state | New task document in `.tandem/board/` with a role-valid global or Subtask ID, `type: task`, optional `kind`, `title`, `state` defaulting to `todo`, optional `parentId`, `createdAt`, and `updatedAt`. |
 
@@ -1171,7 +1174,7 @@ Requesting changes does not automatically set accord status to `rework` or move 
 | Required inputs | Task ID and `completion.summary`. Optional files changed, validation result summary, reviewer/completer, and completion notes. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, `.tandem/logs/` destination index, and document index for validation. |
 | Files written | Completed task document in `.tandem/logs/`; remove/move the active `.tandem/board/` task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, already lives only in logs, required structure is invalid, destination would duplicate an existing log path/ID, or `parentId`/`blockers` are unresolved. Warn, but allow completion, when `review.status` is not `accepted`, an existing accord is not `accepted`, related `references` or rule sources are unresolved, or optional completion metadata is malformed but recoverable. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, already lives only in logs, required structure is invalid, destination would duplicate an existing log path/ID, any active task descendant remains, or `parentId`/`blockers` are unresolved. Warn, but allow completion, when `review.status` is not `accepted`, an existing accord is not `accepted`, related `references` or rule sources are unresolved, or optional completion metadata is malformed but recoverable. |
 | Event | `task.completed`. |
 | Resulting state | Task is archived as a Markdown log document in `.tandem/logs/` with `completedAt` and `completion.summary`; active board document is gone; log document is the completed-work source of truth. |
 

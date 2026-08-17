@@ -180,6 +180,16 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         .as_deref()
         .map(|parent| resolve_parent_relationship(&hierarchy, "task", parent))
         .transpose()?;
+    if let Some(parent) = options.parent.as_deref() {
+        let parent_document = hierarchy
+            .document(parent)
+            .expect("resolve_parent_relationship validated the parent");
+        if parent_document.location != DocumentLocation::Board {
+            return Err(CliError::user(format!(
+                "Validation failed: cannot add a task under archived parent {parent}; parent must be on the Board"
+            )));
+        }
+    }
     for blocker in &options.blockers {
         if hierarchy.document(blocker).is_none() {
             return Err(CliError::user(format!(
@@ -724,6 +734,14 @@ pub(crate) fn complete(
         )));
     }
     validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
+    let active_descendants = active_task_descendant_ids(&hierarchy, doc.id());
+    if !active_descendants.is_empty() {
+        return Err(CliError::user(format!(
+            "Validation failed: cannot complete {} while it has active descendants: {}",
+            doc.id(),
+            active_descendants.join(", ")
+        )));
+    }
     let unresolved = unresolved_blockers_in_hierarchy(&hierarchy, doc.field("blockers"));
     if !unresolved.is_empty() {
         return Err(CliError::user(format!(
@@ -946,6 +964,148 @@ mod tests {
     }
 
     #[test]
+    fn completion_rejects_active_task_descendants() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-complete-descendants-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let parent = add(
+            &project,
+            AddOptions {
+                title: Some("Parent".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let child = add(
+            &project,
+            AddOptions {
+                title: Some("Child".to_string()),
+                parent: Some(parent.id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let error = complete(
+            &project,
+            CompleteOptions {
+                id: parent.id.clone(),
+                summary: Some("Done".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("cannot complete"));
+        assert!(error.message.contains(&child.id));
+        assert!(parent.path.exists());
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn completion_rejects_epic_with_active_child_task() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-complete-epic-descendant-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let epic = add(
+            &project,
+            AddOptions {
+                title: Some("Epic".to_string()),
+                kind: Some("epic".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let child = add(
+            &project,
+            AddOptions {
+                title: Some("Epic task".to_string()),
+                parent: Some(epic.id.clone()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(child.id, "task-2");
+        let error = complete(
+            &project,
+            CompleteOptions {
+                id: epic.id.clone(),
+                summary: Some("Done".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("cannot complete"));
+        assert!(error.message.contains(&child.id));
+        assert!(epic.path.exists());
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn completion_repairs_a_preexisting_orphan() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-complete-orphan-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let parent = add(
+            &project,
+            AddOptions {
+                title: Some("Archived parent".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let child_path = project.board_dir.join("task-1-1.md");
+        fs::write(
+            &child_path,
+            format!(
+                "---\nid: task-1-1\ntype: task\ntitle: Orphan\nstate: todo\nparentId: {}\n---\n",
+                parent.id
+            ),
+        )
+        .unwrap();
+        let archived_parent_path = project.logs_dir.join("task-1.md");
+        fs::rename(&parent.path, &archived_parent_path).unwrap();
+
+        let outcome = complete(
+            &project,
+            CompleteOptions {
+                id: "task-1-1".to_string(),
+                summary: Some("Repaired orphan".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(outcome.log_path.exists());
+        assert!(!child_path.exists());
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
     fn completion_preserves_unknown_source_and_returns_policy_warning() {
         let root = std::env::temp_dir().join(format!(
             "tandem-app-complete-warning-{}",
@@ -976,7 +1136,7 @@ mod tests {
         let outcome = complete(
             &project,
             CompleteOptions {
-                id: created.id,
+                id: created.id.clone(),
                 summary: Some("Done".to_string()),
                 ..CompleteOptions::default()
             },
@@ -990,6 +1150,51 @@ mod tests {
         let archived = fs::read_to_string(&outcome.log_path).unwrap();
         assert!(archived.contains("unknown: retain"));
         assert!(archived.contains("summary: \"Done\""));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn add_rejects_archived_parent() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-add-archived-parent-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let parent = add(
+            &project,
+            AddOptions {
+                title: Some("Parent".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        complete(
+            &project,
+            CompleteOptions {
+                id: parent.id.clone(),
+                summary: Some("Archived".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let error = add(
+            &project,
+            AddOptions {
+                title: Some("Archived child".to_string()),
+                parent: Some(parent.id),
+                ..Default::default()
+            },
+        )
+        .unwrap_err();
+        assert!(error.message.contains("archived parent"));
+        assert!(error.message.contains("Board"));
         fs::remove_dir_all(project.root()).unwrap();
     }
 }

@@ -527,7 +527,7 @@ mod tests {
         )
         .unwrap();
 
-        let second_subtask = add_task(
+        let archived_parent_error = add_task(
             &workspace,
             AddOptions {
                 title: Some("Second Subtask".to_string()),
@@ -535,7 +535,8 @@ mod tests {
                 ..AddOptions::default()
             },
         )
-        .unwrap();
+        .unwrap_err();
+        assert!(archived_parent_error.message.contains("archived parent"));
         let generic_task = add_task(
             &workspace,
             AddOptions {
@@ -545,12 +546,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(second_subtask.id, "task-103-2");
         assert_eq!(generic_task.id, "task-104");
-        assert_eq!(
-            second_subtask.parent_relationship,
-            Some(ParentRelationship::Subtask)
-        );
         let hierarchy = hierarchy_from_workspace(&workspace).unwrap();
         hierarchy.validate_all_task_hierarchies().unwrap();
         let logged_parent = hierarchy.document("task-103").unwrap();
