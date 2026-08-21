@@ -87,3 +87,6 @@
 {"ts":"2026-08-21T03:35:50Z","event":"accord.delivered","id":"task-231","summary":"Accord deliver for task-231","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":87}
 {"ts":"2026-08-21T03:35:53Z","event":"accord.accepted","id":"task-231","summary":"Accord accept for task-231","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":88}
 {"ts":"2026-08-21T03:35:57Z","event":"task.completed","id":"task-231","summary":"Diagnosed the tandem web snapshot loading regression, measured its O(R × D) behavior, compared architectural fixes, and documented the coherent project snapshot plus server-owned coordinator recommendation and future synchronization context.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":89}
+{"ts":"2026-08-21T21:18:31Z","event":"task.created","id":"task-235","summary":"Restore fast Tandem web reference validation","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":90}
+{"ts":"2026-08-21T21:19:47Z","event":"accord.claimed","id":"task-235","summary":"Accord claim for task-235","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":91}
+{"ts":"2026-08-21T21:19:47Z","event":"task.updated","id":"task-235","summary":"Updated task-235 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":92}
