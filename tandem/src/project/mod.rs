@@ -182,17 +182,20 @@ impl TandemProject {
             .find(|item| item.id() == id))
     }
 
-    /// Loose references may target Papercuts without making them documents.
-    /// Filename inspection keeps unrelated Board operations independent from a
-    /// malformed Papercut record.
+    /// Loose references may target a Papercut without making it a document.
+    /// Check only the canonical filename so malformed contents cannot affect
+    /// unrelated reads.
+    pub(crate) fn papercut_reference_exists(&self, id: &str) -> bool {
+        crate::protocol::papercut::papercut_number(id).is_some()
+            && self.papercuts_dir().join(format!("{id}.md")).is_file()
+    }
+
+    /// Loose references may target documents or Papercuts.
     pub(crate) fn reference_target_exists(&self, id: &str) -> Result<bool, CliError> {
         if self.find_document(id)?.is_some() {
             return Ok(true);
         }
-        if crate::protocol::papercut::papercut_number(id).is_none() {
-            return Ok(false);
-        }
-        Ok(self.papercuts_dir().join(format!("{id}.md")).is_file())
+        Ok(self.papercut_reference_exists(id))
     }
 
     pub(crate) fn read_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
@@ -1046,6 +1049,26 @@ pub(crate) fn display_path(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn papercut_reference_exists_checks_only_canonical_filename() {
+        let root = env::temp_dir().join(format!(
+            "tandem-project-papercut-reference-{}",
+            std::process::id()
+        ));
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
+        fs::create_dir_all(project.papercuts_dir()).unwrap();
+        fs::write(project.papercuts_dir().join("papercut-1.md"), "malformed").unwrap();
+        assert!(project.papercut_reference_exists("papercut-1"));
+        assert!(!project.papercut_reference_exists("papercut-0"));
+        assert!(!project.papercut_reference_exists("papercut-1.md"));
+        assert!(!project.papercut_reference_exists("task-1"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn discovers_dot_tandem_before_root_compatibility_file() {
         let root = env::temp_dir().join(format!("tandem-project-{}", std::process::id()));

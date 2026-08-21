@@ -93,7 +93,9 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, CliErro
             .map(parse_field_values)
             .unwrap_or_default()
         {
-            if !project.reference_target_exists(&reference)? {
+            let target_exists = hierarchy.document(&reference).is_some()
+                || project.papercut_reference_exists(&reference);
+            if !target_exists {
                 warnings.push(format!(
                     "{} references missing target {reference}.",
                     document.id()
@@ -359,4 +361,66 @@ fn matches_filter(doc: &Document, filter: &ListFilter<'_>) -> bool {
         && filter
             .review
             .is_none_or(|status| review_status(doc) == Some(status))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn load_read_resolves_documents_and_papercut_filenames_without_parsing_papercuts() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-query-reference-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.board_dir.join("task-1.md"),
+            "---\nid: task-1\ntitle: Source\nstate: todo\nreferences: [task-2, decision-1, task-3, papercut-1, missing-task]\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.board_dir.join("task-2.md"),
+            "---\nid: task-2\ntitle: Active target\nstate: todo\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.board_dir.join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Decision target\nstatus: accepted\ndate: 2026-08-05\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.logs_dir.join("task-3.md"),
+            "---\nid: task-3\ntitle: Completed target\n---\n",
+        )
+        .unwrap();
+        fs::create_dir_all(project.papercuts_dir()).unwrap();
+        fs::write(project.papercuts_dir().join("papercut-1.md"), "malformed").unwrap();
+
+        let read = load_read(&project).unwrap();
+        assert!(read
+            .warnings
+            .iter()
+            .any(|warning| warning == "task-1 references missing target missing-task."));
+        assert!(!read
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("task-2")
+                || warning.contains("decision-1")
+                || warning.contains("task-3")));
+        assert!(!read
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("papercut-1")));
+        fs::remove_dir_all(root).unwrap();
+    }
 }
