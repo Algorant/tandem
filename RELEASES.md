@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.10.3
+
+Tandem v0.10.3 restores fast loading for the local read-only web interface on established workspaces.
+
+### Fixed
+
+- Web reference validation now reuses the Board and Log hierarchy already loaded in memory instead of rereading and reparsing every document for every loose reference.
+- References to Papercuts still resolve through canonical Papercut filenames without parsing their contents, so malformed Papercuts remain isolated from unrelated Board and web reads.
+- Project-scale `/api/v1/project` responses that previously exceeded 30 seconds returned in about 120–161 ms during release validation on the Tandem and Pi workspaces.
+
 ## 0.10.2
 
 Tandem v0.10.2 stops active work from being stranded under archived parents.
