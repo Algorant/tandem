@@ -96,3 +96,7 @@
 {"ts":"2026-08-21T21:35:03Z","event":"task.created","id":"task-236","summary":"Release Tandem 0.10.3","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":96}
 {"ts":"2026-08-21T21:35:09Z","event":"accord.claimed","id":"task-236","summary":"Accord claim for task-236","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":97}
 {"ts":"2026-08-21T21:35:09Z","event":"task.updated","id":"task-236","summary":"Updated task-236 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":98}
+{"ts":"2026-08-21T21:41:14Z","event":"task.created","id":"task-237","summary":"Audit and accelerate the `just release` workflow","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":99}
+{"ts":"2026-08-21T21:41:36Z","event":"accord.delivered","id":"task-236","summary":"Accord deliver for task-236","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":100}
+{"ts":"2026-08-21T21:41:40Z","event":"accord.accepted","id":"task-236","summary":"Accord accept for task-236","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":101}
+{"ts":"2026-08-21T21:41:45Z","event":"task.completed","id":"task-236","summary":"Released Tandem v0.10.3. Pushed main and the annotated tag, published and verified the GitHub Release with 13 assets, and confirmed the branded primary installer installs tandem 0.10.3. AUR verification remained intentionally skipped under the current read-only AUR policy.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":102}
