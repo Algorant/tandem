@@ -2,19 +2,29 @@
 id: task-232
 type: task
 title: "Wrap the TUI draw call in synchronized output to stop clear-then-repaint flicker"
-state: "in-progress"
 priority: "medium"
 effort: "small"
 relatedFiles: ["tandem/src/tui/terminal.rs", "tandem/src/tui/mod.rs"]
 tags: ["tui", "keyboard", "smoke"]
 createdAt: "2026-08-21T03:28:29Z"
-updatedAt: "2026-08-22T15:21:42Z"
+updatedAt: "2026-08-22T16:08:14Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "worker-task-232-75eae6d3"
   claimedAt: "2026-08-22T15:21:42Z"
-  updatedAt: "2026-08-22T15:21:42Z"
+  deliveredAt: "2026-08-22T16:08:06Z"
+  validation:
+    commands: ["cargo fmt --check", "cargo test: 276 + 11 passed", "cargo clippy --all-targets --all-features -- -D warnings", "PTY capture: resize now emits \\x1b[?2026h + \\x1b[2J + 11KB repaint + \\x1b[?2026l as one synchronized update", "Human validation in Ghostty via just dev-release"]
+  summary: "Wrapped the single Ratatui draw call in terminal mode 2026 synchronized output so the clear and repaint are presented atomically."
+  evidence: ["merge commit 3e57a98 on main", "justfile recipe commit 8a00d1a"]
+  filesChanged: ["tandem/src/tui/mod.rs", "tandem/src/tui/terminal.rs", "justfile"]
+  reviewer: "ivan"
+  note: "Human-validated in Ghostty with the release build. Resize no longer flickers."
+  updatedAt: "2026-08-22T16:08:09Z"
 assignee: "worker-task-232-75eae6d3"
+completedAt: "2026-08-22T16:08:14Z"
+completion:
+  summary: "Wrapped the TUI draw call in terminal mode 2026 synchronized output. PTY capture showed the real flicker was clear-then-repaint on resize: a bare \\x1b[2J written alone, then an 11 KB repaint split across three writes, leaving the screen blank for ~26 ms. The original premise, that the first navigation keypress sent a flicker-inducing incremental update, did not reproduce; per-key writes are small and atomic. Two earlier observations were artifacts of a layered pty. Fix is draw_synchronized_on in tandem/src/tui/terminal.rs, generic over the backend writer, with success and error-path tests confirming the end marker survives a failed draw. Human-validated in Ghostty."
 ---
 
 ## Description
