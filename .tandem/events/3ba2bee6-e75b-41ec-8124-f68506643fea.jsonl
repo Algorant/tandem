@@ -100,3 +100,10 @@
 {"ts":"2026-08-21T21:41:36Z","event":"accord.delivered","id":"task-236","summary":"Accord deliver for task-236","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":100}
 {"ts":"2026-08-21T21:41:40Z","event":"accord.accepted","id":"task-236","summary":"Accord accept for task-236","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":101}
 {"ts":"2026-08-21T21:41:45Z","event":"task.completed","id":"task-236","summary":"Released Tandem v0.10.3. Pushed main and the annotated tag, published and verified the GitHub Release with 13 assets, and confirmed the branded primary installer installs tandem 0.10.3. AUR verification remained intentionally skipped under the current read-only AUR policy.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":102}
+{"ts":"2026-08-21T21:45:51Z","event":"accord.claimed","id":"task-232","summary":"Accord claim for task-232","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":103}
+{"ts":"2026-08-21T21:45:51Z","event":"task.updated","id":"task-232","summary":"Updated task-232 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":104}
+{"ts":"2026-08-22T14:39:15Z","event":"task.created","id":"task-238","summary":"Enforce the ignored actor-id invariant and reject stale-state writes","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":105}
+{"ts":"2026-08-22T15:20:50Z","event":"task.updated","id":"task-232","summary":"Updated task-232 metadata: title, body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":106}
+{"ts":"2026-08-22T15:21:42Z","event":"accord.claimed","id":"task-232","summary":"Accord claim for task-232","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":107}
+{"ts":"2026-08-22T15:21:42Z","event":"task.updated","id":"task-232","summary":"Updated task-232 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":108}
+{"ts":"2026-08-22T15:27:26Z","event":"papercut.created","id":"papercut-3","summary":"Created Papercut: worker_integrate refuses task-232 as cross-owner despite matching orchestrator workspace","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":109}
