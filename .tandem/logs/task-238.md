@@ -2,14 +2,13 @@
 id: task-238
 type: task
 title: "Enforce the ignored actor-id invariant and reject stale-state writes"
-state: "validation"
 priority: "high"
 effort: "small"
 references: ["decision-9", "decision-10"]
 relatedFiles: ["tandem/src/project/events.rs", "tandem/src/project/write.rs", "tandem/src/protocol/ids.rs", "protocol/README.md"]
 tags: ["protocol", "events", "identity", "git", "bugfix"]
 createdAt: "2026-08-22T14:39:15Z"
-updatedAt: "2026-08-22T23:07:44Z"
+updatedAt: "2026-08-22T23:07:50Z"
 accord:
   status: "accepted"
   assignee: "worker-task-238-93e9e45b"
@@ -22,6 +21,9 @@ accord:
   note: "Orchestrator-verified. Reran cargo test and cargo clippy --all-targets -- -D warnings in the Worker checkout before merge. All six acceptance criteria met, including the tracked-file regression test that check-ignore alone cannot detect. Confirmed this repository's own .tandem/actor-id is untracked and ignored, so the new hard failure does not self-trigger."
   updatedAt: "2026-08-22T23:07:44Z"
 assignee: "worker-task-238-93e9e45b"
+completedAt: "2026-08-22T23:07:50Z"
+completion:
+  summary: "`ensure_git_ignored()` hard-fails on a tracked `.tandem/actor-id` naming `git rm --cached`, and re-verifies check-ignore after writing the exclude pattern so a .gitignore negation cannot silently defeat it. Regression test added; protocol/README.md states the invariant is enforced. Merged to main as 98914a4."
 ---
 
 ## Description
