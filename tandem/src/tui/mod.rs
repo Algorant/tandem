@@ -339,7 +339,9 @@ impl TuiApp {
             redraw |= self.reload_if_changed();
             redraw |= self.expire_transient_status();
             if redraw {
-                session.terminal_mut().draw(|frame| self.draw(frame))?;
+                session.draw_synchronized(|terminal| {
+                    terminal.draw(|frame| self.draw(frame)).map(|_| ())
+                })?;
                 redraw = false;
             }
             if event::poll(self.next_wake_timeout())? {

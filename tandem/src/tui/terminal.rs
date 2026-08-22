@@ -3,7 +3,10 @@ use std::io::{self, Write};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{
+        disable_raw_mode, enable_raw_mode, BeginSynchronizedUpdate, EndSynchronizedUpdate,
+        EnterAlternateScreen, LeaveAlternateScreen,
+    },
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -44,6 +47,13 @@ impl TerminalSession {
         &mut self.terminal
     }
 
+    pub(super) fn draw_synchronized<F>(&mut self, draw: F) -> Result<(), CliError>
+    where
+        F: FnOnce(&mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()>,
+    {
+        draw_synchronized_on(&mut self.terminal, draw)
+    }
+
     pub(super) fn suspend_for_editor(&mut self) -> Result<(), CliError> {
         self.terminal.show_cursor()?;
         self.terminal.backend_mut().flush()?;
@@ -79,13 +89,74 @@ fn restore_terminal(backend: &mut CrosstermBackend<io::Stdout>) {
     let _ = leave_terminal(backend);
 }
 
+fn draw_synchronized_on<W, F>(
+    terminal: &mut Terminal<CrosstermBackend<W>>,
+    draw: F,
+) -> Result<(), CliError>
+where
+    W: Write,
+    F: FnOnce(&mut Terminal<CrosstermBackend<W>>) -> io::Result<()>,
+{
+    execute!(terminal.backend_mut(), BeginSynchronizedUpdate)?;
+    let draw_result = draw(terminal).map_err(CliError::from);
+    let end_result = execute!(terminal.backend_mut(), EndSynchronizedUpdate);
+    draw_result?;
+    end_result.map_err(CliError::from)
+}
+
 fn leave_terminal(writer: &mut impl Write) -> io::Result<()> {
     execute!(writer, LeaveAlternateScreen, DisableMouseCapture)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
     use super::*;
+
+    #[derive(Clone)]
+    struct SharedWriter(Rc<RefCell<Vec<u8>>>);
+
+    impl Write for SharedWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0.borrow_mut().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn synchronized_update_emits_markers_around_frame_output() {
+        let output = Rc::new(RefCell::new(Vec::new()));
+        let writer = SharedWriter(Rc::clone(&output));
+        let mut terminal = Terminal::new(CrosstermBackend::new(writer)).unwrap();
+        draw_synchronized_on(&mut terminal, |terminal| {
+            terminal.backend_mut().write_all(b"frame")
+        })
+        .unwrap();
+        let output = String::from_utf8(output.borrow().clone()).unwrap();
+
+        let begin = output.find("\x1b[?2026h").unwrap();
+        let frame = output.find("frame").unwrap();
+        let end = output.find("\x1b[?2026l").unwrap();
+        assert!(begin < frame && frame < end);
+    }
+
+    #[test]
+    fn synchronized_update_ends_marker_when_frame_fails() {
+        let output = Rc::new(RefCell::new(Vec::new()));
+        let writer = SharedWriter(Rc::clone(&output));
+        let mut terminal = Terminal::new(CrosstermBackend::new(writer)).unwrap();
+        let result = draw_synchronized_on(&mut terminal, |_| Err(io::Error::other("frame failed")));
+        assert!(result.is_err());
+
+        let output = String::from_utf8(output.borrow().clone()).unwrap();
+        assert!(output.contains("\x1b[?2026l"));
+    }
 
     #[test]
     fn leave_terminal_emits_alternate_screen_and_mouse_cleanup() {
