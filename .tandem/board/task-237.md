@@ -2,14 +2,20 @@
 id: task-237
 type: task
 title: "Audit and accelerate the `just release` workflow"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-236", "task-185"]
 relatedFiles: ["justfile", "scripts/release_checks.py", "scripts/tests/test_release_checks.py", "tandem/RELEASE.md", "tandem/dist-workspace.toml"]
 tags: ["release", "performance", "automation"]
 createdAt: "2026-08-21T21:41:14Z"
-updatedAt: "2026-08-21T21:41:14Z"
+updatedAt: "2026-08-22T22:55:19Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-237-786b832e"
+  claimedAt: "2026-08-22T22:55:19Z"
+  updatedAt: "2026-08-22T22:55:19Z"
+assignee: "worker-task-237-786b832e"
 ---
 
 ## Description

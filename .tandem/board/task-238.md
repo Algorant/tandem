@@ -2,14 +2,20 @@
 id: task-238
 type: task
 title: "Enforce the ignored actor-id invariant and reject stale-state writes"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["decision-9", "decision-10"]
 relatedFiles: ["tandem/src/project/events.rs", "tandem/src/project/write.rs", "tandem/src/protocol/ids.rs", "protocol/README.md"]
 tags: ["protocol", "events", "identity", "git", "bugfix"]
 createdAt: "2026-08-22T14:39:15Z"
-updatedAt: "2026-08-22T14:39:15Z"
+updatedAt: "2026-08-22T22:55:20Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-238-93e9e45b"
+  claimedAt: "2026-08-22T22:55:20Z"
+  updatedAt: "2026-08-22T22:55:20Z"
+assignee: "worker-task-238-93e9e45b"
 ---
 
 ## Description
