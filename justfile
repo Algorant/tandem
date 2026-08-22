@@ -165,7 +165,9 @@ release VERSION:
 
 	cd tandem
 	cargo fmt --check
-	cargo test
+	# Test the same optimized profile used by the release binary so the later
+	# release build reuses the test compilation instead of building debug first.
+	cargo test --release
 	cargo build --release
 	cargo build --profile dist
 	cargo clippy --all-targets --all-features -- -D warnings

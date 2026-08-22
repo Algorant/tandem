@@ -14,6 +14,63 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 4. `just release` then runs the repository validation suite, pushes `main` and `tandem-vX.Y.Z`, waits for the Release workflow, and checks the published non-draft/non-prerelease GitHub Release body and assets. **Temporary:** verification of the `Update tandem-bin AUR package` workflow is currently skipped because the AUR is read-only and rejects package updates. Per Tandem rule 6, an AUR publication failure does not block a release once the tagged GitHub Release, curated notes, required assets, checksums, and primary installer are published and verified; record the AUR outcome as a downstream packaging issue. Restore the AUR wait in `justfile` when the AUR accepts pushes again.
 5. Smoke-test the primary installer command after automated publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
 
+### Release workflow performance audit
+
+The release recipe was measured on a Linux checkout with a warm Cargo registry and
+cold target profiles. Run each command from the repository root, record elapsed
+wall time, and sum the stages; this avoids publishing or creating a tag:
+
+```sh
+python3 - <<'PY'
+import subprocess, time
+commands = [
+    ("cargo fmt", "cd tandem && cargo fmt --check"),
+    ("cargo tests", "cd tandem && cargo test --release"),
+    ("release build", "cd tandem && cargo build --release"),
+    ("dist build", "cd tandem && cargo build --profile dist"),
+    ("clippy", "cd tandem && cargo clippy --all-targets --all-features -- -D warnings"),
+]
+for name, command in commands:
+    started = time.monotonic()
+    subprocess.run(command, shell=True, check=True)
+    print(f"{name}: {time.monotonic() - started:.1f}s")
+PY
+```
+
+Observed timings on 2026-08-22 (the machine and dependency cache affect absolute
+values):
+
+| Stage | Before | After |
+| --- | ---: | ---: |
+| Formatting | 0.7s | 0.7s |
+| Tests | 38.1s (`cargo test`) | 52.8s (`cargo test --release`) |
+| Release build | 63.1s | 0.1s |
+| Dist build | 46.4s | 40.1s |
+| Clippy | 19.3s | 20.6s |
+| **Measured cargo stages** | **167.6s** | **114.1s** |
+
+The dominant avoidable cost was compiling the full dependency graph twice: first
+for debug tests and then for the release binary. Testing in the release profile
+keeps the validation while allowing the required release build to reuse the
+compiled artifacts. Release validation explicitly enables `debug-assertions` and
+`overflow-checks`; the inherited `dist` profile explicitly disables both, so the
+shipped artifact remains unchanged. The cold target-profile rerun was 114.1s
+after the change; a warm rerun was 1.5s versus 1.5s for already-built profile
+stages. The networked tag, GitHub Actions, and publication waits are not included
+here.
+
+Deferred opportunities are intentionally not part of this small change:
+
+- Parallelize independent site/JavaScript checks with Cargo checks. Benefit is
+  bounded by the slowest branch; risk is higher log interleaving and resource
+  contention; cost is medium.
+- Add a first-class release benchmark command that persists stage data across
+  hosts and cold registry caches. Benefit is better trend data; risk is noisy
+  measurements and maintenance; cost is medium.
+- Replace polling for remote workflow startup with an event/API wait. Benefit is
+  less idle network time; risk is missing or selecting the wrong run; cost is
+  medium/high.
+
 ### Current capabilities
 
 - CLI commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `search`, `papercut add|list|show|resolve`, `log list|show|search`, `accord claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, `tui`, and `web`.
