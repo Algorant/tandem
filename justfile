@@ -38,6 +38,19 @@ dev:
 	fi
 	exec cargo run --manifest-path "$manifest" -- tui
 
+# Run the release TUI against this checkout for visual validation.
+# Use this instead of `just dev` for flicker, resize, and rendering checks:
+# debug builds render slowly enough to distort what you are looking for.
+# Run it in a real terminal window, not a multiplexer pane, so you are not
+# observing the multiplexer's own redraw behavior.
+dev-release:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
+	cd "$repo_root"
+	exec tandem/target/release/tandem tui
+
 # Measure Board and Logs idle CPU through a fixed 150x46 PTY.
 # Linux /proc supplies CPU data. Pass --report-only to disable thresholds.
 bench-tui-idle *ARGS:
