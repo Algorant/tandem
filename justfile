@@ -2,6 +2,10 @@
 
 set positional-arguments
 
+# Squash adjacent unpushed commits that touch only .tandem/.
+tidy-history:
+	@./scripts/tidy_history.sh
+
 # Run the development TUI. A delegated visual task may temporarily route this
 # command through Git-local state to its worktree code and a safe fixture.
 dev:
