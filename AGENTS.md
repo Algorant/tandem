@@ -218,8 +218,18 @@ Two campaign practices survive as ongoing repository rules:
 Before making changes:
 
 1. Read this file.
-2. Inspect the files directly relevant to the requested area.
-3. Keep changes scoped to the requested area.
+2. Run `tandem rules list` and follow the project's active rules. They are
+   authoritative operating guidance, not background reading, and they change
+   more often than this file. Read them at the start of a session, not after
+   deciding how to work.
+3. Run `tandem list` to see what is on the Board, and `tandem show <id>` for
+   anything related to the requested area. Existing tasks, blockers, and
+   in-flight work change what the right next step is.
+4. Inspect the files directly relevant to the requested area.
+5. Keep changes scoped to the requested area.
+
+If two rules conflict, or a rule contradicts this file, say so and get it
+resolved rather than silently picking one. Do not infer which rule wins.
 
 When recording durable decisions:
 
