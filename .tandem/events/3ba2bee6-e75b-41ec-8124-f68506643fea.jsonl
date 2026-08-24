@@ -133,3 +133,8 @@
 {"ts":"2026-08-22T23:08:02Z","event":"papercut.created","id":"papercut-5","summary":"Created Papercut: Worker-side accord transitions do not survive integration","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":133}
 {"ts":"2026-08-24T22:21:55Z","event":"task.updated","id":"task-239","summary":"Updated task-239 metadata: body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":134}
 {"ts":"2026-08-24T22:21:55Z","event":"task.updated","id":"task-239","summary":"Updated task-239 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":135}
+{"ts":"2026-08-24T22:32:31Z","event":"task.updated","id":"task-239-4","summary":"Updated task-239-4 metadata: body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":136}
+{"ts":"2026-08-24T22:32:31Z","event":"task.updated","id":"task-239-4","summary":"Updated task-239-4 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":137}
+{"ts":"2026-08-24T22:32:43Z","event":"task.updated","id":"task-228","summary":"Updated task-228 metadata: body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":138}
+{"ts":"2026-08-24T22:32:43Z","event":"task.updated","id":"task-228","summary":"Updated task-228 metadata: blockers, references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":139}
+{"ts":"2026-08-24T22:32:59Z","event":"task.created","id":"task-240","summary":"Collapse adjacent metadata-only commits before push","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":140}
