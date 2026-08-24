@@ -2,20 +2,28 @@
 id: task-241
 type: task
 title: "Surface delivered-but-untriaged work on the Board"
-state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["decision-11", "task-239", "task-239-2"]
 relatedFiles: ["tandem/src/tui/board/mod.rs"]
 tags: ["tui", "board", "workflow", "review", "visual"]
 createdAt: "2026-08-24T23:04:21Z"
-updatedAt: "2026-08-24T23:16:14Z"
+updatedAt: "2026-08-24T23:46:00Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "worker-task-241-f93d9c4b"
   claimedAt: "2026-08-24T23:16:14Z"
-  updatedAt: "2026-08-24T23:16:14Z"
+  deliveredAt: "2026-08-24T23:45:34Z"
+  validation:
+    commands: ["cargo fmt", "cargo clippy --all-targets -- -D warnings", "cargo test: 279 unit + 11 integration passed", "orchestrator terminal validation via Herdr pane against a purpose-built fixture workspace, verdigris theme"]
+  summary: "Board now surfaces delivered-but-untriaged work. Removed the dead Document parameter from board_should_surface_accord_status and moved state-dependent chip precedence to the call site. Added a Delivered · untriaged filter reachable via f, with its own clear option and filter-bar chip. Added test coverage for the predicate near misses, combined filters, chip precedence, and badge_disabled suppression."
+  filesChanged: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs"]
+  note: "Orchestrator-verified including terminal rendering, which was the outstanding blocker. Ran the built binary in a Herdr pane against a four-case fixture and confirmed: in-progress delivered vs non-delivered rows are distinct (DELIVERED chip cream #ebdbb2 on dark green #40503e, adjacent to WIP on brown #513a2c); a validation row with delivered accord and pending review shows PENDING and not DELIVERED; the Delivered · untriaged filter reduces counts to TODO 0 / IN PROGRESS 1 / VALIDATION 0 and isolates the correct task; clear all filters restores the board. Top-level Board (4) count not reflecting filters is pre-existing view-total behavior, not introduced here."
+  updatedAt: "2026-08-24T23:45:46Z"
 assignee: "worker-task-241-f93d9c4b"
+completedAt: "2026-08-24T23:46:00Z"
+completion:
+  summary: "Board surfaces delivered-but-untriaged work, resolving decision-11 E1 and unblocking task-239-2. Chip precedence in validation favors the pending review; in-progress delivered work carries a DELIVERED chip. Added a Delivered · untriaged filter via f with clear options and filter-bar indication, plus test coverage for near misses, combined filters, precedence, and badge_disabled. Verified in a real terminal against a four-case fixture. Merged to main."
 ---
 
 ## Description
