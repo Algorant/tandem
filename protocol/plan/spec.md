@@ -42,7 +42,7 @@ Brainfile is a design reference, not a v0 compatibility target. Tandem should ke
 - Accord statuses are `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`. `ready` is legacy-readable only; new work begins unclaimed and transitions directly to `claimed`.
 - Rules are structured objects with stable IDs: `{ id, rule, source? }`.
 - `parentId`, `blockers`, and `references` may point to any Tandem document by ID. A task-to-task `parentId` is `epic-task` when the resolved parent is an Epic and `subtask` only when the resolved parent has the Task role; a non-task target is generic `parent`.
-- Completion warns about missing accepted review or accepted accord, but allows completion in v0.
+- Completion is silent when `review.status` is missing, but rejects completion while `review.status: pending`; missing accord acceptance remains a warning in v0.
 - Protocol version is `0.2.0`. A discovered `0.1.0` project refuses every project operation except explicit `tandem upgrade`; help/version remain process-level operations, and upgrade is never implicit.
 - Events live in per-actor append logs under `.tandem/events/<actor_id>.jsonl`; legacy `.tandem/events.jsonl` remains a readable transition source, but new writes should not append to it by default.
 - Event payloads are minimal audit records in v0: require `ts`, `event`, `id`, `summary`, `actor`, and `seq`; event identity is `<actor>:<seq>`; defer typed per-event payload schemas.
@@ -136,7 +136,17 @@ Tandem preserves those ideas while changing the parts that feel underdeveloped o
 Default lifecycle:
 
 ```text
-todo → in-progress → validation → complete/archive → logs
+todo --claim--> in-progress --deliver--> in-progress
+                                              |
+                         orchestrator requests review when needed
+                                              |
+                                validation (review: pending)
+                                  /                    \
+                         human accepts          human rejects
+                              |                       |
+                    complete/archive          in-progress (then rework)
+                              |
+                            logs
 ```
 
 Completed work belongs in `.tandem/logs/` and is enriched by aggregated per-actor event logs under `.tandem/events/` plus any legacy `.tandem/events.jsonl`.
@@ -155,7 +165,7 @@ review:
   status: pending          # validation/review state
 ```
 
-This allows a task to be in workflow `validation` while the accord is `delivered`, `accepted`, or `rework`.
+`validation` is entered only when `review.status: pending` is requested. A task may therefore be in workflow `validation` while the accord is `delivered` or `accepted`; `accord rework` is the specific accord action that can return it to `in-progress`.
 
 ### 3. Replace Brainfile's contract concept with accord
 
@@ -257,7 +267,7 @@ Severity notes:
 - **warning** means tools should report the issue but may proceed.
 - Missing or malformed required structure is an error.
 - Unresolved core references, `parentId` and `blockers`, are errors.
-- Unresolved related references, rule sources, and completion-policy issues are warnings.
+- Unresolved related references, rule sources, and non-blocking completion-policy issues are warnings; a pending review is a completion error.
 
 ### Workspace config fields
 
@@ -268,7 +278,7 @@ Workspace config lives in `.tandem/tandem.md` frontmatter.
 | `protocolVersion` | yes | error | Must be `0.2.0`. A discovered `0.1.0` workspace may only run explicit `tandem upgrade`; no operation upgrades implicitly. |
 | `title` | yes | error | Human-readable workspace title. |
 | `states` | yes | error | Array of workflow states. `tandem init` writes `todo`, `in-progress`, `validation`. Duplicate IDs are errors. Missing defaults are warnings if no active task uses them. Existing `review` is a legacy alias for `validation` reads. |
-| `completion` | no | warning | Legacy completion-policy settings are preserved but deprecated and ignored. Tandem warns but does not block when review/accord acceptance is missing. |
+| `completion` | no | warning | Legacy completion-policy settings are preserved but deprecated and ignored. A pending review blocks completion; missing review or accord acceptance is otherwise not an error. |
 | `types` | no | warning if present/malformed | Legacy custom-type declarations are preserved as deprecated read-only content; Tandem does not create custom types/documents. |
 | `rules` | no | error if malformed | Rule groups `always`, `never`, `prefer`, `context`; each entry is a rule object. |
 | `agent` | no | warning if malformed | Agent-facing instructions. Unknown nested fields should be preserved. |
@@ -787,19 +797,19 @@ missing → claimed → delivered → accepted
                  ↘ blocked
 ```
 
-Suggested relationship to task state:
+Accord actions do not synchronize workflow state except `claim`, which moves `todo` to `in-progress`, and `rework` on a task in `validation`, which returns it to `in-progress`:
 
-| Accord status | Suggested task state |
+| Accord status | Workflow-state effect |
 | --- | --- |
-| missing | `todo` |
-| `claimed` | `in-progress` |
-| `delivered` | `validation` |
-| `accepted` | `validation` until completion/archive |
-| `rework` | `in-progress` or `validation`, depending on project preference |
-| `failed` | any state plus failure indicator |
-| `blocked` | any state plus blocked indicator |
+| missing | none |
+| `claimed` | `claim` moves `todo` to `in-progress`; otherwise none |
+| `delivered` | none |
+| `accepted` | none |
+| `rework` | On a task in `validation`, clears the pending review and returns it to `in-progress`; otherwise none |
+| `failed` | none |
+| `blocked` | none |
 
-The protocol should preserve the distinction between accord state and human workflow state. TUI/CLI tools should make misalignment visible rather than silently hiding it.
+`review.status: pending` is the only entrance to `validation`; a manual move to `validation` without a pending review is rejected. After a human accepts a review, the task may remain in `validation` briefly until completion archives it. The protocol preserves the distinction between accord state and human workflow state. TUI/CLI tools should make misalignment visible rather than silently hiding it.
 
 ## Review model
 
@@ -812,9 +822,9 @@ review:
   notes: []
 ```
 
-Review is separate from accord. A delivered accord may still need human acceptance, additional validation, or polish.
+Review is separate from accord and is the active human judgment path. `Request review` sets `review.status: pending` and enters `validation`; `Accept review / request changes` resolves that request. Review is requestable independently of accord status, but only at the delegated Task boundary. Subtasks cannot be reviewed; Epics are exempt. An orchestrator may request a review but may not resolve one. `accord rework` clears a pending review and returns a task in `validation` to `in-progress`.
 
-In v0, completion should warn if `review.status` is not `accepted`, but it should still allow completion.
+In v0, missing `review.status` is the normal case for objective work and is silent. Completion with `review.status: pending` is a hard error because it would discard an unresolved request. Other completion policy checks do not warn merely because review is missing.
 
 ## Completion and logs
 
@@ -822,7 +832,7 @@ Completion is a mutation that:
 
 1. Runs built-in structural validation.
 2. Refuses completion while any active task descendant remains, including direct Tasks beneath an Epic and Subtasks beneath a Task. Each descendant must first be completed, canceled, or otherwise resolved.
-3. Warns when review or accord acceptance is missing.
+3. Rejects completion when `review.status: pending`; missing review is normal and silent. Accord acceptance remains a separate completion-policy check.
 4. Appends a completion event to the current actor's per-actor event log under `.tandem/events/<actor_id>.jsonl`.
 5. Sets `completedAt` and `completion` metadata on the document.
 6. Moves the document from `.tandem/board/` to `.tandem/logs/`.
@@ -1046,6 +1056,7 @@ Errors fail validation and should block normal mutations.
 | `E064` | invalid role transition | Reparenting changes Epic/Task/Subtask role or leaves the immutable ID invalid for the prospective relationship. |
 | `E065` | active descendants prevent completion | A task has one or more active task descendants and cannot be archived until each descendant is resolved. |
 | `E066` | archived parent target | A new Board task targets a parent document in `.tandem/logs/`. |
+| `E067` | pending review prevents completion | A task has `review.status: pending` and cannot be completed until the review is resolved. |
 | `E070` | invalid archived log | A Log Task lacks `completedAt` or `completion.summary`, or has an unsupported `completion.outcome`. |
 
 ### Warning categories
@@ -1056,7 +1067,6 @@ Warnings should be shown, but tools may proceed.
 | --- | --- | --- |
 | `W010` | unresolved related reference | A `references` entry points to no known Tandem document. |
 | `W011` | unresolved rule source | A rule `source` points to no known Tandem document. |
-| `W020` | completion review policy | A task is being completed without `review.status: accepted`. |
 | `W021` | completion accord policy | A task with an accord is being completed without `accord.status: accepted`. |
 | `W030` | missing default state | Workspace `states` omits one of the default states and no active task currently needs it. |
 | `W040` | malformed optional metadata | Optional timestamp, notes, evidence, or validation metadata is malformed but recoverable; invalid priority/effort vocabulary is an error. |
@@ -1075,7 +1085,7 @@ Reference checks should build an ID index from both `.tandem/board/` and `.tande
 
 ### Completion-policy validation
 
-Completion-policy findings are warnings in v0. `tandem complete` should warn when review or accord acceptance is missing, then allow completion unless structural errors are present.
+Completion-policy findings are warnings in v0 except for an unresolved review. `tandem complete` must reject a task with `review.status: pending`; missing `review.status` is silent. It may warn when accord acceptance is missing, then allow completion unless structural errors are present.
 
 ## Mutation semantics
 
@@ -1124,11 +1134,11 @@ Decision ID allocation chooses the next available positive integer after scannin
 | Required inputs | Task ID and target `state`. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and enough document index data to validate core references. |
 | Files written | Target task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, resolves only in `.tandem/logs/`, target `state` is not configured, target task has unresolved `parentId`/`blockers`, or task structure is invalid. Warn for unresolved related `references` or state/accord visual misalignment. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, resolves only in `.tandem/logs/`, target `state` is not configured, target task has unresolved `parentId`/`blockers`, task structure is invalid, or the target is `validation` without `review.status: pending`. Warn for unresolved related `references` or state/accord visual misalignment. |
 | Event | `task.moved`. |
 | Resulting state | Existing active task remains in `.tandem/board/` with updated `state` and `updatedAt`. |
 
-Moving state preserves review metadata and usually preserves accord status, but tools may apply conservative paired synchronization for common non-destructive transitions. In v0, moving a task from `todo` to `in-progress` may claim an existing `accord.status: ready`; other ambiguous state-to-accord changes should warn or require explicit accord commands. The protocol keeps workflow state, accord status, and review metadata separate.
+Moving state preserves review metadata and accord status. The only accord synchronizations permitted are `claim` moving `todo` to `in-progress` and `rework` returning a task in `validation` to `in-progress` while clearing its pending review; other accord actions do not move workflow state. `validation` may be entered only by requesting review, which sets `review.status: pending`. The protocol keeps workflow state, accord status, and review metadata separate.
 
 ### Update accord
 
@@ -1139,9 +1149,9 @@ Moving state preserves review metadata and usually preserves accord status, but 
 | Files written | Target task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
 | Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, requested status is not canonical, accord object would be malformed, or existing core references are unresolved. Warn for unresolved related `references`, completion-policy issues when relevant, or state/accord visual misalignment. |
 | Event | Status-specific event: `accord.ready`, `accord.claimed`, `accord.delivered`, `accord.accepted`, `accord.rework`, `accord.failed`, or `accord.blocked`. |
-| Resulting state | Task stays in `.tandem/board/`; `accord.status` and related accord fields are updated. Tools may also apply conservative state synchronization for compatible states: `claimed` moves `todo` to `in-progress`; `delivered`/`accepted` move `todo`, `in-progress`, or legacy `review` to `validation`; `rework` may move `validation`/legacy `review` back to `in-progress`. `blocked` and `failed` remain cross-cutting signals and do not automatically move workflow state. |
+| Resulting state | Task stays in `.tandem/board/`; `accord.status` and related accord fields are updated. `claim` moves `todo` to `in-progress`. `rework` on a task in `validation` clears the pending review and returns it to `in-progress`; otherwise `rework`, `deliver`, `accept`, `block`, and `fail` leave workflow state untouched. |
 
-Suggested visual alignment remains: `ready` with `todo`, `claimed` with `in-progress`, `delivered`/`accepted` with `validation`. Existing `review` states should be displayed as legacy validation. Misalignment is allowed but should be visible in tools as a warning rather than silently hidden.
+Suggested visual alignment is limited to `ready` with `todo` and `claimed` with `in-progress`; `delivered`, `accepted`, `rework`, `failed`, and `blocked` do not imply a workflow state. `validation` means a requested review that is pending or accepted while awaiting completion, not an accord status. Existing `review` states should be displayed as legacy validation. Misalignment is allowed but should be visible in tools as a warning rather than silently hidden.
 
 ### Request review
 
@@ -1150,22 +1160,22 @@ Suggested visual alignment remains: `ready` with `todo`, `claimed` with `in-prog
 | Required inputs | Task ID. Optional reviewer and notes. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
 | Files written | Target task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or state/review mismatch if the task is not in `validation` (or legacy `review`). |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, the target is a Subtask rather than the delegated Task boundary, review object would be malformed, or existing core references are unresolved. Epics are exempt from the delegated-Task restriction. Warn for unresolved related `references`. |
 | Event | `review.requested`. |
-| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `pending`, `requestedAt` is set, optional reviewer/notes are recorded. Protocol does not automatically move `state`, though tools may pair this with a separate move to `validation`. |
+| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `pending`, `requestedAt` is set, optional reviewer/notes are recorded, and workflow `state` becomes `validation`. Review is requestable independently of accord status. An orchestrator may request review but may not resolve it. |
 
 ### Accept review / request changes
 
 | Aspect | Semantics |
 | --- | --- |
-| Required inputs | Task ID and review decision: accept, request changes, or reject. Optional reviewer and notes. |
+| Required inputs | Task ID and review decision: accept, changes, or reject. Optional reviewer and notes. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
 | Files written | Target task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, requested review status is not canonical, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or completion-policy issues when the review remains unaccepted. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, the review is not pending, the resolver is not human, requested review status is not canonical, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or completion-policy issues when the review remains unresolved. |
 | Event | `review.accepted`, `review.changes_requested`, or `review.rejected`. |
-| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `accepted`, `changes-requested`, or `rejected`; `decidedAt` is set; optional reviewer/notes are recorded. |
+| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `accepted`, `changes-requested`, or `rejected`; `decidedAt` is set; optional reviewer/notes are recorded. A human must resolve the review. Rejection/requested changes returns the task to `in-progress`; the orchestrator then issues `accord rework` when appropriate. |
 
-Requesting changes does not automatically set accord status to `rework` or move task state to `in-progress`; tools may offer that as a paired mutation, but protocol semantics keep review, accord, and state separate.
+Review resolution is separate from accord updates. It never accepts or reworks an accord implicitly, and accord actions never resolve a review.
 
 ### Complete/archive
 
@@ -1174,7 +1184,7 @@ Requesting changes does not automatically set accord status to `rework` or move 
 | Required inputs | Task ID and `completion.summary`. Optional files changed, validation result summary, reviewer/completer, and completion notes. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, `.tandem/logs/` destination index, and document index for validation. |
 | Files written | Completed task document in `.tandem/logs/`; remove/move the active `.tandem/board/` task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, already lives only in logs, required structure is invalid, destination would duplicate an existing log path/ID, any active task descendant remains, or `parentId`/`blockers` are unresolved. Warn, but allow completion, when `review.status` is not `accepted`, an existing accord is not `accepted`, related `references` or rule sources are unresolved, or optional completion metadata is malformed but recoverable. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a non-task document, already lives only in logs, required structure is invalid, destination would duplicate an existing log path/ID, any active task descendant remains, `review.status: pending`, or `parentId`/`blockers` are unresolved. Warn, but allow completion, when an existing accord is not `accepted`, related `references` or rule sources are unresolved, or optional completion metadata is malformed but recoverable. Missing `review.status` is silent. |
 | Event | `task.completed`. |
 | Resulting state | Task is archived as a Markdown log document in `.tandem/logs/` with `completedAt` and `completion.summary`; active board document is gone; log document is the completed-work source of truth. |
 
@@ -1220,6 +1230,17 @@ Tools should:
 
 Tools may build typed projections for querying and validation, but the raw Markdown document remains the source of truth.
 
+### Review commands
+
+The review command family is the active human-judgment path:
+
+- `tandem review request <id>` requests review, sets `review.status: pending`, and enters `validation`.
+- `tandem review accept <id>` resolves a pending review as accepted.
+- `tandem review changes <id>` resolves a pending review as `changes-requested` and returns the task to `in-progress` for iteration.
+- `tandem review reject <id>` resolves a pending review as rejected and returns the task to `in-progress` because the approach is not acceptable.
+
+`changes` and `reject` have the same mechanics but different meanings: `changes` requests iteration on the work, while `reject` rejects the approach. `accord fail` remains the signal for abandoning the effort entirely. An orchestrator may request review, but `accept`, `changes`, and `reject` are human-only. Review requests remain independent of accord status and are limited to the delegated Task boundary; Subtasks are rejected and Epics are exempt.
+
 ## Protocol-facing CLI surface sketch
 
 Using `tandem` as the working CLI binary name:
@@ -1240,6 +1261,7 @@ tandem papercut show <id> [--json]
 tandem papercut resolve <id> --note <text> [--reference <id>]...
 tandem search <query>
 tandem accord claim|deliver|accept|rework|block|fail
+tandem review request|accept|changes|reject <id>
 tandem rules list|add|edit|delete
 tandem decision list|show|add|update|withdraw
 tandem tui

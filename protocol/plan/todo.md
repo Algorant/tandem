@@ -16,8 +16,8 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
   - `.tandem/events/<actor_id>.jsonl` per-actor logs (with legacy `.tandem/events.jsonl` reads during transition)
 - [x] Chose `accord` as the work-agreement object replacing Brainfile contract terminology.
 - [x] Chose canonical workflow fields: `state` on documents and `states` in workspace config.
-- [x] Chose default active states: `todo`, `in-progress`, and `review`.
-- [x] Chose completion lifecycle: `todo → in-progress → review → complete/archive → logs`.
+- [x] Chose default active states: `todo`, `in-progress`, and `validation` (`review` remains a legacy read alias).
+- [x] Chose completion lifecycle: `todo --claim--> in-progress`, with `validation` entered only by pending review before complete/archive → logs.
 - [x] Captured separation between human workflow state, accord state, and review state.
 - [x] Chose strict task identity shape: Epics and Tasks use global `task-N` IDs; only Subtasks directly beneath Tasks use `task-N-M`.
 - [x] Chose first-class document types: `task` and `decision`.
@@ -30,7 +30,7 @@ This todo tracks protocol-specific tasks. The current protocol draft lives in `p
 - [x] Required Epics to be root-only and Subtasks to be leaves; invalid nested Epics, children beneath Subtasks, role/ID mismatches, and role-changing reparenting are structural errors.
 - [x] Required direct Epic Tasks to retain global `task-N` IDs and only Task-owned Subtasks to use `task-N-M`; decision-7 supersedes decision-4 without compatibility exceptions.
 - [x] Chose immutable task IDs; reparenting must preserve both role and valid ID shape and must not silently rename IDs or rewrite references.
-- [x] Decided completion warns about missing accepted review or accord but allows completion in v0.
+- [x] Decided missing review is silent, pending review blocks completion, and missing accord acceptance warns but allows completion in v0.
 - [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed history.
 - [x] Decided per-actor event logs under `.tandem/events/<actor_id>.jsonl` enrich timeline/audit history while avoiding a shared Git append hotspot; legacy `.tandem/events.jsonl` remains readable during transition.
 - [x] Decided v0 validation/lint is built-in structural validation only.
