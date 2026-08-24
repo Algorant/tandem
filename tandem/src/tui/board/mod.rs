@@ -31,11 +31,12 @@ impl BoardArrangement {
 pub(super) struct BoardFilters {
     pub(super) tag: Option<String>,
     pub(super) priority: Option<String>,
+    pub(super) delivered_untriaged: bool,
 }
 
 impl BoardFilters {
     pub(super) fn is_active(&self) -> bool {
-        self.tag.is_some() || self.priority.is_some()
+        self.tag.is_some() || self.priority.is_some() || self.delivered_untriaged
     }
 
     pub(super) fn summary(&self) -> String {
@@ -45,6 +46,9 @@ impl BoardFilters {
         }
         if let Some(priority) = self.priority.as_deref() {
             parts.push(format!("priority {}", priority));
+        }
+        if self.delivered_untriaged {
+            parts.push("delivered · untriaged".to_string());
         }
         if parts.is_empty() {
             "no Board filters".to_string()
@@ -933,9 +937,13 @@ pub(super) fn board_scan_chips(
     for (tag_chip, tone) in configured_tag_chips(doc, theme) {
         chips.push((tag_chip, theme.progress_chip_style(tone)));
     }
-    if let Some(accord) =
-        accord_status(doc).filter(|status| board_should_surface_accord_status(doc, status, theme))
-    {
+    if let Some(accord) = accord_status(doc).filter(|status| {
+        board_should_surface_accord_status(status, theme)
+            // In validation, pending review is the judgment signal; the delivered
+            // accord is intentionally omitted so the row has one unambiguous chip.
+            && !(document_state_label(doc) == "validation"
+                && normalized_accord_status(status) == "delivered")
+    }) {
         chips.push((status_chip(accord, theme), theme.accord_chip_style(accord)));
     }
     if let Some(review) =
@@ -1485,6 +1493,13 @@ pub(super) fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) ->
         ));
         spans.push(Span::raw(" "));
     }
+    if filters.delivered_untriaged {
+        spans.push(Span::styled(
+            chip_text("DELIVERED · UNTRIAGED", theme),
+            theme.accord_chip_style("delivered"),
+        ));
+        spans.push(Span::raw(" "));
+    }
     spans.push(Span::styled(" f change or clear ", theme.muted_style()));
     Line::from(spans)
 }
@@ -1503,7 +1518,15 @@ pub(super) fn board_filters_match(doc: &Document, filters: &BoardFilters) -> boo
             return false;
         }
     }
+    if filters.delivered_untriaged && !is_delivered_untriaged(doc) {
+        return false;
+    }
     true
+}
+
+pub(super) fn is_delivered_untriaged(doc: &Document) -> bool {
+    normalize_filter_value(&document_state_label(doc)) == "in-progress"
+        && accord_status(doc).is_some_and(|status| normalized_accord_status(status) == "delivered")
 }
 
 pub(super) fn board_filter_tags(docs: &[Document]) -> Vec<String> {
@@ -2127,15 +2150,8 @@ pub(super) fn wrap_words(value: &str, width: usize) -> Vec<String> {
     lines
 }
 
-pub(super) fn board_should_surface_accord_status(
-    doc: &Document,
-    status: &str,
-    theme: &TuiTheme,
-) -> bool {
+pub(super) fn board_should_surface_accord_status(status: &str, theme: &TuiTheme) -> bool {
     let normalized = normalized_accord_status(status);
-    if document_state_label(doc) == "validation" && normalized == "delivered" {
-        return false;
-    }
     matches!(
         normalized.as_str(),
         "delivered" | "accepted" | "rework" | "blocked" | "failed"

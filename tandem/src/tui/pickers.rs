@@ -13,6 +13,7 @@ pub(super) enum PickerKind {
 enum PickerAction {
     SetTag(Option<String>),
     SetPriority(Option<String>),
+    SetDeliveredUntriaged(bool),
     ClearAll,
     Move(String),
     Validation(&'static str),
@@ -100,6 +101,16 @@ impl TuiApp {
                 });
             }
         }
+        options.push(PickerOption {
+            label: "Delivered · untriaged".into(),
+            detail: if self.board_filters.delivered_untriaged {
+                "Current filter".into()
+            } else {
+                "Show in-progress work with delivered accord".into()
+            },
+            enabled: !self.board_filters.delivered_untriaged,
+            action: PickerAction::SetDeliveredUntriaged(true),
+        });
         options.extend([
             PickerOption {
                 label: "Clear tag".into(),
@@ -112,6 +123,12 @@ impl TuiApp {
                 detail: "Remove only the priority filter".into(),
                 enabled: self.board_filters.priority.is_some(),
                 action: PickerAction::SetPriority(None),
+            },
+            PickerOption {
+                label: "Clear delivered · untriaged".into(),
+                detail: "Remove only the delivered-work filter".into(),
+                enabled: self.board_filters.delivered_untriaged,
+                action: PickerAction::SetDeliveredUntriaged(false),
             },
             PickerOption {
                 label: "Clear all filters".into(),
@@ -313,6 +330,10 @@ impl TuiApp {
             }
             PickerAction::SetPriority(value) => {
                 self.board_filters.priority = value;
+                self.restore_filtered_selection(selected_id.as_deref());
+            }
+            PickerAction::SetDeliveredUntriaged(value) => {
+                self.board_filters.delivered_untriaged = value;
                 self.restore_filtered_selection(selected_id.as_deref());
             }
             PickerAction::ClearAll => {

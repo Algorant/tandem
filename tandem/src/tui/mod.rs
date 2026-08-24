@@ -1331,6 +1331,7 @@ in-progress = "active"
         let filters = BoardFilters {
             tag: Some("ux".to_string()),
             priority: None,
+            delivered_untriaged: false,
         };
 
         let todo_entries = state_board_entries(&docs, &[], "todo", &filters, &BTreeSet::new());
@@ -1556,6 +1557,7 @@ in-progress = "active"
             &BoardFilters {
                 tag: Some("ux".to_string()),
                 priority: None,
+                delivered_untriaged: false,
             },
         );
         assert_eq!(
@@ -1638,6 +1640,7 @@ in-progress = "active"
             &BoardFilters {
                 tag: Some("ux".to_string()),
                 priority: None,
+                delivered_untriaged: false,
             },
         );
 
@@ -1947,6 +1950,43 @@ in-progress = "active"
     }
 
     #[test]
+    fn board_chip_precedence_surfaces_review_over_validation_delivery() {
+        let theme = TuiTheme::default_dark();
+        let mut validation = doc_with_state("task-28", Some("validation"));
+        validation
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        validation
+            .fields
+            .insert("review.status".to_string(), "pending".to_string());
+        let validation_row =
+            line_text(&board_item_lines_for_doc(&validation, &theme, 120, false, false, false)[0]);
+        assert!(validation_row.contains(" PENDING "));
+        assert!(!validation_row.contains(" DELIVERED "));
+
+        let mut in_progress = doc_with_state("task-29", Some("in-progress"));
+        in_progress
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        let in_progress_row =
+            line_text(&board_item_lines_for_doc(&in_progress, &theme, 120, false, false, false)[0]);
+        assert!(in_progress_row.contains(" DELIVERED "));
+
+        let mut disabled_theme = TuiTheme::default_dark();
+        let warnings = disabled_theme.apply_display_content(
+            r#"
+[board.badges]
+disabled = ["accord:delivered"]
+"#,
+        );
+        assert!(warnings.is_empty(), "unexpected warnings: {warnings:?}");
+        let disabled_row = line_text(
+            &board_item_lines_for_doc(&in_progress, &disabled_theme, 120, false, false, false)[0],
+        );
+        assert!(!disabled_row.contains(" DELIVERED "));
+    }
+
+    #[test]
     fn board_row_uses_configured_tag_badges_and_disabled_badges() {
         let mut theme = TuiTheme::default_dark();
         let warnings = theme.apply_display_content(
@@ -2071,6 +2111,48 @@ tone = "success"
     }
 
     #[test]
+    fn delivered_untriaged_filter_matches_only_in_progress_deliveries() {
+        let mut delivered = doc_with_state("task-24", Some("in-progress"));
+        delivered
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+        delivered
+            .fields
+            .insert("tags".to_string(), "[\"tui\"]".to_string());
+        delivered
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+
+        let mut no_accord = doc_with_state("task-25", Some("in-progress"));
+        no_accord
+            .fields
+            .insert("tags".to_string(), "[\"tui\"]".to_string());
+        let mut other_accord = doc_with_state("task-26", Some("in-progress"));
+        other_accord
+            .fields
+            .insert("accord.status".to_string(), "accepted".to_string());
+        let mut validation = doc_with_state("task-27", Some("validation"));
+        validation
+            .fields
+            .insert("accord.status".to_string(), "delivered".to_string());
+
+        assert!(is_delivered_untriaged(&delivered));
+        assert!(!is_delivered_untriaged(&no_accord));
+        assert!(!is_delivered_untriaged(&other_accord));
+        assert!(!is_delivered_untriaged(&validation));
+
+        let filters = BoardFilters {
+            tag: Some("tui".to_string()),
+            priority: Some("high".to_string()),
+            delivered_untriaged: true,
+        };
+        assert!(board_filters_match(&delivered, &filters));
+        assert!(!board_filters_match(&no_accord, &filters));
+        assert!(!board_filters_match(&other_accord, &filters));
+        assert!(!board_filters_match(&validation, &filters));
+    }
+
+    #[test]
     fn board_filters_match_existing_tags_and_priorities() {
         let mut research = doc_with_state("task-24", Some("todo"));
         research
@@ -2091,6 +2173,7 @@ tone = "success"
         let filters = BoardFilters {
             tag: Some("tui".to_string()),
             priority: Some("high".to_string()),
+            delivered_untriaged: false,
         };
         let tabs = board_subview_tabs(&["todo".to_string()], &docs, &filters);
         assert_eq!(tabs[0].count, 1);
@@ -2147,6 +2230,7 @@ tone = "success"
         app.board_filters = BoardFilters {
             tag: Some("research".to_string()),
             priority: Some("high".to_string()),
+            delivered_untriaged: false,
         };
 
         let footer = app.board_footer_text();
