@@ -154,3 +154,13 @@
 {"ts":"2026-08-24T23:15:08Z","event":"task.updated","id":"task-239-1","summary":"Updated task-239-1 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":154}
 {"ts":"2026-08-24T23:15:08Z","event":"task.updated","id":"task-239-2","summary":"Updated task-239-2 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":155}
 {"ts":"2026-08-24T23:15:08Z","event":"task.updated","id":"task-239-3","summary":"Updated task-239-3 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":156}
+{"ts":"2026-08-24T23:16:14Z","event":"accord.claimed","id":"task-241","summary":"Accord claim for task-241","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":157}
+{"ts":"2026-08-24T23:16:14Z","event":"task.updated","id":"task-241","summary":"Updated task-241 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":158}
+{"ts":"2026-08-24T23:16:14Z","event":"accord.claimed","id":"task-239-1","summary":"Accord claim for task-239-1","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":159}
+{"ts":"2026-08-24T23:16:14Z","event":"task.updated","id":"task-239-1","summary":"Updated task-239-1 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":160}
+{"ts":"2026-08-24T23:22:47Z","event":"decision.updated","id":"decision-11","summary":"Updated decision decision-11","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":161}
+{"ts":"2026-08-24T23:26:20Z","event":"decision.updated","id":"decision-11","summary":"Updated decision decision-11","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":162}
+{"ts":"2026-08-24T23:27:56Z","event":"accord.delivered","id":"task-239-1","summary":"Accord deliver for task-239-1","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":163}
+{"ts":"2026-08-24T23:28:14Z","event":"accord.accepted","id":"task-239-1","summary":"Accord accept for task-239-1","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":164}
+{"ts":"2026-08-24T23:28:14Z","event":"papercut.created","id":"papercut-7","summary":"Created Papercut: review.status not-ready has no command surface","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":165}
+{"ts":"2026-08-24T23:28:26Z","event":"task.completed","id":"task-239-1","summary":"protocol/plan/spec.md and todo.md now implement decision-11. No accord action moves workflow state except claim, plus rework returning a validation task to in-progress. review.status pending is the only entrance to validation; completion rejects a pending review (E067) and is silent on missing review (W020 removed). Review is human-resolved, independent of accord, and limited to the delegated Task boundary. Added the tandem review request|accept|changes|reject family. Merged to main.","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":166}

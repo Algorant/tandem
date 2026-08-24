@@ -11,7 +11,7 @@ alternatives: ["O1 decouple entirely: accord never touches state and the orchest
 references: ["task-239", "task-239-4", "task-228", "papercut-4", "papercut-5"]
 tags: ["protocol", "workflow", "accord", "review", "validation"]
 createdAt: "2026-08-24T23:03:18Z"
-updatedAt: "2026-08-24T23:03:18Z"
+updatedAt: "2026-08-24T23:26:20Z"
 ---
 
 ## Status
@@ -53,3 +53,42 @@ todo --claim--> in-progress --deliver--> in-progress (accord: delivered)
 ## Execution
 
 task-239-1, task-239-2, task-239-3, and task-228 execute this decision and must not restate or reinvent it. E1 must be resolved before task-239-2 lands.
+
+## Amendments
+
+Two gaps in the original record, found while task-239-1 implemented it in `protocol/plan/spec.md`. Both are corrections to this decision, not deviations from it.
+
+### A1 (2026-08-24) — E3 was incomplete
+
+E3 required `accord rework` to clear a stale pending review, but did not say it must also move the task.
+
+Clearing the review alone leaves the task in `validation` with no pending review: parked with nobody waiting on it, which is exactly the failure this decision eliminates. The Worker implemented E3 as written, so the defect was in this record.
+
+**Corrected rule:** `accord rework` on a task in `validation` clears the pending review **and** returns it to `in-progress`. This is the only accord action besides `claim` that moves workflow state.
+
+`block` and `fail` remain state-neutral and preserve a pending review, because such a task legitimately still awaits its human.
+
+### A2 (2026-08-24) — no CLI surface for review
+
+This decision makes requesting and resolving review the central human-judgment path, but specified no CLI surface, and none exists. `tandem accord` has `claim|deliver|accept|rework|block|fail`; review has nothing.
+
+**Adopted:** `tandem review request|accept|reject <id>`, symmetric with `tandem accord`.
+
+Consequences:
+
+- This adds a command family to the locked v0 CLI list in `AGENTS.md`, which must be updated as part of task-239-2.
+- `tandem move <id> --state validation` remains a valid command. It is rejected at runtime when there is no pending review, rather than being removed.
+- Review resolution stays human-only per E2, so `accept` and `reject` are operator commands and are not available to Workers or orchestrators acting on their own requests.
+### A3 (2026-08-24) — `changes-requested` had no command
+
+A2 specified `tandem review request|accept|reject`, but the protocol already documents three resolve outcomes: `accepted`, `changes-requested`, and `rejected`, with a matching `review.changes_requested` event. A2 left `changes-requested` reachable by no command.
+
+**Adopted:** `tandem review request|accept|changes|reject <id>`.
+
+`changes` and `reject` both resolve a pending review and return the task to `in-progress`. They differ in meaning, not mechanics: `changes` means iterate on this work, `reject` means the work is not acceptable as an approach. `accord fail` remains the signal for abandoning the effort entirely.
+
+Adding a subcommand is preferred over deleting the `changes-requested` status, because the status, its event, and its validation entry are already specified and removing them is the larger change.
+
+### Pattern note
+
+A1, A2, and A3 were each found by a Worker implementing this decision faithfully. In every case the Worker was correct and this record was incomplete. Decisions that introduce a workflow concept should enumerate its full status vocabulary, its events, and its command surface together before delegation, rather than leaving them to be discovered.

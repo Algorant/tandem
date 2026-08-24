@@ -2,14 +2,20 @@
 id: task-241
 type: task
 title: "Surface delivered-but-untriaged work on the Board"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["decision-11", "task-239", "task-239-2"]
 relatedFiles: ["tandem/src/tui/board/mod.rs"]
 tags: ["tui", "board", "workflow", "review", "visual"]
 createdAt: "2026-08-24T23:04:21Z"
-updatedAt: "2026-08-24T23:04:21Z"
+updatedAt: "2026-08-24T23:16:14Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-241-f93d9c4b"
+  claimedAt: "2026-08-24T23:16:14Z"
+  updatedAt: "2026-08-24T23:16:14Z"
+assignee: "worker-task-241-f93d9c4b"
 ---
 
 ## Description
