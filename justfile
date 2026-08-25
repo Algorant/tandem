@@ -42,6 +42,10 @@ dev:
 	fi
 	exec cargo run --manifest-path "$manifest" -- tui
 
+# Run the fixture-driven release workflow selector checks.
+test-release-checks:
+	@scripts/tests/test_release_checks.sh
+
 # Run the release TUI against this checkout for visual validation.
 # Use this instead of `just dev` for flicker, resize, and rendering checks:
 # debug builds render slowly enough to distort what you are looking for.
@@ -162,10 +166,10 @@ release VERSION:
 	release_file="$(mktemp)"
 	runs_file="$(mktemp)"
 	trap 'rm -f "$notes_file" "$manifest_file" "$release_file" "$runs_file"' EXIT
-	python3 scripts/release_checks.py notes "$version" "$notes_file"
-	python3 scripts/release_checks.py cargo "$version"
+	scripts/release_checks.sh notes "$version" "$notes_file"
+	scripts/release_checks.sh cargo "$version"
 	dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
-	python3 scripts/release_checks.py manifest "$notes_file" "$manifest_file"
+	scripts/release_checks.sh manifest "$notes_file" "$manifest_file"
 
 	cd tandem
 	cargo fmt --check
@@ -204,7 +208,7 @@ release VERSION:
 		local run_id=""
 		for _ in {1..180}; do
 			gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,headSha,event,createdAt,updatedAt > "$runs_file"
-			selection="$(python3 scripts/release_checks.py select-run "$role" "$runs_file" "$tag" "$release_commit" "$release_run_completed_at")"
+			selection="$(scripts/release_checks.sh select-run "$role" "$runs_file" "$tag" "$release_commit" "$release_run_completed_at")"
 			if [[ -n "$selection" ]]; then
 				run_id="$(jq -r .databaseId <<<"$selection")"
 				echo "Waiting for $workflow run $run_id for $tag"
@@ -222,7 +226,7 @@ release VERSION:
 	wait_for_workflow release "Release"
 
 	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
-	python3 scripts/release_checks.py published "$notes_file" "$release_file"
+	scripts/release_checks.sh published "$notes_file" "$release_file"
 	# TEMPORARY: AUR is read-only and cannot accept package updates, so waiting on
 	# the tandem-bin workflow would fail or hang for 30 minutes after the release
 	# has already published and verified successfully. Tandem rule 6 requires that
