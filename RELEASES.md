@@ -2,6 +2,40 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.11.0
+
+Tandem v0.11.0 changes what `validation` means. It is no longer where delivered work waits by default; it now marks work that a human was explicitly asked to look at.
+
+### Protocol
+
+- Accord actions no longer move workflow state, with two exceptions: `claim` moves `todo` to `in-progress`, and `rework` on a task in `validation` returns it to `in-progress` and clears the pending review. `deliver`, `accept`, `block`, and `fail` leave workflow state untouched.
+- `review.status: pending` is the only entrance to `validation`. Adding a task directly in `validation`, or moving one there without a pending review, is rejected as `E067`.
+- A task may remain in `validation` with an accepted review while awaiting completion.
+- Completing a task with `review.status: pending` is now an error. Completing one with no review is silent; the previous `W020` warning is removed.
+- Review requests are independent of accord status and are limited to the delegated Task boundary. Subtasks cannot be reviewed; Epics are exempt.
+- `review.status: not-ready` is readable but is no longer produced by any command, matching how `accord: ready` is already treated.
+
+### CLI
+
+- New `tandem review request|accept|changes|reject <id>`. `request` sets `review.status: pending` and enters `validation`. `changes` and `reject` both resolve the review and return the task to `in-progress`, differing in recorded status and meaning rather than mechanics.
+
+### TUI
+
+- Board rows distinguish delivered work awaiting triage from work still in progress. A row in `validation` shows its pending review rather than a redundant delivered accord.
+- A `Delivered · untriaged` Board filter lists work that has been delivered but not yet triaged.
+- Draws are wrapped in synchronized output, removing tearing during redraw.
+
+### Fixed
+
+- A tracked `.tandem/actor-id` is now rejected with an actionable error naming `git rm --cached`. Committing that file gave every clone one identity, so parallel machines allocated the same event sequence numbers and collided at merge time. `git check-ignore` alone could not detect this, because ignore rules never apply to tracked files.
+- After writing its ignore pattern, Tandem verifies the pattern actually took effect. A repository `.gitignore` negation can override `.git/info/exclude`, which previously went unnoticed.
+
+### Upgrading
+
+Existing workspaces keep working, but boards built under the previous behavior may hold tasks sitting in `validation` without a pending review. Those tasks are readable and completable; they simply no longer match how work reaches `validation`. Move them back to `in-progress`, or request a review if one is genuinely wanted.
+
+Scripts that relied on `tandem accord deliver` or `accept` moving a task into `validation` need updating. Use `tandem review request` to escalate work to a human, and `tandem complete` directly for objective work.
+
 ## 0.10.3
 
 Tandem v0.10.3 restores fast loading for the local read-only web interface on established workspaces.
