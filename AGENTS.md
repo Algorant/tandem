@@ -56,7 +56,7 @@ Protocol:
 
 CLI/TUI:
 
-- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `rules`, `decision`, `tui`.
+- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `review`, `rules`, `decision`, `tui`.
 - v0 `tandem log`: `list`, `show`, `search` only.
 - v0 `tandem rules`: `list`, `add`, `edit`, `delete`.
 - `tandem accord`: `claim`, `deliver`, `accept`, `rework`, `block`, `fail`; persisted `ready` remains readable but is not a command action.

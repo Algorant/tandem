@@ -51,6 +51,10 @@ pub(crate) fn is_known_name(name: &str) -> bool {
             | "accord.failed"
             | "validation.accepted"
             | "validation.rework"
+            | "review.requested"
+            | "review.accepted"
+            | "review.changes_requested"
+            | "review.rejected"
     )
 }
 

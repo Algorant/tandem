@@ -449,6 +449,36 @@ pub(super) fn accord_actions_usage() -> String {
     format!("{}, or {last}", leading.join(", "))
 }
 
+pub(super) fn cmd_review(args: &[String]) -> Result<(), CliError> {
+    let Some((action, rest)) = args.split_first() else {
+        return Err(CliError::usage(
+            "tandem review requires request, accept, changes, or reject",
+        ));
+    };
+    if !matches!(action.as_str(), "request" | "accept" | "changes" | "reject") {
+        return Err(CliError::usage(format!(
+            "unknown review subcommand `{action}`; use request, accept, changes, or reject"
+        )));
+    }
+    let options = parse_review_args(action, rest)?;
+    let json = options.json;
+    let workspace = discover_workspace()?;
+    let outcome = app::review::transition(&workspace, action, options)?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok": true, "data": {"id": outcome.id, "status": outcome.status, "state": outcome.state, "event": outcome.event_name}})
+        );
+    } else {
+        println!("Review {}", action);
+        println!("ID:      {}", outcome.id);
+        println!("Status:  {}", outcome.status);
+        println!("State:   {}", outcome.state);
+        println!("Event:   {}", outcome.event_name);
+    }
+    Ok(())
+}
+
 pub(super) fn cmd_accord(args: &[String]) -> Result<(), CliError> {
     let Some((action, rest)) = args.split_first() else {
         return Err(CliError::usage(format!(

@@ -822,7 +822,7 @@ review:
   notes: []
 ```
 
-Review is separate from accord and is the active human judgment path. `Request review` sets `review.status: pending` and enters `validation`; `Accept review / request changes` resolves that request. Review is requestable independently of accord status, but only at the delegated Task boundary. Subtasks cannot be reviewed; Epics are exempt. An orchestrator may request a review but may not resolve one. `accord rework` clears a pending review and returns a task in `validation` to `in-progress`.
+Review is separate from accord and is the active judgment path. `Request review` sets `review.status: pending` and enters `validation`; `Accept review / request changes` resolves that request. Review is requestable independently of accord status, but only at the delegated Task boundary. Subtasks cannot be reviewed; Epics are exempt. `accord rework` clears a pending review and returns a task in `validation` to `in-progress`.
 
 In v0, missing `review.status` is the normal case for objective work and is silent. Completion with `review.status: pending` is a hard error because it would discard an unresolved request. Other completion policy checks do not warn merely because review is missing.
 
@@ -1171,9 +1171,9 @@ Suggested visual alignment is limited to `ready` with `todo` and `claimed` with 
 | Required inputs | Task ID and review decision: accept, changes, or reject. Optional reviewer and notes. |
 | Files read | `.tandem/tandem.md`, target task document in `.tandem/board/`, and document index for core reference validation. |
 | Files written | Target task document; append current actor event log under `.tandem/events/<actor_id>.jsonl`. |
-| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, the review is not pending, the resolver is not human, requested review status is not canonical, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or completion-policy issues when the review remains unresolved. |
+| Validation/errors/warnings | Error if the ID is missing, resolves to a log document or non-task document, the review is not pending, requested review status is not canonical, review object would be malformed, or existing core references are unresolved. Warn for unresolved related `references` or completion-policy issues when the review remains unresolved. |
 | Event | `review.accepted`, `review.changes_requested`, or `review.rejected`. |
-| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `accepted`, `changes-requested`, or `rejected`; `decidedAt` is set; optional reviewer/notes are recorded. A human must resolve the review. Rejection/requested changes returns the task to `in-progress`; the orchestrator then issues `accord rework` when appropriate. |
+| Resulting state | Task stays in `.tandem/board/`; `review.status` becomes `accepted`, `changes-requested`, or `rejected`; `decidedAt` is set; optional reviewer/notes are recorded. Rejection/requested changes returns the task to `in-progress`; the orchestrator then issues `accord rework` when appropriate. |
 
 Review resolution is separate from accord updates. It never accepts or reworks an accord implicitly, and accord actions never resolve a review.
 
@@ -1239,7 +1239,7 @@ The review command family is the active human-judgment path:
 - `tandem review changes <id>` resolves a pending review as `changes-requested` and returns the task to `in-progress` for iteration.
 - `tandem review reject <id>` resolves a pending review as rejected and returns the task to `in-progress` because the approach is not acceptable.
 
-`changes` and `reject` have the same mechanics but different meanings: `changes` requests iteration on the work, while `reject` rejects the approach. `accord fail` remains the signal for abandoning the effort entirely. An orchestrator may request review, but `accept`, `changes`, and `reject` are human-only. Review requests remain independent of accord status and are limited to the delegated Task boundary; Subtasks are rejected and Epics are exempt.
+`changes` and `reject` have the same mechanics but different meanings: `changes` requests iteration on the work, while `reject` rejects the approach. `accord fail` remains the signal for abandoning the effort entirely. Review requests remain independent of accord status and are limited to the delegated Task boundary; Subtasks are rejected and Epics are exempt.
 
 ## Protocol-facing CLI surface sketch
 

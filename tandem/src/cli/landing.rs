@@ -19,6 +19,7 @@ const GROUPS: &[(&str, &[(&str, &str)])] = &[
         "Collaborate",
         &[
             ("accord", "Manage work agreements"),
+            ("review", "Request and resolve reviews"),
             ("rules", "Manage project rules"),
             ("decision", "Record and inspect decisions"),
         ],
@@ -110,9 +111,9 @@ mod tests {
         assert_eq!(
             rendered_commands,
             [
-                "add", "move", "update", "complete", "cancel", "accord", "rules", "decision",
-                "list", "show", "search", "papercut", "log", "init", "upgrade", "tui", "web",
-                "version"
+                "add", "move", "update", "complete", "cancel", "accord", "review", "rules",
+                "decision", "list", "show", "search", "papercut", "log", "init", "upgrade", "tui",
+                "web", "version"
             ]
         );
     }

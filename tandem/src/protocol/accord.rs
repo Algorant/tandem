@@ -1,7 +1,6 @@
 //! Canonical accord vocabulary, transitions, and workflow alignment.
 
 use super::document::{parse_field_values, Document};
-use super::workflow::{LEGACY_REVIEW_STATE, VALIDATION_STATE};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AccordRecord {
@@ -119,19 +118,41 @@ pub(crate) fn validate_transition(action: &str, previous_status: &str) -> Result
     }
 }
 
-pub(crate) fn state_sync_target<'a>(status: &str, current_state: &'a str) -> Option<&'a str> {
-    match status {
-        "claimed" if current_state == "todo" => Some("in-progress"),
-        "delivered" | "accepted"
-            if matches!(current_state, "todo" | "in-progress" | LEGACY_REVIEW_STATE) =>
-        {
-            Some(VALIDATION_STATE)
-        }
-        "rework" if matches!(current_state, VALIDATION_STATE | LEGACY_REVIEW_STATE) => {
-            Some("in-progress")
-        }
-        _ => None,
+/// Only the legacy-ready/claimed alignment is a visual suggestion. Delivered,
+/// accepted, blocked, failed, and rework statuses do not imply a workflow state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct StateEffect<'a> {
+    pub(crate) state: Option<&'a str>,
+    pub(crate) clear_review: bool,
+}
+
+/// Decide workflow effects for an accord action. The application layer only
+/// applies this protocol result to the stored document.
+pub(crate) fn state_effect<'a>(
+    action: &str,
+    current_state: &'a str,
+    current_review: Option<&str>,
+) -> StateEffect<'a> {
+    if action == "claim" && current_state == "todo" {
+        return StateEffect {
+            state: Some("in-progress"),
+            clear_review: false,
+        };
     }
+    if action == "rework" && current_state == "validation" && current_review == Some("pending") {
+        return StateEffect {
+            state: Some("in-progress"),
+            clear_review: true,
+        };
+    }
+    StateEffect {
+        state: None,
+        clear_review: false,
+    }
+}
+
+pub(crate) fn state_sync_target<'a>(status: &str, current_state: &'a str) -> Option<&'a str> {
+    (status == "claimed" && current_state == "todo").then_some("in-progress")
 }
 
 pub(crate) fn state_divergence_warning(document: &Document) -> Option<String> {
@@ -151,6 +172,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn state_effects_cover_all_accord_actions_and_review_rework() {
+        for action in ["deliver", "accept", "block", "fail"] {
+            assert_eq!(
+                state_effect(action, "in-progress", Some("pending")),
+                StateEffect {
+                    state: None,
+                    clear_review: false
+                }
+            );
+        }
+        assert_eq!(
+            state_effect("claim", "todo", None),
+            StateEffect {
+                state: Some("in-progress"),
+                clear_review: false
+            }
+        );
+        assert_eq!(state_effect("claim", "in-progress", None).state, None);
+        assert_eq!(
+            state_effect("rework", "validation", Some("pending")),
+            StateEffect {
+                state: Some("in-progress"),
+                clear_review: true
+            }
+        );
+        assert_eq!(
+            state_effect("rework", "in-progress", Some("pending")),
+            StateEffect {
+                state: None,
+                clear_review: false
+            }
+        );
+    }
+
+    #[test]
     fn workflow_alignment_is_visible_without_collapsing_state() {
         let document = Document::new(
             HashMap::from([
@@ -160,9 +216,7 @@ mod tests {
             ]),
             String::new(),
         );
-        assert!(state_divergence_warning(&document)
-            .unwrap()
-            .contains("suggests `validation`"));
+        assert!(state_divergence_warning(&document).is_none());
         assert_eq!(document.field("state"), Some("in-progress"));
     }
 }

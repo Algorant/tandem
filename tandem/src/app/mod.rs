@@ -9,6 +9,7 @@ pub(crate) mod decisions;
 pub(crate) mod papercuts;
 pub(crate) mod project;
 pub(crate) mod queries;
+pub(crate) mod review;
 pub(crate) mod rules;
 pub(crate) mod support;
 pub(crate) mod tasks;

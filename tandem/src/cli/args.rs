@@ -2,6 +2,7 @@ use super::output::require_nonempty;
 use crate::app;
 use crate::app::accord::AccordOptions;
 use crate::app::decisions::AddOptions as DecisionAddOptions;
+use crate::app::review::ReviewOptions;
 use crate::app::tasks::{AddOptions, CancelOptions, CompleteOptions, MoveOptions, UpdateOptions};
 use crate::CliError;
 
@@ -783,6 +784,35 @@ pub(super) fn parse_rule_id(value: &str) -> Result<usize, CliError> {
         .ok()
         .filter(|id| *id > 0)
         .ok_or_else(|| CliError::usage("--id must be a positive integer"))
+}
+
+pub(super) fn parse_review_args(action: &str, args: &[String]) -> Result<ReviewOptions, CliError> {
+    let mut options = ReviewOptions::default();
+    let mut index = 0;
+    while index < args.len() {
+        match args[index].as_str() {
+            "--reviewer" => {
+                index += 1;
+                options.reviewer = Some(required_value(args, index, "--reviewer")?.to_string());
+            }
+            "--note" => {
+                index += 1;
+                options.note = Some(required_raw_value(args, index, "--note")?.to_string());
+            }
+            "--json" => options.json = true,
+            flag if flag.starts_with('-') => {
+                return Err(CliError::usage(format!(
+                    "unknown review {action} flag `{flag}`"
+                )))
+            }
+            value => set_single_positional(&mut options.id, value, &format!("review {action}"))?,
+        }
+        index += 1;
+    }
+    if options.id.is_empty() {
+        return Err(CliError::usage(format!("review {action} requires an <id>")));
+    }
+    Ok(options)
 }
 
 pub(super) fn parse_accord_args(action: &str, args: &[String]) -> Result<AccordOptions, CliError> {

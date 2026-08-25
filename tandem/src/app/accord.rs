@@ -474,12 +474,20 @@ pub(crate) fn transition(
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now);
     let previous_state = doc.field("state").unwrap_or("-").to_string();
-    let synced_state = accord::state_sync_target(status, &previous_state).map(str::to_string);
-    if let Some(state) = synced_state.as_deref() {
+    let effect = accord::state_effect(action, &previous_state, review_status(&doc));
+    let synced_state = if let Some(state) = effect.state {
         validate_state(workspace, state)?;
         updates.insert("state".to_string(), state.to_string());
-    }
-    let patched = patch_frontmatter_content(&patched, &updates, &[])?;
+        Some(state.to_string())
+    } else {
+        None
+    };
+    let removes = if effect.clear_review {
+        ["review.status"].as_slice()
+    } else {
+        [].as_slice()
+    };
+    let patched = patch_frontmatter_content(&patched, &updates, removes)?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
     let event_name = accord::event_name(action).to_string();
@@ -570,7 +578,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(delivered.previous_status, "claimed");
-        assert_eq!(delivered.synced_state.as_deref(), Some("validation"));
+        assert_eq!(delivered.synced_state, None);
 
         let changed = fs::read_to_string(path).unwrap();
         assert!(changed.contains("unknown: keep"));

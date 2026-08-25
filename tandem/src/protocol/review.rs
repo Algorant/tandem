@@ -19,8 +19,3 @@ pub(crate) fn status(document: &Document) -> Option<&str> {
 pub(crate) fn is_known_status(status: &str) -> bool {
     STATUSES.contains(&status)
 }
-
-pub(crate) fn completion_warning(document: &Document) -> Option<String> {
-    let status = status(document).unwrap_or("missing");
-    (status != "accepted").then(|| format!("{} has review.status={status}.", document.id()))
-}

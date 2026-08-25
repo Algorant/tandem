@@ -161,6 +161,7 @@ fn process_help_version_usage_and_missing_project_contracts() {
             "  tandem papercut add|list|show|resolve ...\n",
             "  tandem log list|show|search ...\n",
             "  tandem accord claim|deliver|accept|rework|block|fail ...\n",
+            "  tandem review request|accept|changes|reject <id> [--reviewer <name>] [--note <text>] [--json]\n",
             "  tandem rules list|add|edit|delete ...\n",
             "  tandem decision list|show|add ... [--status <status>] [--date <date>]\n",
             "  tandem tui\n",
@@ -182,7 +183,7 @@ fn process_help_version_usage_and_missing_project_contracts() {
     let unknown_command = project.run(&["unknown-command"]);
     unknown_command.assert_exit(2);
     assert!(unknown_command.stdout.is_empty());
-    assert_eq!(unknown_command.stderr, "Error: unknown command `unknown-command`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, papercut, log, accord, rules, decision, tui, web, version\n");
+    assert_eq!(unknown_command.stderr, "Error: unknown command `unknown-command`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, papercut, log, accord, review, rules, decision, tui, web, version\n");
 
     let unknown_flag = project.run(&["list", "--unknown"]);
     unknown_flag.assert_exit(2);
@@ -443,13 +444,13 @@ fn reads_mutations_accords_events_and_preservation_use_the_real_command() {
     assert!(delivered.stdout.contains("Updated accord"));
     assert!(delivered.stdout.contains("From:   claimed"));
     assert!(delivered.stdout.contains("To:     delivered"));
-    assert!(delivered
+    assert!(!delivered
         .stdout
         .contains("State:  in-progress -> validation"));
 
     let human_read = project.run(&["show", "task-1"]);
     human_read.assert_success();
-    assert!(human_read.stdout.contains("State:     validation"));
+    assert!(human_read.stdout.contains("State:     in-progress"));
     assert!(human_read.stdout.contains("Accord:    delivered"));
 
     let json_read = project.run(&["list", "--json"]);
@@ -457,7 +458,7 @@ fn reads_mutations_accords_events_and_preservation_use_the_real_command() {
     assert!(json_read.stdout.contains("\"ok\":true"));
     assert!(json_read.stdout.contains("\"items\""));
     assert!(json_read.stdout.contains("\"id\":\"task-1\""));
-    assert!(json_read.stdout.contains("\"state\":\"validation\""));
+    assert!(json_read.stdout.contains("\"state\":\"in-progress\""));
 
     let events = project.actor_events();
     assert!(events.contains("\"event\":\"task.created\""));
@@ -511,9 +512,7 @@ fn hierarchy_validation_completion_and_logs_remain_observable_at_the_process_bou
         "reviewer",
     ]);
     completed.assert_success();
-    assert!(completed
-        .stdout
-        .contains("Warning: task-2-1 has review.status=missing."));
+    assert!(!completed.stdout.contains("review.status=missing"));
     assert!(completed
         .stdout
         .contains("Warning: task-2-1 has accord.status=missing, not accepted."));
@@ -807,4 +806,107 @@ fn rules_and_decisions_share_durable_command_behavior() {
     let events = project.actor_events();
     assert!(events.contains("\"event\":\"rules.updated\""));
     assert!(events.contains("\"event\":\"decision.created\""));
+}
+
+#[test]
+fn review_and_validation_transitions_cover_new_protocol_rules() {
+    let project = TempProject::new("review-transitions");
+    project.init();
+    let direct = project.run(&["add", "--title", "invalid", "--state", "validation"]);
+    direct.assert_exit(1);
+    assert!(direct
+        .stderr
+        .contains("validation state requires review.status"));
+    project
+        .run(&["add", "--title", "reviewable"])
+        .assert_success();
+    let move_without_review = project.run(&["move", "task-1", "--state", "validation"]);
+    move_without_review.assert_exit(1);
+    assert!(move_without_review.stderr.contains("E067"));
+    project
+        .run(&["review", "request", "task-1", "--json"])
+        .assert_success();
+    let move_with_review = project.run(&["move", "task-1", "--state", "validation"]);
+    move_with_review.assert_success();
+    let pending_completion = project.run(&["complete", "task-1", "--summary", "pending"]);
+    pending_completion.assert_exit(1);
+    assert!(pending_completion.stderr.contains("E067"));
+    let accepted = project.run(&["review", "accept", "task-1", "--json"]);
+    accepted.assert_success();
+    assert!(accepted.stdout.contains("\"status\":\"accepted\""));
+    assert!(project
+        .read(".tandem/board/task-1.md")
+        .contains("decidedAt:"));
+    project
+        .run(&["complete", "task-1", "--summary", "done"])
+        .assert_success();
+
+    project
+        .run(&["add", "--title", "objective"])
+        .assert_success();
+    let missing_review_completion = project.run(&["complete", "task-2", "--summary", "objective"]);
+    missing_review_completion.assert_success();
+    assert!(!missing_review_completion.stdout.contains("review.status"));
+
+    project.run(&["add", "--title", "changes"]).assert_success();
+    project
+        .run(&["review", "request", "task-3"])
+        .assert_success();
+    project
+        .run(&["review", "changes", "task-3"])
+        .assert_success();
+    assert!(project
+        .read(".tandem/board/task-3.md")
+        .contains("changes-requested"));
+    assert!(project
+        .read(".tandem/board/task-3.md")
+        .contains("state: \"in-progress\""));
+    let not_pending = project.run(&["review", "reject", "task-3"]);
+    not_pending.assert_exit(1);
+    assert!(not_pending
+        .stderr
+        .contains("does not have review.status: pending"));
+
+    project.run(&["add", "--title", "reject"]).assert_success();
+    project
+        .run(&["review", "request", "task-4"])
+        .assert_success();
+    project
+        .run(&["review", "reject", "task-4"])
+        .assert_success();
+    assert!(project
+        .read(".tandem/board/task-4.md")
+        .contains("status: \"rejected\""));
+
+    project.run(&["add", "--title", "rework"]).assert_success();
+    project
+        .run(&["review", "request", "task-5"])
+        .assert_success();
+    project
+        .run(&["accord", "deliver", "task-5", "--summary", "ready"])
+        .assert_success();
+    project
+        .run(&["accord", "rework", "task-5", "--note", "fix"])
+        .assert_success();
+    let reworked = project.read(".tandem/board/task-5.md");
+    assert!(reworked.contains("state: \"in-progress\""));
+    assert!(!reworked.contains("review.status"));
+
+    project
+        .run(&["add", "--title", "epic", "--kind", "epic"])
+        .assert_success();
+    project
+        .run(&["review", "request", "task-6"])
+        .assert_success();
+    project
+        .run(&["add", "--title", "child", "--parent", "task-6"])
+        .assert_success();
+    project
+        .run(&["add", "--title", "subtask", "--parent", "task-7"])
+        .assert_success();
+    let subtask_review = project.run(&["review", "request", "task-7-1"]);
+    subtask_review.assert_exit(1);
+    assert!(subtask_review
+        .stderr
+        .contains("Subtasks cannot be reviewed"));
 }

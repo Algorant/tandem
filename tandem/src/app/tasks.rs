@@ -153,6 +153,11 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
     let state = options.state.as_deref().unwrap_or("todo").to_string();
     validate_state(workspace, &state)?;
+    if state == "validation" {
+        return Err(CliError::user(
+            "E067: validation state requires review.status: pending; use `tandem review request <id>`",
+        ));
+    }
     validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
     validate_optional_vocabulary(
         options.priority.as_deref(),
@@ -295,6 +300,11 @@ pub(crate) fn move_to_state(
         )));
     }
     validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
+    if state == "validation" && crate::protocol::review::status(&doc) != Some("pending") {
+        return Err(CliError::user(
+            "E067: validation state requires review.status: pending",
+        ));
+    }
 
     let doc_id = doc.id().to_string();
     let previous_state = doc.field("state").unwrap_or("-").to_string();
@@ -750,8 +760,16 @@ pub(crate) fn complete(
             unresolved.join(", ")
         )));
     }
-    let mut warnings = crate::protocol::diagnostic::completion_policy_diagnostics(&doc)
+    let completion_diagnostics = crate::protocol::diagnostic::completion_policy_diagnostics(&doc);
+    if let Some(error) = completion_diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)
+    {
+        return Err(CliError::user(error.message.clone()));
+    }
+    let mut warnings = completion_diagnostics
         .into_iter()
+        .filter(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Warning)
         .map(|diagnostic| diagnostic.message)
         .collect::<Vec<_>>();
     let has_completion_warnings = !warnings.is_empty();
@@ -1143,7 +1161,7 @@ mod tests {
         )
         .unwrap();
         assert!(outcome.has_completion_warnings);
-        assert!(outcome
+        assert!(!outcome
             .warnings
             .iter()
             .any(|warning| warning.contains("review.status")));

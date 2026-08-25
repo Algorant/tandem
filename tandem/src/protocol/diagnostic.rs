@@ -110,8 +110,11 @@ pub(crate) fn workflow_state_diagnostic(
 
 pub(crate) fn completion_policy_diagnostics(document: &Document) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    if let Some(warning) = review::completion_warning(document) {
-        diagnostics.push(Diagnostic::warning(warning));
+    if review::status(document) == Some("pending") {
+        diagnostics.push(Diagnostic::error(format!(
+            "E067: {} has review.status: pending and cannot be completed until the review is resolved.",
+            document.id()
+        )));
     }
     let status = accord::status(document).unwrap_or("missing");
     if status != "accepted" {

@@ -46,6 +46,7 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "papercut" => cmd_papercut(&args)?,
         "log" => cmd_log(&args)?,
         "accord" => cmd_accord(&args)?,
+        "review" => cmd_review(&args)?,
         "rules" => cmd_rules(&args)?,
         "decision" => cmd_decision(&args)?,
         "tui" => return parse_tui_request(&args),
@@ -55,7 +56,7 @@ fn dispatch(mut args: Vec<String>) -> Result<StartupRequest, CliError> {
         "help" | "--help" => print_help(),
         other => {
             return Err(CliError::usage(format!(
-                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, papercut, log, accord, rules, decision, tui, web, version"
+                "unknown command `{other}`. Supported commands: init, upgrade, list, show, add, move, update, complete, cancel, search, papercut, log, accord, review, rules, decision, tui, web, version"
             )))
         }
     }
@@ -80,6 +81,7 @@ fn print_help() {
     println!("  tandem papercut add|list|show|resolve ...");
     println!("  tandem log list|show|search ...");
     println!("  tandem accord {} ...", accord_actions_help());
+    println!("  tandem review request|accept|changes|reject <id> [--reviewer <name>] [--note <text>] [--json]");
     println!("  tandem rules list|add|edit|delete ...");
     println!("  tandem decision list|show|add ... [--status <status>] [--date <date>]");
     println!("  tandem tui");
@@ -1076,9 +1078,7 @@ rules:
             )
             .unwrap(), String::new());
 
-        let warning = accord::state_divergence_warning(&doc).unwrap();
-        assert!(warning.contains("workflow state `in-progress`"));
-        assert!(warning.contains("accord.status `delivered` suggests `validation`"));
+        assert!(accord::state_divergence_warning(&doc).is_none());
         assert_eq!(doc.field("state"), Some("in-progress"));
         assert_eq!(review_status(&doc), Some("pending"));
     }
