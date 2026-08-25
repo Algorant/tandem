@@ -1,11 +1,14 @@
 ---
 id: papercut-7
 title: "review.status not-ready has no command surface"
-status: open
+status: "resolved"
 createdAt: "2026-08-24T23:28:14Z"
-updatedAt: "2026-08-24T23:28:14Z"
+updatedAt: "2026-08-25T01:22:01Z"
 references: ["decision-11", "task-239-1", "task-239-2"]
 tags: ["cli", "protocol", "review", "v0"]
+resolution:
+  note: "Resolved in task-239-2. `not-ready` is now legacy-readable and themeable only; no code path in `tandem/src/` produces it. Symmetric with the existing treatment of `accord: ready`. Verified by grep after the change: the only remaining occurrences are the accepted-status list in protocol/review.rs and theme lookups in tui/theme.rs."
+  resolvedAt: "2026-08-25T01:22:01Z"
 ---
 ## Observed
 

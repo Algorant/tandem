@@ -11,7 +11,7 @@ alternatives: ["O1 decouple entirely: accord never touches state and the orchest
 references: ["task-239", "task-239-4", "task-228", "papercut-4", "papercut-5"]
 tags: ["protocol", "workflow", "accord", "review", "validation"]
 createdAt: "2026-08-24T23:03:18Z"
-updatedAt: "2026-08-24T23:26:20Z"
+updatedAt: "2026-08-25T01:01:46Z"
 ---
 
 ## Status
@@ -92,3 +92,20 @@ Adding a subcommand is preferred over deleting the `changes-requested` status, b
 ### Pattern note
 
 A1, A2, and A3 were each found by a Worker implementing this decision faithfully. In every case the Worker was correct and this record was incomplete. Decisions that introduce a workflow concept should enumerate its full status vocabulary, its events, and its command surface together before delegation, rather than leaving them to be discovered.
+### A4 (2026-08-24) — E2 is dropped, not enforced and not policy
+
+E2 said review resolution is human-only, and task-239-1 expressed that as a validation error when "the resolver is not human."
+
+Tandem cannot determine that. `.tandem/actor-id` is a bare per-checkout UUID with no role, and no human/agent distinction exists anywhere in `protocol/` or `project/`. Tandem is local-first with no authentication.
+
+**Adopted:** drop the human-only requirement entirely. It is neither validated nor stated as policy.
+
+The distinction is implicit in how the work actually happens. A human gives the orchestrator feedback, and the orchestrator records the resolution. There is no realistic path where a review resolves without a human having decided it, because the orchestrator only resolves when told to.
+
+Consequences:
+
+- Remove "the resolver is not human" from the resolve mutation's error list.
+- `review.reviewer` stays optional metadata, as it already was. Do not require `--reviewer`.
+- Do not add a human-only rule to project rules or agent guidance.
+
+Rationale: E2 was solving a problem that does not occur. Modeling an implicit property adds a flag, a rule, and a concept without changing any outcome. The earlier version of this amendment proposed recording attribution as policy; that was still overbuilt.

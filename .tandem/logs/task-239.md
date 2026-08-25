@@ -2,13 +2,15 @@
 id: task-239
 type: task
 title: "Tighten in-progress → logs vs validation transitions"
-state: todo
 priority: "high"
 effort: "medium"
 relatedFiles: ["protocol/plan/spec.md", "tandem/src/protocol", "AGENTS.md"]
 createdAt: "2026-08-22T16:11:49Z"
-updatedAt: "2026-08-24T22:21:55Z"
+updatedAt: "2026-08-25T01:37:14Z"
 references: ["papercut-4", "papercut-5"]
+completedAt: "2026-08-25T01:37:14Z"
+completion:
+  summary: "Closed via decision-11 and its amendments A1-A4. validation is no longer the default parking state for delivered work: no accord action moves workflow state except claim and rework-from-validation, review.status pending is the only entrance to validation, completing with a pending review is hard error E067, and a missing review is normal and silent. Shipped as task-239-1 (protocol spec), task-239-2 (Rust implementation, 280 unit + 12 integration tests), and task-241 (Board surfaces delivered-but-untriaged work). task-239-4 produced the decision. task-239-3 was canceled and recreated as task-254 in the ~/.dotfiles/pi/.pi workspace, since Pi skill files live in a separate Stow-managed repository."
 ---
 ## Problem
 
