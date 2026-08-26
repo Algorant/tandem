@@ -187,3 +187,6 @@
 {"ts":"2026-08-25T12:44:54Z","event":"task.updated","id":"task-242","summary":"Updated task-242 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":187}
 {"ts":"2026-08-25T12:50:28Z","event":"task.created","id":"task-243","summary":"Resolve the conflict between rules always-11 and never-4","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":188}
 {"ts":"2026-08-25T12:57:04Z","event":"task.updated","id":"task-233","summary":"Updated task-233 metadata: references, body","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":189}
+{"ts":"2026-08-26T20:52:33Z","event":"rules.updated","id":"rules","summary":"Added rule 12 to always","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":190}
+{"ts":"2026-08-26T20:52:35Z","event":"rules.updated","id":"rules","summary":"Deleted rule 11 from always","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":191}
+{"ts":"2026-08-26T20:52:37Z","event":"rules.updated","id":"rules","summary":"Deleted rule 4 from never","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":192}

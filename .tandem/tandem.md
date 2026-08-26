@@ -22,9 +22,9 @@ rules:
     - id: 10
       rule: "For delegated TUI or visual work, configure the repository's Git-local preview slot so the user runs only `just dev` from the normal checkout; route it to delegated code and a safe fixture, report no extra setup, and clear the route during cleanup."
       source: "task-132"
-    - id: 11
-      rule: "For Tandem Board-only visual validation, use tab 2 of the current orchestrator Herdr workspace: run the configured `just dev` preview there and inspect the TUI directly. Continue without pausing for human validation when it looks correct; escalate only when behavior is off, ambiguous, or requires product preference."
-      source: "User guidance 2026-07-28"
+    - id: 12
+      rule: "Request human review only when you cannot verify the acceptance criteria yourself. Exhaust verification first: run the code, read the output, spawn a Herdr pane and read the rendered result including ANSI color. Static rendering, layout, counts, and colors are verifiable this way and are not automatically human work; temporal behavior such as flicker, resize tearing, and redraw latency is not verifiable from a snapshot. When you do escalate, request review and state what you ran and what specifically stayed unresolved, because \"visual work\" is not a reason. When you are unsure whether something needs review, ask the orchestrator or user directly with ask_me instead of parking the task."
+      source: "task-243"
   never:
     - id: 1
       rule: "Do not mark a newly created task as claimed, delivered, validation, accepted, or completed unless the user explicitly asked to start or finish the work; automated tests or smoke checks are evidence only, not permission to advance lifecycle state."
@@ -34,9 +34,6 @@ rules:
     - id: 3
       rule: "Do not treat a pushed Git tag alone as a complete Tandem release unless the caller explicitly requests tag-only."
       source: "task-15"
-    - id: 4
-      rule: "Do not accept or complete delegated visual, UX, manual, high-risk, or ambiguous work without human review; keep it in validation."
-      source: "User guidance 2026-06-30"
     - id: 5
       rule: "Never commit checkout-local identity, caches, credentials, or other runtime state."
       source: "User guidance 2026-07-31"
