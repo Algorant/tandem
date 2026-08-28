@@ -2,13 +2,15 @@
 id: task-243
 type: task
 title: "Resolve the conflict between rules always-11 and never-4"
-state: todo
 priority: "medium"
 effort: "small"
 references: ["decision-11"]
 tags: ["rules", "review", "validation"]
 createdAt: "2026-08-25T12:50:28Z"
-updatedAt: "2026-08-25T12:50:28Z"
+updatedAt: "2026-08-28T12:39:21Z"
+completedAt: "2026-08-28T12:39:21Z"
+completion:
+  summary: "Replaced the contradictory review rules with a single verification test. Added always-12: request human review only when you cannot verify the acceptance criteria yourself, exhaust verification first (run the code, read output, read a Herdr pane including ANSI color), state what was run and what stayed unresolved when escalating, and use ask_me when unsure instead of parking the task. Phrased as requesting review rather than moving to validation so it sits correctly under decision-11. Deleted always-11 and never-4, which gave opposite instructions for the same situation; never-4 won under uncertainty, making always-11 decorative. Also deleted always-10, which was preview plumbing rather than judgment, and moved its Git-local preview-slot guidance into a new AGENTS.md \"Validating TUI changes\" section alongside the verifiable/not-verifiable boundary. Retired the AGENTS.md campaign practice requiring human terminal validation for every visible TUI change, which restated the deleted never-4. Rejected two earlier proposals during review: a blast-radius rule (agents already handle reversibility) and a \"never decide taste\" rule (unfalsifiable in practice; the escalation-evidence clause in always-12 covers the real risk of not noticing a taste question exists). Left context-2 in place pending a separate decision; it still grants completion authority on the \"non-visual, non-manual\" axis that always-12 replaces."
 ---
 
 ## Description

@@ -206,12 +206,33 @@ The campaign established five ownership boundaries that remain in force:
 [`plan/refactor_spec.md`](plan/refactor_spec.md) for the historical record and
 `decision-8` for the architecture decision itself.
 
-Two campaign practices survive as ongoing repository rules:
+One campaign practice survives as an ongoing repository rule:
 
-- Visible TUI changes require human terminal validation; automated tests do not
-  replace it.
 - Delegate only independently reviewable Tasks, in isolated Task
   worktrees/branches, reviewed before integration.
+
+The campaign also required human terminal validation for every visible TUI
+change. That blanket requirement is retired; rule `always-12` governs when to
+request review, based on whether you can verify the acceptance criteria rather
+than on whether the work is visual.
+
+## Validating TUI changes
+
+A rendered pane is evidence. Spawn a Herdr pane and read the result with
+`herdr pane read --format ansi` to check layout, counts, wrapping, colors, and
+attributes. Build release, not debug: debug builds render slowly enough to
+distort flicker, resize, and latency observations, which is what `just
+dev-release` is for.
+
+A snapshot cannot settle temporal behavior. Flicker, resize tearing, redraw
+latency, and cursor ghosting need a human at a terminal. So do density,
+readability over a long session, and any question about what the design should
+be rather than whether it matches the intent.
+
+For delegated TUI work, configure the repository's Git-local preview slot so the
+user runs only `just dev` from the normal checkout. Route it to the delegated
+code and a safe fixture, report that no extra setup is needed, and clear the
+route during cleanup.
 
 ## Agent workflow
 

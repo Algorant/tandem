@@ -19,9 +19,6 @@ rules:
     - id: 9
       rule: "Before orchestrating parallel or potentially overlapping delegated work, assess whether each worker needs an isolated branch or worktree."
       source: "User guidance 2026-06-30"
-    - id: 10
-      rule: "For delegated TUI or visual work, configure the repository's Git-local preview slot so the user runs only `just dev` from the normal checkout; route it to delegated code and a safe fixture, report no extra setup, and clear the route during cleanup."
-      source: "task-132"
     - id: 12
       rule: "Request human review only when you cannot verify the acceptance criteria yourself. Exhaust verification first: run the code, read the output, spawn a Herdr pane and read the rendered result including ANSI color. Static rendering, layout, counts, and colors are verifiable this way and are not automatically human work; temporal behavior such as flicker, resize tearing, and redraw latency is not verifiable from a snapshot. When you do escalate, request review and state what you ran and what specifically stayed unresolved, because \"visual work\" is not a reason. When you are unsure whether something needs review, ask the orchestrator or user directly with ask_me instead of parking the task."
       source: "task-243"
