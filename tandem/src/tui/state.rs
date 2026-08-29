@@ -380,7 +380,7 @@ impl TuiApp {
         );
     }
 
-    fn finish_log_search(&mut self) {
+    pub(super) fn finish_log_search(&mut self) {
         let query = self
             .log_search_input
             .take()
@@ -388,6 +388,7 @@ impl TuiApp {
             .trim()
             .to_string();
         self.log_search_filter = query;
+        self.rebuild_log_filter_indexes();
         self.selected_log = 0;
         self.log_list_offset = 0;
         self.log_detail_scroll = 0;
@@ -398,6 +399,7 @@ impl TuiApp {
     pub(super) fn clear_log_filter_or_focus(&mut self) {
         if !self.log_search_filter.is_empty() {
             self.log_search_filter.clear();
+            self.log_filter_indexes = None;
             self.selected_log = 0;
             self.log_list_offset = 0;
             self.log_detail_scroll = 0;
@@ -983,12 +985,23 @@ impl TuiApp {
             .unwrap_or(1)
     }
 
-    fn filtered_logs(&self) -> Vec<&Document> {
-        logs::filter_logs(
-            &self.logs,
-            self.hierarchy.index.as_ref(),
-            &self.log_search_filter,
-        )
+    pub(super) fn rebuild_log_filter_indexes(&mut self) {
+        self.log_filter_indexes = if self.log_search_filter.is_empty() {
+            None
+        } else {
+            Some(logs::filtered_log_indexes(
+                &self.logs,
+                self.hierarchy.index.as_ref(),
+                &self.log_search_filter,
+            ))
+        };
+    }
+
+    pub(super) fn filtered_logs(&self) -> Vec<&Document> {
+        match self.log_filter_indexes.as_ref() {
+            Some(indexes) => indexes.iter().map(|&index| &self.logs[index]).collect(),
+            None => self.logs.iter().collect(),
+        }
     }
 
     pub(super) fn selected_log(&self) -> Option<&Document> {

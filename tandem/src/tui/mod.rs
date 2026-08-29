@@ -262,6 +262,7 @@ struct TuiApp {
     log_detail_scroll: u16,
     log_list_offset: usize,
     log_search_filter: String,
+    log_filter_indexes: Option<Vec<usize>>,
     log_search_input: Option<String>,
     status: String,
     observed_status: String,
@@ -312,6 +313,7 @@ impl TuiApp {
             log_detail_scroll: 0,
             log_list_offset: 0,
             log_search_filter: String::new(),
+            log_filter_indexes: None,
             log_search_input: None,
             status: String::new(),
             observed_status: String::new(),
@@ -2671,6 +2673,7 @@ tone = "success"
             log_detail_scroll: 0,
             log_list_offset: 0,
             log_search_filter: String::new(),
+            log_filter_indexes: None,
             log_search_input: None,
             status: String::new(),
             observed_status: String::new(),
@@ -2688,6 +2691,31 @@ tone = "success"
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
         }
+    }
+
+    #[test]
+    fn logs_filter_indexes_apply_replace_clear_and_select_by_index() {
+        let mut app = keyboard_test_app();
+        app.logs = vec![
+            doc_with_state("task-10", None),
+            doc_with_state("task-20", None),
+        ];
+        refresh_test_hierarchy(&mut app);
+
+        app.log_search_input = Some("task-20".to_string());
+        app.finish_log_search();
+        assert_eq!(app.log_filter_indexes, Some(vec![1]));
+        assert_eq!(app.selected_log().map(Document::id), Some("task-20"));
+
+        app.log_search_input = Some("task-10".to_string());
+        app.finish_log_search();
+        assert_eq!(app.log_filter_indexes, Some(vec![0]));
+        assert!(app.select_log_by_id_preserving_scroll("task-10"));
+        assert_eq!(app.selected_log().map(Document::id), Some("task-10"));
+
+        app.clear_log_filter_or_focus();
+        assert_eq!(app.filtered_logs().len(), 2);
+        assert_eq!(app.log_filter_indexes, None);
     }
 
     #[test]
@@ -3602,6 +3630,46 @@ tone = "success"
         assert!(apply_error.message.contains("expected global `task-N`"));
         assert!(workspace.board_dir.join("task-20.md").exists());
         assert!(!workspace.logs_dir.join("task-20.md").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reload_rebuilds_active_logs_filter_indexes_and_keeps_selection_valid() {
+        let root = unique_test_dir("tandem-reload-log-filter");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.logs_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Old title\ncompletedAt: 2026-01-01T00:00:00Z\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.logs_dir.join("task-2.md"),
+            "---\nid: task-2\ntype: task\ntitle: Needle title\ncompletedAt: 2026-01-01T00:00:00Z\n---\n",
+        )
+        .unwrap();
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.log_search_input = Some("needle".to_string());
+        app.finish_log_search();
+        assert_eq!(app.log_filter_indexes, Some(vec![1]));
+        assert_eq!(app.selected_log().map(Document::id), Some("task-2"));
+
+        fs::write(
+            workspace.logs_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Needle replacement\ncompletedAt: 2026-01-01T00:00:00Z\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.logs_dir.join("task-2.md"),
+            "---\nid: task-2\ntype: task\ntitle: Other title\ncompletedAt: 2026-01-01T00:00:00Z\n---\n",
+        )
+        .unwrap();
+
+        app.reload();
+
+        assert_eq!(app.log_filter_indexes, Some(vec![0]));
+        assert_eq!(app.selected_log().map(Document::id), Some("task-1"));
+        assert_eq!(app.filtered_logs().len(), 1);
         fs::remove_dir_all(root).unwrap();
     }
 

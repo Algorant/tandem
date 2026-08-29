@@ -72,18 +72,32 @@ pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<St
     (events, warnings)
 }
 
+pub(super) fn filtered_log_indexes(
+    logs: &[Document],
+    hierarchy: Option<&HierarchyIndex>,
+    query: &str,
+) -> Vec<usize> {
+    let query = query.trim().to_ascii_lowercase();
+    if query.is_empty() {
+        return (0..logs.len()).collect();
+    }
+
+    logs.iter()
+        .enumerate()
+        .filter(|(_, doc)| log_matches_query(doc, hierarchy, &query))
+        .map(|(index, _)| index)
+        .collect()
+}
+
+#[cfg(test)]
 pub(super) fn filter_logs<'a>(
     logs: &'a [Document],
     hierarchy: Option<&HierarchyIndex>,
     query: &str,
 ) -> Vec<&'a Document> {
-    let query = query.trim().to_ascii_lowercase();
-    if query.is_empty() {
-        return logs.iter().collect();
-    }
-
-    logs.iter()
-        .filter(|doc| log_matches_query(doc, hierarchy, &query))
+    filtered_log_indexes(logs, hierarchy, query)
+        .into_iter()
+        .map(|index| &logs[index])
         .collect()
 }
 

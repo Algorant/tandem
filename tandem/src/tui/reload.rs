@@ -133,6 +133,7 @@ impl TuiApp {
         self.docs = docs;
         self.logs = log_load.docs;
         self.hierarchy = hierarchy;
+        self.rebuild_log_filter_indexes();
         let active_ids = self
             .docs
             .iter()
