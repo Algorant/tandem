@@ -6,6 +6,7 @@
 //! `protocol` module owns validation, hierarchy, workflow, accord, review, and
 //! event semantics; shared `app` operations coordinate both boundaries.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -352,17 +353,20 @@ impl ProjectHierarchy {
     fn index_for(
         &self,
         document: &StoredDocument,
-    ) -> Result<ProtocolHierarchyIndex, crate::protocol::diagnostic::Diagnostic> {
-        if self
-            .documents
-            .get(document.id())
-            .is_some_and(|indexed| indexed.path == document.path)
-        {
-            return Ok(self.logical.clone());
+    ) -> Result<Cow<'_, ProtocolHierarchyIndex>, crate::protocol::diagnostic::Diagnostic> {
+        if self.documents.get(document.id()).is_some_and(|indexed| {
+            indexed.path == document.path
+                && indexed.location == document.location
+                && indexed.document.fields == document.document.fields
+                && indexed.document.body == document.document.body
+        }) {
+            return Ok(Cow::Borrowed(&self.logical));
         }
         let mut documents = self.documents.clone();
         documents.insert(document.id().to_string(), document.clone());
-        ProtocolHierarchyIndex::from_documents(documents.into_values().collect())
+        Ok(Cow::Owned(ProtocolHierarchyIndex::from_documents(
+            documents.into_values().collect(),
+        )?))
     }
     pub(crate) fn task_role(
         &self,
@@ -1231,6 +1235,32 @@ mod tests {
         assert_eq!(document.body, "# Body\n");
         assert_eq!(document.location, DocumentLocation::Board);
     }
+
+    #[test]
+    fn hierarchy_queries_borrow_canonical_index() {
+        let document = read_document_from("---\nid: task-1\n---\n", DocumentLocation::Board);
+        let hierarchy = ProjectHierarchy::from_documents(vec![document]).unwrap();
+        let canonical = hierarchy.document("task-1").unwrap();
+        assert!(matches!(
+            hierarchy.index_for(canonical).unwrap(),
+            Cow::Borrowed(_)
+        ));
+    }
+
+    #[test]
+    fn hierarchy_queries_rebuild_for_prospective_replacement() {
+        let document = read_document_from("---\nid: task-1\n---\n", DocumentLocation::Board);
+        let hierarchy = ProjectHierarchy::from_documents(vec![document.clone()]).unwrap();
+        let replacement = read_document_from(
+            "---\nid: task-1\nparentId: task-2\n---\n",
+            DocumentLocation::Board,
+        );
+        assert!(matches!(
+            hierarchy.index_for(&replacement).unwrap(),
+            Cow::Owned(_)
+        ));
+    }
+
     fn read_document_from(content: &str, location: DocumentLocation) -> StoredDocument {
         let (frontmatter, body) = split_frontmatter(content).unwrap();
         StoredDocument::new(
