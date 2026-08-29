@@ -2,20 +2,31 @@
 id: task-244
 type: task
 title: "Cache applied Logs filter indexes in memory"
-state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["task-233", "task-226"]
 relatedFiles: ["tandem/src/tui/logs.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs"]
 tags: ["tui", "logs", "performance"]
 createdAt: "2026-08-28T23:33:30Z"
-updatedAt: "2026-08-29T03:27:44Z"
+updatedAt: "2026-08-29T03:34:17Z"
 accord:
-  status: "claimed"
+  status: "accepted"
   assignee: "worker-task-244-e497e28e"
   claimedAt: "2026-08-29T03:27:44Z"
-  updatedAt: "2026-08-29T03:27:44Z"
+  deliveredAt: "2026-08-29T03:34:09Z"
+  deliverables: ["Ephemeral Logs filter index cache", "Focused apply/replace/clear/indexed-selection test", "Focused real-reload cache rebuild test"]
+  validation:
+    commands: ["cargo fmt --check passed", "cargo test passed: 282 unit tests and 12 integration tests", "cargo clippy --all-targets --all-features -- -D warnings passed", "cargo build --release passed", "Real release-TUI active-filter navigation measured 0.10–0.61 ms after settling, versus prior 14–281 ms with input backup"]
+  summary: "Added ephemeral in-memory indexes for committed Logs filters, reused across navigation, selection, status, and rendering, with rebuild on reload and clear on filter removal."
+  filesChanged: ["tandem/src/tui/logs.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/mod.rs"]
+  note: "Verified merged implementation, focused invalidation coverage, full tests, strict Clippy, release build, and real-terminal response improvement."
+  updatedAt: "2026-08-29T03:34:12Z"
 assignee: "worker-task-244-e497e28e"
+completedAt: "2026-08-29T03:34:17Z"
+completion:
+  summary: "Implemented an ephemeral in-memory cache of matching indexes for committed Logs filters. Filter results are calculated once on apply, reused for navigation and rendering, rebuilt after Logs reload, and discarded when cleared or on exit. Preserved search semantics with no dependencies, persistence, protocol changes, search rewrite, or unrelated optimization. Validation passed: formatting, 282 unit tests, 12 integration tests, strict Clippy, release build, and real-terminal active-filter navigation at 0.10–0.61 ms after settling versus the prior 14–281 ms with input backup."
+  filesChanged: ["tandem/src/tui/logs.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/mod.rs"]
+  validation: "cargo fmt --check; cargo test (282 unit + 12 integration); strict Clippy; cargo build --release; real release-TUI active-filter navigation measured 0.10–0.61 ms after settling"
 ---
 
 ## Description
