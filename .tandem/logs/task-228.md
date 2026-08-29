@@ -2,14 +2,17 @@
 id: task-228
 type: task
 title: "Define a tidy-up procedure for task acceptance and archival to Logs"
-state: todo
 priority: "medium"
 references: ["decision-8", "papercut-4", "papercut-5"]
 relatedFiles: ["AGENTS.md", ".tandem/tandem.md"]
 tags: ["rules", "logs", "validation", "git"]
 createdAt: "2026-08-16T17:01:03Z"
-updatedAt: "2026-08-24T22:32:43Z"
+updatedAt: "2026-08-29T11:58:11Z"
 blockers: ["task-239-4"]
+completedAt: "2026-08-29T11:58:11Z"
+completion:
+  outcome: "canceled"
+  summary: "Canceled: Intentionally not implemented. The task's lifecycle questions were resolved by task-239-4 and decision-11; current pi-agency guidance already requires Workers to report without running Tandem transitions and makes the orchestrator own deliver, accept, review, and completion from main; missing review.status is now normal unless review was explicitly requested; and .tandem metadata is automatically checkpointed. A separate tidy-up checklist and additional project rules would now duplicate established behavior. Remaining tool-level integration concerns continue to be tracked independently as papercut-4 and papercut-5."
 ---
 
 ## Description
