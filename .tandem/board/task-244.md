@@ -2,14 +2,20 @@
 id: task-244
 type: task
 title: "Cache applied Logs filter indexes in memory"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["task-233", "task-226"]
 relatedFiles: ["tandem/src/tui/logs.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs"]
 tags: ["tui", "logs", "performance"]
 createdAt: "2026-08-28T23:33:30Z"
-updatedAt: "2026-08-29T01:13:15Z"
+updatedAt: "2026-08-29T03:27:44Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-244-e497e28e"
+  claimedAt: "2026-08-29T03:27:44Z"
+  updatedAt: "2026-08-29T03:27:44Z"
+assignee: "worker-task-244-e497e28e"
 ---
 
 ## Description
