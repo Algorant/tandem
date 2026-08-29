@@ -2,14 +2,20 @@
 id: task-245
 type: task
 title: "Stop cloning the complete hierarchy for indexed read queries"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 references: ["task-141", "task-226", "task-233", "task-244", "decision-8"]
 relatedFiles: ["tandem/src/project/mod.rs", "tandem/src/protocol/hierarchy.rs", "tandem/src/tui/logs.rs"]
 tags: ["tui", "performance", "hierarchy"]
 createdAt: "2026-08-29T04:09:30Z"
-updatedAt: "2026-08-29T04:09:30Z"
+updatedAt: "2026-08-29T04:14:11Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-245-e343b77d"
+  claimedAt: "2026-08-29T04:14:11Z"
+  updatedAt: "2026-08-29T04:14:11Z"
+assignee: "worker-task-245-e343b77d"
 ---
 
 ## Description
