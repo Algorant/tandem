@@ -2,20 +2,30 @@
 id: task-245
 type: task
 title: "Stop cloning the complete hierarchy for indexed read queries"
-state: "in-progress"
+state: "validation"
 priority: "high"
 effort: "small"
 references: ["task-141", "task-226", "task-233", "task-244", "decision-8"]
 relatedFiles: ["tandem/src/project/mod.rs", "tandem/src/protocol/hierarchy.rs", "tandem/src/tui/logs.rs"]
 tags: ["tui", "performance", "hierarchy"]
 createdAt: "2026-08-29T04:09:30Z"
-updatedAt: "2026-08-29T04:14:11Z"
+updatedAt: "2026-08-29T04:19:50Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "worker-task-245-e343b77d"
   claimedAt: "2026-08-29T04:14:11Z"
-  updatedAt: "2026-08-29T04:14:11Z"
+  deliveredAt: "2026-08-29T04:19:45Z"
+  deliverables: ["Zero-copy canonical ProjectHierarchy query path using Cow", "Owned prospective replacement path with full identity/content check", "Structural tests for borrowed and owned paths"]
+  validation:
+    commands: ["cargo fmt --check passed", "cargo test passed: 284 unit tests and 12 integration tests", "cargo clippy --all-targets --all-features -- -D warnings passed", "cargo build --release passed", "Fixed 150x46 release PTY navigation redraw output followed each key in about 2-5 ms", "150-key 30 Hz held-j simulation drained continuously with no post-release backlog"]
+  summary: "Canonical ProjectHierarchy queries now borrow the existing protocol hierarchy; modified/prospective documents still rebuild an isolated owned index."
+  filesChanged: ["tandem/src/project/mod.rs"]
+  updatedAt: "2026-08-29T04:19:45Z"
 assignee: "worker-task-245-e343b77d"
+review.note: "Automated and fixed-size PTY validation passes, including a 150-key 30 Hz held-j simulation with no backlog. The original failure was observed in the user's actual terminal/tab, so final acceptance requires repeating held j/k there and confirming movement stops immediately after key release."
+review.requestedAt: "2026-08-29T04:19:50Z"
+review.reviewer: "user"
+review.status: "pending"
 ---
 
 ## Description
