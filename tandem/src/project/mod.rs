@@ -20,17 +20,17 @@ use crate::protocol::hierarchy::{
     DocumentLocation, HierarchyDocument, HierarchyIndex as ProtocolHierarchyIndex,
     ParentRelationship, TaskRole,
 };
-use crate::protocol::papercut::Papercut as ProtocolPapercut;
 use crate::CliError;
 
 pub(crate) mod events;
 pub(crate) mod frontmatter;
 pub(crate) mod rules;
+#[cfg(test)]
+mod rules_contract_tests;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
     frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,
-    patch_completion_content, patch_frontmatter_content, patch_papercut_resolution_content,
-    replace_markdown_body,
+    patch_frontmatter_content, patch_resolution_content, replace_markdown_body,
 };
 pub(crate) use write::write_atomic;
 
@@ -38,7 +38,7 @@ pub(crate) use write::write_atomic;
 pub(crate) struct TandemProject {
     pub(crate) root: PathBuf,
     pub(crate) data_dir: PathBuf,
-    pub(crate) board_dir: PathBuf,
+    pub(crate) tasks_dir: PathBuf,
     pub(crate) logs_dir: PathBuf,
     pub(crate) config_path: PathBuf,
     pub(crate) events_path: PathBuf,
@@ -81,7 +81,7 @@ impl TandemProject {
         Self {
             root,
             data_dir: data_dir.clone(),
-            board_dir: data_dir.join("board"),
+            tasks_dir: data_dir.join("tasks"),
             logs_dir: data_dir.join("logs"),
             events_path: data_dir.join("events.jsonl"),
             config_path,
@@ -106,7 +106,7 @@ impl TandemProject {
     /// their config at the root but retain this conventional data location.
     pub(crate) fn data_dir(&self) -> &Path {
         if self.data_dir.as_os_str().is_empty() {
-            self.board_dir
+            self.tasks_dir
                 .parent()
                 .unwrap_or_else(|| Path::new(".tandem"))
         } else {
@@ -120,7 +120,9 @@ impl TandemProject {
         let data_dir = root.join(".tandem");
         let created_data_dir = !data_dir.exists();
         let result = (|| {
-            fs::create_dir_all(data_dir.join("board"))?;
+            fs::create_dir_all(data_dir.join("tasks"))?;
+            fs::create_dir_all(data_dir.join("decisions"))?;
+            fs::create_dir_all(data_dir.join("rules"))?;
             fs::create_dir_all(data_dir.join("logs"))?;
             fs::create_dir_all(data_dir.join("events"))?;
             let config_path = data_dir.join("tandem.md");
@@ -141,10 +143,6 @@ impl TandemProject {
         self.data_dir().join("events")
     }
 
-    pub(crate) fn papercuts_dir(&self) -> PathBuf {
-        self.data_dir().join("papercuts")
-    }
-
     pub(crate) fn actor_events_path(&self, actor: &str) -> PathBuf {
         self.events_dir().join(format!("{actor}.jsonl"))
     }
@@ -154,53 +152,26 @@ impl TandemProject {
     }
 
     pub(crate) fn read_board_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
-        read_documents(&self.board_dir, DocumentLocation::Board)
+        read_documents(&self.tasks_dir, DocumentLocation::Board)
     }
 
     pub(crate) fn read_log_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
         read_documents(&self.logs_dir, DocumentLocation::Logs)
     }
 
-    pub(crate) fn read_papercuts(&self) -> Result<Vec<StoredPapercut>, CliError> {
-        let dir = self.papercuts_dir();
-        if !dir.exists() {
-            return Ok(Vec::new());
-        }
-        let mut paths = fs::read_dir(&dir)?
-            .map(|entry| entry.map(|entry| entry.path()))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
-            .collect::<Vec<_>>();
-        paths.sort();
-        paths.into_iter().map(|path| read_papercut(&path)).collect()
-    }
-
-    pub(crate) fn find_papercut(&self, id: &str) -> Result<Option<StoredPapercut>, CliError> {
-        Ok(self
-            .read_papercuts()?
-            .into_iter()
-            .find(|item| item.id() == id))
-    }
-
-    /// Loose references may target a Papercut without making it a document.
-    /// Check only the canonical filename so malformed contents cannot affect
-    /// unrelated reads.
-    pub(crate) fn papercut_reference_exists(&self, id: &str) -> bool {
-        crate::protocol::papercut::papercut_number(id).is_some()
-            && self.papercuts_dir().join(format!("{id}.md")).is_file()
-    }
-
-    /// Loose references may target documents or Papercuts.
+    /// Loose references may target a document by ID.
     pub(crate) fn reference_target_exists(&self, id: &str) -> Result<bool, CliError> {
-        if self.find_document(id)?.is_some() {
-            return Ok(true);
-        }
-        Ok(self.papercut_reference_exists(id))
+        Ok(self.find_document(id)?.is_some())
     }
 
     pub(crate) fn read_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
         let mut docs = self.read_board_documents()?;
+        // Decisions are active durable records stored separately from Tasks,
+        // but remain part of the common document lookup/read model.
+        docs.extend(read_documents(
+            &self.data_dir().join("decisions"),
+            DocumentLocation::Board,
+        )?);
         docs.extend(self.read_log_documents()?);
         Ok(docs)
     }
@@ -227,7 +198,7 @@ impl TandemProject {
         &self,
         warnings: &mut Vec<String>,
     ) -> Vec<StoredDocument> {
-        read_documents_tolerant(&self.board_dir, DocumentLocation::Board, "Board", warnings)
+        read_documents_tolerant(&self.tasks_dir, DocumentLocation::Board, "Board", warnings)
     }
 
     pub(crate) fn read_log_documents_tolerant(
@@ -237,54 +208,10 @@ impl TandemProject {
         read_documents_tolerant(&self.logs_dir, DocumentLocation::Logs, "Logs", warnings)
     }
 
-    pub(crate) fn read_papercuts_tolerant(
-        &self,
-        warnings: &mut Vec<String>,
-    ) -> Vec<StoredPapercut> {
-        let dir = self.papercuts_dir();
-        if !dir.exists() {
-            return Vec::new();
-        }
-        let entries = match fs::read_dir(&dir) {
-            Ok(entries) => entries,
-            Err(error) => {
-                warnings.push(format!(
-                    "Papercuts load failed: could not read {}: {error}",
-                    display_path(&dir)
-                ));
-                return Vec::new();
-            }
-        };
-        let mut paths = Vec::new();
-        for entry in entries {
-            match entry {
-                Ok(entry)
-                    if entry.path().extension().and_then(|value| value.to_str()) == Some("md") =>
-                {
-                    paths.push(entry.path());
-                }
-                Ok(_) => {}
-                Err(error) => warnings.push(format!(
-                    "Papercuts load warning: could not inspect entry in {}: {error}",
-                    display_path(&dir)
-                )),
-            }
-        }
-        paths.sort();
-        paths
-            .into_iter()
-            .filter_map(|path| match read_papercut(&path) {
-                Ok(papercut) => Some(papercut),
-                Err(error) => {
-                    warnings.push(format!("Papercuts load warning: {}", error.message));
-                    None
-                }
-            })
-            .collect()
-    }
-
     pub(crate) fn read_events_tolerant(&self, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
-        let mut events = read_event_file_tolerant(&self.events_path, warnings);
+        // 0.3.0 events are per-actor only. The former shared events.jsonl
+        // path is intentionally never read.
+        let mut events = Vec::new();
         let events_dir = self.events_dir();
         let entries = match fs::read_dir(&events_dir) {
             Ok(entries) => entries,
@@ -416,15 +343,6 @@ impl ProjectHierarchy {
     }
 }
 
-fn read_event_file_tolerant(path: &Path, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
-    read_event_content(path, warnings)
-        .unwrap_or_default()
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .filter_map(ProjectEvent::parse_legacy)
-        .collect()
-}
-
 fn read_actor_event_file_tolerant(path: &Path, warnings: &mut Vec<String>) -> Vec<ProjectEvent> {
     let Some(actor) = path.file_stem().and_then(|stem| stem.to_str()) else {
         warnings.push(format!(
@@ -496,17 +414,6 @@ pub(crate) struct ProjectEvent {
 }
 
 impl ProjectEvent {
-    fn parse_legacy(line: &str) -> Option<Self> {
-        Some(Self {
-            id: extract_json_string(line, "id")?,
-            event: extract_json_string(line, "event").unwrap_or_else(|| "event".to_string()),
-            ts: extract_json_string(line, "ts").unwrap_or_default(),
-            summary: extract_json_string(line, "summary").unwrap_or_default(),
-            actor: extract_json_string(line, "actor"),
-            seq: extract_json_u64(line, "seq"),
-        })
-    }
-
     fn parse_canonical(line: &str, expected_actor: &str) -> Result<Self, &'static str> {
         let required = |key| extract_json_string(line, key).filter(|value| !value.is_empty());
         let id = required("id").ok_or("missing required id")?;
@@ -647,66 +554,6 @@ fn skip_json_whitespace(line: &str, mut cursor: usize) -> usize {
         cursor += 1;
     }
     cursor
-}
-
-/// Raw project source paired with its protocol-level Papercut value.
-#[derive(Debug, Clone)]
-pub(crate) struct StoredPapercut {
-    pub(crate) path: PathBuf,
-    papercut: ProtocolPapercut,
-}
-
-impl StoredPapercut {
-    pub(crate) fn new(path: PathBuf, fields: HashMap<String, String>, body: String) -> Self {
-        Self {
-            path,
-            papercut: ProtocolPapercut::new(fields, body),
-        }
-    }
-}
-
-impl Deref for StoredPapercut {
-    type Target = ProtocolPapercut;
-    fn deref(&self) -> &Self::Target {
-        &self.papercut
-    }
-}
-
-pub(crate) fn read_papercut(path: &Path) -> Result<StoredPapercut, CliError> {
-    let content = fs::read_to_string(path).map_err(|error| {
-        CliError::user(format!("failed to read {}: {error}", display_path(path)))
-    })?;
-    let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!(
-            "Papercut parse failure: {}: {message}",
-            display_path(path)
-        ))
-    })?;
-    let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
-        CliError::user(format!(
-            "Papercut parse failure: {} frontmatter YAML: {message}",
-            display_path(path)
-        ))
-    })?;
-    let papercut = StoredPapercut::new(path.to_path_buf(), fields, body);
-    papercut.validate().map_err(|message| {
-        CliError::user(format!(
-            "Papercut validation failed for {}: {message}",
-            display_path(path)
-        ))
-    })?;
-    let filename = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("");
-    if filename != papercut.id() {
-        return Err(CliError::user(format!(
-            "Papercut validation failed for {}: filename must match immutable ID `{}`",
-            display_path(path),
-            papercut.id()
-        )));
-    }
-    Ok(papercut)
 }
 
 /// Raw project source paired with its protocol-level document value.
@@ -1054,7 +901,7 @@ pub(crate) fn display_path(path: &Path) -> String {
 mod tests {
     use super::*;
     #[test]
-    fn papercut_reference_exists_checks_only_canonical_filename() {
+    fn reference_target_exists_resolves_only_documents() {
         let root = env::temp_dir().join(format!(
             "tandem-project-papercut-reference-{}",
             std::process::id()
@@ -1064,12 +911,16 @@ mod tests {
             root.join(".tandem"),
             root.join(".tandem/tandem.md"),
         );
-        fs::create_dir_all(project.papercuts_dir()).unwrap();
-        fs::write(project.papercuts_dir().join("papercut-1.md"), "malformed").unwrap();
-        assert!(project.papercut_reference_exists("papercut-1"));
-        assert!(!project.papercut_reference_exists("papercut-0"));
-        assert!(!project.papercut_reference_exists("papercut-1.md"));
-        assert!(!project.papercut_reference_exists("task-1"));
+        fs::create_dir_all(&project.tasks_dir).unwrap();
+        fs::write(
+            project.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: One\nstate: todo\n---\n",
+        )
+        .unwrap();
+        assert!(project.reference_target_exists("task-1").unwrap());
+        assert!(!project.reference_target_exists("task-9").unwrap());
+        // Legacy papercut-* IDs are not documents in protocol 0.3.0.
+        assert!(!project.reference_target_exists("papercut-1").unwrap());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -1115,8 +966,8 @@ mod tests {
             root.join(".tandem"),
             root.join(".tandem/tandem.md"),
         );
-        fs::create_dir_all(&project.board_dir).unwrap();
-        fs::write(project.board_dir.join("task-1.md"), "not frontmatter").unwrap();
+        fs::create_dir_all(&project.tasks_dir).unwrap();
+        fs::write(project.tasks_dir.join("task-1.md"), "not frontmatter").unwrap();
         assert!(project.read_board_documents().is_err());
         let mut warnings = Vec::new();
         assert!(project
@@ -1127,40 +978,7 @@ mod tests {
     }
 
     #[test]
-    fn tolerant_papercut_reads_keep_valid_records_and_isolate_malformed_ones() {
-        let root = env::temp_dir().join(format!(
-            "tandem-project-papercuts-read-{}",
-            std::process::id()
-        ));
-        let project = TandemProject::with_paths(
-            root.clone(),
-            root.join(".tandem"),
-            root.join(".tandem/tandem.md"),
-        );
-        fs::create_dir_all(project.papercuts_dir()).unwrap();
-        fs::write(
-            project.papercuts_dir().join("papercut-1.md"),
-            "---\nid: papercut-1\ntitle: Valid\nstatus: open\ncreatedAt: now\nupdatedAt: now\n---\nBody\n",
-        )
-        .unwrap();
-        fs::write(
-            project.papercuts_dir().join("papercut-2.md"),
-            "not frontmatter",
-        )
-        .unwrap();
-
-        assert!(project.read_papercuts().is_err());
-        let mut warnings = Vec::new();
-        let items = project.read_papercuts_tolerant(&mut warnings);
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].id(), "papercut-1");
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("papercut-2.md"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn aggregates_legacy_and_actor_event_logs_tolerantly() {
+    fn reads_actor_event_logs_without_legacy_aggregation() {
         let root =
             env::temp_dir().join(format!("tandem-project-events-read-{}", std::process::id()));
         let project = TandemProject::with_paths(
@@ -1173,10 +991,9 @@ mod tests {
         fs::write(project.actor_events_path("actor-1"), "{\"ts\":\"new\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"actor\",\"actor\":\"actor-1\",\"seq\":1}\n").unwrap();
         let mut warnings = Vec::new();
         let events = project.read_events_tolerant(&mut warnings);
-        assert_eq!(events.len(), 2);
-        assert_eq!(events[0].actor, None);
-        assert_eq!(events[1].actor.as_deref(), Some("actor-1"));
-        assert_eq!(events[1].seq, Some(1));
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].actor.as_deref(), Some("actor-1"));
+        assert_eq!(events[0].seq, Some(1));
         assert!(warnings.is_empty());
         fs::remove_dir_all(root).unwrap();
     }

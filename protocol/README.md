@@ -1,79 +1,57 @@
-# Tandem Protocol
+# Tandem Protocol 0.3.0
 
-This directory contains the normative Tandem protocol specification.
+This directory is the normative specification for Tandem's local-first coordination format. The executable implementation is `tandem/src/protocol/`; filesystem discovery and persistence belong to `tandem/src/project/`.
 
-The Markdown here is the source of truth for Tandem format and semantics. The
-executable Rust implementation lives in `../tandem/src/protocol/`; it implements
-these requirements and is not a second specification. Concrete project discovery,
-raw-source preservation, locking, and atomic filesystem writes belong to
-`../tandem/src/project/`, not to the normative document model.
+## Workspace layout
 
-The protocol defines the local-first file format for human/agent coordination. It is inspired by Brainfile's useful shape, adapted into Tandem terminology, and extended with the local v3 direction around review, complete/archive, and first-class logs. It has no v0 Brainfile import/migration requirement.
+A 0.3.0 workspace contains:
 
-## Scope
+```text
+.tandem/
+  tandem.md
+  tasks/       # active Task and Epic Markdown records
+  decisions/   # durable Decision Markdown records
+  rules/       # one Rule per Markdown file
+  logs/        # archived Task records
+  events/      # one JSONL ledger per actor
+```
 
-The protocol area owns:
+`.tandem/actor-id` is checkout-local ignored runtime identity. There is no Board directory, Papercut directory, shared event ledger, migration reader, upgrade command, or compatibility path.
 
-- `.tandem/` workspace layout, including enforcement that the checkout/worktree-local `.tandem/actor-id` remains ignored
-- `.tandem/tandem.md` workspace config shape
-- active work documents in `.tandem/board/`
-- completed and canceled work-history documents in `.tandem/logs/`
-- optional lightweight Papercut inbox records in `.tandem/papercuts/`, outside the general document taxonomy and Board workflow
-- tracked per-actor `.tandem/events/<actor_id>.jsonl` lifecycle ledgers, with an enforced ignored checkout/worktree-local `.tandem/actor-id` identity and legacy `.tandem/events.jsonl` reads during transition
-- `accord` work-agreement model
-- review and completion semantics
-- Brainfile-inspired protocol parity decisions
-- local v3 proposal reconciliation from `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`
-- post-v0 schema/fixture definitions only if explicitly useful later
+The workspace frontmatter must contain `protocolVersion: 0.3.0`, `title`, and the active `states` (`todo`, `in-progress`, `validation`). An encountered other protocol version fails clearly with both detected and required versions.
 
-The protocol area does **not** own TUI rendering details. TUI design belongs in `../tandem/`.
+## Documents
 
-## Current status
+Only `task` and `decision` are first-class documents. Unknown fields and Markdown bodies are preserved.
 
-Protocol `0.2.0` is implemented in the single Rust binary crate under
-`../tandem/`. No separate protocol crate, schemas, or fixtures exist, and
-schemas/fixtures are not part of v0. Protocol docs should change only for
-implementation feedback, bug fixes, or explicit product decisions.
+Tasks use immutable global `task-N` IDs for root Tasks, Epics, and direct Epic children. A normal Task directly beneath a normal Task is a leaf Subtask with immutable `task-N-M` ID. Epics (`kind: epic`) are root-only. Subtasks cannot have children, and reparenting may not change role or invalidate the ID. `parentId` is task-only and resolves only Epic → Task or Task → Subtask relationships. Decisions are linked with `references`, never hierarchy.
 
-## Documentation
+Active Tasks have `state` and a mandatory `accord` with at least one `acceptance` criterion. State is exactly `todo`, `in-progress`, or `validation`. Papercuts are ordinary low-priority Tasks tagged `papercut`.
 
-- `plan/spec.md` — normative protocol draft, including Rule category semantics and the universal agent/adapter consumption contract
-- `plan/todo.md` — protocol task tracker
-- `../docs/guides/agents-and-adapters.md` — public framework-neutral operational guidance
-- `../README.md` — parent project overview
-- `../plan/spec.md` — parent project plan
-- `../plan/todo.md` — parent project todo
-- `../AGENTS.md` — agent guidance
+Decision metadata includes `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`), automatic `createdAt`/`updatedAt`, automatic `decidedAt` on acceptance or rejection, `deciders`, `supersedes`, `references`, and `tags`. ADR prose belongs in the Markdown body. There are no manual `date`, `supersededBy`, or prose metadata flags.
 
-## Key current decisions
+Rules use composite IDs such as `always-12`, a category (`always`, `never`, `prefer`, or `context`), optional `source`, timestamps, and rule text as the Markdown body. Reclassification is delete-and-add.
 
-- Product/protocol name: **Tandem**
-- CLI binary: `tandem`
-- Protocol data directory: `.tandem/`
-- Config file: `.tandem/tandem.md`
-- Work agreement object: `accord`
-- Completion is an action/archive transition, not a default `done` column.
-- Human workflow state, accord state, and review state are separate.
-- Logs are first-class terminal work history: missing `completion.outcome` means completed, while reasoned cancellation uses `completion.outcome: canceled`.
-- Match Brainfile's basic protocol feature shape unless Tandem intentionally improves or omits something.
+## Accord and archive
 
+Accord statuses are `ready`, `claimed`, `delivered`, `rework`, `blocked`, and terminal `accepted` or `failed` in Logs. `ready` requires acceptance criteria. `claim` sets top-level `assignee`; `release` clears it and returns to `ready`; `deliver` requires a summary and at least one evidence item; `resume` changes blocked to claimed. `complete` atomically accepts delivered work and archives it. `fail` atomically archives failed work. `cancel` archives canceled work. Archived records retain the full Task and Accord plus `archivedAt` and minimal `resolution: { outcome, note, reviewer }`; delivery evidence is not duplicated.
 
-## Locked v0 protocol decisions
+Validation is exceptional human escalation: `review <id>` requires the exact unresolved `criterion` and a `note`, enters `state: validation`, and may include a reviewer. Completion accepts; Accord rework returns to `in-progress`. Review status is not stored.
 
-- Protocol version: `0.2.0`. Tandem refuses ordinary project operations on discovered `0.1.0` workspaces until the user explicitly runs `tandem upgrade`; help and version remain available.
-- Canonical workflow field: `state`; default states: `todo`, `in-progress`, `validation` (with legacy `review` reads tolerated).
-- New work items use `type: task`; the canonical shape is `task-10` Epic → `task-11` global Task → `task-11-1` parent-derived leaf Subtask. Epics and Tasks—including direct Epic Tasks—use global `task-N` IDs. Only a Subtask directly beneath a Task uses `task-N-M`.
-- First-class document types: `task` and `decision`; decision docs are ADR-compatible durable records and do not need a lifecycle field. Existing custom declarations/documents are deprecated read-only content: upgrade preserves them for list/show/search, but Tandem neither creates nor mutates them.
-- Epic, Task, and Subtask are derived roles over normal task documents. An Epic is `type: task` plus `kind: epic`; a Task is normal and root-level, generic-parented, or directly Epic-parented; a Subtask is normal and directly parented by a Task. Classification resolves documents and never uses ID shape.
-- Direct Epic children use `epic-task`; Task children use `subtask`; decision/custom-document links use generic `parent`. Generic-parent Tasks may have Subtasks.
-- Strict validation rejects a parented Epic, a child beneath a Subtask, any role/ID mismatch, and role-changing or ID-invalidating reparenting.
-- `parentId` remains canonical for hierarchy, while the resolved role constrains ID shape: Epics/Tasks require global `task-N`; Subtasks require `task-N-M`. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid.
-- Decision-7 fully supersedes decision-4 with no compatibility exception. Global and per-Task suffix allocation both scan active board documents and completed logs without reuse.
-- Inline `subtasks:` checklist items are legacy and deprecated for new work. Existing entries remain readable, validatable, and preservable; new lifecycle-bearing checklist work uses first-class Subtask documents.
-- Epics retain normal task lifecycle and have no separate type, ID namespace, command family, or lifecycle. Epics are not delegated; a delegated Task's Subtask documents are Worker A's `pi-todos` execution checklist and are not independently delegated.
-- Accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
-- Rules are structured objects. References can point to any Tandem document by ID.
-- Completion always warns but allows completion unless structural validation blocks it. Legacy project-level completion-policy settings are preserved, deprecated, and ignored.
-- Completed logs are archived markdown docs in `.tandem/logs/`; minimal audit-only events live in tracked per-actor `.tandem/events/<actor_id>.jsonl` logs, while legacy `.tandem/events.jsonl` remains readable during transition. Tandem persists the automatic actor UUID in `.tandem/actor-id` per independent checkout or linked worktree and enforces that this identity file is ignored; tracked files and ineffective ignore rules are hard errors.
-- Validation is built-in structural validation only, with strict structure/core refs, hierarchy roles, and ID grammar: unresolved `parentId`/`blockers`, parented Epics, children beneath Subtasks, role/ID mismatches, role-changing reparenting, and invalid optional `priority` (`low|medium|high|critical`) or `effort` (`trivial|small|medium|large`) values are errors; unresolved related `references` are warnings.
-- No Brainfile import/migration command is required in v0.
+## Events
+
+Every durable mutation writes one event to `.tandem/events/<actor-id>.jsonl`; reads never write. The required envelope is:
+
+```json
+{"ts":"...","seq":4,"actor":"...","event":"task.updated","id":"task-12","data":{"fields":["tags"]}}
+```
+
+Required fields are `ts`, `seq`, `actor`, `event`, `id`, and structured event-specific `data`. Full bodies are never copied into events.
+
+## CLI contract
+
+The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 23 leaves: `init`; `add task|decision`; `show`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure.
+
+`list` and `search` support `--scope active|archived|all`, defaulting to active. `update` never mutates state, assignee, or Accord status. Repeated list values replace the complete list; absent values remain unchanged; `--clear` removes lists and optional scalars. Human prose accepts leading hyphens while typed IDs, enums, and numbers remain strict.
+
+There is no `upgrade`, `migrate`, `move`, `version` command, `log`, `decision`, or `papercut` command family, compatibility parser, fallback, or adapter implementation in this cutover.

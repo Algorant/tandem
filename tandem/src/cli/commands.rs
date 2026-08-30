@@ -1,728 +1,456 @@
-//! Thin command adapters over shared application and project queries.
-
-use super::args::*;
-use super::output::*;
-use crate::app::accord::AccordOptions;
-use crate::app::tasks::{AddOptions, CancelOptions, CompleteOptions, MoveOptions, UpdateOptions};
-use crate::project::rules::read_rules;
-use crate::project::TandemProject;
-use crate::protocol::accord;
-use crate::protocol::config::{LEGACY_PROTOCOL_VERSION, PROTOCOL_VERSION};
-use crate::protocol::hierarchy::ParentRelationship;
+//! Typed CLI-to-application conversion and dispatch.
+use super::model::*;
 use crate::{app, CliError};
 
-type DecisionAddOptions = app::decisions::AddOptions;
-
-pub(super) fn cmd_init(options: InitOptions) -> Result<(), CliError> {
-    let outcome = app::project::initialize(app::project::InitOptions {
-        title: options.title,
-        force: options.force,
-    })?;
-    println!("Created Tandem workspace");
-    println!("Title: {}", outcome.title);
-    println!("Config: {}", display_path(&outcome.project.config_path));
-    println!("Board:  {}", display_path(&outcome.project.board_dir));
-    println!("Logs:   {}", display_path(&outcome.project.logs_dir));
-    println!("Events: {}", display_path(&outcome.project.events_dir()));
-    println!("States: todo, in-progress, validation");
-    Ok(())
-}
-
-pub(super) fn cmd_list(options: ListOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let mut filtered = snapshot.board_documents(&app::queries::ListFilter {
-        state: options.state.as_deref(),
-        doc_type: options.doc_type.as_deref(),
-        priority: options.priority.as_deref(),
-        tag: options.tag.as_deref(),
-        assignee: options.assignee.as_deref(),
-        parent: options.parent.as_deref(),
-        accord: options.accord.as_deref(),
-        review: options.review.as_deref(),
-    });
-    sort_documents(&mut filtered);
-    let relationships = snapshot.relationships_for(&filtered)?;
-
-    if options.json {
-        println!("{}", list_json(&filtered, &relationships)?);
-    } else {
-        print_workspace_deprecation_warnings(&workspace)?;
-        print_list_table(&filtered, &relationships)?;
-        print_document_warnings(&filtered);
-    }
-
-    Ok(())
-}
-
-pub(super) fn cmd_show(options: ShowOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let hierarchy = &snapshot.hierarchy;
-    let doc = snapshot
-        .document(&options.id)
-        .ok_or_else(|| CliError::user(format!("document not found: {}", options.id)))?;
-    let relationship = hierarchy.relationship(&doc)?;
-    let children = snapshot.children(&doc)?;
-    let role = hierarchy.task_role(&doc)?;
-
-    if options.json {
-        println!("{}", show_json(&doc, &children, role, relationship));
-    } else {
-        print_workspace_deprecation_warnings(&workspace)?;
-        print_show(&doc, &children, role, relationship);
-        print_document_warnings(&[doc]);
-    }
-
-    Ok(())
-}
-
-pub(super) fn cmd_add(options: AddOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let json = options.json;
-    let outcome = app::tasks::add(&workspace, options)?;
-
-    if json {
-        println!("{}", add_outcome_json(&outcome));
-        return Ok(());
-    }
-
-    for warning in &outcome.warnings {
-        println!("Warning: {warning}");
-    }
-    if outcome.parent_relationship == Some(ParentRelationship::Subtask) {
-        println!("Created subtask");
-    } else {
-        println!("Created task");
-    }
-    println!("ID:    {}", outcome.id);
-    println!("State: {}", outcome.state);
-    if let Some(kind) = outcome.kind.as_deref() {
-        println!("Kind:  {kind}");
-    }
-    if let Some(parent) = outcome.parent.as_deref() {
-        let label = outcome
-            .parent_relationship
-            .unwrap_or(ParentRelationship::Parent)
-            .human_label();
-        println!("{label}: {parent}");
-    }
-    println!("Title: {}", outcome.title);
-    println!("Path:  {}", display_path(&outcome.path));
-    Ok(())
-}
-
-pub(super) fn cmd_move(options: MoveOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let state = options
-        .state
-        .as_deref()
-        .ok_or_else(|| CliError::usage("move requires --state <state>"))?;
-    let outcome = app::tasks::move_to_state(&workspace, &options.id, state)?;
-
-    if !outcome.changed {
-        println!("{} is already in state {state}", outcome.id);
-        return Ok(());
-    }
-
-    println!("Moved {}", outcome.id);
-    println!("From: {}", outcome.from);
-    println!("To:   {}", outcome.to);
-    if let Some(sync) = outcome.accord_sync.as_deref() {
-        println!("Accord: {sync}");
-    }
-    println!("Path: {}", display_path(&outcome.path));
-    Ok(())
-}
-
-pub(super) fn cmd_update(options: UpdateOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::tasks::update(&workspace, options)?;
-
-    for warning in outcome.warnings {
-        println!("Warning: {warning}");
-    }
-    if outcome.changes.is_empty() {
-        println!("No changes for {}", outcome.id);
-        println!("Path: {}", display_path(&outcome.path));
-        return Ok(());
-    }
-
-    println!("Updated {}", outcome.id);
-    for change in outcome.changes {
-        if change.field == "body" {
-            println!("body: changed");
-        } else {
-            println!(
-                "{}: {} -> {}",
-                app::tasks::display_change_field(&change.field, outcome.parent_relationship),
-                app::tasks::display_change_value(&change.old),
-                app::tasks::display_change_value(&change.new)
-            );
+pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupRequest, CliError> {
+    match command {
+        Command::Init(args) => {
+            app::project::initialize(app::project::InitOptions {
+                title: args.title,
+                force: false,
+            })?;
+            Ok(super::StartupRequest::Exit)
         }
+        Command::Add(args) => add(args, json),
+        Command::Show(args) => show(args, json),
+        Command::List(args) => list(args, json),
+        Command::Search(args) => search(args, json),
+        Command::Update(args) => update(args, json),
+        Command::Accord(args) => accord(args, json),
+        Command::Review(args) => review(args, json),
+        Command::Complete(args) => complete(args, json),
+        Command::Cancel(args) => cancel(args, json),
+        Command::Rules(args) => rules(args, json),
+        Command::Tui => Ok(super::StartupRequest::Tui),
+        Command::Web(args) => Ok(super::StartupRequest::Web(crate::web::Options {
+            port: args.port,
+            no_open: args.no_open,
+        })),
     }
-    println!("Path: {}", display_path(&outcome.path));
-    Ok(())
 }
 
-pub(super) fn cmd_complete(options: CompleteOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::tasks::complete(&workspace, options)?;
-    for warning in &outcome.warnings {
-        println!("Warning: {warning}");
-    }
-    if outcome.has_completion_warnings {
-        println!("Completing anyway under the canonical protocol policy.\n");
-    }
-    println!("Completed {}", outcome.id);
-    println!(
-        "Moved: {} -> {}",
-        display_path(&outcome.board_path),
-        display_path(&outcome.log_path)
-    );
-    println!("Event: task.completed");
-    Ok(())
-}
-
-pub(super) fn cmd_cancel(options: CancelOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let reason = require_nonempty(options.reason.as_deref(), "cancel requires --reason <text>")?;
-    let outcome = app::tasks::cancel(&workspace, &options.id, reason)?;
-
-    println!("Canceled {}", outcome.id);
-    println!("Reason: {}", outcome.reason);
-    println!(
-        "Moved: {} -> {}",
-        display_path(&outcome.board_path),
-        display_path(&outcome.log_path)
-    );
-    println!("Event: task.canceled");
-    Ok(())
-}
-
-pub(super) fn cmd_papercut(args: &[String]) -> Result<(), CliError> {
-    let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage(
-            "tandem papercut requires add, list, show, or resolve",
-        ));
-    };
-    match subcommand.as_str() {
-        "add" => {
-            let options = parse_papercut_add_args(rest)?;
-            let workspace = discover_workspace()?;
-            let outcome = app::papercuts::add(
-                &workspace,
-                app::papercuts::AddOptions {
-                    title: options.title,
-                    body: options.body,
-                    references: options.references,
-                    tags: options.tags,
+fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    match args.command {
+        AddCommand::Task(task) => {
+            let outcome = app::tasks::add(
+                &project,
+                app::tasks::AddOptions {
+                    title: Some(task.title),
+                    acceptance: task.acceptance,
+                    description: task.body,
+                    kind: task.kind,
+                    priority: task.priority,
+                    effort: task.effort,
+                    tags: task.tag,
+                    due_date: task.due_date,
+                    parent: task.parent,
+                    blockers: task.blocker,
+                    references: task.reference,
+                    related_files: task.related_file,
+                    constraints: task.constraint,
+                    validations: task.validation,
+                    ..Default::default()
                 },
             )?;
-            for warning in &outcome.warnings {
-                println!("Warning: {warning}");
-            }
-            println!(
-                "Created Papercut\nID:     {}\nStatus: {}\nTitle:  {}\nPath:   {}",
-                outcome.papercut.id(),
-                outcome.papercut.status(),
-                outcome.papercut.title(),
-                display_path(&outcome.papercut.path)
-            );
-            Ok(())
-        }
-        "list" => {
-            let options = parse_papercut_list_args(rest)?;
-            let workspace = discover_workspace()?;
-            let (items, warnings) = app::papercuts::list(
-                &workspace,
-                app::papercuts::ListOptions {
-                    status: options.status.as_deref(),
-                    all: options.all,
-                },
-            )?;
-            if options.json {
-                println!("{}", papercut_list_json(&items, &warnings));
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
+                );
             } else {
-                print_papercut_list(&items);
-                for warning in warnings {
-                    println!("Warning: {warning}");
-                }
+                println!("Created task\nID: {}\nTitle: {}", outcome.id, outcome.title);
             }
-            Ok(())
         }
-        "show" => {
-            let options = parse_show_args(rest)?;
-            let workspace = discover_workspace()?;
-            let (item, warnings) = app::papercuts::show(&workspace, &options.id)?;
-            if options.json {
-                println!("{}", papercut_show_json(&item, &warnings));
-            } else {
-                print_papercut_show(&item);
-                for warning in warnings {
-                    println!("Warning: {warning}");
-                }
-            }
-            Ok(())
-        }
-        "resolve" => {
-            let options = parse_papercut_resolve_args(rest)?;
-            let workspace = discover_workspace()?;
-            let outcome = app::papercuts::resolve(
-                &workspace,
-                app::papercuts::ResolveOptions {
-                    id: options.id,
-                    note: options.note,
-                    references: options.references,
+        AddCommand::Decision(decision) => {
+            let outcome = app::decisions::add(
+                &project,
+                app::decisions::AddOptions {
+                    title: Some(decision.title),
+                    body: decision.body,
+                    deciders: decision.decider,
+                    supersedes: decision.supersedes,
+                    references: decision.reference,
+                    tags: decision.tag,
+                    ..Default::default()
                 },
             )?;
-            for warning in &outcome.warnings {
-                println!("Warning: {warning}");
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":[]})
+                );
+            } else {
+                println!(
+                    "Created decision\nID: {}\nTitle: {}",
+                    outcome.id, outcome.title
+                );
             }
-            println!(
-                "Resolved Papercut\nID:     {}\nStatus: {}\nNote:   {}\nPath:   {}",
-                outcome.papercut.id(),
-                outcome.papercut.status(),
-                outcome.papercut.field("resolution.note").unwrap_or(""),
-                display_path(&outcome.papercut.path)
-            );
-            Ok(())
         }
-        other => Err(CliError::usage(format!(
-            "unknown papercut subcommand `{other}`; use add, list, show, or resolve"
-        ))),
     }
+    Ok(super::StartupRequest::Exit)
 }
 
-pub(super) fn cmd_search(options: SearchOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let docs = snapshot.all_documents();
-    let results = app::queries::search_documents(
-        docs,
-        &app::queries::SearchFilter {
-            query: &options.query,
-            state: options.state.as_deref(),
-            doc_type: options.doc_type.as_deref(),
-            parent: options.parent.as_deref(),
+fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let docs = app::queries::documents_for_scope(
+        &project,
+        match args.scope {
+            Scope::Active => app::queries::Scope::Active,
+            Scope::Archived => app::queries::Scope::Archived,
+            Scope::All => app::queries::Scope::All,
         },
-    );
-    let relationships = snapshot.relationships_for(
-        &results
-            .iter()
-            .map(|result| result.doc.clone())
-            .collect::<Vec<_>>(),
     )?;
-    // Papercuts participate only in unfiltered global search. Document filters
-    // describe Board/Log taxonomy and hierarchy, which Papercuts do not join.
-    let papercut_results =
-        if options.state.is_none() && options.doc_type.is_none() && options.parent.is_none() {
-            app::queries::search_papercuts(workspace.read_papercuts()?, &options.query)
-        } else {
-            Vec::new()
-        };
-    let papercut_warnings = app::papercuts::warnings_for_items(
-        &workspace,
-        &papercut_results
-            .iter()
-            .map(|result| result.papercut.clone())
-            .collect::<Vec<_>>(),
-    )?;
-
-    if options.json {
-        println!(
-            "{}",
-            global_search_json(
-                &options.query,
-                &results,
-                &papercut_results,
-                &relationships,
-                &papercut_warnings,
-            )?
-        );
-    } else {
-        print_workspace_deprecation_warnings(&workspace)?;
-        if results.is_empty() && papercut_results.is_empty() {
-            println!("No matching Tandem records found.");
-        } else {
-            if !results.is_empty() {
-                print_search_table(&results, &relationships)?;
-            }
-            print_papercut_search(&papercut_results);
-        }
-        print_document_warnings(
-            &results
-                .iter()
-                .map(|result| result.doc.clone())
-                .collect::<Vec<_>>(),
-        );
-        for warning in papercut_warnings {
-            println!("Warning: {warning}");
-        }
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_log(args: &[String]) -> Result<(), CliError> {
-    let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage("tandem log requires list, show, or search"));
+    let filter = app::queries::ListFilter {
+        state: args.state.as_deref(),
+        doc_type: args.r#type.as_deref(),
+        priority: args.priority.as_deref(),
+        effort: args.effort.as_deref(),
+        tags: &args.tag,
+        assignee: args.assignee.as_deref(),
+        parent: args.parent.as_deref(),
+        accord: args.accord.as_deref(),
+        decision_status: args.decision_status.as_deref(),
+        resolution: args.resolution.as_deref(),
     };
-    match subcommand.as_str() {
-        "list" => cmd_log_list(parse_log_list_args(rest)?),
-        "show" => cmd_log_show(parse_show_args(rest)?),
-        "search" => cmd_log_search(parse_log_search_args(rest)?),
-        other => Err(CliError::usage(format!(
-            "unknown log subcommand `{other}`; use list, show, or search"
-        ))),
+    let mut documents = app::queries::filter_documents(docs, &filter);
+    if let Some(limit) = args.limit {
+        documents.truncate(limit);
     }
-}
-
-pub(super) fn cmd_log_list(options: LogListOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let mut docs = snapshot.log_documents();
-    docs.sort_by(|a, b| {
-        b.field("completedAt")
-            .unwrap_or("")
-            .cmp(a.field("completedAt").unwrap_or(""))
-            .then_with(|| a.id().cmp(b.id()))
-    });
-    if let Some(limit) = options.limit {
-        docs.truncate(limit);
-    }
-
-    if options.json {
-        println!("{}", log_list_json(&docs));
-    } else {
-        print_log_table(&docs);
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_log_show(options: ShowOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let hierarchy = &snapshot.hierarchy;
-    let doc = snapshot
-        .log_document(&options.id)
-        .ok_or_else(|| CliError::user(format!("log document not found: {}", options.id)))?;
-    let relationship = hierarchy.relationship(&doc)?;
-    if options.json {
-        println!("{}", log_show_json(&doc, relationship));
-    } else {
-        print_log_show(&doc, relationship);
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_log_search(options: SearchOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let mut results = snapshot
-        .log_documents()
-        .into_iter()
-        .filter_map(|doc| app::queries::search_match(doc, &options.query))
-        .collect::<Vec<_>>();
-    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
-    let relationships = snapshot.relationships_for(
-        &results
-            .iter()
-            .map(|result| result.doc.clone())
-            .collect::<Vec<_>>(),
-    )?;
-    if options.json {
-        println!("{}", search_json(&options.query, &results, &relationships)?);
-    } else {
-        print_search_table(&results, &relationships)?;
-    }
-    Ok(())
-}
-
-pub(super) fn accord_actions_help() -> String {
-    accord::ACTIONS.join("|")
-}
-
-pub(super) fn accord_actions_usage() -> String {
-    let (last, leading) = accord::ACTIONS
-        .split_last()
-        .expect("accord actions must not be empty");
-    format!("{}, or {last}", leading.join(", "))
-}
-
-pub(super) fn cmd_review(args: &[String]) -> Result<(), CliError> {
-    let Some((action, rest)) = args.split_first() else {
-        return Err(CliError::usage(
-            "tandem review requires request, accept, changes, or reject",
-        ));
-    };
-    if !matches!(action.as_str(), "request" | "accept" | "changes" | "reject") {
-        return Err(CliError::usage(format!(
-            "unknown review subcommand `{action}`; use request, accept, changes, or reject"
-        )));
-    }
-    let options = parse_review_args(action, rest)?;
-    let json = options.json;
-    let workspace = discover_workspace()?;
-    let outcome = app::review::transition(&workspace, action, options)?;
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok": true, "data": {"id": outcome.id, "status": outcome.status, "state": outcome.state, "event": outcome.event_name}})
+            serde_json::json!({"ok":true,"data":documents.iter().map(|d| serde_json::json!({"id":d.id(),"title":d.title()})).collect::<Vec<_>>(),"warnings":[]})
         );
     } else {
-        println!("Review {}", action);
-        println!("ID:      {}", outcome.id);
-        println!("Status:  {}", outcome.status);
-        println!("State:   {}", outcome.state);
-        println!("Event:   {}", outcome.event_name);
+        for doc in documents {
+            println!("{}\t{}", doc.id(), doc.title());
+        }
     }
-    Ok(())
+    Ok(super::StartupRequest::Exit)
 }
 
-pub(super) fn cmd_accord(args: &[String]) -> Result<(), CliError> {
-    let Some((action, rest)) = args.split_first() else {
-        return Err(CliError::usage(format!(
-            "tandem accord requires {}",
-            accord_actions_usage()
-        )));
-    };
-    let status = accord::status_for_action(action).ok_or_else(|| {
-        CliError::usage(format!(
-            "unknown accord subcommand `{action}`; use {}",
-            accord_actions_usage()
-        ))
-    })?;
-    let options = parse_accord_args(action, rest)?;
-    cmd_accord_update(action, status, options)
+fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    if let Some(doc) = project.find_document(&args.id)? {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{"id":doc.id(),"type":doc.doc_type(),"title":doc.title()},"warnings":[]})
+            );
+        } else {
+            println!(
+                "ID: {}\nType: {}\nTitle: {}",
+                doc.id(),
+                doc.doc_type(),
+                doc.title()
+            );
+        }
+        return Ok(super::StartupRequest::Exit);
+    }
+    if let Some(rule) = app::queries::find_rule(&project, &args.id)? {
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{"id":rule.id,"category":rule.category,"text":rule.text},"warnings":[]})
+            );
+        } else {
+            println!(
+                "ID: {}\nCategory: {}\nRule: {}",
+                rule.id, rule.category, rule.text
+            );
+        }
+        return Ok(super::StartupRequest::Exit);
+    }
+    Err(CliError::user(format!("document not found: {}", args.id)))
 }
 
-pub(super) fn cmd_accord_update(
-    action: &str,
-    _status: &str,
-    options: AccordOptions,
-) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::accord::transition(&workspace, action, options)?;
-    print_accord_update(
-        &outcome.id,
-        &outcome.previous_status,
-        &outcome.status,
-        &outcome.event_name,
-        &outcome.path,
-    );
-    if let Some(state) = outcome.synced_state.as_deref() {
-        println!("State:  {} -> {state}", outcome.previous_state);
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_rules(args: &[String]) -> Result<(), CliError> {
-    let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage(
-            "tandem rules requires list, add, edit, or delete",
-        ));
-    };
-    match subcommand.as_str() {
-        "list" => cmd_rules_list(parse_category_list_args(rest, "rules list")?),
-        "add" => cmd_rules_add(parse_rule_add_args(rest)?),
-        "edit" => cmd_rules_edit(parse_rule_edit_args(rest)?),
-        "delete" => cmd_rules_delete(parse_rule_delete_args(rest)?),
-        other => Err(CliError::usage(format!(
-            "unknown rules subcommand `{other}`; use list, add, edit, or delete"
-        ))),
-    }
-}
-
-pub(super) fn cmd_rules_list(options: CategoryListOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    if let Some(category) = options.category.as_deref() {
-        app::rules::validate_rule_category(category)?;
-    }
-    let rules = read_rules(&workspace.config_path)?;
-    if options.json {
-        println!("{}", rules_json(&rules, options.category.as_deref()));
-    } else {
-        print_rules(&rules, options.category.as_deref());
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_rules_add(options: RuleAddOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let category = require_rule_category(options.category.as_deref())?;
-    let rule = require_nonempty(options.rule.as_deref(), "rules add requires --rule <text>")?;
-    let outcome = app::rules::add(&workspace, category, rule, options.source)?;
-    if let Some(warning) = outcome.warning {
-        println!("Warning: {warning}");
-    }
-    println!("Added rule");
-    println!("Category: {}", outcome.category);
-    println!("ID:       {}", outcome.id);
-    println!("Rule:     {}", outcome.rule);
-    Ok(())
-}
-
-pub(super) fn cmd_rules_edit(options: RuleEditOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let category = require_rule_category(options.category.as_deref())?;
-    let id = options
-        .id
-        .ok_or_else(|| CliError::usage("rules edit requires --id <rule-id>"))?;
-    let rule = require_nonempty(options.rule.as_deref(), "rules edit requires --rule <text>")?;
-    let outcome = app::rules::edit(&workspace, category, id, rule, options.source)?;
-    if let Some(warning) = outcome.warning {
-        println!("Warning: {warning}");
-    }
-    println!("Edited rule");
-    println!("Category: {}", outcome.category);
-    println!("ID:       {}", outcome.id);
-    println!("Rule:     {}", outcome.rule);
-    Ok(())
-}
-
-pub(super) fn cmd_rules_delete(options: RuleDeleteOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let category = require_rule_category(options.category.as_deref())?;
-    let id = options
-        .id
-        .ok_or_else(|| CliError::usage("rules delete requires --id <rule-id>"))?;
-
-    let outcome = app::rules::delete(&workspace, category, id)?;
-    println!("Deleted rule");
-    println!("Category: {}", outcome.category);
-    println!("ID:       {}", outcome.id);
-    Ok(())
-}
-
-pub(super) fn cmd_decision(args: &[String]) -> Result<(), CliError> {
-    let Some((subcommand, rest)) = args.split_first() else {
-        return Err(CliError::usage(
-            "tandem decision requires list, show, add, update, or withdraw",
-        ));
-    };
-    match subcommand.as_str() {
-        "list" => cmd_decision_list(parse_json_only_args(rest, "decision list")?),
-        "show" => cmd_decision_show(parse_show_args(rest)?),
-        "add" => cmd_decision_add(parse_decision_add_args(rest)?),
-        "update" => cmd_decision_update(parse_decision_update_args(rest)?),
-        "withdraw" => cmd_decision_withdraw(parse_decision_withdraw_args(rest)?),
-        other => Err(CliError::usage(format!(
-            "unknown decision subcommand `{other}`; use list, show, add, update, or withdraw"
-        ))),
-    }
-}
-
-pub(super) fn cmd_decision_list(json: bool) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let mut docs = workspace
-        .read_board_documents()?
-        .into_iter()
-        .filter(|doc| doc.doc_type() == "decision")
-        .collect::<Vec<_>>();
-    docs.sort_by(|a, b| a.id().cmp(b.id()));
-    if json {
-        println!("{}", decision_list_json(&docs));
-    } else {
-        print_decision_table(&docs);
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_decision_show(options: ShowOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let snapshot = app::queries::load(&workspace)?;
-    let hierarchy = &snapshot.hierarchy;
-    let doc = snapshot
-        .document(&options.id)
-        .ok_or_else(|| CliError::user(format!("decision not found: {}", options.id)))?;
-    if doc.doc_type() != "decision" {
-        return Err(CliError::user(format!(
-            "{} is type {}, not decision",
-            doc.id(),
-            doc.doc_type()
-        )));
-    }
-    if options.json {
-        println!("{}", decision_show_json(&doc));
-    } else {
-        print_show(&doc, &[], None, hierarchy.relationship(&doc)?);
-    }
-    Ok(())
-}
-
-pub(super) fn cmd_decision_update(options: DecisionUpdateOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::decisions::update(
-        &workspace,
-        app::decisions::UpdateOptions {
-            id: options.id,
-            title: options.title,
-            status: options.status,
-            body: options.body,
+fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let docs = app::queries::documents_for_scope(
+        &project,
+        match args.scope {
+            Scope::Active => app::queries::Scope::Active,
+            Scope::Archived => app::queries::Scope::Archived,
+            Scope::All => app::queries::Scope::All,
         },
     )?;
-    println!(
-        "Updated decision\nID:    {}\nPath:  {}",
-        outcome.id,
-        display_path(&outcome.path)
-    );
-    Ok(())
-}
-
-pub(super) fn cmd_decision_withdraw(options: DecisionWithdrawOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::decisions::withdraw(&workspace, &options.id, options.reason)?;
-    println!(
-        "Withdrew decision\nID:      {}\nReason:  {}\nPath:    {}",
-        outcome.id,
-        outcome.reason,
-        display_path(&outcome.path)
-    );
-    Ok(())
-}
-
-pub(super) fn cmd_decision_add(options: DecisionAddOptions) -> Result<(), CliError> {
-    let workspace = discover_workspace()?;
-    let outcome = app::decisions::add(&workspace, options)?;
-    for warning in outcome.warnings {
-        println!("Warning: {warning}");
+    let filter = app::queries::SearchFilter {
+        query: &args.query,
+        state: args.state.as_deref(),
+        doc_type: args.r#type.as_deref(),
+        tags: &args.tag,
+        parent: args.parent.as_deref(),
+    };
+    let mut results = app::queries::search_documents(docs, &filter);
+    if let Some(limit) = args.limit {
+        results.truncate(limit);
     }
-    println!("Created decision");
-    println!("ID:     {}", outcome.id);
-    println!("Status: {}", outcome.status);
-    println!("Date:   {}", outcome.date);
-    println!("Title:  {}", outcome.title);
-    println!("Path:   {}", display_path(&outcome.path));
-    Ok(())
-}
-
-pub(super) fn discover_workspace() -> Result<TandemProject, CliError> {
-    app::project::open()
-}
-
-pub(super) fn cmd_upgrade(args: &[String]) -> Result<(), CliError> {
-    if !args.is_empty() {
-        return Err(CliError::usage("tandem upgrade does not accept options"));
-    }
-    match app::project::upgrade()? {
-        app::project::UpgradeOutcome::AlreadyCurrent => {
-            println!("Tandem project is already at protocol {PROTOCOL_VERSION}.");
-        }
-        app::project::UpgradeOutcome::Upgraded => {
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":results.iter().map(|r| serde_json::json!({"id":r.doc.id(),"title":r.doc.title(),"snippet":r.snippet})).collect::<Vec<_>>(),"warnings":[]})
+        );
+    } else {
+        for result in results {
             println!(
-                "Upgraded Tandem project protocol: {LEGACY_PROTOCOL_VERSION} -> {PROTOCOL_VERSION}"
-            );
-            println!(
-                "Preserved existing content while canonicalizing legacy `med` and `normal` priorities to `medium` in documents and logs."
+                "{}\t{}\t{}",
+                result.doc.id(),
+                result.doc.title(),
+                result.snippet
             );
         }
     }
-    Ok(())
+    Ok(super::StartupRequest::Exit)
 }
 
-fn print_workspace_deprecation_warnings(workspace: &TandemProject) -> Result<(), CliError> {
-    for warning in app::project::warnings(workspace)? {
-        println!("Warning: {warning}");
+fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let outcome = app::tasks::update(
+        &project,
+        app::tasks::UpdateOptions {
+            id: args.id,
+            title: args.title,
+            body: args.body,
+            kind: args.kind,
+            priority: args.priority,
+            effort: args.effort,
+            due_date: args.due_date,
+            parent: args.parent,
+            tags: args.tag,
+            blockers: args.blocker,
+            references: args.reference,
+            related_files: args.related_file,
+            clear: args.clear,
+            ..Default::default()
+        },
+    )?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"changes":outcome.changes.iter().map(|c| &c.field).collect::<Vec<_>>()},"warnings":outcome.warnings})
+        );
+    } else {
+        println!("Updated {}", outcome.id);
     }
-    Ok(())
+    Ok(super::StartupRequest::Exit)
+}
+
+fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let (action, id, options) = match args.command {
+        AccordCommand::Claim(v) => (
+            "claim",
+            v.id,
+            app::accord::AccordOptions {
+                assignee: Some(v.assignee),
+                ..Default::default()
+            },
+        ),
+        AccordCommand::Deliver(v) => (
+            "deliver",
+            v.id,
+            app::accord::AccordOptions {
+                summary: Some(v.summary),
+                evidence: v.evidence,
+                files_changed: v.file_changed,
+                ..Default::default()
+            },
+        ),
+        AccordCommand::Rework(v) => (
+            "rework",
+            v.id,
+            app::accord::AccordOptions {
+                note: Some(v.note),
+                ..Default::default()
+            },
+        ),
+        AccordCommand::Block(v) => (
+            "block",
+            v.id,
+            app::accord::AccordOptions {
+                note: Some(v.note),
+                ..Default::default()
+            },
+        ),
+        AccordCommand::Resume(v) => ("resume", v.id, Default::default()),
+        AccordCommand::Release(v) => (
+            "release",
+            v.id,
+            app::accord::AccordOptions {
+                note: Some(v.note),
+                ..Default::default()
+            },
+        ),
+        AccordCommand::Fail(v) => (
+            "fail",
+            v.id,
+            app::accord::AccordOptions {
+                note: Some(v.note),
+                ..Default::default()
+            },
+        ),
+    };
+    let project = app::project::open()?;
+    let outcome = app::accord::transition(
+        &project,
+        action,
+        app::accord::AccordOptions { id, ..options },
+    )?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"status":outcome.status,"event":outcome.event_name},"warnings":[]})
+        );
+    } else {
+        println!("Accord {}: {}", outcome.id, outcome.status);
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn review(args: ReviewArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let outcome = app::review::transition(
+        &project,
+        "request",
+        app::review::ReviewOptions {
+            id: args.id,
+            criterion: Some(args.criterion),
+            note: Some(args.note),
+            reviewer: args.reviewer,
+            ..Default::default()
+        },
+    )?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"state":outcome.state},"warnings":[]})
+        );
+    } else {
+        println!("Validation requested for {}", outcome.id);
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let outcome = app::tasks::complete(
+        &project,
+        app::tasks::CompleteOptions {
+            id: args.id,
+            reviewer: args.reviewer,
+            ..Default::default()
+        },
+    )?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
+        );
+    } else {
+        println!("Completed {}", outcome.id);
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let outcome = app::tasks::cancel(&project, &args.id, &args.note)?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":[]})
+        );
+    } else {
+        println!("Canceled {}", outcome.id);
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    match args.command {
+        RulesCommand::List { category } => {
+            let rules = crate::project::rules::read_rules(&project.config_path)?;
+            let values = category
+                .as_deref()
+                .and_then(|c| rules.get(c))
+                .cloned()
+                .unwrap_or_else(|| rules.values().flatten().cloned().collect());
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"rule":r.rule})).collect::<Vec<_>>(),"warnings":[]})
+                );
+            } else {
+                for r in values {
+                    println!(
+                        "{}-{}\t{}",
+                        category.as_deref().unwrap_or("rule"),
+                        r.id,
+                        r.rule
+                    );
+                }
+            }
+        }
+        RulesCommand::Add {
+            category,
+            text,
+            source,
+        } => {
+            let o = app::rules::add(&project, &category, &text, source)?;
+            println!(
+                "{}",
+                if json {
+                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
+                } else {
+                    format!("Created rule {}-{}", o.category, o.id)
+                }
+            );
+        }
+        RulesCommand::Edit {
+            id, text, source, ..
+        } => {
+            let (category, number) = id
+                .split_once('-')
+                .ok_or_else(|| CliError::usage("rules edit requires <category-N>"))?;
+            let o = app::rules::edit(
+                &project,
+                category,
+                number
+                    .parse()
+                    .map_err(|_| CliError::usage("invalid rule id"))?,
+                &text,
+                source,
+            )?;
+            println!(
+                "{}",
+                if json {
+                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
+                } else {
+                    format!("Updated rule {}-{}", o.category, o.id)
+                }
+            );
+        }
+        RulesCommand::Delete { id } => {
+            let (category, number) = id
+                .split_once('-')
+                .ok_or_else(|| CliError::usage("rules delete requires <category-N>"))?;
+            let o = app::rules::delete(
+                &project,
+                category,
+                number
+                    .parse()
+                    .map_err(|_| CliError::usage("invalid rule id"))?,
+            )?;
+            println!(
+                "{}",
+                if json {
+                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
+                } else {
+                    format!("Deleted rule {}-{}", o.category, o.id)
+                }
+            );
+        }
+    }
+    Ok(super::StartupRequest::Exit)
 }

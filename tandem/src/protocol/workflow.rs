@@ -10,19 +10,21 @@ use super::document::{parse_field_values, Document};
 pub(crate) const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
 pub(crate) const LEGACY_REVIEW_STATE: &str = "review";
 pub(crate) const VALIDATION_STATE: &str = "validation";
-pub(crate) const COMPLETION_OUTCOME_COMPLETED: &str = "completed";
-pub(crate) const COMPLETION_OUTCOME_CANCELED: &str = "canceled";
+pub(crate) const RESOLUTION_OUTCOME_COMPLETED: &str = "completed";
+pub(crate) const RESOLUTION_OUTCOME_CANCELED: &str = "canceled";
+pub(crate) const RESOLUTION_OUTCOME_FAILED: &str = "failed";
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct CompletionRecord {
-    pub(crate) summary: String,
+pub(crate) struct ResolutionRecord {
     pub(crate) outcome: Option<String>,
-    pub(crate) files_changed: Vec<String>,
-    pub(crate) validation: Option<String>,
+    pub(crate) note: Option<String>,
     pub(crate) reviewer: Option<String>,
 }
-pub(crate) const COMPLETION_OUTCOMES: &[&str] =
-    &[COMPLETION_OUTCOME_COMPLETED, COMPLETION_OUTCOME_CANCELED];
+pub(crate) const RESOLUTION_OUTCOMES: &[&str] = &[
+    RESOLUTION_OUTCOME_COMPLETED,
+    RESOLUTION_OUTCOME_CANCELED,
+    RESOLUTION_OUTCOME_FAILED,
+];
 
 pub(crate) fn workflow_states(root: Option<&Yaml>) -> Vec<String> {
     let mut states = Vec::new();
@@ -80,35 +82,33 @@ pub(crate) fn display_known_states(states: &[String]) -> String {
     display.join(", ")
 }
 
-pub(crate) fn completion_summary(document: &Document) -> Option<&str> {
+/// Resolution metadata on archived Logs (minimal D47 record). Falls back to
+/// legacy completion fields so imported history stays readable.
+pub(crate) fn resolution_note(document: &Document) -> Option<&str> {
     document
-        .field("completion.summary")
+        .field("resolution.note")
+        .or_else(|| document.field("completion.summary"))
         .or_else(|| document.field("completionSummary"))
 }
 
-pub(crate) fn completion_outcome(document: &Document) -> &str {
+pub(crate) fn resolution_outcome(document: &Document) -> &str {
     document
-        .field("completion.outcome")
-        .unwrap_or(COMPLETION_OUTCOME_COMPLETED)
+        .field("resolution.outcome")
+        .or_else(|| document.field("completion.outcome"))
+        .unwrap_or(RESOLUTION_OUTCOME_COMPLETED)
 }
 
-pub(crate) fn completion_validation(document: &Document) -> Option<&str> {
+pub(crate) fn resolution_reviewer(document: &Document) -> Option<&str> {
     document
-        .field("completion.validation")
-        .or_else(|| document.field("completion.validation.summary"))
-        .or_else(|| document.field("completion.validation.status"))
-        .or_else(|| document.field("completionValidation"))
-}
-
-pub(crate) fn completion_reviewer(document: &Document) -> Option<&str> {
-    document
-        .field("completion.reviewer")
+        .field("resolution.reviewer")
+        .or_else(|| document.field("completion.reviewer"))
         .or_else(|| document.field("completionReviewer"))
 }
 
-pub(crate) fn completion_files_changed(document: &Document) -> Vec<String> {
+pub(crate) fn resolution_files_changed(document: &Document) -> Vec<String> {
     document
-        .field("completion.filesChanged")
+        .field("resolution.filesChanged")
+        .or_else(|| document.field("completion.filesChanged"))
         .or_else(|| document.field("filesChanged"))
         .map(parse_field_values)
         .unwrap_or_default()
@@ -148,19 +148,31 @@ mod tests {
     }
 
     #[test]
-    fn completion_reads_nested_and_legacy_values() {
+    fn resolution_reads_nested_and_legacy_values() {
         let document = Document::new(
             HashMap::from([
-                ("completion.summary".to_string(), "Done".to_string()),
+                ("resolution.note".to_string(), "Done".to_string()),
+                ("resolution.reviewer".to_string(), "owner".to_string()),
                 (
-                    "completion.filesChanged".to_string(),
+                    "resolution.filesChanged".to_string(),
                     "[src/main.rs]".to_string(),
                 ),
             ]),
             String::new(),
         );
-        assert_eq!(completion_summary(&document), Some("Done"));
-        assert_eq!(completion_outcome(&document), "completed");
-        assert_eq!(completion_files_changed(&document), ["src/main.rs"]);
+        assert_eq!(resolution_note(&document), Some("Done"));
+        assert_eq!(resolution_outcome(&document), "completed");
+        assert_eq!(resolution_reviewer(&document), Some("owner"));
+        assert_eq!(resolution_files_changed(&document), ["src/main.rs"]);
+
+        let legacy = Document::new(
+            HashMap::from([
+                ("completion.summary".to_string(), "Done".to_string()),
+                ("completion.outcome".to_string(), "canceled".to_string()),
+            ]),
+            String::new(),
+        );
+        assert_eq!(resolution_note(&legacy), Some("Done"));
+        assert_eq!(resolution_outcome(&legacy), "canceled");
     }
 }

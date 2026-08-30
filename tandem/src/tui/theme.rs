@@ -2231,7 +2231,7 @@ accent = "wat"
         TandemProject {
             root: PathBuf::new(),
             data_dir: PathBuf::new(),
-            board_dir: tandem_dir.join("board"),
+            tasks_dir: tandem_dir.join("board"),
             logs_dir: tandem_dir.join("logs"),
             events_path: tandem_dir.join("events.jsonl"),
             config_path,

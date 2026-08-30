@@ -143,41 +143,6 @@ impl TuiApp {
         }
     }
 
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn handle_review_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => self.previous_review_item(),
-            KeyCode::Down | KeyCode::Char('j') => self.next_review_item(),
-            KeyCode::Home | KeyCode::Char('g') => self.selected_review_item = 0,
-            KeyCode::End | KeyCode::Char('G') => self.last_review_item(),
-            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
-            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
-            _ => {}
-        }
-        self.clamp_review_selection();
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn handle_review_detail_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Up | KeyCode::Char('k') => self.scroll_review_detail_up(1),
-            KeyCode::Down | KeyCode::Char('j') => self.scroll_review_detail_down(1),
-            KeyCode::PageUp | KeyCode::Char('u') => self.scroll_review_detail_up(6),
-            KeyCode::PageDown | KeyCode::Char('d') => self.scroll_review_detail_down(6),
-            KeyCode::Home | KeyCode::Char('g') => self.review_detail_scroll = 0,
-            KeyCode::End | KeyCode::Char('G') => self.review_detail_scroll_to_end(),
-            KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
-            KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
-            _ => {}
-        }
-    }
-
     pub(super) fn handle_logs_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => match self.focus {
@@ -791,69 +756,6 @@ impl TuiApp {
         self.detail_scroll = self.detail_line_count().saturating_sub(1) as u16;
     }
 
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn previous_review_item(&mut self) {
-        if self.selected_review_item > 0 {
-            self.selected_review_item -= 1;
-            self.review_detail_scroll = 0;
-        }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn next_review_item(&mut self) {
-        let count = self.review_items().len();
-        if self.selected_review_item + 1 < count {
-            self.selected_review_item += 1;
-            self.review_detail_scroll = 0;
-        }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn last_review_item(&mut self) {
-        let count = self.review_items().len();
-        if count > 0 {
-            self.selected_review_item = count - 1;
-            self.review_detail_scroll = 0;
-        }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn scroll_review_detail_up(&mut self, amount: u16) {
-        self.review_detail_scroll = self.review_detail_scroll.saturating_sub(amount);
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn scroll_review_detail_down(&mut self, amount: u16) {
-        let max_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
-        self.review_detail_scroll = self
-            .review_detail_scroll
-            .saturating_add(amount)
-            .min(max_scroll);
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn review_detail_scroll_to_end(&mut self) {
-        self.review_detail_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
-    }
-
     pub(super) fn scroll_log_detail_up(&mut self, amount: u16) {
         self.log_detail_scroll = self.log_detail_scroll.saturating_sub(amount);
     }
@@ -885,7 +787,6 @@ impl TuiApp {
         }
         let max_scroll = self.detail_line_count().saturating_sub(1) as u16;
         self.detail_scroll = self.detail_scroll.min(max_scroll);
-        self.clamp_review_selection();
 
         let log_count = self.filtered_logs().len();
         if log_count == 0 {
@@ -895,21 +796,6 @@ impl TuiApp {
         }
         let max_log_scroll = self.log_detail_line_count().saturating_sub(1) as u16;
         self.log_detail_scroll = self.log_detail_scroll.min(max_log_scroll);
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn clamp_review_selection(&mut self) {
-        let count = review::queue_len(&self.docs);
-        if count == 0 {
-            self.selected_review_item = 0;
-        } else if self.selected_review_item >= count {
-            self.selected_review_item = count - 1;
-        }
-        let max_scroll = self.review_detail_line_count().saturating_sub(1) as u16;
-        self.review_detail_scroll = self.review_detail_scroll.min(max_scroll);
     }
 
     pub(super) fn selected_state_count(&self) -> usize {
@@ -1055,47 +941,6 @@ impl TuiApp {
                 if self.logs.len() == 1 { "" } else { "s" }
             )
         }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn review_items(&self) -> Vec<review::ReviewQueueItem> {
-        review::queue_items_with_hierarchy(&self.docs, &self.logs, self.hierarchy.index.as_ref())
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn selected_review_item(&self) -> Option<review::ReviewQueueItem> {
-        review::selected_item(&self.docs, &self.logs, self.selected_review_item)
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn select_review_item_by_id_preserving_scroll(&mut self, id: &str) -> bool {
-        let items = self.review_items();
-        if let Some(index) = items.iter().position(|item| item.id() == id) {
-            self.selected_review_item = index;
-            self.clamp_review_selection();
-            true
-        } else {
-            self.clamp_review_selection();
-            false
-        }
-    }
-
-    #[allow(
-        dead_code,
-        reason = "retained Review navigation remains compiled pending a separate product decision"
-    )]
-    fn review_detail_line_count(&self) -> usize {
-        let item = self.selected_review_item();
-        review::detail_line_count(item.as_ref(), &self.theme)
     }
 
     pub(super) fn board_docs(&self) -> Vec<&Document> {
@@ -1336,6 +1181,10 @@ pub(super) fn document_state_label(doc: &Document) -> String {
         .to_string()
 }
 
+pub(super) fn is_papercut_doc(doc: &Document) -> bool {
+    doc.values("tags").iter().any(|tag| tag == "papercut")
+}
+
 pub(super) fn is_decision_doc(doc: &Document) -> bool {
     doc.doc_type().eq_ignore_ascii_case("decision")
 }
@@ -1459,9 +1308,8 @@ pub(super) fn collect_reload_fingerprint(workspace: &TandemProject) -> ReloadFin
     if let Some(user_config_path) = theme::user_config_path_from_env() {
         insert_optional_fingerprint(&mut files, user_config_path);
     }
-    insert_directory_fingerprints(&mut files, &workspace.board_dir, "md");
+    insert_directory_fingerprints(&mut files, &workspace.tasks_dir, "md");
     insert_directory_fingerprints(&mut files, &workspace.logs_dir, "md");
-    insert_directory_fingerprints(&mut files, &workspace.papercuts_dir(), "md");
     insert_directory_fingerprints(&mut files, &workspace.events_dir(), "jsonl");
     if let Some(user_theme_dir) = theme::user_theme_dir_from_env() {
         insert_directory_fingerprints(&mut files, &user_theme_dir, "toml");
@@ -1504,20 +1352,18 @@ pub(super) fn review_attention_reason(doc: &Document) -> Option<String> {
         _ => {}
     }
 
-    match review_status(doc) {
-        Some("pending") => Some("review pending".to_string()),
-        Some("changes-requested") => Some("changes requested".to_string()),
-        Some("rejected") => Some("review rejected".to_string()),
-        Some("failed") => Some("review failed".to_string()),
-        _ if doc
-            .field("blockers")
-            .map(parse_field_values)
-            .map(|blockers| !blockers.is_empty())
-            .unwrap_or(false) =>
-        {
-            Some("has blockers".to_string())
-        }
-        _ => None,
+    if document_state_label(doc) == "validation" {
+        return Some("human validation pending".to_string());
+    }
+    if doc
+        .field("blockers")
+        .map(parse_field_values)
+        .map(|blockers| !blockers.is_empty())
+        .unwrap_or(false)
+    {
+        Some("has blockers".to_string())
+    } else {
+        None
     }
 }
 
@@ -1600,7 +1446,7 @@ pub(super) fn validation_prompt_lines(
                 theme.text_style(),
             )));
             lines.push(Line::from(Span::styled(
-                "Enter/y accepts; Esc/n cancels. Completion/logging remains a separate later action.",
+                "Enter/y accepts; Esc/n cancels. Accepting archives the Task with accord accepted.",
                 theme.muted_style(),
             )));
         }
@@ -1624,30 +1470,6 @@ pub(super) fn validation_prompt_lines(
             lines.push(Line::from(""));
             lines.push(Line::from(Span::styled(
                 "Enter requests rework and moves the item back to in-progress; Esc cancels without writing.",
-                theme.muted_style(),
-            )));
-        }
-        ValidationPrompt::ApplyAccepted { candidates } => {
-            lines.push(Line::from(Span::styled(
-                "These accepted Validation tasks will be completed and moved to logs:",
-                theme.text_style(),
-            )));
-            for candidate in candidates.iter().take(8) {
-                lines.push(Line::from(vec![
-                    Span::styled("• ", theme.muted_style()),
-                    Span::styled(candidate.id.clone(), theme.label_style()),
-                    Span::styled(format!(" — {}", candidate.title), theme.text_style()),
-                ]));
-            }
-            if candidates.len() > 8 {
-                lines.push(Line::from(Span::styled(
-                    format!("… and {} more", candidates.len() - 8),
-                    theme.muted_style(),
-                )));
-            }
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Enter/y applies; Esc/n cancels without changing files. Delivered or rework items are excluded.",
                 theme.muted_style(),
             )));
         }

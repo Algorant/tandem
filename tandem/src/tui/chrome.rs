@@ -384,7 +384,7 @@ impl TuiApp {
         let commands = if self.focus == FocusPane::Detail {
             format!("e Edit · {arrangement_hint} · ? Help")
         } else {
-            format!("a Add · e Edit · f Filter · m Move · v Validate · {arrangement_hint} · ? Help")
+            format!("e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
         };
         self.with_status(commands)
     }
@@ -505,9 +505,7 @@ impl TuiApp {
                     "b State Board",
                     HitAction::ToggleBoardArrangement,
                 );
-                self.register_footer_hit(area, text, "a Add", HitAction::StartQuickAdd);
                 self.register_footer_hit(area, text, "f Filter", HitAction::OpenFilterPicker);
-                self.register_footer_hit(area, text, "m Move", HitAction::OpenMovePicker);
                 self.register_footer_hit(area, text, "v Validate", HitAction::OpenValidationPicker);
                 self.register_footer_hit(area, text, "e Edit", HitAction::OpenEditor);
             }
@@ -546,10 +544,9 @@ impl TuiApp {
 
     pub(super) fn show_validation_action_hint(&mut self, action: &str) {
         match action {
-            "accept" | "approve" => self.start_validation_accept(),
-            "rework" => self.start_validation_rework(),
-            "apply" | "archive" => self.start_validation_apply_accepted(),
-            "complete" => self.show_validation_complete_hint(),
+            "request" => self.start_validation_request(),
+            "accept" => self.start_validation_accept(),
+            "changes" => self.start_validation_rework(),
             _ => self.status = format!("Unknown Validation action `{action}`."),
         }
     }
@@ -635,7 +632,6 @@ impl TuiApp {
                     .title(match prompt {
                         ValidationPrompt::Accept { .. } => " Accept sign-off ",
                         ValidationPrompt::Rework { .. } => " Request rework ",
-                        ValidationPrompt::ApplyAccepted { .. } => " Apply accepted ",
                     })
                     .border_style(self.theme.border_style(true))
                     .style(self.theme.panel_style()),

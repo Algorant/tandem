@@ -119,7 +119,7 @@ pub(crate) fn create_new_sequential_document_after<F>(
 where
     F: FnMut(&str) -> String,
 {
-    create_new_sequential_file_after(&project.board_dir, prefix, last_allocated, content_for_id)
+    create_new_sequential_file_after(&project.tasks_dir, prefix, last_allocated, content_for_id)
 }
 
 pub(crate) fn create_new_sequential_file_after<F>(
@@ -284,9 +284,9 @@ mod tests {
         let data_dir = root.join(".tandem");
         let project =
             TandemProject::with_paths(root.clone(), data_dir.clone(), data_dir.join("tandem.md"));
-        fs::create_dir_all(&project.board_dir).unwrap();
+        fs::create_dir_all(&project.tasks_dir).unwrap();
         fs::write(&project.config_path, "---\n---\n").unwrap();
-        let board_path = project.board_dir.join("task-1.md");
+        let board_path = project.tasks_dir.join("task-1.md");
         fs::write(&board_path, "---\nid: task-1\n---\n# retained\n").unwrap();
         let (_, snapshot) = read_file_snapshot(&board_path).unwrap();
         let log_path = archive_board_document(

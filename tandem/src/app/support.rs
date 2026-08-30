@@ -1,10 +1,11 @@
 //! Private support shared by Task and accord application use cases.
 //!
-//! Application errors use the crate-level `CliError` value while this module
+//! Application errors use the crate-level `Error` value while this module
 //! otherwise depends only on project/protocol ownership boundaries.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::app::Error;
 use crate::project::{
     self, display_path, parse_frontmatter_fields, split_frontmatter, ProjectHierarchy,
     StoredDocument as Document, TandemProject,
@@ -13,31 +14,29 @@ use crate::protocol::diagnostic::{metadata_diagnostics, Severity};
 use crate::protocol::document::{parse_field_values, validate_task_kind};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::workflow::{display_known_states, is_known_or_legacy_state, workflow_states};
-use crate::CliError;
 
 pub(crate) fn require_nonempty<'a>(
     value: Option<&'a str>,
     message: &str,
-) -> Result<&'a str, CliError> {
+) -> Result<&'a str, Error> {
     value
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| CliError::usage(message))
+        .ok_or_else(|| Error::usage(message))
 }
 
 pub(crate) fn date_from_timestamp(timestamp: &str) -> String {
     timestamp.chars().take(10).collect()
 }
 
-pub(crate) fn document_exists(project: &TandemProject, id: &str) -> Result<bool, CliError> {
+pub(crate) fn document_exists(project: &TandemProject, id: &str) -> Result<bool, Error> {
     Ok(project.find_document(id)?.is_some())
 }
 
-/// Loose `references` may target either a general Tandem document or a
-/// Papercut inbox record. Strict relationships and Rule sources must use
-/// `document_exists` instead.
-pub(crate) fn reference_target_exists(project: &TandemProject, id: &str) -> Result<bool, CliError> {
-    project.reference_target_exists(id)
+/// Loose `references` may target any document by ID. Strict relationships
+/// and Rule sources use `document_exists` instead.
+pub(crate) fn reference_target_exists(project: &TandemProject, id: &str) -> Result<bool, Error> {
+    Ok(project.reference_target_exists(id)?)
 }
 
 pub(crate) fn current_timestamp() -> String {
@@ -53,8 +52,14 @@ pub(crate) fn append_event(
     event_name: &str,
     id: &str,
     summary: &str,
-) -> Result<(), CliError> {
-    project::events::append_event(project, event_name, id, summary, &current_timestamp())
+) -> Result<(), Error> {
+    Ok(project::events::append_event(
+        project,
+        event_name,
+        id,
+        summary,
+        &current_timestamp(),
+    )?)
 }
 
 fn format_unix_timestamp(seconds: u64) -> String {
@@ -85,7 +90,7 @@ pub(crate) fn create_new_sequential_document<F>(
     project: &TandemProject,
     prefix: &str,
     content_for_id: F,
-) -> Result<project::write::CreatedDocument, CliError>
+) -> Result<project::write::CreatedDocument, Error>
 where
     F: FnMut(&str) -> String,
 {
@@ -94,17 +99,15 @@ where
         hierarchy.documents.values().map(|document| document.id()),
         prefix,
     );
-    project::write::create_new_sequential_document_after(
+    Ok(project::write::create_new_sequential_document_after(
         project,
         prefix,
         last_allocated,
         content_for_id,
-    )
+    )?)
 }
 
-pub(crate) fn hierarchy_from_project(
-    project: &TandemProject,
-) -> Result<ProjectHierarchy, CliError> {
+pub(crate) fn hierarchy_from_project(project: &TandemProject) -> Result<ProjectHierarchy, Error> {
     let index = ProjectHierarchy::from_documents(project.read_documents()?)?;
     index.validate_document_metadata()?;
     Ok(index)
@@ -137,9 +140,9 @@ pub(crate) fn resolve_parent_relationship(
     hierarchy: &ProjectHierarchy,
     child_type: &str,
     parent_id: &str,
-) -> Result<ParentRelationship, CliError> {
+) -> Result<ParentRelationship, Error> {
     let parent = hierarchy.document(parent_id).ok_or_else(|| {
-        CliError::user(format!(
+        Error::user(format!(
             "Validation failed: parent document not found: {parent_id}"
         ))
     })?;
@@ -149,7 +152,7 @@ pub(crate) fn resolve_parent_relationship(
     match hierarchy.task_role(parent)? {
         Some(TaskRole::Epic) => Ok(ParentRelationship::EpicTask),
         Some(TaskRole::Task) => Ok(ParentRelationship::Subtask),
-        Some(TaskRole::Subtask) => Err(CliError::user(format!(
+        Some(TaskRole::Subtask) => Err(Error::user(format!(
             "Validation failed: cannot attach a child beneath Subtask {parent_id}"
         ))),
         None => Ok(ParentRelationship::Parent),
@@ -174,16 +177,16 @@ pub(crate) fn unresolved_blockers_in_hierarchy(
 
 pub(crate) fn workspace_deprecation_warnings(
     workspace: &TandemProject,
-) -> Result<Vec<String>, CliError> {
+) -> Result<Vec<String>, Error> {
     let content = workspace.read_config_raw()?;
     let (frontmatter, _) = split_frontmatter(&content).map_err(|message| {
-        CliError::user(format!(
+        Error::user(format!(
             "Parse failure: {}: {message}",
             display_path(&workspace.config_path)
         ))
     })?;
     let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {
-        CliError::user(format!(
+        Error::user(format!(
             "Parse failure: {} frontmatter YAML: {message}",
             display_path(&workspace.config_path)
         ))
@@ -206,15 +209,15 @@ pub(crate) fn workspace_deprecation_warnings(
     Ok(warnings)
 }
 
-pub(crate) fn validate_state(project: &TandemProject, state: &str) -> Result<(), CliError> {
+pub(crate) fn validate_state(project: &TandemProject, state: &str) -> Result<(), Error> {
     if state.trim().is_empty() {
-        return Err(CliError::usage("state must not be empty"));
+        return Err(Error::usage("state must not be empty"));
     }
     let states = workflow_states(project.read_config_yaml()?.as_ref());
     if is_known_or_legacy_state(&states, state) {
         Ok(())
     } else {
-        Err(CliError::user(format!(
+        Err(Error::user(format!(
             "Validation failed: unknown state `{state}`; known states: {}",
             display_known_states(&states)
         )))
@@ -225,7 +228,7 @@ pub(crate) fn validate_task_document_against_hierarchy(
     project: &TandemProject,
     document: &Document,
     hierarchy: &ProjectHierarchy,
-) -> Result<(), CliError> {
+) -> Result<(), Error> {
     let mut errors = metadata_diagnostics(document, document.location == DocumentLocation::Logs)
         .into_iter()
         .filter(|diagnostic| diagnostic.severity == Severity::Error)
@@ -273,7 +276,7 @@ pub(crate) fn validate_task_document_against_hierarchy(
         hierarchy.validate_all_task_hierarchies()?;
         Ok(())
     } else {
-        Err(CliError::user(format!(
+        Err(Error::user(format!(
             "Validation failed for {}: {}",
             display_path(&document.path),
             errors.join("; ")

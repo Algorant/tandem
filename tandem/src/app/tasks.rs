@@ -9,9 +9,10 @@ use crate::app::support::{
     resolve_parent_relationship, unresolved_blockers_in_hierarchy, validate_state,
     validate_task_document_against_hierarchy, workspace_deprecation_warnings,
 };
+use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
-    self, patch_accord_content, patch_completion_content, patch_frontmatter_content,
+    self, patch_accord_content, patch_frontmatter_content, patch_resolution_content,
     replace_markdown_body, write_atomic, yaml_double_quote, ProjectHierarchy as HierarchyIndex,
     StoredDocument as Document, TandemProject,
 };
@@ -19,8 +20,9 @@ use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
 use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
-use crate::protocol::workflow::{CompletionRecord, COMPLETION_OUTCOME_CANCELED};
-use crate::CliError;
+use crate::protocol::workflow::{
+    ResolutionRecord, RESOLUTION_OUTCOME_CANCELED, RESOLUTION_OUTCOME_COMPLETED,
+};
 
 fn inline_array(values: &[String]) -> String {
     format!(
@@ -45,12 +47,21 @@ fn push_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
     }
 }
 
+fn push_array_line_indented(lines: &mut Vec<String>, key: &str, values: &[String]) {
+    if !values.is_empty() {
+        lines.push(format!("  {key}: {}", inline_array(values)));
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct AddOptions {
     pub(crate) title: Option<String>,
     pub(crate) state: Option<String>,
     pub(crate) json: bool,
     pub(crate) description: Option<String>,
+    pub(crate) acceptance: Vec<String>,
+    pub(crate) constraints: Vec<String>,
+    pub(crate) validations: Vec<String>,
     pub(crate) kind: Option<String>,
     pub(crate) priority: Option<String>,
     pub(crate) effort: Option<String>,
@@ -96,6 +107,7 @@ pub(crate) struct UpdateOptions {
     pub(crate) blockers: Vec<String>,
     pub(crate) references: Vec<String>,
     pub(crate) related_files: Vec<String>,
+    pub(crate) clear: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -117,9 +129,7 @@ pub(crate) struct UpdateOutcome {
 #[derive(Debug, Default)]
 pub(crate) struct CompleteOptions {
     pub(crate) id: String,
-    pub(crate) summary: Option<String>,
-    pub(crate) files_changed: Vec<String>,
-    pub(crate) validation: Option<String>,
+    pub(crate) note: Option<String>,
     pub(crate) reviewer: Option<String>,
 }
 
@@ -147,18 +157,18 @@ pub(crate) struct CancelOutcome {
 }
 
 /// Create a Task, Epic, or Subtask after canonical hierarchy validation.
-pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
+pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let title =
         require_nonempty(options.title.as_deref(), "add requires --title <title>")?.to_string();
     let state = options.state.as_deref().unwrap_or("todo").to_string();
     validate_state(workspace, &state)?;
-    if state == "validation" {
-        return Err(CliError::user(
-            "E067: validation state requires review.status: pending; use `tandem review request <id>`",
+    validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
+    if options.acceptance.is_empty() {
+        return Err(Error::usage(
+            "add requires at least one --acceptance <text>",
         ));
     }
-    validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
     validate_optional_vocabulary(
         options.priority.as_deref(),
         "add --priority",
@@ -174,7 +184,7 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         .map(str::to_string);
 
     if kind.as_deref() == Some("epic") && options.parent.is_some() {
-        return Err(CliError::user(
+        return Err(Error::user(
             "Validation failed: an Epic cannot have parentId; remove --parent or --kind epic",
         ));
     }
@@ -190,14 +200,14 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             .document(parent)
             .expect("resolve_parent_relationship validated the parent");
         if parent_document.location != DocumentLocation::Board {
-            return Err(CliError::user(format!(
+            return Err(Error::user(format!(
                 "Validation failed: cannot add a task under archived parent {parent}; parent must be on the Board"
             )));
         }
     }
     for blocker in &options.blockers {
         if hierarchy.document(blocker).is_none() {
-            return Err(CliError::user(format!(
+            return Err(Error::user(format!(
                 "Validation failed: blocker document not found: {blocker}"
             )));
         }
@@ -241,6 +251,11 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             push_array_line(&mut lines, "references", &options.references);
             push_array_line(&mut lines, "relatedFiles", &options.related_files);
             push_array_line(&mut lines, "tags", &options.tags);
+            lines.push("accord:".to_string());
+            lines.push("  status: ready".to_string());
+            push_array_line_indented(&mut lines, "acceptance", &options.acceptance);
+            push_array_line_indented(&mut lines, "constraints", &options.constraints);
+            push_array_line_indented(&mut lines, "validation", &options.validations);
             lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
             lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
             lines.push("---".to_string());
@@ -282,7 +297,7 @@ pub(crate) fn move_to_state(
     workspace: &TandemProject,
     id: &str,
     state: &str,
-) -> Result<MoveTaskOutcome, CliError> {
+) -> Result<MoveTaskOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     validate_state(workspace, state)?;
 
@@ -291,21 +306,15 @@ pub(crate) fn move_to_state(
         .document(id)
         .filter(|doc| doc.location == DocumentLocation::Board)
         .cloned()
-        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+        .ok_or_else(|| Error::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: only task documents can be moved in v0: {} is type {}",
             doc.id(),
             doc.doc_type()
         )));
     }
     validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
-    if state == "validation" && crate::protocol::review::status(&doc) != Some("pending") {
-        return Err(CliError::user(
-            "E067: validation state requires review.status: pending",
-        ));
-    }
-
     let doc_id = doc.id().to_string();
     let previous_state = doc.field("state").unwrap_or("-").to_string();
     if previous_state == state {
@@ -367,16 +376,16 @@ pub(crate) fn move_to_state(
 pub(crate) fn update(
     workspace: &TandemProject,
     options: UpdateOptions,
-) -> Result<UpdateOutcome, CliError> {
+) -> Result<UpdateOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
         .cloned()
-        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+        .ok_or_else(|| Error::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: only task documents can be updated in v0: {} is type {}",
             doc.id(),
             doc.doc_type()
@@ -405,7 +414,7 @@ pub(crate) fn update(
         .task_role(&prospective)?
         .expect("prospective task has a task role");
     if options.parent.is_some() && old_role != prospective_role {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: reparenting {} would change its canonical role from {} to {}; IDs are immutable",
             doc.id(),
             old_role.as_str(),
@@ -460,13 +469,6 @@ pub(crate) fn update(
         &mut updates,
         &mut changes,
         &doc,
-        "assignee",
-        options.assignee.as_deref(),
-    )?;
-    apply_scalar_update(
-        &mut updates,
-        &mut changes,
-        &doc,
         "dueDate",
         options.due_date.as_deref(),
     )?;
@@ -477,32 +479,46 @@ pub(crate) fn update(
         "parentId",
         options.parent.as_deref(),
     )?;
-    apply_list_append_update(&mut updates, &mut changes, &doc, "tags", &options.tags);
-    apply_list_append_update(
+    apply_list_replace_update(&mut updates, &mut changes, &doc, "tags", &options.tags);
+    apply_list_replace_update(
         &mut updates,
         &mut changes,
         &doc,
         "blockers",
         &options.blockers,
     );
-    apply_list_append_update(
+    apply_list_replace_update(
         &mut updates,
         &mut changes,
         &doc,
         "references",
         &options.references,
     );
-    apply_list_append_update(
+    apply_list_replace_update(
         &mut updates,
         &mut changes,
         &doc,
         "relatedFiles",
         &options.related_files,
     );
+    let clear_fields = options
+        .clear
+        .iter()
+        .map(|field| match field.as_str() {
+            "parent" => "parentId",
+            "due-date" => "dueDate",
+            "related-file" => "relatedFiles",
+            "blocker" => "blockers",
+            "tag" => "tags",
+            other => other,
+        })
+        .collect::<Vec<_>>();
+    let clear_body = options.clear.iter().any(|field| field == "body");
     let replacement_body = options
         .body
         .as_deref()
-        .filter(|body| doc.body.as_str() != *body);
+        .filter(|body| doc.body.as_str() != *body)
+        .or(clear_body.then_some(""));
     if replacement_body.is_some() {
         changes.push(UpdateChange {
             field: "body".to_string(),
@@ -511,6 +527,15 @@ pub(crate) fn update(
         });
     }
 
+    for field in &clear_fields {
+        if doc.field(field).is_some() && !changes.iter().any(|change| change.field == *field) {
+            changes.push(UpdateChange {
+                field: (*field).to_string(),
+                old: "<set>".to_string(),
+                new: "<cleared>".to_string(),
+            });
+        }
+    }
     let doc_id = doc.id().to_string();
     let path = doc.path.clone();
     if changes.is_empty() {
@@ -525,7 +550,7 @@ pub(crate) fn update(
 
     updates.insert("updatedAt".to_string(), current_timestamp());
     let (content, signature) = read_file_snapshot(&doc.path)?;
-    let patched = patch_frontmatter_content(&content, &updates, &[])?;
+    let patched = patch_frontmatter_content(&content, &updates, &clear_fields)?;
     let patched = if let Some(body) = replacement_body {
         replace_markdown_body(&patched, body)?
     } else {
@@ -560,7 +585,7 @@ pub(crate) fn update(
 pub(crate) fn validate_update_options(
     options: &UpdateOptions,
     hierarchy: &HierarchyIndex,
-) -> Result<Option<ParentRelationship>, CliError> {
+) -> Result<Option<ParentRelationship>, Error> {
     if let Some(title) = options.title.as_deref() {
         require_nonempty(Some(title), "update --title must not be empty")?;
     }
@@ -577,8 +602,10 @@ pub(crate) fn validate_update_options(
         EFFORTS,
         "effort",
     )?;
-    if let Some(assignee) = options.assignee.as_deref() {
-        require_nonempty(Some(assignee), "update --assignee must not be empty")?;
+    if options.assignee.is_some() {
+        return Err(Error::usage(
+            "update cannot write assignee; use accord claim or release",
+        ));
     }
     if let Some(due_date) = options.due_date.as_deref() {
         require_nonempty(Some(due_date), "update --due-date must not be empty")?;
@@ -586,7 +613,7 @@ pub(crate) fn validate_update_options(
     let parent_relationship = if let Some(parent) = options.parent.as_deref() {
         let parent = require_nonempty(Some(parent), "update --parent must not be empty")?;
         if parent == options.id {
-            return Err(CliError::user(format!(
+            return Err(Error::user(format!(
                 "Validation failed: task {} cannot be its own parent",
                 options.id
             )));
@@ -608,7 +635,7 @@ pub(crate) fn validate_update_options(
     }
     for blocker in &options.blockers {
         if hierarchy.document(blocker).is_none() {
-            return Err(CliError::user(format!(
+            return Err(Error::user(format!(
                 "Validation failed: blocker document not found: {blocker}"
             )));
         }
@@ -616,13 +643,12 @@ pub(crate) fn validate_update_options(
     Ok(parent_relationship)
 }
 
-fn validate_task_kind_option(kind: Option<&str>, flag: &str) -> Result<(), CliError> {
+fn validate_task_kind_option(kind: Option<&str>, flag: &str) -> Result<(), Error> {
     let Some(kind) = kind else {
         return Ok(());
     };
     let kind = require_nonempty(Some(kind), &format!("{flag} must not be empty"))?;
-    validate_task_kind(kind)
-        .map_err(|message| CliError::user(format!("Validation failed: {message}")))
+    validate_task_kind(kind).map_err(|message| Error::user(format!("Validation failed: {message}")))
 }
 
 fn validate_optional_vocabulary(
@@ -630,7 +656,7 @@ fn validate_optional_vocabulary(
     flag: &str,
     allowed: &[&str],
     label: &str,
-) -> Result<(), CliError> {
+) -> Result<(), Error> {
     let Some(value) = value else {
         return Ok(());
     };
@@ -638,7 +664,7 @@ fn validate_optional_vocabulary(
     if allowed.contains(&value) {
         Ok(())
     } else {
-        Err(CliError::user(format!(
+        Err(Error::user(format!(
             "Validation failed: invalid {label} `{value}`; expected one of: {}",
             allowed.join(", ")
         )))
@@ -651,7 +677,7 @@ fn apply_scalar_update(
     doc: &Document,
     key: &str,
     value: Option<&str>,
-) -> Result<(), CliError> {
+) -> Result<(), Error> {
     let Some(value) = value else {
         return Ok(());
     };
@@ -668,7 +694,7 @@ fn apply_scalar_update(
     Ok(())
 }
 
-fn apply_list_append_update(
+fn apply_list_replace_update(
     updates: &mut BTreeMap<String, String>,
     changes: &mut Vec<UpdateChange>,
     doc: &Document,
@@ -679,12 +705,7 @@ fn apply_list_append_update(
         return;
     }
     let old_values = doc.field(key).map(parse_field_values).unwrap_or_default();
-    let mut new_values = old_values.clone();
-    for addition in additions {
-        if !new_values.iter().any(|value| value == addition) {
-            new_values.push(addition.to_string());
-        }
-    }
+    let new_values = additions.to_vec();
     if new_values != old_values {
         updates.insert(key.to_string(), inline_array(&new_values));
         changes.push(UpdateChange {
@@ -723,21 +744,16 @@ pub(crate) fn display_change_value(value: &str) -> String {
 pub(crate) fn complete(
     workspace: &TandemProject,
     options: CompleteOptions,
-) -> Result<CompleteOutcome, CliError> {
+) -> Result<CompleteOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
-    let summary = require_nonempty(
-        options.summary.as_deref(),
-        "complete requires --summary <text>",
-    )?
-    .to_string();
     let hierarchy = hierarchy_from_workspace(workspace)?;
     let doc = hierarchy
         .document(&options.id)
         .filter(|doc| doc.location == DocumentLocation::Board)
         .cloned()
-        .ok_or_else(|| CliError::user(format!("active task not found: {}", options.id)))?;
+        .ok_or_else(|| Error::user(format!("active task not found: {}", options.id)))?;
     if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: only task documents can be completed in v0: {} is type {}",
             doc.id(),
             doc.doc_type()
@@ -746,7 +762,7 @@ pub(crate) fn complete(
     validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
     let active_descendants = active_task_descendant_ids(&hierarchy, doc.id());
     if !active_descendants.is_empty() {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: cannot complete {} while it has active descendants: {}",
             doc.id(),
             active_descendants.join(", ")
@@ -754,7 +770,7 @@ pub(crate) fn complete(
     }
     let unresolved = unresolved_blockers_in_hierarchy(&hierarchy, doc.field("blockers"));
     if !unresolved.is_empty() {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: {} has unresolved blockers: {}",
             doc.id(),
             unresolved.join(", ")
@@ -765,7 +781,7 @@ pub(crate) fn complete(
         .iter()
         .find(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)
     {
-        return Err(CliError::user(error.message.clone()));
+        return Err(Error::user(error.message.clone()));
     }
     let mut warnings = completion_diagnostics
         .into_iter()
@@ -776,30 +792,40 @@ pub(crate) fn complete(
     warnings.extend(workspace_deprecation_warnings(workspace)?);
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
+    // Protocol 0.3.0 (D16/D39): completing a delivered Task atomically accepts
+    // the Accord and archives it; there is no accepted-but-active state.
+    let mut accord = AccordRecord::from_document(&doc, &now);
+    if accord.status.eq_ignore_ascii_case("delivered") {
+        accord.status = "accepted".to_string();
+        accord.reviewer = options.reviewer.clone();
+        accord.note = None;
+        accord.reason = None;
+    }
     let mut updates = BTreeMap::new();
-    updates.insert("completedAt".to_string(), now.clone());
-    updates.insert("updatedAt".to_string(), now);
-    let patched = patch_frontmatter_content(
-        &content,
+    updates.insert("updatedAt".to_string(), now.clone());
+    updates.insert("archivedAt".to_string(), now);
+    let mut patched = patch_accord_content(&content, &accord)?;
+    patched = patch_frontmatter_content(
+        &patched,
         &updates,
         &[
             "state",
+            "completedAt",
             "completionSummary",
             "completionValidation",
             "completionReviewer",
             "filesChanged",
         ],
     )?;
-    let patched = patch_completion_content(
+    let patched = patch_resolution_content(
         &patched,
-        &CompletionRecord {
-            summary: summary.clone(),
-            files_changed: options.files_changed,
-            validation: options.validation,
+        &ResolutionRecord {
+            outcome: Some(RESOLUTION_OUTCOME_COMPLETED.to_string()),
+            note: options.note,
             reviewer: options.reviewer,
-            ..CompletionRecord::default()
         },
     )?;
+    let summary = "Completed".to_string();
     let log_path = project::write::archive_board_document(
         workspace,
         &doc.path,
@@ -821,7 +847,7 @@ pub(crate) fn cancel(
     workspace: &TandemProject,
     id: &str,
     reason: &str,
-) -> Result<CancelOutcome, CliError> {
+) -> Result<CancelOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
     let reason = require_nonempty(Some(reason), "cancel requires --reason <text>")?.to_string();
     let hierarchy = hierarchy_from_workspace(workspace)?;
@@ -830,9 +856,9 @@ pub(crate) fn cancel(
         .document(id)
         .filter(|doc| doc.location == DocumentLocation::Board)
         .cloned()
-        .ok_or_else(|| CliError::user(format!("active task not found: {id}")))?;
+        .ok_or_else(|| Error::user(format!("active task not found: {id}")))?;
     if doc.doc_type() != "task" {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: only active task documents can be canceled: {} is type {}",
             doc.id(),
             doc.doc_type()
@@ -842,7 +868,7 @@ pub(crate) fn cancel(
 
     let active_descendants = active_task_descendant_ids(&hierarchy, doc.id());
     if !active_descendants.is_empty() {
-        return Err(CliError::user(format!(
+        return Err(Error::user(format!(
             "Validation failed: cannot cancel {} while it has active descendants: {}",
             doc.id(),
             active_descendants.join(", ")
@@ -852,28 +878,29 @@ pub(crate) fn cancel(
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::new();
-    updates.insert("completedAt".to_string(), now.clone());
-    updates.insert("updatedAt".to_string(), now);
+    updates.insert("updatedAt".to_string(), now.clone());
+    updates.insert("archivedAt".to_string(), now);
     let patched = patch_frontmatter_content(
         &content,
         &updates,
         &[
             "state",
+            "completedAt",
             "completionSummary",
             "completionValidation",
             "completionReviewer",
             "filesChanged",
         ],
     )?;
-    let summary = format!("Canceled: {reason}");
-    let patched = patch_completion_content(
+    let patched = patch_resolution_content(
         &patched,
-        &CompletionRecord {
-            summary: summary.clone(),
-            outcome: Some(COMPLETION_OUTCOME_CANCELED.to_string()),
-            ..CompletionRecord::default()
+        &ResolutionRecord {
+            outcome: Some(RESOLUTION_OUTCOME_CANCELED.to_string()),
+            note: Some(reason.clone()),
+            ..ResolutionRecord::default()
         },
     )?;
+    let summary = format!("Canceled: {reason}");
     let log_path = project::write::archive_board_document(
         workspace, &doc.path, &signature, &patched, "canceled",
     )?;
@@ -895,7 +922,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn task_references_accept_papercuts_while_parent_and_blockers_remain_documents() {
+    fn references_resolve_tagged_tasks_while_parent_and_blockers_require_real_targets() {
         let root = std::env::temp_dir().join(format!(
             "tandem-app-task-papercut-reference-{}",
             SystemTime::now()
@@ -905,33 +932,40 @@ mod tests {
         ));
         let project = TandemProject::initialize(
             &root,
-            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
-        let papercut = crate::app::papercuts::add(
+        // A Papercut is a low-priority Task tagged papercut in protocol 0.3.0,
+        // so its ID is a real document target for loose references.
+        let tagged = add(
             &project,
-            crate::app::papercuts::AddOptions {
+            AddOptions {
+                acceptance: vec!["friction captured".to_string()],
                 title: Some("Small friction".to_string()),
+                tags: vec!["papercut".to_string()],
+                priority: Some("low".to_string()),
                 ..Default::default()
             },
         )
         .unwrap();
-        let papercut_id = papercut.papercut.id().to_string();
-        let update_papercut_id = crate::app::papercuts::add(
+        let papercut_id = tagged.id;
+        let update_papercut_id = add(
             &project,
-            crate::app::papercuts::AddOptions {
+            AddOptions {
+                acceptance: vec!["friction captured".to_string()],
                 title: Some("More friction".to_string()),
+                tags: vec!["papercut".to_string()],
+                priority: Some("low".to_string()),
                 ..Default::default()
             },
         )
         .unwrap()
-        .papercut
-        .id()
-        .to_string();
+        .id;
 
         let created = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Fix the friction".to_string()),
                 references: vec![papercut_id.clone()],
                 ..Default::default()
@@ -954,14 +988,15 @@ mod tests {
         .unwrap();
         assert!(updated.warnings.is_empty());
         let updated_source = fs::read_to_string(&updated.path).unwrap();
-        assert!(updated_source.contains(&papercut_id));
+        assert!(!updated_source.contains(&papercut_id));
         assert!(updated_source.contains(&update_papercut_id));
 
         let parent_error = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Invalid parent".to_string()),
-                parent: Some(papercut_id.clone()),
+                parent: Some("task-99".to_string()),
                 ..Default::default()
             },
         )
@@ -971,8 +1006,9 @@ mod tests {
         let blocker_error = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Invalid blocker".to_string()),
-                blockers: vec![papercut_id],
+                blockers: vec!["task-99".to_string()],
                 ..Default::default()
             },
         )
@@ -998,6 +1034,7 @@ mod tests {
         let parent = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Parent".to_string()),
                 ..Default::default()
             },
@@ -1006,6 +1043,7 @@ mod tests {
         let child = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Child".to_string()),
                 parent: Some(parent.id.clone()),
                 ..Default::default()
@@ -1016,7 +1054,7 @@ mod tests {
             &project,
             CompleteOptions {
                 id: parent.id.clone(),
-                summary: Some("Done".to_string()),
+                note: Some("Done".to_string()),
                 ..Default::default()
             },
         )
@@ -1044,6 +1082,7 @@ mod tests {
         let epic = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Epic".to_string()),
                 kind: Some("epic".to_string()),
                 ..Default::default()
@@ -1053,6 +1092,7 @@ mod tests {
         let child = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Epic task".to_string()),
                 parent: Some(epic.id.clone()),
                 ..Default::default()
@@ -1064,7 +1104,7 @@ mod tests {
             &project,
             CompleteOptions {
                 id: epic.id.clone(),
-                summary: Some("Done".to_string()),
+                note: Some("Done".to_string()),
                 ..Default::default()
             },
         )
@@ -1092,12 +1132,13 @@ mod tests {
         let parent = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Archived parent".to_string()),
                 ..Default::default()
             },
         )
         .unwrap();
-        let child_path = project.board_dir.join("task-1-1.md");
+        let child_path = project.tasks_dir.join("task-1-1.md");
         fs::write(
             &child_path,
             format!(
@@ -1113,7 +1154,7 @@ mod tests {
             &project,
             CompleteOptions {
                 id: "task-1-1".to_string(),
-                summary: Some("Repaired orphan".to_string()),
+                note: Some("Repaired orphan".to_string()),
                 ..Default::default()
             },
         )
@@ -1140,6 +1181,7 @@ mod tests {
         let created = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Keep source".to_string()),
                 ..AddOptions::default()
             },
@@ -1155,7 +1197,7 @@ mod tests {
             &project,
             CompleteOptions {
                 id: created.id.clone(),
-                summary: Some("Done".to_string()),
+                note: Some("Done".to_string()),
                 ..CompleteOptions::default()
             },
         )
@@ -1164,10 +1206,13 @@ mod tests {
         assert!(!outcome
             .warnings
             .iter()
-            .any(|warning| warning.contains("review.status")));
+            .any(|warning| warning.contains("validation.state")));
         let archived = fs::read_to_string(&outcome.log_path).unwrap();
         assert!(archived.contains("unknown: retain"));
-        assert!(archived.contains("summary: \"Done\""));
+        assert!(archived.contains("note: \"Done\""));
+        assert!(archived.contains("outcome: \"completed\""));
+        assert!(archived.contains("archivedAt"));
+        assert!(!archived.contains("completion:"));
         fs::remove_dir_all(project.root()).unwrap();
     }
 
@@ -1188,6 +1233,7 @@ mod tests {
         let parent = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Parent".to_string()),
                 ..Default::default()
             },
@@ -1197,7 +1243,7 @@ mod tests {
             &project,
             CompleteOptions {
                 id: parent.id.clone(),
-                summary: Some("Archived".to_string()),
+                note: Some("Archived".to_string()),
                 ..Default::default()
             },
         )
@@ -1205,6 +1251,7 @@ mod tests {
         let error = add(
             &project,
             AddOptions {
+                acceptance: vec!["test acceptance".to_string()],
                 title: Some("Archived child".to_string()),
                 parent: Some(parent.id),
                 ..Default::default()

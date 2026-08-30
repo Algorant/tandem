@@ -153,7 +153,7 @@ fn parse_scalar_value(value: &str) -> String {
 /// Project parsing retains representation; protocol defines these field meanings.
 pub(crate) fn normalize_fields(fields: &mut HashMap<String, String>) {
     copy_first_alias(fields, "accordStatus", &["accord.status"]);
-    copy_first_alias(fields, "reviewStatus", &["review.status"]);
+    copy_first_alias(fields, "reviewStatus", &["validation.state"]);
     copy_first_alias(fields, "completionSummary", &["completion.summary"]);
     copy_first_alias(
         fields,

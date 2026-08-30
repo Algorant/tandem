@@ -2,8 +2,7 @@
 
 use super::accord;
 use super::document::{has_metadata, Document};
-use super::review;
-use super::workflow::{completion_outcome, completion_summary, COMPLETION_OUTCOMES};
+use super::workflow::{resolution_note, resolution_outcome, RESOLUTION_OUTCOMES};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Severity {
@@ -48,20 +47,18 @@ pub(crate) fn metadata_diagnostics(document: &Document, is_log: bool) -> Vec<Dia
         diagnostics.push(Diagnostic::error("missing required field `type`"));
     }
     if is_log && document.doc_type() == "task" {
-        if document.field("completedAt").is_none() {
+        if document.field("archivedAt").is_none() {
+            diagnostics.push(Diagnostic::error("missing required log field `archivedAt`"));
+        }
+        if resolution_note(document).is_none() {
             diagnostics.push(Diagnostic::error(
-                "missing required log field `completedAt`",
+                "missing required log field `resolution.note`",
             ));
         }
-        if completion_summary(document).is_none() {
-            diagnostics.push(Diagnostic::error(
-                "missing required log field `completion.summary`",
-            ));
-        }
-        let outcome = completion_outcome(document);
-        if !COMPLETION_OUTCOMES.contains(&outcome) {
+        let outcome = resolution_outcome(document);
+        if !RESOLUTION_OUTCOMES.contains(&outcome) {
             diagnostics.push(Diagnostic::error(format!(
-                "invalid completion.outcome `{outcome}`; expected completed or canceled"
+                "invalid resolution.outcome `{outcome}`; expected completed, canceled, or failed"
             )));
         }
     }
@@ -77,15 +74,10 @@ pub(crate) fn metadata_diagnostics(document: &Document, is_log: bool) -> Vec<Dia
         }
     }
     if has_metadata(document, "review") || document.field("reviewStatus").is_some() {
-        match review::status(document) {
-            Some(status) if review::is_known_status(status) => {}
-            Some(status) => diagnostics.push(Diagnostic::error(format!(
-                "invalid review.status `{status}`"
-            ))),
-            None => diagnostics.push(Diagnostic::error(
-                "review.status is required when review metadata is present",
-            )),
-        }
+        diagnostics.push(Diagnostic::warning(format!(
+            "{} carries legacy review metadata; protocol 0.3.0 uses state=validation and validation.criterion/note instead.",
+            document.id()
+        )));
     }
     diagnostics
 }
@@ -110,16 +102,14 @@ pub(crate) fn workflow_state_diagnostic(
 
 pub(crate) fn completion_policy_diagnostics(document: &Document) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    if review::status(document) == Some("pending") {
-        diagnostics.push(Diagnostic::error(format!(
-            "E067: {} has review.status: pending and cannot be completed until the review is resolved.",
-            document.id()
-        )));
-    }
-    let status = accord::status(document).unwrap_or("missing");
-    if status != "accepted" {
+    let status = accord::status(document)
+        .unwrap_or("missing")
+        .to_ascii_lowercase();
+    // D16: completing a delivered Task accepts the Accord atomically, so only
+    // a status that is neither delivered nor accepted deserves a warning.
+    if !matches!(status.as_str(), "accepted" | "delivered") {
         diagnostics.push(Diagnostic::warning(format!(
-            "{} has accord.status={status}, not accepted.",
+            "{} has accord.status={status}; complete normally follows a delivered Accord.",
             document.id()
         )));
     }

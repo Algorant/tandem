@@ -25,6 +25,7 @@ debug-assertions = false
 overflow-checks = false
 
 [dependencies]
+clap = { version = "4.6", features = ["derive"] }
 axum = "0.8"
 crossterm = "0.28"
 ratatui = "0.29"

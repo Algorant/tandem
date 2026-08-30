@@ -21,10 +21,9 @@ use crate::project::{StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
-use crate::protocol::review::status as review_status;
 use crate::protocol::workflow::{
-    completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
-    completion_validation, state_matches_filter,
+    resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
+    state_matches_filter,
 };
 use crate::CliError;
 
@@ -294,18 +293,28 @@ async fn board_api(State(state): State<WebState>, uri: Uri) -> Response {
         reject_unknown_query(
             &query,
             &[
-                "state", "type", "priority", "tag", "assignee", "parent", "accord", "review",
+                "state",
+                "type",
+                "priority",
+                "effort",
+                "assignee",
+                "parent",
+                "accord",
+                "decision-status",
+                "resolution",
             ],
         )?;
         let filter = ListFilter {
             state: query.get("state").map(String::as_str),
             doc_type: query.get("type").map(String::as_str),
             priority: query.get("priority").map(String::as_str),
-            tag: query.get("tag").map(String::as_str),
+            effort: query.get("effort").map(String::as_str),
+            tags: &[],
             assignee: query.get("assignee").map(String::as_str),
             parent: query.get("parent").map(String::as_str),
             accord: query.get("accord").map(String::as_str),
-            review: query.get("review").map(String::as_str),
+            decision_status: query.get("decision-status").map(String::as_str),
+            resolution: query.get("resolution").map(String::as_str),
         };
         let mut documents = read.snapshot.board_documents(&filter);
         sort_documents(&mut documents);
@@ -329,8 +338,6 @@ async fn attention_api(State(state): State<WebState>) -> Response {
             .filter(|document| {
                 state_matches_filter(document.field("state"), "validation")
                     || accord_status(document) == Some("delivered")
-                    || review_status(document) == Some("pending")
-                    || review_status(document) == Some("changes-requested")
             })
             .collect::<Vec<_>>();
         sort_documents(&mut documents);
@@ -669,7 +676,6 @@ fn summary_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentSumma
         parent_relationship: relationship.map(ParentRelationship::as_str),
         tags: values(document, "tags"),
         accord_status: accord_status(document).map(str::to_string),
-        review_status: review_status(document).map(str::to_string),
     })
 }
 
@@ -683,17 +689,16 @@ fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetail
     let children = read
         .snapshot
         .children(document)
-        .map_err(ApiFailure::from_cli)?
+        .map_err(|error| ApiFailure::from_cli(error.into()))?
         .iter()
         .map(|child| summary_dto(read, child))
         .collect::<Result<Vec<_>, _>>()?;
-    let completion = (document.location == DocumentLocation::Logs && document.doc_type() == "task")
-        .then(|| CompletionDto {
-            outcome: completion_outcome(document).to_string(),
-            summary: completion_summary(document).map(str::to_string),
-            files_changed: completion_files_changed(document),
-            validation: completion_validation(document).map(str::to_string),
-            reviewer: completion_reviewer(document).map(str::to_string),
+    let resolution = (document.location == DocumentLocation::Logs && document.doc_type() == "task")
+        .then(|| ResolutionDto {
+            outcome: resolution_outcome(document).to_string(),
+            note: resolution_note(document).map(str::to_string),
+            files_changed: resolution_files_changed(document),
+            reviewer: resolution_reviewer(document).map(str::to_string),
         });
     let accord = accord_status(document).map(|_| {
         AccordDto::from(AccordRecord::from_document(
@@ -701,15 +706,12 @@ fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetail
             document.field("updatedAt").unwrap_or(""),
         ))
     });
-    let review = review_status(document).map(|status| ReviewDto {
-        status: status.to_string(),
-        reviewer: document.field("review.reviewer").map(str::to_string),
-        requested_at: document.field("review.requestedAt").map(str::to_string),
-        decided_at: document.field("review.decidedAt").map(str::to_string),
-        note: document
-            .field("review.note")
-            .or_else(|| document.field("review.reason"))
-            .map(str::to_string),
+    let validation = (document.field("state") == Some("validation")).then(|| ValidationDto {
+        state: "validation".to_string(),
+        criterion: document.field("validation.criterion").map(str::to_string),
+        note: document.field("validation.note").map(str::to_string),
+        reviewer: document.field("validation.reviewer").map(str::to_string),
+        requested_at: document.field("validation.requestedAt").map(str::to_string),
     });
     Ok(DocumentDetailDto {
         summary,
@@ -725,8 +727,8 @@ fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetail
         parent: parent.map(Box::new),
         children,
         accord,
-        review,
-        completion,
+        validation,
+        resolution,
         decision: (document.doc_type() == "decision").then(|| decision_dto(document)),
     })
 }
@@ -736,10 +738,10 @@ fn log_summary_dto(document: &Document) -> LogSummaryDto {
         id: document.id().to_string(),
         document_type: document.doc_type().to_string(),
         title: document.title().to_string(),
-        completed_at: document.field("completedAt").map(str::to_string),
-        outcome: completion_outcome(document).to_string(),
-        summary: completion_summary(document).map(str::to_string),
-        validation: completion_validation(document).map(str::to_string),
+        archived_at: document.field("archivedAt").map(str::to_string),
+        outcome: resolution_outcome(document).to_string(),
+        note: resolution_note(document).map(str::to_string),
+        reviewer: resolution_reviewer(document).map(str::to_string),
     }
 }
 
@@ -977,7 +979,6 @@ struct DocumentSummaryDto {
     parent_relationship: Option<&'static str>,
     tags: Vec<String>,
     accord_status: Option<String>,
-    review_status: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -997,8 +998,8 @@ struct DocumentDetailDto {
     parent: Option<Box<DocumentSummaryDto>>,
     children: Vec<DocumentSummaryDto>,
     accord: Option<AccordDto>,
-    review: Option<ReviewDto>,
-    completion: Option<CompletionDto>,
+    validation: Option<ValidationDto>,
+    resolution: Option<ResolutionDto>,
     decision: Option<DecisionDto>,
 }
 
@@ -1042,21 +1043,20 @@ impl From<AccordRecord> for AccordDto {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ReviewDto {
-    status: String,
+struct ValidationDto {
+    state: String,
+    criterion: Option<String>,
+    note: Option<String>,
     reviewer: Option<String>,
     requested_at: Option<String>,
-    decided_at: Option<String>,
-    note: Option<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct CompletionDto {
+struct ResolutionDto {
     outcome: String,
-    summary: Option<String>,
+    note: Option<String>,
     files_changed: Vec<String>,
-    validation: Option<String>,
     reviewer: Option<String>,
 }
 
@@ -1075,10 +1075,10 @@ struct LogSummaryDto {
     #[serde(rename = "type")]
     document_type: String,
     title: String,
-    completed_at: Option<String>,
+    archived_at: Option<String>,
     outcome: String,
-    summary: Option<String>,
-    validation: Option<String>,
+    note: Option<String>,
+    reviewer: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1147,18 +1147,18 @@ mod tests {
         )
         .unwrap();
         fs::write(
-            project.board_dir.join("task-1.md"),
-            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\naccord:\n  status: delivered\n  assignee: worker\n  summary: Ready to inspect\n  validation:\n    commands: [cargo test]\nreview:\n  status: pending\n  reviewer: owner\n---\n\n## Body\n",
+            project.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\naccord:\n  status: delivered\n  assignee: worker\n  summary: Ready to inspect\n  validation:\n    commands: [cargo test]\nvalidation:\n  criterion: verify the API\n  note: needs human confirmation\n  reviewer: owner\n  requestedAt: 2026-08-05T00:00:00Z\n---\n\n## Body\n",
         )
         .unwrap();
         fs::write(
-            project.board_dir.join("decision-1.md"),
+            project.tasks_dir.join("decision-1.md"),
             "---\nid: decision-1\ntype: decision\ntitle: Use Axum\nstatus: accepted\ndate: 2026-08-05\n---\n\nDecision body\n",
         )
         .unwrap();
         fs::write(
             project.logs_dir.join("task-2.md"),
-            "---\nid: task-2\ntype: task\ntitle: Finished\ncompletedAt: 2026-08-05T00:00:00Z\ncompletion:\n  outcome: completed\n  summary: Done\n---\n",
+            "---\nid: task-2\ntype: task\ntitle: Finished\narchivedAt: 2026-08-05T00:00:00Z\nresolution:\n  outcome: completed\n  note: Done\n---\n",
         )
         .unwrap();
         (root, project)
@@ -1206,8 +1206,8 @@ mod tests {
         assert_eq!(detail["data"]["accordStatus"], "delivered");
         assert_eq!(detail["data"]["accord"]["assignee"], "worker");
         assert_eq!(detail["data"]["accord"]["validations"][0], "cargo test");
-        assert_eq!(detail["data"]["review"]["status"], "pending");
-        assert_eq!(detail["data"]["review"]["reviewer"], "owner");
+        assert_eq!(detail["data"]["validation"]["state"], "validation");
+        assert_eq!(detail["data"]["validation"]["criterion"], "verify the API");
         assert_eq!(detail["data"]["body"], "\n## Body\n");
         assert_eq!(detail["data"]["bodyHtml"], "<h2>Body</h2>");
         assert!(detail["data"].get("path").is_none());
@@ -1397,7 +1397,7 @@ mod tests {
     async fn project_read_failures_do_not_expose_source_paths() {
         let (root, project) = test_project();
         let app = router(project.clone(), TEST_HOST);
-        fs::write(project.board_dir.join("task-1.md"), "not frontmatter").unwrap();
+        fs::write(project.tasks_dir.join("task-1.md"), "not frontmatter").unwrap();
         let (status, error) = json_request(app, "/api/v1/project").await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(error["error"]["code"], "project_read_failed");
@@ -1415,7 +1415,7 @@ mod tests {
         let app = router(project.clone(), TEST_HOST);
         let (_, before) = json_request(app.clone(), "/api/v1/project").await;
         fs::write(
-            project.board_dir.join("task-1.md"),
+            project.tasks_dir.join("task-1.md"),
             "---\nid: task-1\ntype: task\ntitle: Changed\nstate: validation\n---\n",
         )
         .unwrap();

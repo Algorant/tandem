@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io;
 
 mod app;
@@ -12,19 +14,27 @@ mod web;
 pub(crate) struct CliError {
     pub(crate) message: String,
     pub(crate) code: i32,
+    pub(crate) json: bool,
 }
 
 impl CliError {
+    pub(crate) fn with_json(mut self, json: bool) -> Self {
+        self.json = json;
+        self
+    }
+
     pub(crate) fn usage(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             code: 2,
+            json: false,
         }
     }
     pub(crate) fn user(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             code: 1,
+            json: false,
         }
     }
 }
@@ -41,9 +51,22 @@ impl From<protocol::diagnostic::Diagnostic> for CliError {
     }
 }
 
+impl From<app::Error> for CliError {
+    fn from(error: app::Error) -> Self {
+        CliError::user(error.message)
+    }
+}
+
 fn main() {
     if let Err(error) = run() {
-        eprintln!("Error: {}", error.message);
+        if error.json {
+            println!(
+                "{}",
+                serde_json::json!({"ok": false, "error": {"code": if error.code == 2 { "usage" } else { "io" }, "message": error.message, "details": {}}})
+            );
+        } else {
+            eprintln!("Error: {}", error.message);
+        }
         std::process::exit(error.code);
     }
 }

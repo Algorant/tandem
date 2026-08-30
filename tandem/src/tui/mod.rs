@@ -26,7 +26,6 @@ use ratatui::{
 };
 
 use crate::app;
-use crate::app::accord::ValidationApplyCandidate;
 use crate::app::tasks::AddOptions;
 use crate::project::rules::{empty_rules, parse_rules_from_yaml};
 use crate::project::write::{file_signature, FileSignature, HierarchyLock};
@@ -38,10 +37,9 @@ use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
-use crate::protocol::review::status as review_status;
 use crate::protocol::workflow::{
-    self, completion_outcome, workflow_states, COMPLETION_OUTCOME_CANCELED,
-    COMPLETION_OUTCOME_COMPLETED,
+    self, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
+    RESOLUTION_OUTCOME_COMPLETED,
 };
 use crate::CliError;
 
@@ -59,7 +57,6 @@ mod reload;
     dead_code,
     reason = "retained Review implementation is intentionally compiled pending a separate product decision"
 )]
-mod review;
 mod rules;
 mod state;
 mod terminal;
@@ -100,7 +97,7 @@ fn sort_documents(docs: &mut [Document]) {
 }
 
 fn is_canceled_log(doc: &Document) -> bool {
-    doc.location == DocumentLocation::Logs && completion_outcome(doc) == COMPLETION_OUTCOME_CANCELED
+    doc.location == DocumentLocation::Logs && resolution_outcome(doc) == RESOLUTION_OUTCOME_CANCELED
 }
 
 fn truncate(value: &str, max_chars: usize) -> String {
@@ -249,7 +246,6 @@ struct TuiApp {
     theme_warnings: Vec<String>,
     selected_state: usize,
     selected_item: usize,
-    selected_review_item: usize,
     board_filters: BoardFilters,
     board_arrangement: BoardArrangement,
     selected_log: usize,
@@ -258,7 +254,6 @@ struct TuiApp {
     expanded_board_doc_id: Option<String>,
     expanded_board_hierarchy_ids: BTreeSet<String>,
     detail_scroll: u16,
-    review_detail_scroll: u16,
     log_detail_scroll: u16,
     log_list_offset: usize,
     log_search_filter: String,
@@ -300,7 +295,6 @@ impl TuiApp {
             theme_warnings: Vec::new(),
             selected_state: 0,
             selected_item: 0,
-            selected_review_item: 0,
             board_filters: BoardFilters::default(),
             board_arrangement: BoardArrangement::State,
             selected_log: 0,
@@ -309,7 +303,6 @@ impl TuiApp {
             expanded_board_doc_id: None,
             expanded_board_hierarchy_ids: BTreeSet::new(),
             detail_scroll: 0,
-            review_detail_scroll: 0,
             log_detail_scroll: 0,
             log_list_offset: 0,
             log_search_filter: String::new(),
@@ -437,7 +430,6 @@ mod tests {
     use ratatui::{backend::TestBackend, Terminal};
 
     use super::*;
-    use crate::project::read_documents;
 
     fn doc_with_state(id: &str, state: Option<&str>) -> Document {
         let mut fields = HashMap::new();
@@ -966,20 +958,21 @@ in-progress = "active"
     }
 
     #[test]
-    fn archived_log_validation_rejects_unknown_completion_outcomes() {
+    fn archived_log_validation_rejects_unknown_resolution_outcomes() {
         let mut log = doc_with_state("task-1", None);
         log.location = DocumentLocation::Logs;
         log.fields
-            .insert("completedAt".to_string(), "now".to_string());
+            .insert("archivedAt".to_string(), "now".to_string());
         log.fields
-            .insert("completion.summary".to_string(), "Archived".to_string());
+            .insert("resolution.note".to_string(), "Archived".to_string());
         log.fields
-            .insert("completion.outcome".to_string(), "abandoned".to_string());
+            .insert("resolution.outcome".to_string(), "abandoned".to_string());
 
         let errors = validation_load_errors(&[], &[log], &["todo".to_string()]).join("\n");
         assert!(
-            errors
-                .contains("invalid completion.outcome `abandoned`; expected completed or canceled"),
+            errors.contains(
+                "invalid resolution.outcome `abandoned`; expected completed, canceled, or failed"
+            ),
             "{errors}"
         );
     }
@@ -1065,18 +1058,18 @@ in-progress = "active"
         let root = unique_test_dir("tandem-invalid-hierarchy-panel");
         let workspace = temp_workspace(&root);
         fs::write(
-            workspace.board_dir.join("task-1.md"),
+            workspace.tasks_dir.join("task-1.md"),
             "---\nid: task-1\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-1-1.md"),
+            workspace.tasks_dir.join("task-1-1.md"),
             "---\nid: task-1-1\ntype: task\ntitle: Invalid Epic child ID\nstate: todo\nparentId: task-1\n---\n",
         )
         .unwrap();
         write_task_doc(&workspace, "task-10", "Task parent", "todo");
         fs::write(
-            workspace.board_dir.join("task-11.md"),
+            workspace.tasks_dir.join("task-11.md"),
             "---\nid: task-11\ntype: task\ntitle: Invalid global Subtask ID\nstate: todo\nparentId: task-10\n---\n",
         )
         .unwrap();
@@ -1358,7 +1351,7 @@ in-progress = "active"
         );
         assert_eq!(
             tabs.iter().map(|tab| tab.count).collect::<Vec<_>>(),
-            vec![0, 0, 1]
+            vec![0, 0, 1, 0]
         );
     }
 
@@ -1432,7 +1425,7 @@ in-progress = "active"
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Parent", "todo");
         fs::write(
-            workspace.board_dir.join("task-1-1.md"),
+            workspace.tasks_dir.join("task-1-1.md"),
             "---\nid: task-1-1\ntype: task\ntitle: Subtask\nstate: validation\nparentId: task-1\n---\n",
         )
         .unwrap();
@@ -1442,7 +1435,7 @@ in-progress = "active"
         assert!(app.select_document_by_id("task-1-1"));
 
         fs::write(
-            workspace.board_dir.join("task-1-1.md"),
+            workspace.tasks_dir.join("task-1-1.md"),
             "---\nid: task-1-1\ntype: task\ntitle: Reloaded subtask\nstate: validation\nparentId: task-1\n---\n",
         )
         .unwrap();
@@ -1604,8 +1597,8 @@ in-progress = "active"
             .fields
             .insert("parentId".to_string(), "task-103".to_string());
         canceled_child.fields.insert(
-            "completion.outcome".to_string(),
-            COMPLETION_OUTCOME_CANCELED.to_string(),
+            "resolution.outcome".to_string(),
+            RESOLUTION_OUTCOME_CANCELED.to_string(),
         );
         let docs = vec![epic];
         let logs = vec![canceled_child];
@@ -1728,17 +1721,17 @@ in-progress = "active"
         let root = unique_test_dir("tandem-epic-navigation");
         let workspace = temp_workspace(&root);
         fs::write(
-            workspace.board_dir.join("task-103.md"),
+            workspace.tasks_dir.join("task-103.md"),
             "---\nid: task-103\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-104.md"),
+            workspace.tasks_dir.join("task-104.md"),
             "---\nid: task-104\ntype: task\ntitle: Task\nstate: todo\nparentId: task-103\n---\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-104-1.md"),
+            workspace.tasks_dir.join("task-104-1.md"),
             "---\nid: task-104-1\ntype: task\ntitle: Subtask\nstate: validation\nparentId: task-104\n---\n",
         )
         .unwrap();
@@ -1855,17 +1848,17 @@ in-progress = "active"
         let root = unique_test_dir("tandem-epic-render");
         let workspace = temp_workspace(&root);
         fs::write(
-            workspace.board_dir.join("task-1.md"),
+            workspace.tasks_dir.join("task-1.md"),
             "---\nid: task-1\ntype: task\nkind: epic\ntitle: \"Ship hierarchical subtasks\"\nstate: todo\npriority: high\n---\n\nParent epic body.\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-2.md"),
+            workspace.tasks_dir.join("task-2.md"),
             "---\nid: task-2\ntype: task\ntitle: First epic task\nstate: in-progress\npriority: medium\nparentId: task-1\n---\n\nGlobally allocated direct Epic task.\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-3.md"),
+            workspace.tasks_dir.join("task-3.md"),
             "---\nid: task-3\ntype: task\ntitle: Second epic task\nstate: todo\nparentId: task-1\n---\n\nAnother globally allocated direct Epic task.\n",
         )
         .unwrap();
@@ -1952,18 +1945,14 @@ in-progress = "active"
     }
 
     #[test]
-    fn board_chip_precedence_surfaces_review_over_validation_delivery() {
+    fn board_chips_suppress_delivered_accord_in_validation_and_honor_disabled_badges() {
         let theme = TuiTheme::default_dark();
         let mut validation = doc_with_state("task-28", Some("validation"));
         validation
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
-        validation
-            .fields
-            .insert("review.status".to_string(), "pending".to_string());
         let validation_row =
             line_text(&board_item_lines_for_doc(&validation, &theme, 120, false, false, false)[0]);
-        assert!(validation_row.contains(" PENDING "));
         assert!(!validation_row.contains(" DELIVERED "));
 
         let mut in_progress = doc_with_state("task-29", Some("in-progress"));
@@ -2543,12 +2532,12 @@ tone = "success"
         let workspace = TandemProject {
             root: PathBuf::new(),
             data_dir: PathBuf::new(),
-            board_dir: tandem_dir.join("board"),
+            tasks_dir: tandem_dir.join("board"),
             logs_dir: tandem_dir.join("logs"),
             config_path: tandem_dir.join("tandem.md"),
             events_path: tandem_dir.join("events.jsonl"),
         };
-        fs::create_dir_all(&workspace.board_dir).unwrap();
+        fs::create_dir_all(&workspace.tasks_dir).unwrap();
         fs::create_dir_all(&workspace.logs_dir).unwrap();
         fs::write(
             &workspace.config_path,
@@ -2560,7 +2549,7 @@ tone = "success"
 
     fn write_task_doc(workspace: &TandemProject, id: &str, title: &str, state: &str) {
         fs::write(
-            workspace.board_dir.join(format!("{id}.md")),
+            workspace.tasks_dir.join(format!("{id}.md")),
             format!(
                 "---\nid: {id}\ntype: task\ntitle: {title}\nstate: {state}\n---\n\nBody for {id}.\n"
             ),
@@ -2570,7 +2559,7 @@ tone = "success"
 
     fn write_delivered_validation_task(workspace: &TandemProject, id: &str) {
         fs::write(
-            workspace.board_dir.join(format!("{id}.md")),
+            workspace.tasks_dir.join(format!("{id}.md")),
             format!(
                 "---\nid: {id}\ntype: task\ntitle: Delivered task\nstate: validation\naccord:\n  status: delivered\n  updatedAt: 2026-06-28T00:00:00Z\n  deliveredAt: 2026-06-28T00:00:00Z\n  summary: ready for sign-off\n---\n\nBody for {id}.\n"
             ),
@@ -2580,7 +2569,7 @@ tone = "success"
 
     fn write_accepted_validation_task(workspace: &TandemProject, id: &str, title: &str) {
         fs::write(
-            workspace.board_dir.join(format!("{id}.md")),
+            workspace.tasks_dir.join(format!("{id}.md")),
             format!(
                 "---\nid: {id}\ntype: task\ntitle: {title}\nstate: validation\naccord:\n  status: accepted\nreview:\n  status: accepted\n---\n\nBody for {id}.\n"
             ),
@@ -2588,16 +2577,23 @@ tone = "success"
         .unwrap();
     }
 
-    fn papercut_item(id: &str, title: &str, body: &str) -> crate::project::StoredPapercut {
-        crate::project::StoredPapercut::new(
-            PathBuf::from(format!(".tandem/papercuts/{id}.md")),
+    fn papercut_item(id: &str, title: &str, body: &str) -> crate::project::StoredDocument {
+        crate::project::StoredDocument::new(
+            PathBuf::from(format!(".tandem/tasks/{id}.md")),
+            crate::protocol::hierarchy::DocumentLocation::Board,
             HashMap::from([
                 ("id".to_string(), id.to_string()),
+                ("type".to_string(), "task".to_string()),
                 ("title".to_string(), title.to_string()),
-                ("status".to_string(), "open".to_string()),
+                ("state".to_string(), "in-progress".to_string()),
+                ("accord.status".to_string(), "claimed".to_string()),
+                ("priority".to_string(), "low".to_string()),
                 ("createdAt".to_string(), "2026-08-10T00:00:00Z".to_string()),
                 ("updatedAt".to_string(), "2026-08-10T01:00:00Z".to_string()),
-                ("tags".to_string(), "[\"tui\", \"friction\"]".to_string()),
+                (
+                    "tags".to_string(),
+                    "[\"papercut\", \"friction\"]".to_string(),
+                ),
                 ("references".to_string(), "[\"task-1\"]".to_string()),
             ]),
             body.to_string(),
@@ -2605,11 +2601,10 @@ tone = "success"
     }
 
     fn write_papercut(workspace: &TandemProject, id: &str, title: &str, body: &str) {
-        fs::create_dir_all(workspace.papercuts_dir()).unwrap();
         fs::write(
-            workspace.papercuts_dir().join(format!("{id}.md")),
+            workspace.tasks_dir.join(format!("{id}.md")),
             format!(
-                "---\nid: {id}\ntitle: {title}\nstatus: open\ncreatedAt: 2026-08-10T00:00:00Z\nupdatedAt: 2026-08-10T01:00:00Z\ntags: [tui, friction]\nreferences: [task-1]\n---\n{body}\n"
+                "---\nid: {id}\ntype: task\ntitle: {title}\nstate: in-progress\npriority: low\ncreatedAt: 2026-08-10T00:00:00Z\nupdatedAt: 2026-08-10T01:00:00Z\ntags: [papercut, friction]\nreferences: [task-1]\naccord:\n  status: claimed\n---\n{body}\n"
             ),
         )
         .unwrap();
@@ -2640,7 +2635,7 @@ tone = "success"
             workspace: TandemProject {
                 root: PathBuf::new(),
                 data_dir: PathBuf::new(),
-                board_dir: PathBuf::from(".tandem/board"),
+                tasks_dir: PathBuf::from(".tandem/tasks"),
                 logs_dir: PathBuf::from(".tandem/logs"),
                 config_path: PathBuf::from(".tandem/tandem.md"),
                 events_path: PathBuf::from(".tandem/events.jsonl"),
@@ -2660,7 +2655,6 @@ tone = "success"
             theme_warnings: Vec::new(),
             selected_state: 0,
             selected_item: 0,
-            selected_review_item: 0,
             board_filters: BoardFilters::default(),
             board_arrangement: BoardArrangement::State,
             selected_log: 0,
@@ -2669,7 +2663,6 @@ tone = "success"
             expanded_board_doc_id: None,
             expanded_board_hierarchy_ids: BTreeSet::new(),
             detail_scroll: 0,
-            review_detail_scroll: 0,
             log_detail_scroll: 0,
             log_list_offset: 0,
             log_search_filter: String::new(),
@@ -2762,7 +2755,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "a Add · e Edit · f Filter · m Move · v Validate · b Epic Board · ? Help"
+            "e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
         assert!(!app.board_footer_text().contains("TODO"));
         assert!(!app.board_footer_text().contains("row"));
@@ -2811,10 +2804,8 @@ tone = "success"
         app.selected_item = 0;
         app.detail_scroll = 3;
         app.board_arrangement = BoardArrangement::Epic;
-        app.load_papercuts(crate::app::papercuts::InboxLoad {
-            items: vec![papercut_item("papercut-1", "First", "Body")],
-            warnings: Vec::new(),
-        });
+        app.docs = vec![papercut_item("task-10", "First", "Body")];
+        app.refresh_papercuts();
 
         for view in TuiView::ALL {
             app.view = view;
@@ -2840,14 +2831,12 @@ tone = "success"
     #[test]
     fn papercut_header_count_and_hit_target_are_global() {
         let mut app = keyboard_test_app();
-        app.load_papercuts(crate::app::papercuts::InboxLoad {
-            items: vec![
-                papercut_item("papercut-1", "First", "Body"),
-                papercut_item("papercut-2", "Second", "Body"),
-                papercut_item("papercut-3", "Third", "Body"),
-            ],
-            warnings: Vec::new(),
-        });
+        app.docs = vec![
+            papercut_item("task-10", "First", "Body"),
+            papercut_item("task-11", "Second", "Body"),
+            papercut_item("task-12", "Third", "Body"),
+        ];
+        app.refresh_papercuts();
         let mut terminal = Terminal::new(TestBackend::new(120, 28)).unwrap();
 
         for view in TuiView::ALL {
@@ -2881,14 +2870,12 @@ tone = "success"
             .map(|index| format!("- body line {index}"))
             .collect::<Vec<_>>()
             .join("\n");
-        app.load_papercuts(crate::app::papercuts::InboxLoad {
-            items: vec![
-                papercut_item("papercut-1", "First", "Body"),
-                papercut_item("papercut-2", "Second", &long_body),
-                papercut_item("papercut-3", "Third", "Body"),
-            ],
-            warnings: vec!["Papercuts load warning: malformed record".to_string()],
-        });
+        app.docs = vec![
+            papercut_item("task-10", "First", "Body"),
+            papercut_item("task-11", "Second", &long_body),
+            papercut_item("task-12", "Third", "Body"),
+        ];
+        app.refresh_papercuts();
         app.toggle_papercuts();
         let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
@@ -2902,7 +2889,7 @@ tone = "success"
         app.handle_mouse(left_click(second.rect.x, second.rect.y));
         assert_eq!(
             app.selected_papercut_id_for_reload().as_deref(),
-            Some("papercut-2")
+            Some("task-11")
         );
         app.handle_key(key(KeyCode::Enter)).unwrap();
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
@@ -2910,10 +2897,10 @@ tone = "success"
 
         terminal.draw(|frame| app.draw(frame)).unwrap();
         let text = terminal_text(&terminal);
-        assert!(text.contains("Detail papercut-2"));
-        assert!(text.contains("Status: open"));
-        assert!(text.contains("Tags: tui, friction"));
-        assert!(text.contains("1 load warning"));
+        assert!(text.contains("Detail task-11"));
+        assert!(text.contains("State: in-progress"));
+        assert!(text.contains("Accord: claimed"));
+        assert!(text.contains("Tags: papercut, friction"));
 
         let detail = app
             .hits
@@ -2929,18 +2916,16 @@ tone = "success"
     #[test]
     fn papercut_mouse_rows_follow_the_scrolled_list_offset() {
         let mut app = keyboard_test_app();
-        app.load_papercuts(crate::app::papercuts::InboxLoad {
-            items: (1..=20)
-                .map(|index| {
-                    papercut_item(
-                        &format!("papercut-{index}"),
-                        &format!("Friction {index}"),
-                        "Body",
-                    )
-                })
-                .collect(),
-            warnings: Vec::new(),
-        });
+        app.docs = (1..=20)
+            .map(|index| {
+                papercut_item(
+                    &format!("task-{index}"),
+                    &format!("Friction {index}"),
+                    "Body",
+                )
+            })
+            .collect();
+        app.refresh_papercuts();
         app.papercuts_view.selected = 19;
         app.toggle_papercuts();
         let mut terminal = Terminal::new(TestBackend::new(80, 20)).unwrap();
@@ -2965,39 +2950,33 @@ tone = "success"
         let root = unique_test_dir("tandem-tui-papercuts-reload");
         let workspace = temp_workspace(&root);
         write_task_doc(&workspace, "task-1", "Board remains available", "todo");
-        write_papercut(&workspace, "papercut-1", "First", "Body one");
-        write_papercut(&workspace, "papercut-2", "Second", "Body two");
-        fs::write(
-            workspace.papercuts_dir().join("papercut-3.md"),
-            "not frontmatter",
-        )
-        .unwrap();
-        let papercut_path = workspace.papercuts_dir().join("papercut-2.md");
+        write_papercut(&workspace, "task-10", "First", "Body one");
+        write_papercut(&workspace, "task-11", "Second", "Body two");
+        let papercut_path = workspace.tasks_dir.join("task-11.md");
         let source_before = fs::read_to_string(&papercut_path).unwrap();
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         assert_eq!(app.papercut_count(), 2);
-        assert_eq!(app.docs.len(), 1);
-        assert_eq!(app.papercut_warnings().len(), 1);
+        assert_eq!(app.docs.len(), 3);
         app.papercuts_view.selected = 1;
         app.toggle_papercuts();
 
-        write_papercut(&workspace, "papercut-4", "Fourth", "Body four");
+        write_papercut(&workspace, "task-12", "Fourth", "Body four");
         app.handle_key(key(KeyCode::Char('r'))).unwrap();
         assert!(app.papercuts_open());
         assert_eq!(app.papercut_count(), 3);
         assert_eq!(
             app.selected_papercut_id_for_reload().as_deref(),
-            Some("papercut-2")
+            Some("task-11")
         );
-        assert_eq!(app.docs.len(), 1);
+        assert_eq!(app.docs.len(), 4);
 
-        write_papercut(&workspace, "papercut-5", "Fifth", "Body five");
+        write_papercut(&workspace, "task-13", "Fifth", "Body five");
         app.last_reload_check = Instant::now() - Duration::from_secs(1);
         app.reload_if_changed();
         assert_eq!(app.papercut_count(), 4);
         assert_eq!(
             app.selected_papercut_id_for_reload().as_deref(),
-            Some("papercut-2")
+            Some("task-11")
         );
 
         app.handle_papercuts_key(key(KeyCode::Char('j')));
@@ -3125,17 +3104,11 @@ tone = "success"
         let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
 
-        let add_hit = app
+        assert!(!app
             .hits
             .iter()
-            .find(|hit| hit.action == HitAction::StartQuickAdd)
-            .cloned()
-            .expect("footer should register quick-add action");
-        assert_eq!(
-            app.handle_mouse(left_click(add_hit.rect.x, add_hit.rect.y)),
-            KeyAction::Continue
-        );
-        assert!(app.quick_add.is_some());
+            .any(|hit| hit.action == HitAction::StartQuickAdd));
+        assert!(app.quick_add.is_none());
     }
 
     #[test]
@@ -3170,7 +3143,7 @@ tone = "success"
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
-            "a Add · e Edit · f Filter · m Move · v Validate · b Epic Board · ? Help"
+            "e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
     }
 
@@ -3424,12 +3397,8 @@ tone = "success"
         assert!(app.status.contains("type feedback"));
 
         app.handle_key(key(KeyCode::Esc)).unwrap();
-        app.handle_key(key(KeyCode::Char('v'))).unwrap();
-        app.handle_key(key(KeyCode::Down)).unwrap();
-        app.handle_key(key(KeyCode::Down)).unwrap();
-        app.handle_key(key(KeyCode::Enter)).unwrap();
-        assert!(app.status.contains("no accepted tasks"));
-        assert!(!app.status.contains("tandem complete"));
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert!(!app.status.contains("no accepted tasks"));
     }
 
     #[test]
@@ -3456,16 +3425,18 @@ tone = "success"
     }
 
     #[test]
-    fn accept_confirmation_updates_accord_and_review_without_rework_feedback() {
+    fn accept_confirmation_archives_with_accord_accepted_without_rework_feedback() {
         let root = unique_test_dir("tandem-validation-accept");
         let workspace = temp_workspace(&root);
         write_delivered_validation_task(&workspace, "task-1");
 
         let outcome = app::accord::accept_validation(&workspace, "task-1", "tui").unwrap();
-        assert_eq!(outcome.state, "validation");
-        let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        assert_eq!(outcome.state, "archived");
+        assert!(!workspace.tasks_dir.join("task-1.md").exists());
+        let content = fs::read_to_string(workspace.logs_dir.join("task-1.md")).unwrap();
         assert!(content.contains("status: \"accepted\""));
-        assert!(content.contains("review.status: \"accepted\""));
+        assert!(content.contains("archivedAt"));
+        assert!(!content.contains("validation.state"));
         assert!(!content.contains("## Feedback"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -3484,10 +3455,12 @@ tone = "success"
         )
         .unwrap();
         assert_eq!(outcome.state, "in-progress");
-        let content = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        assert!(workspace.tasks_dir.join("task-1.md").exists());
+        let content = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
         assert!(content.contains("state: \"in-progress\""));
         assert!(content.contains("status: \"rework\""));
-        assert!(content.contains("review.status: \"changes-requested\""));
+        assert!(!content.contains("validation.state"));
+        assert!(!content.contains("review:"));
         assert!(content.contains("## Feedback"));
         assert!(content.contains("Please fix the contrast."));
         fs::remove_dir_all(root).unwrap();
@@ -3498,7 +3471,7 @@ tone = "success"
         let root = unique_test_dir("tandem-validation-cancel");
         let workspace = temp_workspace(&root);
         write_delivered_validation_task(&workspace, "task-1");
-        let before = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        let before = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         assert!(app.select_document_by_id("task-1"));
 
@@ -3508,102 +3481,25 @@ tone = "success"
         app.handle_key(key(KeyCode::Char('x'))).unwrap();
         app.handle_key(key(KeyCode::Esc)).unwrap();
 
-        let after = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
+        let after = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
         assert_eq!(after, before);
         assert!(app.validation_prompt.is_none());
         fs::remove_dir_all(root).unwrap();
     }
 
-    #[test]
-    fn apply_accepted_candidates_excludes_delivered_and_rework_items() {
-        let mut accepted = doc_with_state("task-1", Some("validation"));
-        accepted
-            .fields
-            .insert("accord.status".to_string(), "accepted".to_string());
-        accepted
-            .fields
-            .insert("review.status".to_string(), "accepted".to_string());
-        let mut delivered = doc_with_state("task-2", Some("validation"));
-        delivered
-            .fields
-            .insert("accord.status".to_string(), "delivered".to_string());
-        let mut rework = doc_with_state("task-3", Some("in-progress"));
-        rework
-            .fields
-            .insert("accord.status".to_string(), "rework".to_string());
-
-        let candidates =
-            app::accord::accepted_validation_candidates(&[accepted, delivered, rework]);
-
-        assert_eq!(candidates.len(), 1);
-        assert_eq!(candidates[0].id, "task-1");
-    }
-
-    #[test]
-    fn apply_accepted_cancel_keeps_task_files_unchanged() {
-        let root = unique_test_dir("tandem-apply-cancel");
-        let workspace = temp_workspace(&root);
-        write_accepted_validation_task(&workspace, "task-1", "Accepted one");
-        let before = fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap();
-        let mut app = TuiApp::load(workspace.clone()).unwrap();
-        app.selected_state = app
-            .states
-            .iter()
-            .position(|state| state == "validation")
-            .unwrap();
-
-        app.handle_key(key(KeyCode::Char('v'))).unwrap();
-        app.handle_key(key(KeyCode::Down)).unwrap();
-        app.handle_key(key(KeyCode::Down)).unwrap();
-        app.handle_key(key(KeyCode::Enter)).unwrap();
-        assert!(matches!(
-            app.validation_prompt,
-            Some(ValidationPrompt::ApplyAccepted { .. })
-        ));
-        app.handle_key(key(KeyCode::Esc)).unwrap();
-
-        assert_eq!(
-            fs::read_to_string(workspace.board_dir.join("task-1.md")).unwrap(),
-            before
-        );
-        assert!(!workspace.logs_dir.join("task-1.md").exists());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn apply_accepted_confirm_completes_only_accepted_candidates_to_logs() {
-        let root = unique_test_dir("tandem-apply-confirm");
-        let workspace = temp_workspace(&root);
-        write_accepted_validation_task(&workspace, "task-1", "Accepted one");
-        write_delivered_validation_task(&workspace, "task-2");
-        let candidates = app::accord::accepted_validation_candidates(
-            &read_documents(&workspace.board_dir, DocumentLocation::Board).unwrap(),
-        );
-
-        let outcome =
-            app::accord::apply_accepted_validation(&workspace, &candidates, "tui").unwrap();
-
-        assert_eq!(outcome.completed_ids, vec!["task-1"]);
-        assert!(!workspace.board_dir.join("task-1.md").exists());
-        assert!(workspace.board_dir.join("task-2.md").exists());
-        let log = fs::read_to_string(workspace.logs_dir.join("task-1.md")).unwrap();
-        assert!(log.contains("completedAt:"));
-        assert!(log.contains("Applied accepted Validation sign-off for task-1"));
-        assert!(log.contains("  reviewer: \"tui\""));
-        fs::remove_dir_all(root).unwrap();
-    }
+    // The former bulk-apply flow was removed by the 0.3.0 validation model.
 
     #[test]
     fn graph_sensitive_tui_mutations_fail_closed_on_fresh_invalid_snapshot() {
         let root = unique_test_dir("tandem-mutation-hierarchy-lock");
         let workspace = temp_workspace(&root);
         fs::write(
-            workspace.board_dir.join("task-10.md"),
+            workspace.tasks_dir.join("task-10.md"),
             "---\nid: task-10\ntype: task\nkind: epic\ntitle: Epic\nstate: todo\n---\n",
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("task-10-1.md"),
+            workspace.tasks_dir.join("task-10-1.md"),
             "---\nid: task-10-1\ntype: task\ntitle: Invalid Epic Task ID\nstate: todo\nparentId: task-10\n---\n",
         )
         .unwrap();
@@ -3612,23 +3508,17 @@ tone = "success"
             &workspace,
             AddOptions {
                 title: Some("Must not be created".to_string()),
+                acceptance: vec!["preserve hierarchy".to_string()],
                 state: Some("todo".to_string()),
                 ..AddOptions::default()
             },
         )
         .unwrap_err();
         assert!(add_error.message.contains("expected global `task-N`"));
-        assert!(!workspace.board_dir.join("task-11.md").exists());
+        assert!(!workspace.tasks_dir.join("task-11.md").exists());
 
         write_accepted_validation_task(&workspace, "task-20", "Accepted candidate");
-        let candidates = vec![ValidationApplyCandidate {
-            id: "task-20".to_string(),
-            title: "Accepted candidate".to_string(),
-        }];
-        let apply_error =
-            app::accord::apply_accepted_validation(&workspace, &candidates, "tui").unwrap_err();
-        assert!(apply_error.message.contains("expected global `task-N`"));
-        assert!(workspace.board_dir.join("task-20.md").exists());
+        assert!(workspace.tasks_dir.join("task-20.md").exists());
         assert!(!workspace.logs_dir.join("task-20.md").exists());
         fs::remove_dir_all(root).unwrap();
     }
@@ -3708,7 +3598,7 @@ tone = "success"
 
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         fs::write(
-            workspace.board_dir.join("task-1.md"),
+            workspace.tasks_dir.join("task-1.md"),
             "---\nid: task-1\ntype: task\ntitle: Broken\nstate: todo\n\nmissing closing delimiter\n",
         )
         .unwrap();
@@ -3742,7 +3632,7 @@ tone = "success"
     }
 
     #[test]
-    fn tui_load_surfaces_workspace_compatibility_warnings() {
+    fn tui_load_has_no_legacy_compatibility_warnings() {
         let root = unique_test_dir("tandem-tui-compatibility");
         let workspace = temp_workspace(&root);
         fs::write(
@@ -3751,26 +3641,23 @@ tone = "success"
         )
         .unwrap();
         fs::write(
-            workspace.board_dir.join("note-1.md"),
+            workspace.tasks_dir.join("note-1.md"),
             "---\nid: note-1\ntype: note\ntitle: Legacy note\nstate: todo\neffort: xlarge\n---\n\nLegacy body.\n",
         )
         .unwrap();
 
         let app = TuiApp::load(workspace).unwrap();
         let warnings = app.runtime_warnings();
-        assert!(warnings
+        assert!(!warnings
             .iter()
-            .any(|warning| warning.contains("custom type declarations are deprecated")));
-        assert!(warnings
-            .iter()
-            .any(|warning| warning.contains("completion-policy settings are deprecated")));
+            .any(|warning| warning.contains("deprecated")));
         assert_eq!(app.docs[0].id(), "note-1");
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn review_attention_reason_covers_delivered_and_pending_items() {
-        let mut delivered = doc_with_state("task-1", Some("review"));
+    fn review_attention_reason_covers_delivered_and_validation_items() {
+        let mut delivered = doc_with_state("task-1", Some("in-progress"));
         delivered
             .fields
             .insert("accord.status".to_string(), "delivered".to_string());
@@ -3779,13 +3666,10 @@ tone = "success"
             Some("accord delivered")
         );
 
-        let mut pending = doc_with_state("task-2", Some("review"));
-        pending
-            .fields
-            .insert("review.status".to_string(), "pending".to_string());
+        let pending = doc_with_state("task-2", Some("validation"));
         assert_eq!(
             review_attention_reason(&pending).as_deref(),
-            Some("review pending")
+            Some("human validation pending")
         );
     }
 
@@ -3961,6 +3845,10 @@ tone = "success"
                     state: "review".to_string(),
                     count: 1,
                 },
+                BoardSubviewTab {
+                    state: "__papercuts".to_string(),
+                    count: 0,
+                },
             ]
         );
         assert_eq!(state_tab_title("in-progress", 3), " IN PROGRESS 3 ");
@@ -4115,11 +4003,8 @@ tone = "success"
         app.docs[1]
             .fields
             .insert("accord.status".into(), "accepted".into());
-        app.docs[1]
-            .fields
-            .insert("review.status".into(), "accepted".into());
         app.start_validation_picker();
-        assert_eq!(app.board_picker.as_ref().unwrap().selected, 2);
+        assert_eq!(app.board_picker.as_ref().unwrap().selected, 0);
     }
 
     #[test]
@@ -4156,7 +4041,7 @@ tone = "success"
     fn papercuts_enter_opens_detail_without_returning_to_list() {
         let mut app = keyboard_test_app();
         app.papercuts_view
-            .set_items(vec![papercut_item("papercut-1", "One", "Body")]);
+            .set_items(vec![papercut_item("task-10", "One", "Body")]);
         app.toggle_papercuts();
         app.handle_papercuts_key(key(KeyCode::Enter));
         assert!(app.papercuts_footer_text().contains("Shift-Tab list"));

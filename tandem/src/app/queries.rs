@@ -1,19 +1,57 @@
 //! Canonical read/query composition shared by peer interfaces.
 
 use crate::app::support::hierarchy_from_project;
+use crate::app::Error;
 use crate::project::rules::parse_rules_from_content;
 use crate::project::write::HierarchyLock;
-use crate::project::{ProjectHierarchy, StoredDocument as Document, StoredPapercut, TandemProject};
+use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{state_divergence_warning, status as accord_status};
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
-use crate::protocol::review::status as review_status;
 use crate::protocol::workflow::{state_matches_filter, workflow_states};
-use crate::CliError;
 
 pub(crate) struct Snapshot {
     pub(crate) hierarchy: ProjectHierarchy,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Scope {
+    Active,
+    Archived,
+    All,
+}
+
+#[allow(dead_code)]
+pub(crate) fn find_rule(
+    project: &TandemProject,
+    id: &str,
+) -> Result<Option<crate::project::rules::RuleRecord>, Error> {
+    Ok(
+        crate::project::rules::read_rule_files(&project.data_dir().join("rules"))?
+            .into_iter()
+            .find(|rule| rule.id == id),
+    )
+}
+
+#[allow(dead_code)]
+pub(crate) fn documents_for_scope(
+    project: &TandemProject,
+    scope: Scope,
+) -> Result<Vec<Document>, Error> {
+    match scope {
+        Scope::Active => project
+            .read_documents()
+            .map(|docs| {
+                docs.into_iter()
+                    .filter(|doc| doc.location != DocumentLocation::Logs)
+                    .collect()
+            })
+            .map_err(Into::into),
+        Scope::Archived => project.read_log_documents().map_err(Into::into),
+        Scope::All => project.read_documents().map_err(Into::into),
+    }
 }
 
 /// One coherent, UI-neutral project read used by long-running peer interfaces.
@@ -32,11 +70,13 @@ pub(crate) struct ListFilter<'a> {
     pub(crate) state: Option<&'a str>,
     pub(crate) doc_type: Option<&'a str>,
     pub(crate) priority: Option<&'a str>,
-    pub(crate) tag: Option<&'a str>,
+    pub(crate) effort: Option<&'a str>,
+    pub(crate) tags: &'a [String],
     pub(crate) assignee: Option<&'a str>,
     pub(crate) parent: Option<&'a str>,
     pub(crate) accord: Option<&'a str>,
-    pub(crate) review: Option<&'a str>,
+    pub(crate) decision_status: Option<&'a str>,
+    pub(crate) resolution: Option<&'a str>,
 }
 
 #[derive(Debug)]
@@ -46,27 +86,22 @@ pub(crate) struct SearchResult {
 }
 
 #[derive(Debug)]
-pub(crate) struct PapercutSearchResult {
-    pub(crate) papercut: StoredPapercut,
-    pub(crate) snippet: String,
-}
-
-#[derive(Debug)]
 pub(crate) struct SearchFilter<'a> {
     pub(crate) query: &'a str,
     pub(crate) state: Option<&'a str>,
     pub(crate) doc_type: Option<&'a str>,
+    pub(crate) tags: &'a [String],
     pub(crate) parent: Option<&'a str>,
 }
 
-pub(crate) fn load(project: &TandemProject) -> Result<Snapshot, CliError> {
+pub(crate) fn load(project: &TandemProject) -> Result<Snapshot, Error> {
     let _lock = HierarchyLock::acquire(project)?;
     let hierarchy = hierarchy_from_project(project)?;
     hierarchy.validate_all_task_hierarchies()?;
     Ok(Snapshot { hierarchy })
 }
 
-pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, CliError> {
+pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> {
     let _lock = HierarchyLock::acquire(project)?;
     let config = project.read_config_raw()?;
     let documents = project.read_documents()?;
@@ -93,8 +128,7 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, CliErro
             .map(parse_field_values)
             .unwrap_or_default()
         {
-            let target_exists = hierarchy.document(&reference).is_some()
-                || project.papercut_reference_exists(&reference);
+            let target_exists = hierarchy.document(&reference).is_some();
             if !target_exists {
                 warnings.push(format!(
                     "{} references missing target {reference}.",
@@ -168,14 +202,14 @@ impl Snapshot {
             .cloned()
     }
 
-    pub(crate) fn children(&self, parent: &Document) -> Result<Vec<Document>, CliError> {
+    pub(crate) fn children(&self, parent: &Document) -> Result<Vec<Document>, Error> {
         children_for(&self.hierarchy, parent)
     }
 
     pub(crate) fn relationships_for(
         &self,
         documents: &[Document],
-    ) -> Result<std::collections::BTreeMap<String, Option<ParentRelationship>>, CliError> {
+    ) -> Result<std::collections::BTreeMap<String, Option<ParentRelationship>>, Error> {
         documents
             .iter()
             .map(|document| {
@@ -191,7 +225,7 @@ impl Snapshot {
 pub(crate) fn children_for(
     hierarchy: &ProjectHierarchy,
     parent: &Document,
-) -> Result<Vec<Document>, CliError> {
+) -> Result<Vec<Document>, Error> {
     let Some(parent_role) = hierarchy.task_role(parent)? else {
         return Ok(Vec::new());
     };
@@ -254,42 +288,17 @@ pub(crate) fn search_documents(
                 .parent
                 .is_none_or(|parent| doc.field("parentId") == Some(parent))
         })
+        .filter(|doc| {
+            filter.tags.is_empty()
+                || filter.tags.iter().any(|tag| {
+                    parse_field_values(doc.field("tags").unwrap_or(""))
+                        .iter()
+                        .any(|value| value == tag)
+                })
+        })
         .filter_map(|doc| search_match(doc, filter.query))
         .collect::<Vec<_>>();
     results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
-    results
-}
-
-pub(crate) fn search_papercuts(
-    items: Vec<StoredPapercut>,
-    query: &str,
-) -> Vec<PapercutSearchResult> {
-    let lowered_query = query.to_lowercase();
-    let mut results = items
-        .into_iter()
-        .filter_map(|papercut| {
-            let mut haystacks = vec![
-                papercut.id().to_string(),
-                papercut.title().to_string(),
-                papercut.body.clone(),
-            ];
-            for key in ["status", "tags", "references", "resolution.note"] {
-                if let Some(value) = papercut.field(key) {
-                    haystacks.push(value.to_string());
-                }
-            }
-            haystacks
-                .into_iter()
-                .find(|value| value.to_lowercase().contains(&lowered_query))
-                .map(|matched| PapercutSearchResult {
-                    papercut,
-                    snippet: snippet_for_match(&matched, query),
-                })
-        })
-        .collect::<Vec<_>>();
-    results.sort_by_key(|result| {
-        crate::protocol::papercut::papercut_number(result.papercut.id()).unwrap_or(usize::MAX)
-    });
     results
 }
 
@@ -345,22 +354,29 @@ fn matches_filter(doc: &Document, filter: &ListFilter<'_>) -> bool {
             .priority
             .is_none_or(|priority| doc.field("priority") == Some(priority))
         && filter
+            .effort
+            .is_none_or(|effort| doc.field("effort") == Some(effort))
+        && filter
             .assignee
             .is_none_or(|assignee| doc.field("assignee") == Some(assignee))
         && filter
             .parent
             .is_none_or(|parent| doc.field("parentId") == Some(parent))
-        && filter.tag.is_none_or(|tag| {
-            parse_field_values(doc.field("tags").unwrap_or(""))
-                .iter()
-                .any(|value| value == tag)
-        })
+        && (filter.tags.is_empty()
+            || filter.tags.iter().any(|tag| {
+                parse_field_values(doc.field("tags").unwrap_or(""))
+                    .iter()
+                    .any(|value| value == tag)
+            }))
         && filter
             .accord
             .is_none_or(|status| accord_status(doc) == Some(status))
+        && filter.decision_status.is_none_or(|status| {
+            doc.doc_type() == "decision" && doc.field("status") == Some(status)
+        })
         && filter
-            .review
-            .is_none_or(|status| review_status(doc) == Some(status))
+            .resolution
+            .is_none_or(|outcome| doc.field("resolution.outcome") == Some(outcome))
 }
 
 #[cfg(test)]
@@ -370,7 +386,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn load_read_resolves_documents_and_papercut_filenames_without_parsing_papercuts() {
+    fn load_read_resolves_documented_references_and_warns_unresolved() {
         let root = std::env::temp_dir().join(format!(
             "tandem-query-reference-{}",
             SystemTime::now()
@@ -380,22 +396,22 @@ mod tests {
         ));
         let project = TandemProject::initialize(
             &root,
-            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
         fs::write(
-            project.board_dir.join("task-1.md"),
-            "---\nid: task-1\ntitle: Source\nstate: todo\nreferences: [task-2, decision-1, task-3, papercut-1, missing-task]\n---\n",
+            project.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntitle: Source\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\nreferences: [task-2, decision-1, task-3, papercut-1, missing-task]\n---\n",
         )
         .unwrap();
         fs::write(
-            project.board_dir.join("task-2.md"),
-            "---\nid: task-2\ntitle: Active target\nstate: todo\n---\n",
+            project.tasks_dir.join("task-2.md"),
+            "---\nid: task-2\ntitle: Active target\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\n---\n",
         )
         .unwrap();
         fs::write(
-            project.board_dir.join("decision-1.md"),
-            "---\nid: decision-1\ntype: decision\ntitle: Decision target\nstatus: accepted\ndate: 2026-08-05\n---\n",
+            project.data_dir().join("decisions/decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Decision target\nstatus: accepted\n---\n",
         )
         .unwrap();
         fs::write(
@@ -403,24 +419,24 @@ mod tests {
             "---\nid: task-3\ntitle: Completed target\n---\n",
         )
         .unwrap();
-        fs::create_dir_all(project.papercuts_dir()).unwrap();
-        fs::write(project.papercuts_dir().join("papercut-1.md"), "malformed").unwrap();
 
         let read = load_read(&project).unwrap();
         assert!(read
             .warnings
             .iter()
             .any(|warning| warning == "task-1 references missing target missing-task."));
+        // Legacy papercut-* IDs resolve to nothing in protocol 0.3.0: Papercuts
+        // are Tasks tagged papercut, so a stale papercut-N reference warns.
+        assert!(read
+            .warnings
+            .iter()
+            .any(|warning| warning == "task-1 references missing target papercut-1."));
         assert!(!read
             .warnings
             .iter()
             .any(|warning| warning.contains("task-2")
                 || warning.contains("decision-1")
                 || warning.contains("task-3")));
-        assert!(!read
-            .warnings
-            .iter()
-            .any(|warning| warning.contains("papercut-1")));
         fs::remove_dir_all(root).unwrap();
     }
 }

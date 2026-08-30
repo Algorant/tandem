@@ -7,13 +7,13 @@ use crate::app::support::{
     append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
     reference_target_exists,
 };
+use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
     patch_frontmatter_content, replace_markdown_body, write_atomic, yaml_double_quote,
     TandemProject,
 };
 use crate::protocol::config::DECISION_STATUSES;
-use crate::CliError;
 
 #[derive(Debug, Default)]
 pub(crate) struct AddOptions {
@@ -62,7 +62,7 @@ pub(crate) struct WithdrawOutcome {
     pub(crate) path: PathBuf,
 }
 
-pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOutcome, CliError> {
+pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOutcome, Error> {
     let title = require_nonempty(
         options.title.as_deref(),
         "decision add requires --title <title>",
@@ -120,7 +120,7 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
 pub(crate) fn update(
     project: &TandemProject,
     options: UpdateOptions,
-) -> Result<UpdateOutcome, CliError> {
+) -> Result<UpdateOutcome, Error> {
     let doc = active_decision(project, &options.id)?;
     if let Some(status) = options.status.as_deref() {
         validate_status(status)?;
@@ -158,7 +158,7 @@ pub(crate) fn withdraw(
     project: &TandemProject,
     id: &str,
     reason: String,
-) -> Result<WithdrawOutcome, CliError> {
+) -> Result<WithdrawOutcome, Error> {
     let doc = active_decision(project, id)?;
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
@@ -187,14 +187,14 @@ pub(crate) fn withdraw(
 fn active_decision(
     project: &TandemProject,
     id: &str,
-) -> Result<crate::project::StoredDocument, CliError> {
+) -> Result<crate::project::StoredDocument, Error> {
     project
         .read_board_document(id)?
         .filter(|doc| doc.doc_type() == "decision")
-        .ok_or_else(|| CliError::user(format!("active decision not found: {id}")))
+        .ok_or_else(|| Error::user(format!("active decision not found: {id}")))
 }
 
-fn validate_options(options: &AddOptions) -> Result<(), CliError> {
+fn validate_options(options: &AddOptions) -> Result<(), Error> {
     if let Some(context) = options.context.as_deref() {
         require_nonempty(Some(context), "decision add --context must not be empty")?;
     }
@@ -217,12 +217,12 @@ fn validate_options(options: &AddOptions) -> Result<(), CliError> {
     Ok(())
 }
 
-pub(crate) fn validate_status(status: &str) -> Result<(), CliError> {
+pub(crate) fn validate_status(status: &str) -> Result<(), Error> {
     let status = require_nonempty(Some(status), "decision add --status must not be empty")?;
     if DECISION_STATUSES.contains(&status) {
         Ok(())
     } else {
-        Err(CliError::user(format!(
+        Err(Error::user(format!(
             "Validation failed: invalid decision status `{status}`; expected one of: {}",
             DECISION_STATUSES.join(", ")
         )))
@@ -232,7 +232,7 @@ pub(crate) fn validate_status(status: &str) -> Result<(), CliError> {
 pub(crate) fn diagnostics(
     project: &TandemProject,
     options: &AddOptions,
-) -> Result<Vec<String>, CliError> {
+) -> Result<Vec<String>, Error> {
     let mut warnings = Vec::new();
     for reference in &options.references {
         if !reference_target_exists(project, reference)? {
@@ -253,7 +253,7 @@ fn push_reference_warning(
     warnings: &mut Vec<String>,
     field: &str,
     id: &str,
-) -> Result<(), CliError> {
+) -> Result<(), Error> {
     match project.find_document(id)? {
         Some(doc) if doc.doc_type() == "decision" => {}
         Some(doc) => warnings.push(format!(
@@ -265,11 +265,11 @@ fn push_reference_warning(
     Ok(())
 }
 
-fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str, CliError> {
+fn require_nonempty<'a>(value: Option<&'a str>, message: &str) -> Result<&'a str, Error> {
     let value = value
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| CliError::usage(message))?;
+        .ok_or_else(|| Error::usage(message))?;
     Ok(value)
 }
 fn inline_array(values: &[String]) -> String {
@@ -311,20 +311,21 @@ mod tests {
         ));
         let project = TandemProject::initialize(
             &root,
-            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
-        let papercut_id = crate::app::papercuts::add(
+        let papercut_id = crate::app::tasks::add(
             &project,
-            crate::app::papercuts::AddOptions {
+            crate::app::tasks::AddOptions {
+                acceptance: vec!["friction captured".to_string()],
                 title: Some("Decision friction".to_string()),
+                tags: vec!["papercut".to_string()],
+                priority: Some("low".to_string()),
                 ..Default::default()
             },
         )
         .unwrap()
-        .papercut
-        .id()
-        .to_string();
+        .id;
         let outcome = add(
             &project,
             AddOptions {

@@ -59,6 +59,7 @@ impl AccordRecord {
 }
 
 pub(crate) const STATUSES: &[&str] = &[
+    "ready",
     "claimed",
     "delivered",
     "accepted",
@@ -66,8 +67,10 @@ pub(crate) const STATUSES: &[&str] = &[
     "failed",
     "blocked",
 ];
-pub(crate) const LEGACY_STATUSES: &[&str] = &["ready"];
-pub(crate) const ACTIONS: &[&str] = &["claim", "deliver", "accept", "rework", "block", "fail"];
+pub(crate) const LEGACY_STATUSES: &[&str] = &[];
+pub(crate) const ACTIONS: &[&str] = &[
+    "claim", "deliver", "rework", "block", "resume", "release", "fail",
+];
 
 pub(crate) fn status(document: &Document) -> Option<&str> {
     document
@@ -83,9 +86,10 @@ pub(crate) fn status_for_action(action: &str) -> Option<&'static str> {
     match action {
         "claim" => Some("claimed"),
         "deliver" => Some("delivered"),
-        "accept" => Some("accepted"),
         "rework" => Some("rework"),
         "block" => Some("blocked"),
+        "resume" => Some("claimed"),
+        "release" => Some("ready"),
         "fail" => Some("failed"),
         _ => None,
     }
@@ -95,9 +99,10 @@ pub(crate) fn event_name(action: &str) -> &'static str {
     match action {
         "claim" => "accord.claimed",
         "deliver" => "accord.delivered",
-        "accept" => "accord.accepted",
         "rework" => "accord.rework",
         "block" => "accord.blocked",
+        "resume" => "accord.resumed",
+        "release" => "accord.released",
         "fail" => "accord.failed",
         _ => "accord.updated",
     }
@@ -105,13 +110,10 @@ pub(crate) fn event_name(action: &str) -> &'static str {
 
 pub(crate) fn validate_transition(action: &str, previous_status: &str) -> Result<(), String> {
     match action {
-        "accept" if previous_status != "delivered" && previous_status != "accepted" => Err(
-            format!("accord accept requires current accord.status=delivered; current status is {previous_status}"),
-        ),
         "rework" if previous_status != "delivered" && previous_status != "rework" => Err(
             format!("accord rework requires current accord.status=delivered; current status is {previous_status}"),
         ),
-        "claim" | "deliver" | "block" | "fail" if previous_status == "accepted" => Err(
+        "claim" | "deliver" | "block" | "fail" | "release" | "resume" if previous_status == "accepted" => Err(
             format!("accepted accord cannot transition with `tandem accord {action}`"),
         ),
         _ => Ok(()),
@@ -123,32 +125,24 @@ pub(crate) fn validate_transition(action: &str, previous_status: &str) -> Result
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct StateEffect<'a> {
     pub(crate) state: Option<&'a str>,
-    pub(crate) clear_review: bool,
 }
 
 /// Decide workflow effects for an accord action. The application layer only
-/// applies this protocol result to the stored document.
-pub(crate) fn state_effect<'a>(
-    action: &str,
-    current_state: &'a str,
-    current_review: Option<&str>,
-) -> StateEffect<'a> {
+/// applies this protocol result to the stored document. Review metadata does
+/// not gate workflow transitions in protocol 0.3.0: reworking a Task that is
+/// in validation returns it to in-progress directly.
+pub(crate) fn state_effect<'a>(action: &str, current_state: &'a str) -> StateEffect<'a> {
     if action == "claim" && current_state == "todo" {
         return StateEffect {
             state: Some("in-progress"),
-            clear_review: false,
         };
     }
-    if action == "rework" && current_state == "validation" && current_review == Some("pending") {
+    if action == "rework" && current_state == "validation" {
         return StateEffect {
             state: Some("in-progress"),
-            clear_review: true,
         };
     }
-    StateEffect {
-        state: None,
-        clear_review: false,
-    }
+    StateEffect { state: None }
 }
 
 pub(crate) fn state_sync_target<'a>(status: &str, current_state: &'a str) -> Option<&'a str> {
@@ -172,38 +166,49 @@ mod tests {
     use super::*;
 
     #[test]
-    fn state_effects_cover_all_accord_actions_and_review_rework() {
-        for action in ["deliver", "accept", "block", "fail"] {
+    fn state_effects_cover_all_accord_actions_and_rework() {
+        for action in ["deliver", "accept", "block", "fail", "release", "resume"] {
             assert_eq!(
-                state_effect(action, "in-progress", Some("pending")),
-                StateEffect {
-                    state: None,
-                    clear_review: false
-                }
+                state_effect(action, "in-progress"),
+                StateEffect { state: None }
             );
         }
         assert_eq!(
-            state_effect("claim", "todo", None),
+            state_effect("claim", "todo"),
             StateEffect {
-                state: Some("in-progress"),
-                clear_review: false
+                state: Some("in-progress")
             }
         );
-        assert_eq!(state_effect("claim", "in-progress", None).state, None);
+        assert_eq!(state_effect("claim", "in-progress").state, None);
         assert_eq!(
-            state_effect("rework", "validation", Some("pending")),
+            state_effect("rework", "validation"),
             StateEffect {
-                state: Some("in-progress"),
-                clear_review: true
+                state: Some("in-progress")
             }
         );
-        assert_eq!(
-            state_effect("rework", "in-progress", Some("pending")),
-            StateEffect {
-                state: None,
-                clear_review: false
-            }
-        );
+        assert_eq!(state_effect("rework", "in-progress").state, None);
+    }
+
+    #[test]
+    fn protocol_0_3_transition_matrix_is_explicit() {
+        assert_eq!(status_for_action("claim"), Some("claimed"));
+        assert_eq!(status_for_action("deliver"), Some("delivered"));
+        assert_eq!(status_for_action("rework"), Some("rework"));
+        assert_eq!(status_for_action("block"), Some("blocked"));
+        assert_eq!(status_for_action("resume"), Some("claimed"));
+        assert_eq!(status_for_action("release"), Some("ready"));
+        assert_eq!(status_for_action("fail"), Some("failed"));
+        assert!(validate_transition("rework", "delivered").is_ok());
+        assert!(validate_transition("resume", "blocked").is_ok());
+        assert!(validate_transition("release", "claimed").is_ok());
+        assert!(validate_transition("fail", "claimed").is_ok());
+        assert!(validate_transition("deliver", "accepted").is_err());
+    }
+
+    #[test]
+    fn ready_requires_acceptance_at_the_application_boundary() {
+        assert!(STATUSES.contains(&"ready"));
+        assert!(!ACTIONS.contains(&"accept"));
     }
 
     #[test]

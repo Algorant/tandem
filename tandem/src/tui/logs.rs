@@ -9,10 +9,8 @@ use crate::project::{
 };
 use crate::protocol::accord::status as accord_status;
 use crate::protocol::document::parse_field_values;
-use crate::protocol::review::status as review_status;
 use crate::protocol::workflow::{
-    completion_files_changed, completion_outcome, completion_reviewer, completion_summary,
-    completion_validation,
+    resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
 };
 
 use super::{is_canceled_log, markdownish_lines, StatusTone, TuiTheme};
@@ -22,7 +20,7 @@ use crate::project::extract_json_string;
 #[cfg(test)]
 use crate::protocol::hierarchy::DocumentLocation;
 #[cfg(test)]
-use crate::protocol::workflow::COMPLETION_OUTCOME_CANCELED;
+use crate::protocol::workflow::RESOLUTION_OUTCOME_CANCELED;
 
 #[derive(Debug, Clone)]
 pub(super) struct LogEvent {
@@ -107,13 +105,13 @@ fn log_matches_query(doc: &Document, hierarchy: Option<&HierarchyIndex>, query: 
     haystack.push('\n');
     haystack.push_str(doc.title());
     haystack.push('\n');
-    haystack.push_str(completion_summary(doc).unwrap_or(""));
+    haystack.push_str(resolution_note(doc).unwrap_or(""));
     haystack.push('\n');
-    haystack.push_str(completion_outcome(doc));
+    haystack.push_str(resolution_outcome(doc));
     haystack.push('\n');
-    haystack.push_str(completion_validation(doc).unwrap_or(""));
+
     haystack.push('\n');
-    haystack.push_str(&completion_files_changed(doc).join("\n"));
+    haystack.push_str(&resolution_files_changed(doc).join("\n"));
     haystack.push('\n');
     haystack.push_str(&doc.body);
     if let Some(hierarchy) = hierarchy {
@@ -191,7 +189,7 @@ fn log_row_title(doc: &Document) -> String {
     if !title.is_empty() {
         return title.to_string();
     }
-    let summary = completion_summary(doc).unwrap_or("").trim();
+    let summary = resolution_note(doc).unwrap_or("").trim();
     if !summary.is_empty() {
         return summary.to_string();
     }
@@ -248,10 +246,9 @@ pub(super) fn detail_lines_for_log(
         theme.title_style(),
     )));
 
-    let summary = completion_summary(doc);
-    let validation = completion_validation(doc);
-    let reviewer = completion_reviewer(doc);
-    if summary.is_some() || validation.is_some() || reviewer.is_some() {
+    let summary = resolution_note(doc);
+    let reviewer = resolution_reviewer(doc);
+    if summary.is_some() || reviewer.is_some() {
         lines.push(Line::from(""));
         lines.push(section_heading(
             if is_canceled_log(doc) {
@@ -262,11 +259,10 @@ pub(super) fn detail_lines_for_log(
             theme,
         ));
         push_compact_optional(&mut lines, "summary", summary, theme);
-        push_compact_optional(&mut lines, "validation", validation, theme);
         push_compact_optional(&mut lines, "reviewer", reviewer, theme);
     }
 
-    let files = completion_files_changed(doc);
+    let files = resolution_files_changed(doc);
     lines.push(Line::from(""));
     lines.push(section_heading("Files changed", theme));
     if files.is_empty() {
@@ -387,9 +383,6 @@ fn compact_metadata(doc: &Document) -> Vec<String> {
     let mut items = Vec::new();
     if let Some(value) = accord_status(doc).filter(|value| !value.trim().is_empty()) {
         items.push(format!("accord {value}"));
-    }
-    if let Some(value) = review_status(doc).filter(|value| !value.trim().is_empty()) {
-        items.push(format!("review {value}"));
     }
     if let Some(value) = doc
         .field("priority")
@@ -686,7 +679,7 @@ mod tests {
         );
         doc.fields.insert(
             "completion.outcome".to_string(),
-            COMPLETION_OUTCOME_CANCELED.to_string(),
+            RESOLUTION_OUTCOME_CANCELED.to_string(),
         );
         let hierarchy = test_hierarchy(&[], std::slice::from_ref(&doc));
 

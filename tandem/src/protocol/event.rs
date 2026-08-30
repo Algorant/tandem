@@ -27,8 +27,6 @@ pub(crate) const TASK_UPDATED: &str = "task.updated";
 pub(crate) const TASK_COMPLETED: &str = "task.completed";
 pub(crate) const TASK_CANCELED: &str = "task.canceled";
 pub(crate) const DECISION_CREATED: &str = "decision.created";
-pub(crate) const PAPERCUT_CREATED: &str = "papercut.created";
-pub(crate) const PAPERCUT_RESOLVED: &str = "papercut.resolved";
 pub(crate) const RULES_UPDATED: &str = "rules.updated";
 
 pub(crate) fn is_known_name(name: &str) -> bool {
@@ -40,14 +38,14 @@ pub(crate) fn is_known_name(name: &str) -> bool {
             | TASK_COMPLETED
             | TASK_CANCELED
             | DECISION_CREATED
-            | PAPERCUT_CREATED
-            | PAPERCUT_RESOLVED
             | RULES_UPDATED
             | "accord.claimed"
             | "accord.delivered"
             | "accord.accepted"
             | "accord.rework"
             | "accord.blocked"
+            | "accord.resumed"
+            | "accord.released"
             | "accord.failed"
             | "validation.accepted"
             | "validation.rework"

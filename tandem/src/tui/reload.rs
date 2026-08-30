@@ -108,7 +108,6 @@ impl TuiApp {
 
         let theme_load = TuiTheme::load_for_workspace(&self.workspace);
         let log_load = logs::load_logs(&self.workspace);
-        let papercut_load = app::papercuts::load_open_inbox(&self.workspace);
         let hierarchy = TuiHierarchySnapshot::from_documents(&docs, &log_load.docs);
         load_errors.extend(log_load.warnings);
         let (log_events, event_warnings) = logs::load_log_events(&self.workspace);
@@ -154,7 +153,7 @@ impl TuiApp {
         self.theme = theme_load.theme;
         self.theme_source = theme_load.source;
         self.theme_warnings = theme_load.warnings;
-        self.load_papercuts(papercut_load);
+        self.refresh_papercuts();
         self.restore_reload_selection(selection);
         self.clamp_selection();
         self.clamp_rules_state();
@@ -180,7 +179,7 @@ impl TuiApp {
             "Reloaded {} active document{} from {} · {} open Papercut{} · {}{}",
             self.docs.len(),
             if self.docs.len() == 1 { "" } else { "s" },
-            display_path(&self.workspace.board_dir),
+            display_path(&self.workspace.tasks_dir),
             self.papercut_count(),
             if self.papercut_count() == 1 { "" } else { "s" },
             theme_note,
@@ -228,7 +227,6 @@ impl TuiApp {
         self.load_errors
             .iter()
             .chain(self.theme_warnings.iter())
-            .chain(self.papercut_warnings().iter())
             .cloned()
             .collect()
     }

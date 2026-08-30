@@ -3,7 +3,7 @@
 //! Workflow-state semantics live in [`super::workflow`]. See the normative
 //! [workspace config fields](../../../protocol/plan/spec.md#workspace-config-fields).
 
-pub(crate) const PROTOCOL_VERSION: &str = "0.2.0";
+pub(crate) const PROTOCOL_VERSION: &str = "0.3.0";
 
 pub(crate) fn default_project_config(title: &str) -> String {
     let quoted_title = yaml_double_quote(title);
@@ -21,8 +21,6 @@ fn yaml_double_quote(value: &str) -> String {
         .replace('\t', "\\t");
     format!("\"{escaped}\"")
 }
-pub(crate) const LEGACY_PROTOCOL_VERSION: &str = "0.1.0";
-
 pub(crate) const RULE_CATEGORIES: [&str; 4] = ["always", "never", "prefer", "context"];
 pub(crate) const DECISION_STATUSES: &[&str] = &[
     "proposed",
@@ -30,7 +28,6 @@ pub(crate) const DECISION_STATUSES: &[&str] = &[
     "rejected",
     "deprecated",
     "superseded",
-    "withdrawn",
 ];
 
 #[derive(Debug, Clone)]

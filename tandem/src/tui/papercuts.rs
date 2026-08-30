@@ -1,7 +1,10 @@
-//! Read-only global Papercuts utility inbox state, rendering, and interaction.
+//! Read-only Papercuts utility inbox derived from active Tasks tagged `papercut`.
 //!
-//! The panel is transient TUI state. Protocol meaning and concrete file reads
-//! remain in the protocol, project, and application layers.
+//! The panel is transient TUI state. A Papercut is a low-priority Task tagged
+//! `papercut` (protocol 0.3.0), so the inbox derives its items from the
+//! Board's already-loaded active Task documents and never reads a separate
+//! Papercut store. Rows and the detail view show the Task's real state and
+//! Accord status.
 
 use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{
@@ -12,12 +15,11 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::papercuts::InboxLoad;
-use crate::project::{display_path, StoredPapercut};
+use crate::project::{display_path, StoredDocument as Document};
 
 use super::{
-    detail_field_line, detail_section_heading, markdownish_lines, HitAction, HitRegion, StatusTone,
-    TuiApp, TuiTheme,
+    detail_field_line, detail_section_heading, is_papercut_doc, markdownish_lines, HitAction,
+    HitRegion, StatusTone, TuiApp, TuiTheme,
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -30,8 +32,7 @@ enum PapercutFocus {
 #[derive(Debug, Default)]
 pub(super) struct PapercutsState {
     open: bool,
-    items: Vec<StoredPapercut>,
-    warnings: Vec<String>,
+    items: Vec<Document>,
     pub(super) selected: usize,
     focus: PapercutFocus,
     pub(super) detail_scroll: u16,
@@ -40,14 +41,13 @@ pub(super) struct PapercutsState {
 
 impl PapercutsState {
     #[cfg(test)]
-    pub(super) fn set_items(&mut self, items: Vec<StoredPapercut>) {
+    pub(super) fn set_items(&mut self, items: Vec<Document>) {
         self.items = items;
         self.clamp();
     }
 
-    fn replace_load(&mut self, load: InboxLoad) {
-        self.items = load.items;
-        self.warnings = load.warnings;
+    fn replace_items(&mut self, items: Vec<Document>) {
+        self.items = items;
         self.clamp();
     }
 
@@ -58,28 +58,31 @@ impl PapercutsState {
         } else if self.selected >= self.items.len() {
             self.selected = self.items.len() - 1;
         }
-        self.detail_scroll = self.detail_scroll.min(
-            papercut_detail_line_count(self.selected_item(), Some(&self.warnings)).saturating_sub(1)
-                as u16,
-        );
+        self.detail_scroll = self
+            .detail_scroll
+            .min(papercut_detail_line_count(self.selected_item()).saturating_sub(1) as u16);
     }
 
-    fn selected_item(&self) -> Option<&StoredPapercut> {
+    fn selected_item(&self) -> Option<&Document> {
         self.items.get(self.selected)
     }
 }
 
 impl TuiApp {
-    pub(super) fn load_papercuts(&mut self, load: InboxLoad) {
-        self.papercuts_view.replace_load(load);
+    /// Rebuilds the inbox from the Board's active Task documents. Call after
+    /// every doc reload so the Papercuts section stays tag-derived.
+    pub(super) fn refresh_papercuts(&mut self) {
+        let items = self
+            .docs
+            .iter()
+            .filter(|doc| is_papercut_doc(doc))
+            .cloned()
+            .collect::<Vec<_>>();
+        self.papercuts_view.replace_items(items);
     }
 
     pub(super) fn papercut_count(&self) -> usize {
         self.papercuts_view.items.len()
-    }
-
-    pub(super) fn papercut_warnings(&self) -> &[String] {
-        &self.papercuts_view.warnings
     }
 
     pub(super) fn papercuts_open(&self) -> bool {
@@ -115,19 +118,11 @@ impl TuiApp {
         }
         self.papercuts_view.open = true;
         self.papercuts_view.clamp();
-        self.status = match (
-            self.papercuts_view.items.len(),
-            self.papercuts_view.warnings.len(),
-        ) {
-            (0, 0) => "Papercuts inbox is empty; press i or Esc to close.".to_string(),
-            (count, 0) => format!(
-                "Papercuts inbox open: {count} open record{} · read-only.",
+        self.status = match self.papercuts_view.items.len() {
+            0 => "No Papercut tasks open; press i or Esc to close.".to_string(),
+            count => format!(
+                "Papercuts inbox open: {count} open Papercut task{} · read-only.",
                 if count == 1 { "" } else { "s" }
-            ),
-            (count, warnings) => format!(
-                "Papercuts inbox open: {count} open record{} · {warnings} load warning{} · read-only.",
-                if count == 1 { "" } else { "s" },
-                if warnings == 1 { "" } else { "s" }
             ),
         };
     }
@@ -297,11 +292,8 @@ impl TuiApp {
     }
 
     fn scroll_papercut_detail_down(&mut self, amount: u16) {
-        let max_scroll = papercut_detail_line_count(
-            self.papercuts_view.selected_item(),
-            Some(&self.papercuts_view.warnings),
-        )
-        .saturating_sub(1) as u16;
+        let max_scroll = papercut_detail_line_count(self.papercuts_view.selected_item())
+            .saturating_sub(1) as u16;
         self.papercuts_view.detail_scroll = self
             .papercuts_view
             .detail_scroll
@@ -310,12 +302,7 @@ impl TuiApp {
     }
 
     pub(super) fn papercut_indicator_text(&self) -> String {
-        let warning = if self.papercuts_view.warnings.is_empty() {
-            ""
-        } else {
-            " !"
-        };
-        format!("Papercuts {}{warning}", self.papercuts_view.items.len())
+        format!("Papercuts {}", self.papercuts_view.items.len())
     }
 
     pub(super) fn papercut_indicator_line(&self) -> Line<'static> {
@@ -328,19 +315,10 @@ impl TuiApp {
                 .status_style(StatusTone::Accent)
                 .add_modifier(Modifier::BOLD)
         };
-        let mut spans = vec![Span::styled(
+        Line::from(Span::styled(
             format!("Papercuts {}", self.papercuts_view.items.len()),
             style,
-        )];
-        if !self.papercuts_view.warnings.is_empty() {
-            spans.push(Span::styled(
-                " !".to_string(),
-                self.theme
-                    .status_style(StatusTone::Error)
-                    .add_modifier(Modifier::BOLD),
-            ));
-        }
-        Line::from(spans)
+        ))
     }
 
     pub(super) fn papercuts_footer_text(&self) -> String {
@@ -355,8 +333,13 @@ impl TuiApp {
         let popup = papercut_panel_rect(area);
         frame.render_widget(Clear, area);
         let title = format!(
-            " Papercuts inbox · {} open · read-only ",
-            self.papercuts_view.items.len()
+            " Papercuts · {} open task{} · read-only ",
+            self.papercuts_view.items.len(),
+            if self.papercuts_view.items.len() == 1 {
+                ""
+            } else {
+                "s"
+            }
         );
         let outer = Block::default()
             .borders(Borders::ALL)
@@ -369,64 +352,34 @@ impl TuiApp {
             return;
         }
 
-        let (warning_area, content_area) = if self.papercuts_view.warnings.is_empty() {
-            (None, inner)
-        } else {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Length(1), Constraint::Min(1)])
-                .split(inner);
-            (Some(chunks[0]), chunks[1])
-        };
-        if let Some(warning_area) = warning_area {
-            let count = self.papercuts_view.warnings.len();
-            let warning = format!(
-                "! {count} load warning{} · {}",
-                if count == 1 { "" } else { "s" },
-                self.papercuts_view
-                    .warnings
-                    .first()
-                    .map(String::as_str)
-                    .unwrap_or("inspect Papercut storage")
-            );
-            frame.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    warning,
-                    self.theme.status_style(StatusTone::Error),
-                )))
-                .style(self.theme.panel_style()),
-                warning_area,
-            );
-        }
-
-        if content_area.height < 9 {
+        if inner.height < 9 {
             match self.papercuts_view.focus {
-                PapercutFocus::List => self.draw_papercut_list(frame, content_area),
-                PapercutFocus::Detail => self.draw_papercut_detail(frame, content_area),
+                PapercutFocus::List => self.draw_papercut_list(frame, inner),
+                PapercutFocus::Detail => self.draw_papercut_detail(frame, inner),
             }
             return;
         }
 
-        let chunks = if content_area.width >= 92 {
+        let chunks = if inner.width >= 92 {
             Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-                .split(content_area)
+                .split(inner)
         } else {
-            let max_list_height = content_area
+            let max_list_height = inner
                 .height
                 .saturating_mul(50)
                 .checked_div(100)
                 .unwrap_or(0)
                 .max(5)
-                .min(content_area.height.saturating_sub(4));
+                .min(inner.height.saturating_sub(4));
             let list_height = (self.papercuts_view.items.len() as u16)
                 .saturating_add(2)
                 .clamp(5, max_list_height);
             Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Length(list_height), Constraint::Min(4)])
-                .split(content_area)
+                .split(inner)
         };
         self.draw_papercut_list(frame, chunks[0]);
         self.draw_papercut_detail(frame, chunks[1]);
@@ -440,7 +393,7 @@ impl TuiApp {
         let count = self.papercuts_view.items.len();
         let items = if count == 0 {
             vec![ListItem::new(Line::from(Span::styled(
-                "No open Papercuts.",
+                "No open Papercut tasks.",
                 self.theme.muted_style(),
             )))]
         } else {
@@ -505,11 +458,11 @@ impl TuiApp {
         let (title, lines) = match self.papercuts_view.selected_item() {
             Some(item) => (
                 format!(" Detail {} ", item.id()),
-                papercut_detail_lines(item, &self.papercuts_view.warnings, &self.theme),
+                papercut_detail_lines(item, &self.theme),
             ),
             None => (
                 " Detail ".to_string(),
-                empty_papercut_detail_lines(&self.papercuts_view.warnings, &self.theme),
+                empty_papercut_detail_lines(&self.theme),
             ),
         };
         let detail = Paragraph::new(lines)
@@ -542,13 +495,13 @@ fn papercut_panel_rect(area: Rect) -> Rect {
 }
 
 fn papercut_list_item(
-    item: &StoredPapercut,
+    item: &Document,
     theme: &TuiTheme,
     available_width: u16,
 ) -> ListItem<'static> {
     let id_width = item.id().chars().count().saturating_add(2);
     let title_width = (available_width as usize).saturating_sub(id_width);
-    ListItem::new(Line::from(vec![
+    let mut spans = vec![
         Span::styled(
             format!("{}  ", item.id()),
             theme.status_style(StatusTone::Accent),
@@ -557,26 +510,32 @@ fn papercut_list_item(
             super::truncate(item.title(), title_width),
             theme.text_style(),
         ),
-    ]))
+    ];
+    if let Some(accord) = item.field("accord.status") {
+        spans.push(Span::styled(
+            format!(" · {accord}"),
+            theme.status_style(StatusTone::Accent),
+        ));
+    }
+    ListItem::new(Line::from(spans))
 }
 
-fn papercut_detail_lines(
-    item: &StoredPapercut,
-    warnings: &[String],
-    theme: &TuiTheme,
-) -> Vec<Line<'static>> {
+fn papercut_detail_lines(item: &Document, theme: &TuiTheme) -> Vec<Line<'static>> {
     let mut lines = vec![
         Line::from(Span::styled(item.title().to_string(), theme.title_style())),
         Line::from(""),
-        detail_section_heading("Papercut", theme),
+        detail_section_heading("Papercut task", theme),
         detail_field_line("ID", item.id(), theme),
         detail_field_line("Title", item.title(), theme),
-        detail_field_line("Status", item.status(), theme),
     ];
+    push_optional_field(&mut lines, "State", item.field("state"), theme);
+    push_optional_field(&mut lines, "Accord", item.field("accord.status"), theme);
+    push_optional_field(&mut lines, "Priority", item.field("priority"), theme);
     push_optional_field(&mut lines, "Created", item.field("createdAt"), theme);
     push_optional_field(&mut lines, "Updated", item.field("updatedAt"), theme);
     push_values_field(&mut lines, "Tags", item.values("tags"), theme);
     push_values_field(&mut lines, "References", item.values("references"), theme);
+    push_values_field(&mut lines, "Blockers", item.values("blockers"), theme);
     lines.push(detail_field_line("Path", &display_path(&item.path), theme));
     lines.push(Line::from(""));
     lines.push(detail_section_heading("Body", theme));
@@ -585,38 +544,21 @@ fn papercut_detail_lines(
     } else {
         lines.extend(markdownish_lines(&item.body, theme));
     }
-    append_warning_lines(&mut lines, warnings, theme);
     lines
 }
 
-fn empty_papercut_detail_lines(warnings: &[String], theme: &TuiTheme) -> Vec<Line<'static>> {
-    let mut lines = vec![
+fn empty_papercut_detail_lines(theme: &TuiTheme) -> Vec<Line<'static>> {
+    vec![
         Line::from(Span::styled(
-            "No open Papercut selected.",
+            "No open Papercut task selected.",
             theme.muted_style(),
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "Papercuts stay outside Board workflow. Use the CLI or integration tools to capture or resolve them.",
+            "Papercuts are low-priority Tasks tagged papercut. Capture friction with the CLI or integration tools; resolve them by completing or canceling the Task.",
             theme.text_style(),
         )),
-    ];
-    append_warning_lines(&mut lines, warnings, theme);
-    lines
-}
-
-fn append_warning_lines(lines: &mut Vec<Line<'static>>, warnings: &[String], theme: &TuiTheme) {
-    if warnings.is_empty() {
-        return;
-    }
-    lines.push(Line::from(""));
-    lines.push(detail_section_heading("Load warnings", theme));
-    for warning in warnings {
-        lines.push(Line::from(vec![
-            Span::styled("! ", theme.status_style(StatusTone::Error)),
-            Span::styled(warning.clone(), theme.status_style(StatusTone::Error)),
-        ]));
-    }
+    ]
 }
 
 fn push_optional_field(
@@ -641,16 +583,23 @@ fn push_values_field(
     }
 }
 
-fn papercut_detail_line_count(item: Option<&StoredPapercut>, warnings: Option<&[String]>) -> usize {
-    let item_lines = item.map_or(3, |item| {
+fn papercut_detail_line_count(item: Option<&Document>) -> usize {
+    item.map_or(3, |item| {
+        let state_line = usize::from(item.field("state").is_some());
+        let accord_line = usize::from(item.field("accord.status").is_some());
+        let priority_line = usize::from(item.field("priority").is_some());
         let tag_line = usize::from(!item.values("tags").is_empty());
         let reference_line = usize::from(!item.values("references").is_empty());
-        11usize
+        let blocker_line = usize::from(!item.values("blockers").is_empty());
+        9usize
+            .saturating_add(state_line)
+            .saturating_add(accord_line)
+            .saturating_add(priority_line)
             .saturating_add(tag_line)
             .saturating_add(reference_line)
+            .saturating_add(blocker_line)
             .saturating_add(item.body.lines().count().max(1))
-    });
-    item_lines.saturating_add(warnings.map_or(0, |warnings| warnings.len().saturating_add(2)))
+    })
 }
 
 #[cfg(test)]
@@ -661,16 +610,22 @@ mod tests {
     use super::*;
     use crate::tui::{rect_contains, FocusPane};
 
-    fn item(id: &str, title: &str, body: &str) -> StoredPapercut {
-        StoredPapercut::new(
-            PathBuf::from(format!(".tandem/papercuts/{id}.md")),
+    fn item(id: &str, title: &str, state: &str, accord: &str, body: &str) -> Document {
+        Document::new(
+            PathBuf::from(format!(".tandem/tasks/{id}.md")),
+            crate::protocol::hierarchy::DocumentLocation::Board,
             HashMap::from([
                 ("id".to_string(), id.to_string()),
                 ("title".to_string(), title.to_string()),
-                ("status".to_string(), "open".to_string()),
+                ("state".to_string(), state.to_string()),
+                ("accord.status".to_string(), accord.to_string()),
+                ("priority".to_string(), "low".to_string()),
                 ("createdAt".to_string(), "2026-08-10T00:00:00Z".to_string()),
                 ("updatedAt".to_string(), "2026-08-10T01:00:00Z".to_string()),
-                ("tags".to_string(), "[\"tui\", \"friction\"]".to_string()),
+                (
+                    "tags".to_string(),
+                    "[\"papercut\", \"friction\"]".to_string(),
+                ),
                 ("references".to_string(), "[\"task-1\"]".to_string()),
             ]),
             body.to_string(),
@@ -685,26 +640,31 @@ mod tests {
     }
 
     #[test]
-    fn detail_uses_protocol_fields_and_shared_markdown_rendering() {
+    fn detail_uses_task_fields_and_shared_markdown_rendering() {
         let theme = TuiTheme::default_dark();
         let lines = papercut_detail_lines(
-            &item("papercut-1", "Small friction", "# Notes\n\n- first\n`code`"),
-            &["Papercuts load warning: malformed record".to_string()],
+            &item(
+                "task-12",
+                "Small friction",
+                "in-progress",
+                "claimed",
+                "# Notes\n\n- first\n`code`",
+            ),
             &theme,
         )
         .iter()
         .map(line_text)
         .collect::<Vec<_>>();
 
-        assert!(lines.iter().any(|line| line.contains("ID: papercut-1")));
-        assert!(lines.iter().any(|line| line.contains("Status: open")));
+        assert!(lines.iter().any(|line| line.contains("ID: task-12")));
+        assert!(lines.iter().any(|line| line.contains("State: in-progress")));
+        assert!(lines.iter().any(|line| line.contains("Accord: claimed")));
         assert!(lines
             .iter()
-            .any(|line| line.contains("Tags: tui, friction")));
+            .any(|line| line.contains("Tags: papercut, friction")));
         assert!(lines.iter().any(|line| line.contains("References: task-1")));
         assert!(lines.iter().any(|line| line == "Notes"));
         assert!(lines.iter().any(|line| line == "• first"));
-        assert!(lines.iter().any(|line| line.contains("malformed record")));
     }
 
     #[test]
@@ -720,10 +680,7 @@ mod tests {
     #[test]
     fn focus_is_independent_from_main_view_focus() {
         let mut state = PapercutsState::default();
-        state.replace_load(InboxLoad {
-            items: vec![item("papercut-1", "First", "Body")],
-            warnings: Vec::new(),
-        });
+        state.replace_items(vec![item("task-12", "First", "todo", "ready", "Body")]);
         state.focus = PapercutFocus::Detail;
         let main_focus = FocusPane::Board;
         assert_eq!(state.focus, PapercutFocus::Detail);

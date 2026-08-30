@@ -1,78 +1,21 @@
 # Tandem Protocol Todo
 
-Status: v0 draft accepted for implementation
-Last updated: 2026-08-10
+**Protocol:** 0.3.0  
+**Status:** normative cutover specification accepted
 
-This todo tracks protocol-specific tasks. The current protocol draft lives in `protocol/plan/spec.md`.
+## Complete
 
-## Accomplished
+- [x] Define typed `.tandem/tasks`, `decisions`, `rules`, `logs`, and per-actor `events` storage.
+- [x] Define Task/Decision documents and fixed Epic → Task → Subtask hierarchy.
+- [x] Define mandatory active Task Accord, exceptional validation, and atomic archive flows.
+- [x] Define tagged-Task Papercuts and per-file Rules.
+- [x] Define structured event envelope and actor-local identity.
+- [x] Define global JSON, generated help, exit codes, scope, clear, and list replacement semantics.
 
-- [x] Captured Brainfile-inspired file-based model.
-- [x] Chose working protocol/product name: **Tandem**.
-- [x] Chose protocol data layout:
-  - `.tandem/tandem.md`
-  - `.tandem/board/`
-  - `.tandem/logs/`
-  - `.tandem/events/<actor_id>.jsonl` per-actor logs (with legacy `.tandem/events.jsonl` reads during transition)
-- [x] Chose `accord` as the work-agreement object replacing Brainfile contract terminology.
-- [x] Chose canonical workflow fields: `state` on documents and `states` in workspace config.
-- [x] Chose default active states: `todo`, `in-progress`, and `validation` (`review` remains a legacy read alias).
-- [x] Chose completion lifecycle: `todo --claim--> in-progress`, with `validation` entered only by pending review before complete/archive → logs.
-- [x] Captured separation between human workflow state, accord state, and review state.
-- [x] Chose strict task identity shape: Epics and Tasks use global `task-N` IDs; only Subtasks directly beneath Tasks use `task-N-M`.
-- [x] Chose first-class document types: `task` and `decision`.
-- [x] Decided custom document types are config-only in v0, with no type-management CLI.
-- [x] Chose accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, and `blocked`.
-- [x] Chose structured rule objects with `id`, `rule`, and optional `source`.
-- [x] Decided `parentId`, `blockers`, and `references` may point to any Tandem document by ID.
-- [x] Chose Task and Subtask roles as normal task documents linked by canonical `parentId`, distinct from legacy inline checklist `subtasks:`.
-- [x] Accepted strict derived hierarchy roles: direct Epic children are Tasks (`epic-task`), Task children are Subtasks (`subtask`), and non-task parents are generic `parent`; classification resolves documents, never ID shape.
-- [x] Required Epics to be root-only and Subtasks to be leaves; invalid nested Epics, children beneath Subtasks, role/ID mismatches, and role-changing reparenting are structural errors.
-- [x] Required direct Epic Tasks to retain global `task-N` IDs and only Task-owned Subtasks to use `task-N-M`; decision-7 supersedes decision-4 without compatibility exceptions.
-- [x] Chose immutable task IDs; reparenting must preserve both role and valid ID shape and must not silently rename IDs or rewrite references.
-- [x] Decided missing review is silent, pending review blocks completion, and missing accord acceptance warns but allows completion in v0.
-- [x] Decided archived Markdown documents in `.tandem/logs/` are the source of truth for completed history.
-- [x] Decided per-actor event logs under `.tandem/events/<actor_id>.jsonl` enrich timeline/audit history while avoiding a shared Git append hotspot; legacy `.tandem/events.jsonl` remains readable during transition.
-- [x] Decided v0 validation/lint is built-in structural validation only.
-- [x] Chose `protocolVersion: 0.1.0` for the first v0 draft.
-- [x] Chose minimal audit-only event payloads requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`, with event identity `<actor>:<seq>` and optional cosmetic `actorName`.
-- [x] Chose strict-core-reference validation severity: unresolved `parentId`/`blockers` are errors; unresolved related `references` and rule sources are warnings.
-- [x] Decided `type: decision` documents do not need a lifecycle field in v0.
-- [x] Decided schemas and fixtures are not part of v0.
-- [x] Captured Brainfile design mapping as reference only, with no required conversion command.
-- [x] Drafted task document frontmatter model.
-- [x] Drafted ADR-compatible decision document frontmatter/body model.
-- [x] Drafted accord lifecycle.
-- [x] Drafted review model.
-- [x] Drafted completion/logs/events model.
-- [x] Drafted protocol-facing CLI surface using `tandem`.
-- [x] Added `protocol/README.md` for protocol-area documentation.
-- [x] Added implementation-facing v0 field reference for workspace config, task documents, decision documents, accords, reviews, completion metadata, logs, and rules.
-- [x] Added minimal audit event envelope, actor identity/sequence rules, legacy-read behavior, and event name catalog.
-- [x] Added validation diagnostics with error/warning categories and examples.
-- [x] Defined completed-log document expectations.
-- [x] Defined mutation semantics for adding tasks/decisions, moving state, updating accords, review decisions, complete/archive, and post-v0 restore/reopen boundaries.
-- [x] Accepted protocol v0 draft for implementation.
-- [x] Specified and implemented the optional project-local Papercut inbox, including independent record validation, lazy storage, sequential IDs, loose references, global search, and audit events without expanding the general document taxonomy.
+## Implementation follow-up
 
-## Current tasks
-
-- [ ] Implement strict Epic/Task/Subtask classification, role-specific ID allocation/validation, and reparenting rejection in CLI/TUI/integrations; protocol documentation is specified but implementation is not yet complete.
-- [ ] Integrate delegated Task-tree execution: Epics are not delegated, and Worker A projects a delegated Task's Subtask documents into `pi-todos` without independently delegating them.
-- [ ] Tighten examples if implementation discovers ambiguous field behavior.
-
-## Next recommended steps
-
-1. Implement the first `tandem` CLI slice in `../tandem/`: `init`, `list`, and `show`.
-2. Tighten protocol examples only when implementation discovers ambiguous behavior.
-3. Keep schemas, fixtures, and protocol implementation layout out of v0 unless explicitly approved.
-
-## Acceptance criteria for protocol v0 draft
-
-- [x] A human can create/edit valid Tandem files by hand.
-- [x] An agent can read rules, claim work through an accord, deliver evidence, and request review.
-- [x] A tool can list active tasks without reading event history.
-- [x] A tool can browse first-class decision documents.
-- [x] A tool can show rich completed history from archived Markdown logs plus event timelines.
-- [x] Brainfile-inspired design differences are documented clearly without creating a conversion requirement.
-- [x] Unknown fields are preserved by compliant tooling.
+- [ ] Implement 0.3.0 types and validation in `tandem/src/protocol/`.
+- [ ] Implement new storage discovery and per-file Rules in `tandem/src/project/`.
+- [ ] Implement Accord, review escalation, deterministic updates, and archive operations in `tandem/src/app/`.
+- [ ] Replace handwritten CLI with clap derive and semantic process tests.
+- [ ] Adapt TUI and web read models without adding compatibility paths.

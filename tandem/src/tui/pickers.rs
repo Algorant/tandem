@@ -197,59 +197,58 @@ impl TuiApp {
                 accord_status(doc).unwrap_or("missing").to_string(),
             )
         });
-        let (context, delivered) = match selected.as_ref() {
+        let (context, delivered, active_task) = match selected.as_ref() {
             Some((id, title, state, status)) => (
                 format!(
                     "{id} — {title} · state {} · accord {status}",
                     display_state_label(state)
                 ),
                 state == "validation" && normalized_accord_status(status) == "delivered",
+                state != "validation" && status != "missing",
             ),
-            None => ("No selected Board task".into(), false),
+            None => ("No selected Board task".into(), false, false),
         };
         let reason = match selected.as_ref() {
             None => "Disabled: no selected task".to_string(),
+            Some((_, _, state, status)) if state != "validation" && status == "missing" => {
+                "Disabled: task has no Accord".into()
+            }
             Some((_, _, state, _)) if state != "validation" => {
-                format!("Disabled: state {}", display_state_label(state))
+                "Request exceptional human validation".into()
             }
             Some((_, _, _, status)) if normalized_accord_status(status) != "delivered" => {
                 format!("Disabled: accord {status}")
             }
             _ => "Available for delivered Validation work".into(),
         };
-        let apply_count = app::accord::accepted_validation_candidates(&self.docs).len();
         let mut picker = BoardPicker {
             kind: PickerKind::Validation,
             selected: 0,
             title: "Validation actions".into(),
             context,
-            options: vec![
-                PickerOption {
-                    label: "Accept delivery".into(),
-                    detail: reason.clone(),
-                    enabled: delivered,
-                    action: PickerAction::Validation("accept"),
-                },
-                PickerOption {
-                    label: "Request rework".into(),
+            options: if active_task {
+                vec![PickerOption {
+                    label: "Request human validation".into(),
                     detail: reason,
-                    enabled: delivered,
-                    action: PickerAction::Validation("rework"),
-                },
-                PickerOption {
-                    label: "Apply / archive accepted".into(),
-                    detail: if apply_count == 0 {
-                        "Disabled: no accepted tasks".into()
-                    } else {
-                        format!(
-                            "Archive {apply_count} accepted Validation task{}",
-                            plural_suffix(apply_count)
-                        )
+                    enabled: true,
+                    action: PickerAction::Validation("request"),
+                }]
+            } else {
+                vec![
+                    PickerOption {
+                        label: "Accept and archive".into(),
+                        detail: reason.clone(),
+                        enabled: delivered,
+                        action: PickerAction::Validation("accept"),
                     },
-                    enabled: apply_count > 0 && self.hierarchy.errors.is_empty(),
-                    action: PickerAction::Validation("apply"),
-                },
-            ],
+                    PickerOption {
+                        label: "Request changes".into(),
+                        detail: reason,
+                        enabled: delivered,
+                        action: PickerAction::Validation("changes"),
+                    },
+                ]
+            },
         };
         picker.select_first_enabled();
         self.board_picker = Some(picker);

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::project::split_frontmatter;
 use crate::protocol::accord::AccordRecord;
-use crate::protocol::workflow::CompletionRecord;
+use crate::protocol::workflow::ResolutionRecord;
 use crate::CliError;
 
 /// Replaces only selected top-level YAML fields, retaining unknown source and
@@ -65,51 +65,6 @@ pub(crate) fn patch_frontmatter_content(
     Ok(format!("---\n{}---\n{}", output_frontmatter, body))
 }
 
-/// Replaces the canonical Papercut resolution block while preserving unknown
-/// frontmatter and the Markdown body exactly.
-pub(crate) fn patch_papercut_resolution_content(
-    content: &str,
-    note: &str,
-    resolved_at: &str,
-) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let block = format!(
-        "resolution:\n  note: {}\n  resolvedAt: {}\n",
-        yaml_double_quote(note),
-        yaml_double_quote(resolved_at)
-    );
-    let mut output = String::new();
-    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
-    let mut index = 0;
-    let mut replaced = false;
-    while index < lines.len() {
-        let raw = lines[index];
-        let line = raw.trim_end_matches('\n').trim_end_matches('\r');
-        if frontmatter_line_key(line) == Some("resolution") {
-            output.push_str(&block);
-            replaced = true;
-            index += 1;
-            while index < lines.len() {
-                let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
-                if is_top_level_frontmatter_boundary(next) {
-                    break;
-                }
-                index += 1;
-            }
-            continue;
-        }
-        output.push_str(raw);
-        index += 1;
-    }
-    if !output.is_empty() && !output.ends_with('\n') {
-        output.push('\n');
-    }
-    if !replaced {
-        output.push_str(&block);
-    }
-    Ok(format!("---\n{}---\n{}", output, body))
-}
-
 /// Replaces the canonical accord block while preserving unrelated source bytes.
 pub(crate) fn patch_accord_content(
     content: &str,
@@ -152,13 +107,15 @@ pub(crate) fn patch_accord_content(
     Ok(format!("---\n{}---\n{}", output, body))
 }
 
-/// Replaces legacy completion fields or the canonical completion block while preserving unrelated bytes.
-pub(crate) fn patch_completion_content(
+/// Replaces legacy completion fields or the canonical resolution block while
+/// preserving unrelated bytes. Protocol 0.3.0 archives carry minimal
+/// resolution metadata plus archivedAt; delivery evidence lives in the Accord.
+pub(crate) fn patch_resolution_content(
     content: &str,
-    completion: &CompletionRecord,
+    resolution: &ResolutionRecord,
 ) -> Result<String, CliError> {
     let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
-    let completion_block = render_completion_block(completion);
+    let resolution_block = render_resolution_block(resolution);
     let mut output = String::new();
     let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
     let mut index = 0;
@@ -176,8 +133,10 @@ pub(crate) fn patch_completion_content(
             index += 1;
             continue;
         }
-        if frontmatter_line_key(line) == Some("completion") {
-            output.push_str(&completion_block);
+        if frontmatter_line_key(line) == Some("completion")
+            || frontmatter_line_key(line) == Some("resolution")
+        {
+            output.push_str(&resolution_block);
             replaced = true;
             index += 1;
             while index < lines.len() {
@@ -196,7 +155,7 @@ pub(crate) fn patch_completion_content(
         if !output.is_empty() && !output.ends_with('\n') {
             output.push('\n');
         }
-        output.push_str(&completion_block);
+        output.push_str(&resolution_block);
     }
     if !output.is_empty() && !output.ends_with('\n') {
         output.push('\n');
@@ -204,18 +163,14 @@ pub(crate) fn patch_completion_content(
     Ok(format!("---\n{}---\n{}", output, body))
 }
 
-fn render_completion_block(completion: &CompletionRecord) -> String {
-    let mut lines = vec!["completion:".to_string()];
-    if let Some(outcome) = completion.outcome.as_deref() {
-        lines.push(format!("  outcome: {}", yaml_double_quote(outcome)));
-    }
+fn render_resolution_block(resolution: &ResolutionRecord) -> String {
+    let mut lines = vec!["resolution:".to_string()];
     lines.push(format!(
-        "  summary: {}",
-        yaml_double_quote(&completion.summary)
+        "  outcome: {}",
+        yaml_double_quote(resolution.outcome.as_deref().unwrap_or(""))
     ));
-    push_nested_array_line(&mut lines, "filesChanged", &completion.files_changed);
-    push_optional_nested_line(&mut lines, "validation", completion.validation.as_deref());
-    push_optional_nested_line(&mut lines, "reviewer", completion.reviewer.as_deref());
+    push_optional_nested_line(&mut lines, "note", resolution.note.as_deref());
+    push_optional_nested_line(&mut lines, "reviewer", resolution.reviewer.as_deref());
     lines.push(String::new());
     lines.join("\n")
 }
@@ -348,24 +303,21 @@ mod tests {
     }
 
     #[test]
-    fn patches_completion_as_nested_metadata_and_preserves_body() {
+    fn patches_resolution_as_nested_metadata_and_preserves_body() {
         let input = "---\nid: task-1\ntype: task\ntitle: Demo\ncompletionSummary: old\nfilesChanged: [old.rs]\n---\n\nBody\n";
-        let output = patch_completion_content(
+        let output = patch_resolution_content(
             input,
-            &CompletionRecord {
-                summary: "Done".to_string(),
-                files_changed: vec!["src/main.rs".to_string()],
-                validation: Some("cargo test passed".to_string()),
+            &ResolutionRecord {
+                outcome: Some("failed".to_string()),
+                note: Some("Not feasible".to_string()),
                 reviewer: Some("Algorant".to_string()),
-                ..CompletionRecord::default()
             },
         )
         .unwrap();
         assert!(!output.contains("completionSummary:"));
         assert!(!output.contains("filesChanged: [old.rs]"));
-        assert!(output.contains("completion:\n  summary: \"Done\"\n"));
-        assert!(output.contains("  filesChanged: [\"src/main.rs\"]\n"));
-        assert!(output.contains("  validation: \"cargo test passed\"\n"));
+        assert!(output.contains("resolution:\n  outcome: \"failed\"\n"));
+        assert!(output.contains("  note: \"Not feasible\"\n"));
         assert!(output.contains("  reviewer: \"Algorant\"\n"));
         assert!(output.ends_with("\nBody\n"));
     }

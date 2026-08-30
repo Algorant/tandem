@@ -129,11 +129,6 @@ pub(super) const BINDINGS: &[Binding] = &[
     },
     Binding {
         scope: BindingScope::Board,
-        keys: "a",
-        description: "add a task",
-    },
-    Binding {
-        scope: BindingScope::Board,
         keys: "e",
         description: "edit the selected active task",
     },
@@ -146,11 +141,6 @@ pub(super) const BINDINGS: &[Binding] = &[
         scope: BindingScope::Board,
         keys: "f",
         description: "open Board filter controls",
-    },
-    Binding {
-        scope: BindingScope::Board,
-        keys: "m",
-        description: "open task state-movement picker",
     },
     Binding {
         scope: BindingScope::Board,

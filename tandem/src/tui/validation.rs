@@ -12,9 +12,9 @@ pub(super) enum ValidationPrompt {
         id: String,
         title: String,
         feedback: String,
-    },
-    ApplyAccepted {
-        candidates: Vec<ValidationApplyCandidate>,
+        criterion: Option<String>,
+        request: bool,
+        editing_criterion: bool,
     },
 }
 
@@ -22,19 +22,39 @@ impl ValidationPrompt {
     pub(super) fn id(&self) -> &str {
         match self {
             Self::Accept { id, .. } | Self::Rework { id, .. } => id,
-            Self::ApplyAccepted { .. } => "accepted candidates",
         }
     }
 
     pub(super) fn title(&self) -> &str {
         match self {
             Self::Accept { title, .. } | Self::Rework { title, .. } => title,
-            Self::ApplyAccepted { .. } => "Apply accepted",
         }
     }
 }
 
 impl TuiApp {
+    pub(super) fn start_validation_request(&mut self) {
+        let Some(doc) = self.selected_doc().cloned() else {
+            self.status = "Validation request requires a selected active task.".into();
+            return;
+        };
+        let criterion = doc
+            .values("accord.acceptance")
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| "Confirm the agreed acceptance criteria".into());
+        self.validation_prompt = Some(ValidationPrompt::Rework {
+            id: doc.id().to_string(),
+            title: doc.title().to_string(),
+            feedback: String::new(),
+            criterion: Some(criterion),
+            request: true,
+            editing_criterion: true,
+        });
+        self.status =
+            "Enter the reason human judgment is required; Enter submits, Esc cancels.".into();
+    }
+
     pub(super) fn activate_confirmation(&mut self) {
         if self.validation_prompt.is_some() {
             self.handle_validation_prompt_key(KeyEvent::from(KeyCode::Enter));
@@ -111,31 +131,15 @@ impl TuiApp {
             id,
             title,
             feedback: String::new(),
+            criterion: None,
+            request: false,
+            editing_criterion: false,
         });
         self.status = "Request rework: type feedback, Enter sends, Esc cancels.".to_string();
     }
 
     pub(super) fn show_validation_complete_hint(&mut self) {
-        self.status = "Completion is intentionally de-emphasized in Validation. Accept sign-off first; use C / Apply accepted to archive accepted work explicitly.".to_string();
-    }
-
-    pub(super) fn start_validation_apply_accepted(&mut self) {
-        if !self.hierarchy.errors.is_empty() {
-            self.status = "Apply accepted disabled: fix the persistent Board hierarchy errors and reload first."
-                .to_string();
-            return;
-        }
-        let candidates = app::accord::accepted_validation_candidates(&self.docs);
-        if candidates.is_empty() {
-            self.status = "No accepted Validation tasks are ready to apply/archive.".to_string();
-            return;
-        }
-        self.status = format!(
-            "Apply/archive {} accepted Validation task{}? Enter confirms, Esc cancels.",
-            candidates.len(),
-            plural_suffix(candidates.len())
-        );
-        self.validation_prompt = Some(ValidationPrompt::ApplyAccepted { candidates });
+        self.status = "Completion is intentionally de-emphasized in Validation. Request exceptional human review first; accepting sign-off archives the Task.".to_string();
     }
 
     pub(super) fn handle_validation_prompt_key(&mut self, key: KeyEvent) {
@@ -144,7 +148,6 @@ impl TuiApp {
                 let action = match self.validation_prompt.take() {
                     Some(ValidationPrompt::Accept { .. }) => "Acceptance",
                     Some(ValidationPrompt::Rework { .. }) => "Rework request",
-                    Some(ValidationPrompt::ApplyAccepted { .. }) => "Apply accepted",
                     None => "Validation action",
                 };
                 self.status = format!("{action} canceled.");
@@ -152,30 +155,18 @@ impl TuiApp {
             KeyCode::Char('n')
                 if matches!(
                     self.validation_prompt,
-                    Some(ValidationPrompt::Accept { .. } | ValidationPrompt::ApplyAccepted { .. })
+                    Some(ValidationPrompt::Accept { .. })
                 ) =>
             {
-                let action = match self.validation_prompt.take() {
-                    Some(ValidationPrompt::Accept { .. }) => "Acceptance",
-                    Some(ValidationPrompt::ApplyAccepted { .. }) => "Apply accepted",
-                    _ => "Validation action",
-                };
-                self.status = format!("{action} canceled.");
+                self.status = "Acceptance canceled.".to_string();
             }
             KeyCode::Char('y')
                 if matches!(
                     self.validation_prompt,
-                    Some(ValidationPrompt::Accept { .. } | ValidationPrompt::ApplyAccepted { .. })
+                    Some(ValidationPrompt::Accept { .. })
                 ) =>
             {
-                if matches!(
-                    self.validation_prompt,
-                    Some(ValidationPrompt::ApplyAccepted { .. })
-                ) {
-                    self.finish_validation_apply_accepted();
-                } else {
-                    self.finish_validation_accept();
-                }
+                self.finish_validation_accept();
             }
             KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => {
                 if matches!(
@@ -183,17 +174,36 @@ impl TuiApp {
                     Some(ValidationPrompt::Accept { .. })
                 ) {
                     self.finish_validation_accept();
-                } else if matches!(
-                    self.validation_prompt,
-                    Some(ValidationPrompt::ApplyAccepted { .. })
-                ) {
-                    self.finish_validation_apply_accepted();
                 } else {
                     self.finish_validation_rework();
                 }
             }
+            KeyCode::Tab => {
+                if let Some(ValidationPrompt::Rework {
+                    editing_criterion,
+                    request: true,
+                    ..
+                }) = self.validation_prompt.as_mut()
+                {
+                    *editing_criterion = !*editing_criterion;
+                    self.refresh_validation_prompt_status();
+                }
+            }
             KeyCode::Backspace => {
-                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                if let Some(ValidationPrompt::Rework {
+                    feedback,
+                    criterion,
+                    editing_criterion,
+                    request: true,
+                    ..
+                }) = self.validation_prompt.as_mut()
+                {
+                    if *editing_criterion {
+                        criterion.get_or_insert_default().pop();
+                    } else {
+                        feedback.pop();
+                    }
+                } else if let Some(ValidationPrompt::Rework { feedback, .. }) =
                     self.validation_prompt.as_mut()
                 {
                     feedback.pop();
@@ -201,7 +211,20 @@ impl TuiApp {
                 self.refresh_validation_prompt_status();
             }
             KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                if let Some(ValidationPrompt::Rework {
+                    feedback,
+                    criterion,
+                    editing_criterion,
+                    request: true,
+                    ..
+                }) = self.validation_prompt.as_mut()
+                {
+                    if *editing_criterion {
+                        criterion.get_or_insert_default().clear();
+                    } else {
+                        feedback.clear();
+                    }
+                } else if let Some(ValidationPrompt::Rework { feedback, .. }) =
                     self.validation_prompt.as_mut()
                 {
                     feedback.clear();
@@ -212,7 +235,21 @@ impl TuiApp {
                 if !key.modifiers.contains(KeyModifiers::CONTROL)
                     && !key.modifiers.contains(KeyModifiers::ALT) =>
             {
-                if let Some(ValidationPrompt::Rework { feedback, .. }) =
+                if let Some(ValidationPrompt::Rework {
+                    feedback,
+                    criterion,
+                    editing_criterion,
+                    request: true,
+                    ..
+                }) = self.validation_prompt.as_mut()
+                {
+                    if *editing_criterion {
+                        criterion.get_or_insert_default().push(ch);
+                    } else {
+                        feedback.push(ch);
+                    }
+                    self.refresh_validation_prompt_status();
+                } else if let Some(ValidationPrompt::Rework { feedback, .. }) =
                     self.validation_prompt.as_mut()
                 {
                     feedback.push(ch);
@@ -228,18 +265,30 @@ impl TuiApp {
             Some(ValidationPrompt::Accept { id, .. }) => {
                 format!("Confirm acceptance for {id}: Enter/y accepts sign-off, Esc/n cancels.")
             }
-            Some(ValidationPrompt::Rework { id, feedback, .. }) => format!(
-                "Request rework for {id}: {} · Enter sends, Esc cancels",
-                if feedback.trim().is_empty() {
-                    "<feedback>"
+            Some(ValidationPrompt::Rework {
+                id,
+                feedback,
+                criterion,
+                request: true,
+                editing_criterion,
+                ..
+            }) => format!(
+                "Validation request for {id}: {} · Tab switches criterion/note · Enter submits",
+                if *editing_criterion {
+                    criterion.as_deref().unwrap_or("<criterion>")
+                } else if feedback.trim().is_empty() {
+                    "<note>"
                 } else {
                     feedback.as_str()
                 }
             ),
-            Some(ValidationPrompt::ApplyAccepted { candidates }) => format!(
-                "Apply/archive {} accepted Validation task{}: Enter confirms, Esc cancels.",
-                candidates.len(),
-                plural_suffix(candidates.len())
+            Some(ValidationPrompt::Rework { id, feedback, .. }) => format!(
+                "Request changes for {id}: {} · Enter submits, Esc cancels",
+                if feedback.trim().is_empty() {
+                    "<note>"
+                } else {
+                    feedback.as_str()
+                }
             ),
             None => self.status.clone(),
         };
@@ -262,43 +311,59 @@ impl TuiApp {
         }
     }
 
-    pub(super) fn finish_validation_apply_accepted(&mut self) {
-        let Some(ValidationPrompt::ApplyAccepted { candidates }) = self.validation_prompt.take()
-        else {
-            return;
-        };
-        match app::accord::apply_accepted_validation(&self.workspace, &candidates, "tui") {
-            Ok(outcome) => {
-                let reload_note = self.reload().warning_note();
-                self.status = format!(
-                    "Applied/archived {} accepted Validation task{} to logs: {}{}",
-                    outcome.completed_ids.len(),
-                    plural_suffix(outcome.completed_ids.len()),
-                    outcome.completed_ids.join(", "),
-                    reload_note
-                );
-            }
-            Err(error) => {
-                let reload_note = self.reload().warning_note();
-                self.status = format!("Apply accepted error: {}{}", error.message, reload_note);
-            }
-        }
-    }
-
     pub(super) fn finish_validation_rework(&mut self) {
-        let Some(ValidationPrompt::Rework { id, feedback, .. }) = self.validation_prompt.as_ref()
+        let Some(ValidationPrompt::Rework {
+            id,
+            feedback,
+            criterion,
+            request,
+            ..
+        }) = self.validation_prompt.as_ref()
         else {
             return;
         };
         let feedback = feedback.trim().to_string();
         if feedback.is_empty() {
             self.status = format!(
-                "Request rework for {id} needs feedback. Type feedback, Enter sends, Esc cancels."
+                "{} requires a note. Type the reason and press Enter.",
+                if *request {
+                    "Validation request"
+                } else {
+                    "Request changes"
+                }
             );
             return;
         }
         let id = id.clone();
+        let request = *request;
+        let criterion = criterion.clone();
         self.validation_prompt = None;
+        if request {
+            match app::review::transition(
+                &self.workspace,
+                "request",
+                app::review::ReviewOptions {
+                    id: id.clone(),
+                    criterion,
+                    note: Some(feedback),
+                    reviewer: None,
+                    ..Default::default()
+                },
+            ) {
+                Ok(_) => {
+                    let reload_note = self.reload().warning_note();
+                    self.status = format!("Validation requested for {}{}", id, reload_note);
+                }
+                Err(error) => {
+                    let reload_note = self.reload().warning_note();
+                    self.status = format!(
+                        "Validation request failed: {}{}",
+                        error.message, reload_note
+                    );
+                }
+            }
+            return;
+        }
         match app::accord::request_validation_rework(&self.workspace, &id, "tui", &feedback) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();

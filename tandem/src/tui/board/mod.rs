@@ -97,18 +97,27 @@ pub(super) fn board_subview_tabs(
     docs: &[Document],
     filters: &BoardFilters,
 ) -> Vec<BoardSubviewTab> {
-    states
+    let mut tabs = states
         .iter()
         .map(|state| BoardSubviewTab {
             state: state.clone(),
             count: docs
                 .iter()
-                .filter(|doc| is_board_visible_doc(doc))
+                .filter(|doc| is_board_visible_doc(doc) && !is_papercut_doc(doc))
                 .filter(|doc| document_state_label(doc) == state.as_str())
                 .filter(|doc| board_filters_match(doc, filters))
                 .count(),
         })
-        .collect()
+        .collect::<Vec<_>>();
+    tabs.push(BoardSubviewTab {
+        state: "__papercuts".to_string(),
+        count: docs
+            .iter()
+            .filter(|doc| is_board_visible_doc(doc) && is_papercut_doc(doc))
+            .filter(|doc| board_filters_match(doc, filters))
+            .count(),
+    });
+    tabs
 }
 
 pub(super) fn state_tab_title(state: &str, count: usize) -> String {
@@ -231,10 +240,20 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
 ) -> Vec<StateBoardEntry<'a>> {
     let mut entries = Vec::new();
     for root in active_docs.iter().filter(|doc| {
-        is_board_visible_doc(doc) && is_state_board_root(doc, active_docs, completed_logs)
+        is_board_visible_doc(doc)
+            && if state == "__papercuts" {
+                is_papercut_doc(doc)
+            } else {
+                !is_papercut_doc(doc)
+            }
+            && is_state_board_root(doc, active_docs, completed_logs)
     }) {
         let mut visited = BTreeSet::from([root.id().to_string()]);
-        let root_matches_state = document_state_label(root) == state;
+        let root_matches_state = if state == "__papercuts" {
+            is_papercut_doc(root)
+        } else {
+            !is_papercut_doc(root) && document_state_label(root) == state
+        };
         let descendant_matches_state = is_task_doc(root)
             && task_subtree_matches_filters(
                 root.id(),
@@ -694,7 +713,7 @@ pub(super) fn count_task_descendants(
         .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
     {
         if visited.insert(doc.id().to_string()) {
-            if completion_outcome(doc) == COMPLETION_OUTCOME_COMPLETED {
+            if resolution_outcome(doc) == RESOLUTION_OUTCOME_COMPLETED {
                 completed += 1;
             }
             let nested = count_task_descendants(doc.id(), active_docs, completed_logs, visited);
@@ -791,7 +810,7 @@ pub(super) fn relationship_context_for_doc_with_hierarchy(
         completed_logs
             .iter()
             .filter(|child| is_task_doc(child))
-            .filter(|child| completion_outcome(child) == COMPLETION_OUTCOME_COMPLETED)
+            .filter(|child| resolution_outcome(child) == RESOLUTION_OUTCOME_COMPLETED)
             .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
             .filter(|child| child.id() != doc.id())
             .map(|child| related_child_summary(child, true))
@@ -939,17 +958,13 @@ pub(super) fn board_scan_chips(
     }
     if let Some(accord) = accord_status(doc).filter(|status| {
         board_should_surface_accord_status(status, theme)
-            // In validation, pending review is the judgment signal; the delivered
-            // accord is intentionally omitted so the row has one unambiguous chip.
+            // In validation the Task awaits explicit human judgment; the
+            // delivered accord is intentionally omitted so the row has one
+            // unambiguous chip.
             && !(document_state_label(doc) == "validation"
                 && normalized_accord_status(status) == "delivered")
     }) {
         chips.push((status_chip(accord, theme), theme.accord_chip_style(accord)));
-    }
-    if let Some(review) =
-        review_status(doc).filter(|status| board_should_surface_review_status(status, theme))
-    {
-        chips.push((status_chip(review, theme), theme.review_chip_style(review)));
     }
     if let Some((completed, total)) = subtask_progress(doc).filter(|(completed, total)| {
         !theme.badge_disabled("subtasks")
@@ -1518,10 +1533,7 @@ pub(super) fn board_filters_match(doc: &Document, filters: &BoardFilters) -> boo
             return false;
         }
     }
-    if filters.delivered_untriaged && !is_delivered_untriaged(doc) {
-        return false;
-    }
-    true
+    !(filters.delivered_untriaged && !is_delivered_untriaged(doc))
 }
 
 pub(super) fn is_delivered_untriaged(doc: &Document) -> bool {
@@ -2181,16 +2193,6 @@ pub(super) fn validation_visual_chip(
         .then(|| configured_or_default_tag_chip("visual", "VISUAL", StatusTone::Accent, theme))
 }
 
-pub(super) fn board_should_surface_review_status(status: &str, theme: &TuiTheme) -> bool {
-    let normalized = status.trim().replace('_', "-").to_ascii_lowercase();
-    matches!(
-        normalized.as_str(),
-        "pending" | "changes-requested" | "rejected" | "failed"
-    ) && !theme.badge_disabled("review")
-        && !theme.badge_disabled(&normalized)
-        && !theme.badge_disabled(&format!("review:{normalized}"))
-}
-
 #[derive(Debug, Clone)]
 pub(super) struct BoardSubtask {
     pub(super) title: String,
@@ -2295,7 +2297,6 @@ pub(super) fn detail_lines_for_doc_with_context(
         ));
     }
     push_optional_detail_line(&mut lines, "Accord", accord_status(doc), theme);
-    push_optional_detail_line(&mut lines, "Review", review_status(doc), theme);
     push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
     lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
     push_board_accord_detail_section(&mut lines, doc, theme);

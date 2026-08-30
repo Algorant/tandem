@@ -193,7 +193,7 @@ function detailLink(item, label) {
 }
 
 export function renderDetail(detail, kind = 'document') {
-  const completion = detail.completion;
+  const resolution = detail.resolution;
   const metadata = [
     ['ID', detail.id], ['Type / role', [detail.type, detail.role].filter(Boolean).join(' / ')], ['Location', detail.location],
     ['State', detail.state || 'Not applicable'], ['Priority', detail.priority || 'Not set'], ['Assignee', detail.assignee || 'Not set'],
@@ -218,10 +218,10 @@ export function renderDetail(detail, kind = 'document') {
     ['Evidence', listValue(detail.accord.evidence)], ['Files changed', listValue(detail.accord.filesChanged)],
     ['Reviewer', detail.accord.reviewer], ['Note', detail.accord.note], ['Reason', detail.accord.reason],
   ]));
-  if (detail.review) sections.push(detailSection('Review', [
-    ['Status', badge('Status', detail.review.status, statusTone(detail.review.status))],
-    ['Reviewer', detail.review.reviewer], ['Requested', detail.review.requestedAt],
-    ['Decided', detail.review.decidedAt], ['Note', detail.review.note],
+  if (detail.validation) sections.push(detailSection('Validation', [
+    ['State', badge('State', detail.validation.state, statusTone(detail.validation.state))],
+    ['Criterion', detail.validation.criterion], ['Note', detail.validation.note],
+    ['Reviewer', detail.validation.reviewer], ['Requested', detail.validation.requestedAt],
   ]));
   if (detail.decision) sections.push(detailSection('Decision record', [
     ['Status', badge('Status', detail.decision.status, statusTone(detail.decision.status))],
@@ -230,14 +230,13 @@ export function renderDetail(detail, kind = 'document') {
     ['Alternatives', listValue(detail.decision.alternatives)], ['Supersedes', listValue(detail.decision.supersedes)],
     ['Superseded by', listValue(detail.decision.supersededBy)],
   ]));
-  if (completion) sections.push(el('section', { class: 'panel metadata' }, [
-    el('h3', { text: 'Completion' }),
+  if (resolution) sections.push(el('section', { class: 'panel metadata' }, [
+    el('h3', { text: 'Resolution' }),
     el('dl', { class: 'detail-grid' }, [
-      el('dt', { text: 'Outcome' }), el('dd', {}, badge('Outcome', completion.outcome, statusTone(completion.outcome))),
-      el('dt', { text: 'Summary' }), el('dd', { text: completion.summary || 'Not recorded' }),
-      el('dt', { text: 'Validation' }), el('dd', { text: completion.validation || 'Not recorded' }),
-      el('dt', { text: 'Reviewer' }), el('dd', { text: completion.reviewer || 'Not recorded' }),
-      el('dt', { text: 'Files changed' }), el('dd', { text: listValue(completion.filesChanged) }),
+      el('dt', { text: 'Outcome' }), el('dd', {}, badge('Outcome', resolution.outcome, statusTone(resolution.outcome))),
+      el('dt', { text: 'Note' }), el('dd', { text: resolution.note || 'Not recorded' }),
+      el('dt', { text: 'Reviewer' }), el('dd', { text: resolution.reviewer || 'Not recorded' }),
+      el('dt', { text: 'Files changed' }), el('dd', { text: listValue(resolution.filesChanged) }),
     ]),
   ]));
   const back = kind === 'log' ? '#logs' : kind === 'decision' ? '#decisions' : '#board';

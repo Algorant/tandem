@@ -1,11 +1,11 @@
 //! Shared project Rules mutation operations.
 
 use crate::app::support::{append_event, document_exists};
+use crate::app::Error;
 use crate::project::rules::{parse_rules_from_content, patch_rules_category_content};
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{write_atomic, TandemProject};
 use crate::protocol::config::{RuleItem, RULE_CATEGORIES};
-use crate::CliError;
 
 #[derive(Debug)]
 pub(crate) struct MutationOutcome {
@@ -26,7 +26,7 @@ pub(crate) fn add(
     category: &str,
     rule: &str,
     source: Option<String>,
-) -> Result<MutationOutcome, CliError> {
+) -> Result<MutationOutcome, Error> {
     validate_rule_category(category)?;
     let rule = require_rule_text(rule, "rules add requires --rule <text>")?;
     let source = normalized_source(source);
@@ -72,7 +72,7 @@ pub(crate) fn edit(
     id: usize,
     rule: &str,
     source: Option<String>,
-) -> Result<MutationOutcome, CliError> {
+) -> Result<MutationOutcome, Error> {
     validate_rule_category(category)?;
     let rule = require_rule_text(rule, "rules edit requires --rule <text>")?;
     let source = source.map(|value| normalized_source(Some(value)));
@@ -84,7 +84,7 @@ pub(crate) fn edit(
         .or_default()
         .iter_mut()
         .find(|item| item.id == id)
-        .ok_or_else(|| CliError::user(format!("rule not found: {category} #{id}")))?;
+        .ok_or_else(|| Error::user(format!("rule not found: {category} #{id}")))?;
     item.rule = rule.to_string();
     if let Some(source) = source {
         item.source = source;
@@ -110,7 +110,7 @@ pub(crate) fn delete(
     project: &TandemProject,
     category: &str,
     id: usize,
-) -> Result<DeleteOutcome, CliError> {
+) -> Result<DeleteOutcome, Error> {
     validate_rule_category(category)?;
     let (content, signature) = read_file_snapshot(&project.config_path)?;
     let mut rules = parse_rules_from_content(&content, &project.config_path)?;
@@ -118,7 +118,7 @@ pub(crate) fn delete(
     let before = items.len();
     items.retain(|item| item.id != id);
     if items.len() == before {
-        return Err(CliError::user(format!("rule not found: {category} #{id}")));
+        return Err(Error::user(format!("rule not found: {category} #{id}")));
     }
     let patched = patch_rules_category_content(&content, category, &rules)?;
     ensure_file_unchanged(&project.config_path, &signature)?;
@@ -135,20 +135,20 @@ pub(crate) fn delete(
     })
 }
 
-pub(crate) fn validate_rule_category(category: &str) -> Result<(), CliError> {
+pub(crate) fn validate_rule_category(category: &str) -> Result<(), Error> {
     if RULE_CATEGORIES.contains(&category) {
         Ok(())
     } else {
-        Err(CliError::usage(format!(
+        Err(Error::usage(format!(
             "unknown rule category `{category}`; use always, never, prefer, or context"
         )))
     }
 }
 
-fn require_rule_text<'a>(value: &'a str, message: &str) -> Result<&'a str, CliError> {
+fn require_rule_text<'a>(value: &'a str, message: &str) -> Result<&'a str, Error> {
     let value = value.trim();
     if value.is_empty() {
-        Err(CliError::usage(message))
+        Err(Error::usage(message))
     } else {
         Ok(value)
     }
@@ -161,7 +161,7 @@ fn normalized_source(source: Option<String>) -> Option<String> {
 fn missing_source_warning(
     project: &TandemProject,
     source: Option<&str>,
-) -> Result<Option<String>, CliError> {
+) -> Result<Option<String>, Error> {
     if let Some(source) = source {
         if !document_exists(project, source)? {
             return Ok(Some(format!("rule source not found: {source}")));
@@ -191,17 +191,7 @@ mod tests {
             "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\nunknown: retain\n---\nbody\n",
         )
         .unwrap();
-        let papercut_id = crate::app::papercuts::add(
-            &project,
-            crate::app::papercuts::AddOptions {
-                title: Some("Rule source boundary".to_string()),
-                ..Default::default()
-            },
-        )
-        .unwrap()
-        .papercut
-        .id()
-        .to_string();
+        let papercut_id = "task-99".to_string();
         let added = add(&project, "always", "Keep it", Some(" missing ".to_string())).unwrap();
         assert_eq!(added.id, 1);
         assert_eq!(
@@ -219,15 +209,15 @@ mod tests {
             .unwrap()
             .contains("Keep all"));
 
-        let papercut_source = add(
+        let missing_source = add(
             &project,
             "always",
-            "Papercuts are not Rule source documents",
+            "Rule sources must reference existing documents",
             Some(papercut_id.clone()),
         )
         .unwrap();
         assert_eq!(
-            papercut_source.warning,
+            missing_source.warning,
             Some(format!("rule source not found: {papercut_id}"))
         );
         let read = crate::app::queries::load_read(&project).unwrap();
@@ -235,7 +225,7 @@ mod tests {
             warning
                 == &format!(
                     "Rule {} references missing source {papercut_id}.",
-                    papercut_source.id
+                    missing_source.id
                 )
         }));
         fs::remove_dir_all(root).unwrap();
