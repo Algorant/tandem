@@ -2,20 +2,22 @@
 id: task-247
 type: task
 title: "Implement protocol 0.3.0 and the comprehensive clap CLI cutover"
-state: "in-progress"
 priority: "critical"
 effort: "large"
 references: ["task-246", "decision-12", "papercut-1", "papercut-9", "decision-3", "decision-8"]
 relatedFiles: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "protocol/README.md", "protocol/plan/spec.md", "tandem/Cargo.toml", "tandem/src/protocol/", "tandem/src/project/", "tandem/src/app/", "tandem/src/cli/", "tandem/src/main.rs", "tandem/src/tui/", "tandem/src/web/", "tandem/tests/cli_behavior.rs", "tandem/README.md"]
 tags: ["protocol", "cli", "clap", "cutover"]
 createdAt: "2026-08-30T17:48:26Z"
-updatedAt: "2026-08-30T22:03:59Z"
+updatedAt: "2026-08-30T23:43:49Z"
 accord:
   status: "claimed"
   assignee: "worker-task-247-6cbd4785"
   claimedAt: "2026-08-30T22:03:59Z"
   updatedAt: "2026-08-30T22:03:59Z"
 assignee: "worker-task-247-6cbd4785"
+completedAt: "2026-08-30T23:43:49Z"
+completion:
+  summary: "Implemented and integrated the protocol 0.3.0 + clap CLI cutover: normative spec, typed storage (tasks/decisions/rules/logs/events), app operations with app::Error, clap 4.6 derive CLI (23 commands, 27 help surfaces, global JSON, PC1+PC9 resolved), minimal resolution archives, per-file rules, papercut-as-tagged-task (including TUI recursion), validation escalation with atomic accept/archive, TUI fourth Papercuts section with Add/Move removed, web read-model alignment, legacy review/papercut/completion machinery removed. Verified: 234 unit + 5 process tests green, fmt/clippy clean, release build 6.48s warm, stripped binary 5,050,864 bytes (+424,608 vs baseline), 27/27 help surfaces workspace-free, smoke suite passed, rendered TUI pane confirms four Board sections and no Add/Move."
 ---
 
 ## Description
