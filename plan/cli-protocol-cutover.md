@@ -52,6 +52,24 @@ preserved merely because it exists. Each behavior must earn its place.
 | D25 | Delivery proof | provisional | Accord delivery requires a summary and at least one evidence item. Evidence may be automated, observational, documentary, or reasoned. |
 | D26 | Changed files | provisional | Delivery may include an optional structured `filesChanged` list; do not require it for non-code work. |
 | D27 | Accord statuses | provisional | Active: `ready`, `claimed`, `delivered`, `rework`, `blocked`. Terminal in Logs: `accepted`, `failed`. Release returns to `ready`. |
+| D28 | Add command | provisional | Use explicit `tandem add task` and `tandem add decision` typed subcommands. No default type. |
+| D29 | Add title | provisional | The required title is the first quoted positional argument for both document types. |
+| D30 | Body naming | provisional | Use `--body` for creation and update. Delete the `--description` one-off. |
+| D31 | Unified show | provisional | One `show <id>` resolves Task or Decision documents from active or archived storage and renders by type. |
+| D32 | Search command | provisional | Keep full-text `search` separate from structured `list`; their output and user intent differ. |
+| D33 | Read scope | provisional | `list` and `search` share `--scope active|archived|all`, defaulting to active. Remove Log- and Decision-specific read commands. |
+| D34 | Update command | provisional | Use one `update <id>`; resolve the document and validate fields by type. |
+| D35 | Lifecycle separation | provisional | Generic update cannot write Task state or Accord status. Lifecycle actions own required notes, evidence, timestamps, assignment, and archival side effects. |
+| D36 | List replacement | provisional | On update, an absent list field is unchanged, present repeated values replace the full list, and generic `--clear <field>` removes it. No add/remove flag matrix. |
+| D37 | Accord command family | provisional | Keep `accord claim|deliver|rework|block|resume|release|fail` grouped under one major product concept. Remove Accord accept; complete owns acceptance. |
+| D38 | Human review command | provisional | One `review <id>` action enters exceptional validation with criterion/note. `complete` accepts; `accord rework` requests changes. No review subcommand family. |
+| D39 | Complete command | provisional | `complete` handles normal orchestrator-verified and exceptional human-validated acceptance based on current state; both accept the Accord and archive atomically. |
+| D40 | Decision prose | provisional | Store ADR Context, Decision, Consequences, and Alternatives as Markdown body sections; remove dedicated prose flags. |
+| D41 | Decision dates | provisional | Remove manual Decision date. Maintain automatic createdAt, updatedAt, and decidedAt when accepted/rejected. |
+| D42 | Decision statuses | provisional | Keep proposed, accepted, rejected, deprecated, and superseded as Decision metadata editable through common update. |
+| D43 | Rule categories | provisional | Keep always, never, prefer, and context as distinct agent enforcement vocabulary. |
+| D44 | Rule identity | provisional | Keep composite category IDs such as always-12. Reclassification is delete-and-add because it changes meaning. |
+| D45 | Rule provenance | provisional | Keep an optional source reference to the Task or Decision that established a Rule. |
 
 ## Interactive sequence
 
@@ -365,11 +383,146 @@ accord:
 
 ## 4. Core command model
 
-Pending.
+### Creation
+
+- **D28 — typed add subcommands.** Use `tandem add task` and
+  `tandem add decision`. Explicit subcommands give each type accurate help and
+  validation without conditionally-valid flags. There is no default type.
+- **D29 — positional title.** The required title is the first quoted positional
+  argument for both document types.
+- **D30 — one Markdown body name.** Use `--body` on creation and update. Delete
+  add's `--description` synonym.
+
+```text
+tandem add task "Fix command help" \
+  --acceptance "Every command supports --help"
+
+tandem add decision "Adopt clap" --body "..."
+```
+
+Do not add a `create` alias without observed demand.
+
+### Read and browse
+
+- **D31 — one document lookup.** `show <id>` resolves Tasks and Decisions from
+  active or archived storage. Type controls rendering; location does not require
+  a different command.
+- **D32 — search remains distinct.** `list` performs structured browse/filter;
+  `search` performs full-text discovery and returns match context.
+- **D33 — common scope filter.** `list` and `search` accept
+  `--scope active|archived|all`, default `active`. This replaces the `log` read
+  family. `--type task|decision` replaces Decision-specific listing. Tagged
+  Papercuts use ordinary `--tag papercut`.
+
+```text
+tandem show <id>
+tandem list [filters] [--scope active|archived|all]
+tandem search <query> [filters] [--scope active|archived|all]
+```
+
+### Metadata mutation
+
+- **D34 — one inferred-type update.** `update <id>` resolves the document and
+  validates supplied fields against Task or Decision semantics. The semantic ID
+  already carries type, so a second type argument adds no information.
+- **D35 — lifecycle is not metadata mutation.** `update` cannot write Task
+  `state` or Accord `status`. Explicit lifecycle actions own required assignment,
+  notes, delivery evidence, timestamps, events, and archival side effects.
+- **D36 — deterministic list replacement (PC9).** An absent list field is
+  unchanged. Present repeated flags define the exact resulting list. Generic
+  `--clear <field>` removes a list or optional scalar. Do not create
+  `--add-*`/`--remove-*` pairs for every field.
+
+```text
+# exact resulting tags are cli + config
+tandem update task-12 --tag cli --tag config
+
+# remove all references and clear the parent
+tandem update task-12 --clear references --clear parent
+```
+
+### Lifecycle actions
+
+- **D37 — Accord remains one command family.** Keep
+  `accord claim|deliver|rework|block|resume|release|fail`. The family exposes one
+  major product concept and its guarded state machine. Remove `accept` because
+  D16 makes acceptance part of completion.
+- **D38 — review is one escalation verb.** `review <id>` enters validation and
+  requires unresolved criterion + note. It is not a status family. `complete`
+  handles acceptance; `accord rework` handles requested changes.
+- **D39 — one completion action.** `complete` handles both normal delivered work
+  and validation. Normal completion records orchestrator verification;
+  validation completion additionally requires human reviewer evidence. Both
+  atomically accept Accord and archive.
+
+```text
+tandem accord claim <id> --assignee ...
+tandem accord deliver <id> --summary ... --evidence ...
+tandem accord rework <id> --note ...
+tandem accord block <id> --note ...
+tandem accord resume <id>
+tandem accord release <id> --note ...
+tandem accord fail <id> --note ...
+
+tandem review <id> --criterion ... --note ... [--reviewer ...]
+tandem complete <id> [--reviewer ...]
+tandem cancel <id> --note ...
+```
+
+`resume` leaves blocked and returns to claimed. `release` clears assignee and
+returns to ready. `fail` archives as failed. `cancel` archives work that is no
+longer wanted or has been superseded.
 
 ## 5. Rules and decisions
 
-Pending.
+### Decisions
+
+- **D40 — ADR prose stays prose.** Context, Decision, Consequences, and
+  Alternatives are Markdown body sections. Remove `--context`,
+  `--consequence`, and `--alternative`; full-text search already covers them.
+- **D41 — dates are automatic.** Remove manual `--date`. Maintain `createdAt`
+  and `updatedAt`; write `decidedAt` when status becomes accepted or rejected.
+- **D42 — retain standard ADR statuses.** `proposed`, `accepted`, `rejected`,
+  `deprecated`, `superseded`. They are Decision metadata editable through
+  common `update`, not Task workflow.
+- Keep structured `deciders`, `supersedes`, `references`, and `tags` because
+  they support attribution, relationships, and filtering.
+- Remove stored `supersededBy`; store `supersedes` on the newer Decision and
+  derive reverse relationships by lookup.
+
+```yaml
+id: decision-12
+type: decision
+title: Adopt clap
+status: accepted
+deciders: [ivan]
+supersedes: [decision-3]
+references: [task-246]
+tags: [cli]
+createdAt: ...
+updatedAt: ...
+decidedAt: ...
+```
+
+### Rules
+
+- **D43 — retain four enforcement categories.** `always`, `never`, `prefer`,
+  `context` remain distinct because they communicate agent behavior, not merely
+  organization.
+- **D44 — composite Rule identity.** Keep `always-12`-style IDs. Category is
+  visible in references. Reclassification is delete-and-add because changing
+  enforcement strength changes the Rule's meaning.
+- **D45 — retain provenance.** Keep optional `source` pointing to the Task or
+  Decision that established the Rule.
+- Rules stay in workspace config, use hard deletion, and do not become
+  documents or archived work.
+
+```text
+tandem rules list [always|never|prefer|context]
+tandem rules add always "Read active rules before work" [--source task-12]
+tandem rules edit always-12 "Revised rule text" [--source task-15]
+tandem rules delete always-12
+```
 
 ## 6. Logs and events
 
