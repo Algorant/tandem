@@ -2,14 +2,20 @@
 id: task-247
 type: task
 title: "Implement protocol 0.3.0 and the comprehensive clap CLI cutover"
-state: todo
+state: "in-progress"
 priority: "critical"
 effort: "large"
 references: ["task-246", "decision-12", "papercut-1", "papercut-9", "decision-3", "decision-8"]
 relatedFiles: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "protocol/README.md", "protocol/plan/spec.md", "tandem/Cargo.toml", "tandem/src/protocol/", "tandem/src/project/", "tandem/src/app/", "tandem/src/cli/", "tandem/src/main.rs", "tandem/src/tui/", "tandem/src/web/", "tandem/tests/cli_behavior.rs", "tandem/README.md"]
 tags: ["protocol", "cli", "clap", "cutover"]
 createdAt: "2026-08-30T17:48:26Z"
-updatedAt: "2026-08-30T17:48:26Z"
+updatedAt: "2026-08-30T22:03:59Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-247-6cbd4785"
+  claimedAt: "2026-08-30T22:03:59Z"
+  updatedAt: "2026-08-30T22:03:59Z"
+assignee: "worker-task-247-6cbd4785"
 ---
 
 ## Description
