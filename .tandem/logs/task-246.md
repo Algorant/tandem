@@ -2,16 +2,15 @@
 id: task-246
 type: task
 title: "Research Clap migration and specify a comprehensive CLI cutover"
-state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["papercut-1", "papercut-9", "decision-3", "decision-8"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/src/cli/mod.rs", "tandem/src/cli/args.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/landing.rs", "tandem/src/cli/output.rs", "tandem/tests/cli_behavior.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/plan/modularization-research.md", "extensions/pi-tandem/", "AGENTS.md"]
 tags: ["config", "cli", "research", "clap"]
 createdAt: "2026-08-30T12:30:45Z"
-updatedAt: "2026-08-30T17:42:36Z"
+updatedAt: "2026-08-30T17:47:41Z"
 accord:
-  status: "delivered"
+  status: "accepted"
   assignee: "pi"
   claimedAt: "2026-08-30T13:50:09Z"
   deliveredAt: "2026-08-30T17:42:36Z"
@@ -21,8 +20,21 @@ accord:
   summary: "Completed the interactive CLI/protocol audit and comprehensive clap cutover specification. Produced the authoritative protocol 0.3.0 decision ledger, full current grammar inventory, selected 23-command target, clap 4.6.6 prototype evidence, exact cutover/validation plan, proposed first-class Decision, and core/Pi handoff Tasks."
   evidence: ["Commit 3d82267 contains the completed research candidate", "Sideshow final candidate: http://localhost:8228/session/TgM6iL-l_-A/p/iFI5r_sqMJQ", "Clap prototype confirmed nested help, global JSON placement, leading-hyphen prose, duplicate scalar errors, repeatable lists, empty rejection, and contextual errors", "Measured isolated stripped clap delta 500752 bytes and cold release build about 5.1 seconds"]
   filesChanged: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "tandem/plan/spec.md"]
-  updatedAt: "2026-08-30T17:42:36Z"
+  reviewer: "Algorant"
+  note: "Owner accepted the protocol 0.3.0/clap cutover research and authorized creation of implementation Tasks."
+  updatedAt: "2026-08-30T17:47:36Z"
 assignee: "pi"
+review.note: "Accepted after interactive review. The cutover ledger, research artifact, Decision draft, prototypes, validation plan, and handoff specifications are approved."
+review.requestedAt: "2026-08-30T17:47:29Z"
+review.reviewer: "Algorant"
+review.status: "accepted"
+review.decidedAt: "2026-08-30T17:47:33Z"
+completedAt: "2026-08-30T17:47:41Z"
+completion:
+  summary: "Completed and owner-validated the comprehensive protocol 0.3.0 and clap CLI cutover research. Produced the accepted decision ledger, full grammar/compatibility audit, clap 4.6.6 prototypes, exact core cutover specification, validation plan, and cross-workspace handoff requirements."
+  filesChanged: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "tandem/plan/spec.md"]
+  validation: "Owner reviewed all eleven interactive sequences and accepted decision-12. git diff --check passed; all required artifact sections are complete; clap prototype and Sideshow candidates were reviewed."
+  reviewer: "Algorant"
 ---
 
 ## Description
