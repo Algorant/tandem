@@ -9,12 +9,19 @@ references: ["papercut-1", "papercut-9", "decision-3", "decision-8"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/src/cli/mod.rs", "tandem/src/cli/args.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/landing.rs", "tandem/src/cli/output.rs", "tandem/tests/cli_behavior.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/plan/modularization-research.md", "extensions/pi-tandem/", "AGENTS.md"]
 tags: ["config", "cli", "research", "clap"]
 createdAt: "2026-08-30T12:30:45Z"
-updatedAt: "2026-08-30T13:50:09Z"
+updatedAt: "2026-08-30T17:42:36Z"
 accord:
-  status: "claimed"
+  status: "delivered"
   assignee: "pi"
   claimedAt: "2026-08-30T13:50:09Z"
-  updatedAt: "2026-08-30T13:50:09Z"
+  deliveredAt: "2026-08-30T17:42:36Z"
+  deliverables: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "tandem/plan/spec.md link"]
+  validation:
+    commands: ["git diff --check", "All 10 required artifact sections present", "No pending phase placeholders remain", "Planning artifact links resolve", "Disposable clap 4.6.6 derive prototype built and exercised", "Target grammar/help/JSON/value edge cases prototyped"]
+  summary: "Completed the interactive CLI/protocol audit and comprehensive clap cutover specification. Produced the authoritative protocol 0.3.0 decision ledger, full current grammar inventory, selected 23-command target, clap 4.6.6 prototype evidence, exact cutover/validation plan, proposed first-class Decision, and core/Pi handoff Tasks."
+  evidence: ["Commit 3d82267 contains the completed research candidate", "Sideshow final candidate: http://localhost:8228/session/TgM6iL-l_-A/p/iFI5r_sqMJQ", "Clap prototype confirmed nested help, global JSON placement, leading-hyphen prose, duplicate scalar errors, repeatable lists, empty rejection, and contextual errors", "Measured isolated stripped clap delta 500752 bytes and cold release build about 5.1 seconds"]
+  filesChanged: ["plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md", "tandem/plan/spec.md"]
+  updatedAt: "2026-08-30T17:42:36Z"
 assignee: "pi"
 ---
 
