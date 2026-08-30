@@ -28,7 +28,25 @@ plus source reading of `tandem/src/cli/{mod,args,commands,landing}.rs`,
 
 ## 1. Executive recommendation
 
-Pending phase 2.
+Adopt `clap` 4.6.x with default features plus `derive`, and replace the
+handwritten parser in one comprehensive protocol 0.3.0/core CLI cutover. Do not
+migrate the existing 39-command grammar unchanged. The parser is only one
+symptom: Tandem currently expresses the same read, lifecycle, and record
+operations through parallel Task, Log, Decision, Papercut, Accord, and Review
+command families.
+
+The selected cutover reduces the core to 23 invocable leaf commands across 13
+root subcommands and three nested families (`add`, `accord`, `rules`). It
+retains separate structured `list` and full-text `search`, makes `--json`
+global, unifies lookup/update, removes direct state movement and Review status,
+makes Accord mandatory for active Tasks, moves Papercuts into tagged Tasks,
+and introduces a clean protocol 0.3.0 storage layout.
+
+Implement it as one isolated Task/branch with ordered commits and no dual
+parser, compatibility reader, upgrade/migrate command, or partial merge. The
+complete interactive product decisions are authoritative in
+[`plan/cli-protocol-cutover.md`](../../plan/cli-protocol-cutover.md); preliminary
+proposals below are retained only as research history where marked.
 
 ## 2. Current CLI grammar and compatibility matrix
 
@@ -333,7 +351,7 @@ reopened (aliases are now permitted):
 
 Accidental and should not be preserved:
 
-- **A1.** PC1: `--help` fails on 26 of 27 leaf commands.
+- **A1.** PC1: generated/per-command help fails on 44 of 46 current help surfaces; only root help and `web --help` work.
 - **A2.** F3: the arbitrary `required_value`/`required_raw_value` split.
 - **A3.** F1/F2: stale `--help` text and the missing `review` landing entry.
 - **A4.** F5: the two divergent `decision` parser shapes.
@@ -342,20 +360,27 @@ Accidental and should not be preserved:
 - **A7.** 27 separately worded `unknown <command> flag` messages that a
   generated parser would render uniformly.
 
-### 2.12 Open compatibility questions for the owner
+### 2.12 Compatibility questions — resolved
 
-- **Q1.** Are the byte-exact `--help` and landing assertions in
-  `cli_behavior.rs` a contract, or may the cutover rewrite them to match
-  generated output?
-- **Q2.** Should `-h` and `-V` stay rejected under C1, or is short-flag help an
-  accepted exception?
-- **Q3.** Should A2 be resolved by making every free-text flag accept leading
-  dashes, or by requiring `--flag=value` for such values?
-- **Q4.** Is F7 fixed in this repository by adding `list --effort`, or in the
-  adapter by dropping the flag? Rule never-2 puts the adapter side out of scope
-  for core work.
+- Byte-exact current help/output is not a compatibility target; correctness and
+  the selected new contract replace it.
+- `-h`, `-V`, and `-j` are the only short aliases.
+- Every prose-class value accepts leading hyphens; typed values remain strict.
+- `list --effort` belongs in core Tandem because effort is a reasonable sibling
+  filter. Pi is not authoritative.
+- Existing workspace migration/retention is outside the protocol and cutover
+  implementation; workspace owners handle it project by project.
 
-### 2.13 Simplification and consolidation audit
+### 2.13 Preliminary simplification audit (superseded by the interactive ledger)
+
+The following S1–S15 proposals were the first audit pass. They identified real
+redundancy but are not the selected design where they conflict with
+`plan/cli-protocol-cutover.md`. In particular, the final design keeps full-text
+`search`, keeps Task state plus mandatory Accord status, keeps intent-shaped Pi
+tool choices open for the owning workspace, stores Rules as per-file records,
+and preserves the current TUI Board architecture.
+
+### 2.13.1 Original audit detail
 
 The parser is large partly because the command set is. 39 commands and 49 flags
 cover a protocol with four document kinds and three lifecycle axes. Most of the
@@ -633,44 +658,518 @@ rather than archival. Recorded as an option; not proposed.
 
 ## 3. Clap design
 
-Pending phase 2.
+### Dependency and features
+
+```toml
+clap = { version = "4.6", features = ["derive"] }
+```
+
+Current stable is 4.6.6, MSRV 1.85, license MIT OR Apache-2.0. Keep default
+features (`std`, `color`, `help`, `usage`, `error-context`, `suggestions`) and
+add `derive`. Do not enable `env`, `unicode`, `wrap_help`, `cargo`, unstable
+features, completions, or manpages. Do not add a Tandem `rust-version`
+declaration in this cutover.
+
+### Typed command model
+
+Use derive for one static command tree:
+
+```rust
+#[derive(Parser)]
+struct Cli {
+    #[arg(long, short = 'j', global = true)]
+    json: bool,
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    Init(InitArgs),
+    Add(AddArgs),
+    Show(ShowArgs),
+    List(ListArgs),
+    Search(SearchArgs),
+    Update(UpdateArgs),
+    Accord(AccordArgs),
+    Review(ReviewArgs),
+    Complete(CompleteArgs),
+    Cancel(CancelArgs),
+    Rules(RulesArgs),
+    Tui,
+    Web(WebArgs),
+}
+
+#[derive(Subcommand)]
+enum AddCommand { Task(AddTaskArgs), Decision(AddDecisionArgs) }
+#[derive(Subcommand)]
+enum AccordCommand { Claim(...), Deliver(...), Rework(...), Block(...), Resume(...), Release(...), Fail(...) }
+#[derive(Subcommand)]
+enum RulesCommand { List(...), Add(...), Edit(...), Delete(...) }
+```
+
+Clap owns grammar, occurrence, numeric parsing, `Scope`, and `ClearField`.
+Protocol/app owns every semantic vocabulary and transition; do not duplicate
+priority, effort, Decision status, Accord status, Rule category, hierarchy, or
+reference validity as parser enums.
+
+### Modules and conversion boundary
+
+```text
+cli/model.rs     derive structs/enums only
+cli/parse.rs     global JSON extraction, try_parse_from, clap error mapping
+cli/commands.rs  typed command to app options/invocation
+cli/output.rs    human/JSON rendering
+cli/landing.rs   no-args surface
+cli/mod.rs       startup wiring
+```
+
+Delete `args.rs`. Do not create one file per command. Parser structs contain
+interface values; conversion into app option types lives in `commands.rs`.
+Protocol/filesystem behavior never enters `model.rs` or `parse.rs`.
+
+### Startup and errors
+
+Extract exact `-j`/`--json` tokens before clap so grammar failures can honor the
+global JSON contract. Exact tokens are reserved; literal prose `--json` uses
+`--body=--json`. Call `Cli::try_parse_from` and intercept
+`DisplayHelp`/`DisplayVersion` for stdout/exit 0. Map real clap errors to usage
+exit 2 and the selected human/JSON renderer. Preserve
+`StartupRequest::{Exit,Tui,Web}` and defer workspace opening until after typed
+dispatch.
+
+Replace app-layer `CliError` coupling with `app::Error { kind, message,
+details }`; CLI and TUI render it independently.
 
 ## 4. Difficult-case prototype results
 
-Pending phase 2.
+A disposable `/tmp/tandem-clap-probe` used exact clap 4.6.6 with derive.
+Nothing was committed to production.
+
+| Case | Result |
+| --- | --- |
+| root/family/leaf `--help` | generated successfully through `DisplayHelp` |
+| global `--json` before root command | parsed |
+| global `--json` after nested leaf args | parsed |
+| `-j` alias | parsed |
+| positional title `"- Fix help"` | parsed with `allow_hyphen_values` |
+| `--body "- bullet"` | parsed |
+| repeated `--tag` | accumulated in order |
+| repeated scalar `--priority` | `ArgumentConflict`, exit 2 |
+| `--body ""` | reusable nonempty parser rejects it |
+| unknown flag | contextual usage + help hint |
+| `Scope`/`ClearField` | derive `ValueEnum` works for CLI-owned values |
+| `--body --json` | clap consumes `--json` as prose when hyphens are allowed; bootstrap extraction therefore reserves exact global tokens, while literal text uses `--body=--json` |
+
+The prototype confirmed that help/version are clap errors by design; Tandem must
+print those two kinds to stdout rather than using `Error::exit`.
+
+Measured locally:
+
+- cold release build: ~5.1 seconds;
+- stripped minimal plain Rust binary: 342,472 bytes;
+- stripped minimal clap probe: 843,224 bytes;
+- isolated clap parser cost: ~500,752 bytes;
+- current stripped Tandem release binary: 4,626,256 bytes.
+
+This is an upper-bound minimal-binary comparison, not a final Tandem size
+prediction. Record actual before/after release size during implementation.
 
 ## 5. Cutover specification
 
-Pending phase 2.
+### Target command surface
+
+Global: `-h/--help`, `-V/--version`, `-j/--json`. There is no `version` command,
+`upgrade`, command alias, global migration flag, or per-command JSON option.
+
+```text
+tandem init [--title <title>]
+
+tandem add task <title>
+  --acceptance <text>... [--body <markdown>] [--kind epic]
+  [--priority <value>] [--effort <value>] [--tag <tag>]...
+  [--due-date <date>] [--parent <task-id>] [--blocker <id>]...
+  [--reference <id>]... [--related-file <path>]...
+  [--constraint <text>]... [--validation <text>]...
+
+tandem add decision <title>
+  [--body <markdown>] [--decider <name>]... [--supersedes <id>]...
+  [--reference <id>]... [--tag <tag>]...
+
+tandem show <id>
+
+tandem list [--scope active|archived|all] [--type task|decision]
+  [--state <value>] [--priority <value>] [--effort <value>]
+  [--tag <tag>]... [--assignee <name>] [--parent <id>]
+  [--accord <status>] [--decision-status <status>]
+  [--resolution <completed|canceled|failed>] [--limit <n>]
+
+tandem search <query> [--scope active|archived|all]
+  [--type task|decision] [--state <value>] [--tag <tag>]...
+  [--parent <id>] [--limit <n>]
+
+tandem update <id>
+  [--title <text>] [--body <markdown>] [type-specific metadata/list flags]
+  [--clear <field>]...
+
+tandem accord claim <id> --assignee <name>
+tandem accord deliver <id> --summary <text> --evidence <text>...
+  [--file-changed <path>]...
+tandem accord rework <id> --note <text>
+tandem accord block <id> --note <text>
+tandem accord resume <id>
+tandem accord release <id> --note <text>
+tandem accord fail <id> --note <text>
+
+tandem review <id> --criterion <text> --note <text> [--reviewer <name>]
+tandem complete <id> [--reviewer <name>]
+tandem cancel <id> --note <text>
+
+tandem rules list [always|never|prefer|context]
+tandem rules add <category> <text> [--source <id>]
+tandem rules edit <category-id> <text> [--source <id>] [--clear source]
+tandem rules delete <category-id>
+
+tandem tui
+tandem web [--port <1..65535>] [--no-open]
+```
+
+`update` infers record type. Common fields are title, body, tags, and references.
+Task-only fields include priority, effort, due date, parent, blockers, related
+files, Accord acceptance/constraints/planned validation. Decision-only fields
+include status, deciders, and supersedes. `update` never writes Task state,
+assignee, or Accord status. Present list flags replace the complete list; absent
+means unchanged; `--clear` removes it.
+
+This is 23 invocable leaves: 10 flat leaves plus 13 leaves under three families
+(`add` 2, `accord` 7, `rules` 4). Root, families, and leaves produce 27 generated
+help surfaces.
+
+### Protocol and persistence cutover
+
+Normative version becomes 0.3.0. Layout:
+
+```text
+.tandem/tasks/
+.tandem/decisions/
+.tandem/rules/
+.tandem/logs/
+.tandem/events/<actor-id>.jsonl
+.tandem/tandem.md
+```
+
+Papercuts become low-priority Tasks tagged `papercut`. Active Tasks require a
+mandatory Accord with status `ready`, at least one acceptance criterion, and
+optional constraints/planned validation. Task state remains
+`todo|in-progress|validation`; Review status is deleted. Validation is only an
+explicit human escalation. Full definitions and transitions are in the living
+cutover ledger.
+
+No production upgrade/migrate/converter, compatibility reader, dual protocol,
+or workspace backup convention ships. Existing workspace handling is owned
+project by project outside this cutover.
+
+### Files/modules
+
+- normative: update `protocol/README.md`, `protocol/plan/spec.md`, protocol todo;
+- protocol Rust: rewrite Accord/review/workflow/document/event/rule semantics;
+  remove Papercut and legacy-version paths;
+- project: replace Board/Papercut/config-Rule storage with typed directories and
+  per-file Rules; keep per-actor events only;
+- app: implement typed reads, deterministic update replacement, Accord/review/
+  archive transitions, `app::Error`;
+- CLI: add clap/model/parse; delete `args.rs`; shrink dispatch; unify output;
+- TUI: preserve current Board list/subviews and State/Epic arrangements, add
+  Papercuts as fourth Board section, remove Add/direct Move, adapt Validation;
+- web: compile and read the new app/storage model; broader redesign deferred;
+- tests/docs: replace stale exact-help/current-protocol contracts.
+
+### Implementation order and rollback
+
+One comprehensive Task and isolated branch/worktree. Ordered commits:
+normative protocol → Rust protocol → project → app/error → clap CLI → output and
+tests → targeted TUI → docs/removal. Nothing merges until coherent. Rollback is
+discard/rework of the branch, never a shipped second parser or protocol path.
+
+### Task-ready acceptance
+
+- protocol 0.3.0 normative and executable semantics agree;
+- only the target command tree parses; every removed command/flag fails usage;
+- all 27 help surfaces work without a workspace;
+- manual parser and `args.rs` are gone;
+- global JSON covers every command and error;
+- Task/Accord/validation/archive flows match the ledger;
+- new directory layout and per-file Rules are the only runtime storage path;
+- PC9 replacement/clear semantics pass process tests;
+- TUI preserves existing architecture with the targeted changes;
+- release build/tests/lint pass and binary-size delta is recorded;
+- no adapter, migration, backup, fallback, completion, or manpage work is
+  smuggled into core scope.
 
 ## 6. Test and validation plan
 
-Pending phase 2.
+### Parser and generated help
+
+- `Cli::command().debug_assert()`;
+- table-driven `try_parse_from` tests for every leaf, required positional/flag,
+  scalar repetition, repeated lists, clear fields, typed numbers, leading
+  hyphen prose, global JSON placement, and removed grammar;
+- recursively traverse root/family/leaf command tree and assert help exit 0,
+  nonempty Usage/description, no workspace access, and exactly 27 surfaces;
+- help/version text always stdout and uncolored when non-TTY/`NO_COLOR`;
+- JSON bootstrap tests, including parse failure with `--json` before/after the
+  failing command and literal `--body=--json`.
+
+### Process contract
+
+Rewrite `tests/cli_behavior.rs` around semantic assertions rather than freezing
+all generated prose byte-for-byte. Assert stdout/stderr separation, exit 0/1/2,
+JSON success/error envelopes, stable error codes, unknown suggestions, missing
+workspace behavior after successful parse, and landing output.
+
+### Protocol/app/project
+
+- new-workspace layout and 0.3.0 config;
+- mandatory active Accord, ready/claim/deliver/rework/block/resume/release/
+  fail/complete transitions and evidence requirements;
+- exceptional validation entry/accept/rework only;
+- Epic/Task/Subtask identity and task-only parent hierarchy;
+- Papercut-tagged Tasks and Board exclusion rules;
+- typed Task/Decision/Rule lookup across active/archive stores;
+- deterministic list replacement/clear and no lifecycle bypass through update;
+- minimal resolution logs and optional Accord on historical Logs;
+- per-file Rule allocation/mutation;
+- per-actor structured events for every durable mutation.
+
+### TUI/web/release
+
+- TUI rendering tests for four Board sections and unchanged State/Epic layout;
+- TUI interaction tests proving Add/Move removal and adapted Validation paths;
+- render a release TUI pane for layout/colors if implementation changes visible
+  structure; escalate temporal behavior only when unverified;
+- web smoke tests against new read models; no visual redesign acceptance;
+- `cargo test`, release build, lint/format, real-command smoke suite;
+- record clean/cached build timing and stripped release-size delta.
+
+No human review is required for criteria that automated/process/rendered evidence
+can settle. Request it only for any remaining product/visual judgment.
 
 ## 7. PC1 and PC9 dispositions
 
 ### PC1 — `<command> --help`
 
-Fully characterized in 2.7. Resolution criterion: every invocable command and
-subcommand family responds to `--help` on stdout with exit 0, without a
-workspace. Today 2 of 46 surfaces do. Under the 2.13 consolidation the surface
-count drops to 29, which is 29 help pages that generate themselves rather than
-46 hand-written ones.
+Resolve in the core cutover. Every root/family/leaf help surface (27 in the
+target tree) must emit generated help on stdout with exit 0 and no workspace.
+Delete static per-command help and the false landing promise becomes true by
+construction.
 
 ### PC9 — list field replacement
 
-Confirmed in 2.3: `--tag`, `--reference`, `--related-file`, `--blocker`, and
-`--file-changed` push onto a `Vec` with no replace, clear, or remove syntax,
-while `--body ""` clears. Sequencing recommendation pending phase 2.
+Resolve in the same cutover because update grammar is being replaced. For every
+list-valued field: absent means unchanged; present repeated values replace the
+complete list; `--clear <field>` removes it. Scalar supplied values must be
+nonempty. There are no additive defaults, add/remove flag pairs, or empty-string
+clearing aliases.
 
 ## 8. Decision draft
 
-Pending phase 2.
+**Proposed title:** Adopt protocol 0.3.0 and a clap-derived minimal CLI
+
+**Status:** Proposed — do not mark accepted until owner review.
+
+**Deciders:** Algorant
+
+**References:** `task-246`, `papercut-1`, `papercut-9`, `decision-3`,
+`decision-8`, `plan/cli-protocol-cutover.md`
+
+### Context
+
+Tandem's handwritten parser spans 1,147 lines in `args.rs`, repeats flag and
+error logic across 39 invocable commands, and provides working help on only two
+of 46 current help-relevant surfaces. Static help and landing output already
+drift from dispatch. Scalar options silently overwrite, prose hyphen handling
+is arbitrary, list metadata cannot be replaced/cleared, and Pi can emit a core
+flag the CLI rejects.
+
+Sustained use also showed that migrating the current grammar unchanged would
+preserve product duplication: Task, Log, Decision, and Papercut read families;
+separate Move/update state paths; Review status duplicating Validation;
+Papercuts implemented as a parallel record system; Rules embedded in shared
+config; and completion metadata duplicating Accord delivery.
+
+### Decision
+
+Adopt protocol 0.3.0 and the complete product/CLI contract in
+`plan/cli-protocol-cutover.md`.
+
+Use clap 4.6.x with default features plus derive for one static command model.
+Remove the handwritten parser in one comprehensive cutover and do not ship dual
+parsers. Use 13 root subcommands and 23 invocable leaves, with typed `add`,
+`accord`, and `rules` families; unified lookup/update; separate structured list
+and full-text search; global JSON; generated help; mandatory active Task Accord;
+tagged-Task Papercuts; per-file Rules; typed storage directories; minimal Logs;
+and structured per-actor events.
+
+Preserve Decision as first-class ADR content, fixed Epic → Task → Subtask roles,
+parent-derived Subtask IDs, Task state plus separate mandatory Accord status,
+and exceptional human Validation. Preserve the current TUI list/subview and
+State/Epic arrangement architecture; make only the targeted protocol
+adaptations.
+
+Use one isolated implementation Task/branch. Normative protocol changes precede
+Rust implementation inside the branch. Merge only the coherent candidate. Old
+workspace handling is outside the protocol/cutover; the new binary supports
+0.3.0 only and fails clearly on older versions.
+
+### Compatibility policy
+
+Correct new behavior replaces current byte-exact output, command, flag, field,
+storage, and protocol compatibility. No upgrade/migrate command, implicit
+conversion, compatibility reader, backup convention, parser fallback, alias
+shim, or old protocol path ships.
+
+Help/version remain generated text. Human output uses stdout for results and
+stderr for warnings/errors. Global JSON uses stdout-only success/error
+envelopes. Exit statuses remain 0 success, 2 usage, 1 operational failure.
+
+### Consequences
+
+- PC1 and PC9 resolve in the core cutover.
+- Protocol/app/project/CLI/TUI tests and docs require broad replacement.
+- `app::Error` removes shared app dependence on CLI process errors.
+- The isolated parser cost is approximately 501 KB stripped and raises the
+  effective toolchain floor to clap's Rust 1.85, though Tandem does not declare
+  an MSRV.
+- Shell completions, manpages, web redesign, TUI contextual lifecycle picker,
+  workspace migration, and Pi adapter implementation remain separate.
+- The Pi integration requires an owning-workspace overhaul after the core CLI
+  exists; its final tool inventory is intentionally not predetermined here.
+
+### Supersession and amendment
+
+This Decision supersedes the v0 guidance prohibiting clap and the current v0
+CLI/protocol command/storage/lifecycle decisions that conflict with the
+cutover ledger. It does not supersede decision-8's protocol/project/app/peer
+interface ownership direction; `app::Error` and the typed CLI strengthen it. It
+amends decision-3's Rust stack by adding clap as the canonical CLI parser.
+
+### Alternatives
+
+- Preserve handwritten parsing and patch help: rejected because grammar,
+  generated documentation, error uniformity, and repetition remain manually
+  synchronized.
+- Port the existing 39-command grammar directly to clap: rejected because it
+  preserves product duplication and conditional one-offs.
+- Split the core cutover into separately merged protocol/CLI/TUI Tasks:
+  rejected because intermediate compatibility or broken main states would be
+  required across heavily overlapping files.
+- Builder-only or derive+parallel-builder models: rejected because the command
+  tree is static and one derive source is sufficient.
+- One universal record/tool abstraction: rejected where type-specific Task,
+  Decision, Rule, and agent intent semantics improve clarity.
 
 ## 9. Cross-workspace impact and handoff tasks
 
-Pending phase 3. Preliminary surface identified in 2.10.
+### Core Tandem repository
+
+**Core implementation Task (ready to create after Decision approval)**
+
+**Title:** Implement protocol 0.3.0 and the comprehensive clap CLI cutover
+
+**Priority/effort:** critical / large
+
+**Blockers:** accepted Decision drafted in section 8; completion of `task-246`
+
+**References:** `task-246`, `papercut-1`, `papercut-9`, accepted Decision ID,
+`decision-3`, `decision-8`
+
+**Related files:** `protocol/`, `tandem/Cargo.toml`, `tandem/src/protocol/`,
+`tandem/src/project/`, `tandem/src/app/`, `tandem/src/cli/`,
+`tandem/src/main.rs`, targeted `tandem/src/tui/`, `tandem/src/web/`,
+`tandem/tests/cli_behavior.rs`, `tandem/README.md`, planning/spec docs.
+
+**Body/acceptance:** use section 5 Task-ready acceptance and section 6 test plan
+verbatim. Work in one isolated branch/worktree with the section 5 commit order.
+Do not modify adapters, migrate workspaces, ship fallbacks, or partially merge.
+
+### Project-local `extensions/pi-tandem/`
+
+Affected because every argument builder and guidance surface assumes current
+CLI/protocol shapes. Rule never-2 prohibits changing it inside core work. Create
+an explicit adapter Task in this Tandem workspace after core Decision approval,
+blocked by the core cutover, if this project-local adapter remains a maintained
+distribution surface. Its requirements should match the owning Pi overhaul
+below rather than copying protocol behavior.
+
+### Canonical Pi configuration/extensions workspace
+
+Owning Tandem workspace: `~/.pi`. Implementation source:
+`~/.dotfiles/pi/.pi/agent/extensions/pi-tandem/` and related skill/agency/alias/
+manifest files.
+
+**Handoff title:** Overhaul pi-tandem for Tandem protocol 0.3.0 and the
+comprehensive CLI cutover
+
+**Blocker:** completed and installed core cutover
+
+**Requirements:** use the complete ready-to-create handoff in
+`plan/cli-protocol-cutover.md` section 10. Audit the integration after the CLI
+exists; retain/refactor/combine/create/remove tools by agent utility, not CLI
+mirroring. Preserve convenient Papercut-tagged Task capture. Use argument arrays
+and global JSON only; never parse/mutate files or own protocol behavior.
+
+Do not create or mutate the external Task/workspace during research. Owner
+reviews the map first.
+
+### TUI and web
+
+Required TUI adaptation is part of the core Task because the protocol/storage
+change otherwise breaks the peer interface. A contextual lifecycle picker is a
+separate proposed research Task, not a blocker. Web must compile/read the new
+app model in core; broader visual/information redesign is deferred until the
+TUI settles.
+
+### Docs, scripts, release automation, tests
+
+Repository help/README/spec/tests construct or assert old argv and output and
+must change in core. No independent release script consumer was found that
+requires a separate workspace Task. Release notes must call out the breaking
+0.3.0 workspace/CLI contract and absence of migration support.
 
 ## 10. Risks, rejected alternatives, open questions
 
-Pending phase 2. Owner questions to date: Q1–Q4 in 2.12.
+### Risks
+
+- **R1 — cutover breadth.** Protocol/storage/app/CLI/TUI overlap makes the Task
+  large. Mitigation: one isolated branch with ordered commits and full review,
+  not partial merges.
+- **R2 — semantic drift between normative and Rust protocol.** Mitigation:
+  normative commit first, executable protocol tests before interface work.
+- **R3 — JSON parse-error bootstrap.** Reserved `-j`/`--json` extraction is a
+  narrow preparse rule. Test every placement and literal `--flag=--json` case.
+- **R4 — TUI accidental redesign.** The research briefly inferred kanban
+  columns. Final contract explicitly preserves current subview/list and
+  State/Epic arrangement architecture.
+- **R5 — adapter break window.** Core and Pi overhaul are separate. Coordinate
+  installation/handoff at the workspace-owner level; do not add core shims.
+- **R6 — size/build cost.** Isolated clap cost is ~501 KB and ~5.1 second cold
+  probe build. Measure actual release delta before integration.
+- **R7 — mandatory Accord friction.** Every active Task needs acceptance
+  criteria. TUI creation is removed rather than shipping an incomplete form;
+  CLI and adapters must make the requirement clear.
+
+### Rejected alternatives
+
+Rejected alternatives are recorded in the cutover ledger per sequence. The
+major rejected paths are: direct port of current grammar; dual parser; protocol
+fallbacks; global task IDs for Subtasks; a separate Papercut protocol; generic
+parent documents; Review status; routine Validation; accepted-but-active Tasks;
+optional Accord; duplicate assignees; completion evidence duplication; shared
+events JSONL; Rules in shared config; kanban TUI redesign; speculative Pi tool
+inventory; shell/man generation; and separately merged core cutover stages.
+
+### Open questions
+
+No unresolved owner/product questions remain from the interactive sequence.
+Implementation may discover technical defects, but it must return for a new
+Decision rather than silently changing the selected contract.

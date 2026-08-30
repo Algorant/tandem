@@ -21,6 +21,12 @@ live in `../src/protocol/`; concrete project files are owned by
 
 The CLI/TUI baseline is broad feature parity with the live Brainfile project: keep the general command/workflow shape, then intentionally improve the flawed parts. The intent is not to port the current Brainfile Ink TUI directly. Strict Epic → Task → Subtask classification and validation are implemented canonically and are consumed by both interfaces; remaining TUI gaps are tracked separately.
 
+A proposed protocol 0.3.0 and comprehensive clap CLI redesign is documented in
+[`clap-migration-research.md`](clap-migration-research.md) with its interactive
+living ledger in [`../../plan/cli-protocol-cutover.md`](../../plan/cli-protocol-cutover.md).
+The proposal is not accepted product behavior until owner review and a
+first-class Tandem Decision.
+
 ## Baseline inputs
 
 - Live Brainfile CLI behavior from `brainfile --help` and subcommand help.

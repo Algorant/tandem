@@ -93,6 +93,19 @@ preserved merely because it exists. Each behavior must earn its place.
 | D66 | TUI structure | provisional | Preserve the current state-subview tabs, full-width selected-state rows, detail behavior, and State/Epic Board arrangement toggle. Do not replace it with kanban columns. |
 | D67 | TUI cutover mutations | provisional | Remove TUI Add and direct Move. Keep and adapt existing Validation controls only; other Accord lifecycle actions remain CLI-only in this cutover. |
 | D68 | Contextual lifecycle UI | proposed follow-up | Explore one contextual valid-actions picker in a separate TUI research Task; it is not part of the core cutover. |
+| D69 | Protocol version | provisional | The redesigned protocol version is 0.3.0. |
+| D70 | Historical Log schema | provisional | Active Tasks require Accord. Accord remains optional on canonical Logs so imported/pre-Accord history is not fabricated; new Logs naturally preserve Accord. |
+| D71 | Existing workspaces | convention | Workspace owners handle existing 0.2.0 state project by project outside this cutover. No migration, archive, backup, conversion, ID-continuity, or recreation work belongs to this design or implementation plan. |
+| D72 | Pi adapter boundary | handoff | Do not predetermine final Pi tool inventory. The ~/.pi overhaul Task audits and redesigns tools against the finished CLI; preserve convenient Papercut-tagged Task capture and keep all protocol logic in core. |
+| D73 | Clap dependency | provisional | Adopt clap 4.6.x (current 4.6.6) with default features plus derive, using the normal compatible Cargo range. |
+| D74 | Rust version policy | provisional | Do not add a rust-version package declaration as part of this cutover. |
+| D75 | Generated artifacts | provisional | Defer shell completions and manpages. |
+| D76 | JSON bootstrap | provisional | Extract exact -j/--json tokens before clap parsing so grammar failures honor JSON mode; literal reserved-token prose uses --flag=--json. |
+| D77 | Validation ownership | provisional | Clap validates grammar and CLI-only enums; app/protocol retains all semantic vocabularies, transitions, hierarchy, and persistence validation. |
+| D78 | Help under JSON | provisional | Help/version always emit generated human text and exit 0 even when --json is present. |
+| D79 | Core implementation unit | provisional | Implement as one comprehensive Task on one isolated branch/worktree with ordered commits; review and merge only as a coherent candidate. |
+| D80 | CLI module structure | provisional | Replace args.rs with ownership-based model.rs and parse.rs; retain commands.rs, output.rs, landing.rs, and a wiring-only mod.rs. Do not create one file per command. |
+| D81 | Shared app errors | provisional | Replace app-layer CliError coupling with app::Error carrying stable operational kinds/details; CLI and TUI map it independently. |
 
 ## Interactive sequence
 
@@ -698,15 +711,211 @@ ID          PRI   ACCORD     RELATION   TITLE                 ASSIGNEE
 
 ## 9. Protocol version and direct cutover
 
-Pending.
+### Version and transition strategy
+
+- **D69 — protocol 0.3.0.** This remains an explicitly pre-1.0 protocol while
+  Tandem is actively reshapeable.
+- **D70 — historical Logs need no fabricated Accord.** Active Tasks require
+  Accord. Canonical Logs permit Accord to be absent because imported history
+  may predate the agreement model. Every Log created by 0.3.0 naturally retains
+  the Task's Accord.
+- **D71 — existing workspace handling is outside this cutover.** The project
+  owner handles old 0.2.0 state project by project. This document establishes
+  the new convention only. It does not prescribe or implement migration,
+  archive, backup, conversion, ID continuity, record recreation, tags, renamed
+  directories, or temporary tooling.
+- No `upgrade`, `migrate`, implicit converter, compatibility reader, backup
+  directory convention, or dual protocol implementation ships. An encountered
+  0.2.0 workspace fails clearly with detected and required protocol versions.
+
+### Protocol 0.3.0 convention
+
+A newly initialized workspace contains the D46 layout, D19–D27 Accord model,
+D47 Log shape, and D50–D52 event ledger. Runtime behavior is defined only for
+0.3.0. How any existing project chooses to retain or replace prior coordination
+state is not a Tandem protocol concern.
 
 ## 10. Cross-workspace handoffs
 
-Pending.
+### Pi adapter overhaul
+
+Do not pre-design the final Pi tool inventory in this workspace. CLI command
+consolidation does not imply that intent-shaped agent tools must disappear, and
+preserving old tool names does not imply that old protocol behavior survives.
+The owning implementation Task must make those choices against the finished
+CLI.
+
+Required handoff:
+
+**Title:** Overhaul pi-tandem for Tandem protocol 0.3.0 and the comprehensive
+CLI cutover
+
+**Owning workspace:** `~/.pi`
+
+**Implementation source:**
+`~/.dotfiles/pi/.pi/agent/extensions/pi-tandem/`
+
+**Blocker:** completed and installed core protocol 0.3.0/CLI cutover
+
+**Goal:** Audit and refactor the entire Pi integration against the installed
+canonical CLI. Map agent intents to the new command and JSON contracts. Retain,
+combine, create, or remove tools based on model-call utility rather than
+one-to-one CLI mirroring.
+
+**Required scope:**
+
+- inspect every current tool schema, argument builder, renderer, command,
+  manifest entry, alias, test, README section, prompt guideline, and skill rule;
+- use `execFile`/argument arrays and global `--json` envelopes exclusively;
+- never parse or mutate Tandem Markdown, storage directories, events, IDs,
+  hierarchy, Accord, lifecycle, or Rule files in TypeScript;
+- remove old assumptions about `move`, per-command JSON, Review status,
+  `accord accept`, separate Log/Decision/Papercut CLI families, additive list
+  updates, `--description`, and current Rule argument shape;
+- preserve a convenient agent intent for adding Papercut-tagged low-priority
+  Tasks with mandatory Accord acceptance, whether through a retained
+  `tandem_papercut` tool or a better schema chosen in that Task;
+- evaluate intent-shaped `tandem_log`, `tandem_decision`, `tandem_task`, and
+  other tools on their merits at implementation time; this document does not
+  predetermine their survival or exact names;
+- update `pi-tandem` skill guidance, `pi-agency` validation guidance,
+  `pi-cc-use` aliases, config manifest, tests, README, widget/help inventory,
+  and any generated/projection surfaces;
+- validate real tool calls against an installed protocol 0.3.0 CLI, including
+  creation, Accord delivery, exceptional human review, archived scope, Rule
+  operations, Decision authoring, explicit clearing, errors, and Papercut
+  capture.
+
+**Acceptance:**
+
+- no emitted argv references a removed command or flag;
+- every tool parses the canonical JSON success/error envelope and respects
+  process exit status;
+- no integration code owns protocol or persistence behavior;
+- Papercut capture remains convenient for agents;
+- stale tools/guidance are removed rather than shimmed;
+- retained and new tools have focused closed schemas and passing real-command
+  tests.
+
+**References:** `task-246`, the accepted protocol/CLI Decision, and the core
+cutover Task ID once created.
+
+**Related files:**
+
+- `~/.dotfiles/pi/.pi/agent/extensions/pi-tandem/`
+- `~/.dotfiles/pi/.pi/agent/skills/pi-tandem/SKILL.md`
+- `~/.dotfiles/pi/.pi/agent/extensions/pi-agency/`
+- `~/.dotfiles/pi/.pi/agent/extensions/pi-cc-use/`
+- `~/.dotfiles/pi/.pi/agent/config-manifest.json`
+
+Do not create this Task until the owner approves the complete handoff map. Do
+not mutate the external workspace during `task-246`.
 
 ## 11. Clap architecture and implementation plan
 
-Pending.
+### Dependency choice
+
+- **D73 — clap 4.6.x.** Current stable is 4.6.6 (2026-08-06), MSRV 1.85,
+  license MIT OR Apache-2.0. Use normal Cargo compatibility rather than exact
+  pinning:
+
+```toml
+clap = { version = "4.6", features = ["derive"] }
+```
+
+Default features supply help, usage, color, error context, and suggestions.
+Do not enable env, unicode, wrap_help, cargo, unstable, completion, or manpage
+features.
+- **D74 — no package MSRV declaration.** Clap has an effective dependency floor
+  of Rust 1.85, but this cutover does not add `rust-version` or pin the user
+  toolchain.
+- **D75 — no generated shell/man artifacts.** Defer them until distribution has
+  an observed need.
+
+Measured disposable prototype:
+
+- derive supports the full nested static tree and global `--json` before/after
+  nested subcommands;
+- prose values with leading hyphens parse; duplicate scalar options fail;
+  repeatable lists append; empty values fail through a reusable value parser;
+- root/family/leaf help and typo suggestions generate correctly;
+- cold release build: about 5.1 seconds on the current machine;
+- stripped minimal binary: 342 KB plain Rust versus 843 KB with clap, roughly
+  501 KB isolated parser cost; current stripped Tandem is 4.63 MB;
+- four clap-family packages enter the lockfile.
+
+### Parser ownership and startup
+
+- Use derive for the complete static command model. Do not maintain a builder
+  command model in parallel. Narrow `Cli::command()` access is allowed for help
+  tests and styles.
+- Use `Cli::try_parse_from`; never let clap print or terminate the process.
+- **D76 — bootstrap JSON mode.** Extract exact `-j`/`--json` argv tokens before
+  parsing so grammar errors can use the JSON envelope. These tokens are globally
+  reserved. Literal prose exactly equal to `--json` uses `--body=--json` (or the
+  corresponding prose flag); ordinary leading-hyphen Markdown remains direct.
+- **D77 — protocol semantics stay below CLI.** Clap validates grammar, required
+  occurrence, repetition, numeric parsing, and CLI-owned `Scope`/`ClearField`.
+  App/protocol validates priority, effort, Decision status, Accord transitions,
+  Rule categories, hierarchy, references, versions, and filesystem state. Do
+  not duplicate protocol enums as `ValueEnum`.
+- **D78 — help/version remain text.** `--json --help` and `--json --version`
+  print generated human documentation and exit 0; they are not result
+  envelopes.
+- Preserve `StartupRequest::{Exit,Tui,Web}`. Parsing and documentation exits
+  never discover a workspace. TUI/Web open the project only after typed startup
+  dispatch.
+
+```text
+raw argv
+  → extract reserved -j/--json
+  → Cli::try_parse_from
+  → DisplayHelp/DisplayVersion → stdout, 0
+  → grammar error → human/JSON renderer, 2
+  → typed command → app operation → human/JSON renderer
+  → StartupRequest for TUI/Web
+```
+
+### Implementation shape
+
+- **D79 — one comprehensive core Task and branch.** Protocol, storage, app,
+  clap CLI, tests, and required TUI adaptation overlap too heavily for separate
+  partial merges. Use one isolated worktree/branch with ordered reviewable
+  commits; review and merge only when coherent.
+- **D80 — ownership-based CLI modules.** Delete `cli/args.rs`. Add `model.rs`
+  for derive types and `parse.rs` for JSON bootstrap/clap mapping. Keep
+  `commands.rs`, `output.rs`, `landing.rs`; shrink `mod.rs` to startup dispatch.
+  Do not create one module per command.
+- **D81 — shared operations return `app::Error`.** Remove shared app dependence
+  on process-oriented `CliError`. `app::Error` carries stable operational kind,
+  message, and optional details. CLI maps to exit/JSON/human output; TUI maps to
+  UI feedback. Parse/usage errors remain CLI-owned.
+
+```text
+cli/
+  model.rs
+  parse.rs
+  commands.rs
+  output.rs
+  landing.rs
+  mod.rs
+```
+
+Implementation commit order:
+
+1. Normative protocol 0.3.0 specification and Decision.
+2. Rust protocol types/validation.
+3. Project storage layout, discovery, events, and Rule files.
+4. App operations, Accord lifecycle, archive behavior, and `app::Error`.
+5. Clap dependency, derive model, parser/error bootstrap, typed dispatch.
+6. Unified output/JSON, read scope, update replacement, help.
+7. Process, protocol, app, and generated-help tests.
+8. Targeted TUI adaptation preserving current structure.
+9. Docs, landing, release notes, and removal of superseded code.
+
+Rollback boundary is the isolated branch. If the candidate fails review, discard
+or rework it. Never merge a dual parser, protocol compatibility path, or partial
+cutover.
 
 ## Related evidence
 
