@@ -1,11 +1,14 @@
 ---
 id: papercut-5
 title: "Worker-side accord transitions do not survive integration"
-status: open
+status: "resolved"
 createdAt: "2026-08-22T23:08:02Z"
-updatedAt: "2026-08-22T23:08:02Z"
-references: ["papercut-4", "task-237", "task-238", "task-239"]
+updatedAt: "2026-08-30T12:51:40Z"
+references: ["papercut-4", "task-237", "task-238", "task-239", "decision-11", "task-228"]
 tags: ["accord", "integration", "workers", "workflow", "worktrees"]
+resolution:
+  note: "Resolved by the current Worker and orchestrator contract. Worker kickoff instructions and Pi Agency guidance now prohibit Workers from running Tandem lifecycle transitions; Workers report implementation evidence only. The orchestrator records transitions from the main checkout, and Worker integration requires a clean source, preventing uncommitted worktree-local `.tandem` transitions from being silently integrated or discarded as lifecycle truth."
+  resolvedAt: "2026-08-30T12:51:40Z"
 ---
 ## Observed
 

@@ -1,11 +1,14 @@
 ---
 id: papercut-2
 title: "worker_integrate refuses as cross-owner despite successful worker_recover"
-status: open
+status: "resolved"
 createdAt: "2026-08-17T20:54:48Z"
-updatedAt: "2026-08-17T20:54:48Z"
+updatedAt: "2026-08-30T12:51:25Z"
 references: ["task-230"]
 tags: ["herdr", "integration", "ownership", "worker"]
+resolution:
+  note: "Resolved externally by Dotfiles Pi configuration task-253. Pi Agency now scopes Worker integration outcomes, delivery records, and in-flight merge deduplication by repository identity (`repoKey`) while preserving same-repository cross-owner refusal. Durable task-230 records confirm the original failure was a cross-repository ID collision: a Dotfiles task-230 integration outcome blocked Tandem task-230 despite successful recovery."
+  resolvedAt: "2026-08-30T12:51:25Z"
 ---
 Worker `worker-task-230-0def6a42` was started, reworked twice, and reported normally in this session. `worker_integrate` (both `merge` and `inspect`) refused with:
 

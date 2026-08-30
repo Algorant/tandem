@@ -1,11 +1,14 @@
 ---
 id: papercut-4
 title: "Worker integration completes without verifying Tandem board state"
-status: open
+status: "resolved"
 createdAt: "2026-08-22T23:02:16Z"
-updatedAt: "2026-08-22T23:02:16Z"
-references: ["task-228", "task-238", "task-239"]
+updatedAt: "2026-08-30T12:51:35Z"
+references: ["task-228", "task-238", "task-239", "decision-11"]
 tags: ["accord", "integration", "workers", "workflow"]
+resolution:
+  note: "Resolved as superseded by decision-11 and the current orchestration contract. Worker integration is intentionally a technical source operation, not a Tandem lifecycle transition. The orchestrator reads and verifies the Task from the main checkout, then owns Accord delivery/acceptance, optional review, completion, and user-facing workflow reporting. Requiring `accord: delivered` before technical integration would conflict with the accepted verification flow."
+  resolvedAt: "2026-08-30T12:51:35Z"
 ---
 ## Observed
 
