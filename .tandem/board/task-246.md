@@ -2,14 +2,20 @@
 id: task-246
 type: task
 title: "Research Clap migration and specify a comprehensive CLI cutover"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["papercut-1", "papercut-9", "decision-3", "decision-8"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/src/cli/mod.rs", "tandem/src/cli/args.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/landing.rs", "tandem/src/cli/output.rs", "tandem/tests/cli_behavior.rs", "tandem/plan/spec.md", "tandem/plan/todo.md", "tandem/plan/modularization-research.md", "extensions/pi-tandem/", "AGENTS.md"]
 tags: ["config", "cli", "research", "clap"]
 createdAt: "2026-08-30T12:30:45Z"
-updatedAt: "2026-08-30T12:30:45Z"
+updatedAt: "2026-08-30T13:50:09Z"
+accord:
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-08-30T13:50:09Z"
+  updatedAt: "2026-08-30T13:50:09Z"
+assignee: "pi"
 ---
 
 ## Description
