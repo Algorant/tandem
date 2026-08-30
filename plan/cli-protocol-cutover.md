@@ -70,6 +70,29 @@ preserved merely because it exists. Each behavior must earn its place.
 | D43 | Rule categories | provisional | Keep always, never, prefer, and context as distinct agent enforcement vocabulary. |
 | D44 | Rule identity | provisional | Keep composite category IDs such as always-12. Reclassification is delete-and-add because it changes meaning. |
 | D45 | Rule provenance | provisional | Keep an optional source reference to the Task or Decision that established a Rule. |
+| D46 | Storage layout | provisional | Store active Tasks in tasks/, durable Decisions in decisions/, one Rule per Markdown file in rules/, archived Tasks in logs/, and audit ledgers in events/. Board is a UI concept. |
+| D47 | Archived resolution | provisional | Preserve the full Task and Accord, remove active state, and add only archivedAt plus resolution outcome/note/reviewer. Do not duplicate delivery data. |
+| D48 | Decision durability | provisional | Decisions never move to Logs; rejected, deprecated, and superseded statuses preserve standing in decisions/. |
+| D49 | Rule lookup | provisional | Common show resolves Rule IDs in addition to Tasks and Decisions; Rules retain their management family. |
+| D50 | Event topology | provisional | Keep per-actor events/<actor-id>.jsonl only. Delete shared legacy events.jsonl support; retain ignored checkout-local actor identity. |
+| D51 | Event coverage | provisional | Emit an event for every durable mutation and none for reads. |
+| D52 | Event payload | provisional | Required envelope is ts, seq, actor, event, id plus event-specific structured data. Remove required free-text summary and never copy full bodies. |
+| D53 | Global JSON | provisional | `--json` is a global option accepted before or after subcommands on every read and mutation. All commands share one envelope. |
+| D54 | JSON streams | provisional | In JSON mode, success and error envelopes go to stdout and stderr remains empty; nonzero process status still signals failure. |
+| D55 | Human streams | provisional | In human mode, primary results go to stdout; warnings and errors go to stderr. |
+| D56 | Exit codes | provisional | Use 0 success, 2 grammar/usage error, and 1 for every operational failure. Stable JSON error codes provide finer categories. |
+| D57 | Global aliases | provisional | Support only -h/--help, -V/--version, and -j/--json as short global aliases. No command aliases without observed demand. |
+| D58 | Bare invocation | provisional | Running `tandem` with no args shows a concise landing/help surface; TUI remains explicit. |
+| D59 | Prose values | provisional | Every human-written text field accepts leading hyphens as ordinary text; typed IDs/enums/numbers remain strict. |
+| D60 | Scalar repetition | provisional | Repeating a scalar option is a usage error. Only declared list options may repeat. |
+| D61 | Clearing fields | provisional | `--clear <field>` is the only clearing mechanism; supplied values must be nonempty. |
+| D62 | TUI primary views | provisional | Top-level TUI views are Board, Rules, Decisions, and Logs. Do not add a speculative History/Activity view. |
+| D63 | Papercut Board section | provisional | Preserve the current full-width Board list/subview model and add Papercuts as the fourth peer section beside Todo, In progress, and Validation. It is derived from tag=papercut; rows retain real state. |
+| D64 | Validation visibility | provisional | Validation appears only as its existing Board subview section; no extra top-level tab or duplicate queue. |
+| D65 | Web sequencing | provisional | Defer web redesign until the TUI information model is implemented and validated, then align web read models to it. |
+| D66 | TUI structure | provisional | Preserve the current state-subview tabs, full-width selected-state rows, detail behavior, and State/Epic Board arrangement toggle. Do not replace it with kanban columns. |
+| D67 | TUI cutover mutations | provisional | Remove TUI Add and direct Move. Keep and adapt existing Validation controls only; other Accord lifecycle actions remain CLI-only in this cutover. |
+| D68 | Contextual lifecycle UI | proposed follow-up | Explore one contextual valid-actions picker in a separate TUI research Task; it is not part of the core cutover. |
 
 ## Interactive sequence
 
@@ -526,15 +549,152 @@ tandem rules delete always-12
 
 ## 6. Logs and events
 
-Pending.
+### Storage layout
+
+- **D46 — persistence follows record purpose.** Use one Markdown file per
+  durable record under type/purpose directories. Board remains a UI concept,
+  not a filesystem directory.
+
+```text
+.tandem/
+  tasks/       # active Tasks
+  decisions/   # durable Decisions
+  rules/       # always-12.md, prefer-7.md, ...
+  logs/        # archived Tasks
+  events/      # per-actor audit ledgers
+  tandem.md    # workspace configuration
+```
+
+- Rule files carry `id`, `category`, optional `source`, timestamps, and the Rule
+  text as Markdown body. This removes concurrent Rule mutation from the shared
+  workspace config file.
+- **D49 — common lookup includes Rules.** `show always-12` resolves a Rule.
+  Rules retain their management family for category allocation and hard delete.
+
+### Archived Tasks
+
+- **D47 — minimal resolution metadata.** Move the complete Task and Accord to
+  `logs/`, remove active `state`, and add only terminal facts. Accord delivery
+  remains the sole source for summary, evidence, and changed files.
+- **D48 — Decisions remain durable.** Decisions never move to Logs; rejected,
+  deprecated, and superseded statuses communicate standing in `decisions/`.
+
+```yaml
+archivedAt: ...
+resolution:
+  outcome: completed | canceled | failed
+  note: ...       # required for cancel/fail
+  reviewer: ...   # human-validation completion only
+```
+
+### Event ledger
+
+- **D50 — per-actor JSONL only.** Keep
+  `.tandem/events/<actor-id>.jsonl` and ignored checkout-local
+  `.tandem/actor-id`. Independent worktrees append separately. Delete legacy
+  shared `.tandem/events.jsonl` support with no fallback reader.
+- **D51 — every durable mutation emits.** Create, content/metadata update,
+  lifecycle transition, archive, Decision change, and Rule change emit events.
+  Reads never emit.
+- **D52 — structured facts, not required prose.** Required envelope:
+  `ts`, `seq`, `actor`, `event`, `id`, plus event-specific `data`. Remove
+  required `summary`; UI/CLI renders a sentence from event type and data. Do not
+  copy full Markdown bodies into events. Ordinary update data lists changed
+  fields; lifecycle events retain transition values, notes, and terminal facts.
+
+```json
+{"ts":"...","seq":4,"actor":"a7b...","event":"task.updated","id":"task-12","data":{"fields":["tags","priority"]}}
+{"ts":"...","seq":5,"actor":"a7b...","event":"accord.rework","id":"task-12","data":{"from":"delivered","to":"rework","note":"Help still requires a workspace"}}
+```
 
 ## 7. Output contract
 
-Pending.
+### JSON and process streams
+
+- **D53 — JSON is global.** `--json` is accepted before or after subcommands on
+  every read and mutation. Delete per-command JSON declarations and shapes.
+- **D54 — one JSON stream.** Success and failure envelopes go to stdout; stderr
+  stays empty. Process exit remains nonzero on failure.
+- **D55 — clean human streams.** Human primary results go to stdout. Warnings
+  and errors go to stderr, keeping piped result output clean.
+
+```json
+{"ok":true,"data":{},"warnings":[]}
+{"ok":false,"error":{"code":"not_found","message":"record not found: missing","details":{"id":"missing"}}}
+```
+
+Every adapter requests JSON and never parses human output.
+
+### Errors, help, aliases, and values
+
+- **D56 — three process statuses.** `0` success, `2` grammar/usage failure,
+  `1` every operational failure. Stable JSON error codes such as `usage`,
+  `not_found`, `validation`, `conflict`, and `io` provide machine detail without
+  multiplying exit statuses.
+- **D57 — three universal short aliases.** `-h`/`--help`, `-V`/`--version`,
+  `-j`/`--json`. Command flags and names stay canonical; no speculative
+  `create`, `ls`, or other aliases.
+- **D58 — safe bare invocation.** `tandem` prints the concise landing/help
+  surface. It never conditionally launches TUI based on terminal detection.
+- Every command and family exposes generated help without workspace discovery.
+  Parser errors show relevant usage and a help hint; runtime errors do not dump
+  unrelated usage.
+
+- **D59 — prose values accept leading hyphens.** Titles, bodies, notes,
+  acceptance criteria, summaries, evidence, and Rule text all follow one text
+  policy. Typed IDs, enums, paths, and numbers remain strict.
+- **D60 — duplicate scalars are errors.** `--priority high --priority low`
+  fails as usage. Only declared list options such as `--tag` repeat.
+- **D61 — explicit clearing only.** `--clear body`, `--clear tags`,
+  `--clear parent`, etc. remove optional values. Supplied values must be
+  nonempty; delete `--body ""` as a second clearing path.
+- Support both `--flag value` and `--flag=value` through clap.
+- Generated help includes one concise example where workflow is not obvious.
 
 ## 8. TUI and web implications
 
-Pending.
+### Navigation
+
+- **D62 — four primary views.** Board, Logs, Rules, Decisions. Keep the top-level
+  name Logs because no global Activity view is justified; events appear in each
+  record's detail timeline.
+- **D63 — Papercuts is the fourth Board section.** Preserve the current state
+  subview tabs and full-width list. Add Papercuts beside Todo, In progress, and
+  Validation. It selects active Tasks tagged `papercut`; rows show their actual
+  Task state and Accord status. Normal state sections exclude tagged Papercuts.
+- **D64 — validation keeps its existing section only.** No duplicate top-level
+  tab, global count surface, or separate queue.
+- **D65 — web follows later.** Defer web redesign until the changed TUI is
+  implemented and validated. Then align read models and taxonomy to the TUI;
+  web remains read-only and is not a priority in the core cutover.
+
+```text
+[1] Board  [2] Logs  [3] Rules  [4] Decisions
+
+[ Todo 5 ] [ In progress 2 ] [ Validation 1 ] [ Papercuts 4 ]
+
+ID          PRI   ACCORD     RELATION   TITLE                 ASSIGNEE
+...
+```
+
+### Board hierarchy and actions
+
+- **D66 — preserve the current Board architecture.** State subview tabs,
+  full-width selected-state rows, detail behavior, and the State Board / Epic
+  Board arrangement toggle stay. The earlier kanban-column and Epic-focus mocks
+  were an unsupported redesign and are rejected.
+- **D67 — minimum mutation adaptation.** Remove `a Add` because TUI creation is
+  not currently needed. Remove `m Move` because direct state movement no longer
+  exists. Keep `v Validate`, adapted to request exceptional human review,
+  complete on acceptance, or Accord rework on requested changes. Other Accord
+  lifecycle operations remain CLI-only for this cutover.
+- Keep filters, `$EDITOR` metadata/body editing, Logs/Rules/Decisions behavior,
+  detail, themes, keyboard navigation, mouse hit maps, and current layout unless
+  a required protocol field forces a targeted change.
+- **D68 — contextual lifecycle picker is a follow-up proposal.** The rendered
+  valid-actions picker is promising but not a priority for this cutover. Create
+  a separate exploratory TUI research Task rather than expanding core scope.
+- Do not add Task or Papercut quick capture in this cutover.
 
 ## 9. Protocol version and direct cutover
 
