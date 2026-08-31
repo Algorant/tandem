@@ -22,3 +22,4 @@ __pycache__/
 # Logs / temp
 *.log
 /tmp/
+.tandem_old/actor-id
