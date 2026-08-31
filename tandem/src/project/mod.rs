@@ -29,8 +29,8 @@ pub(crate) mod rules;
 mod rules_contract_tests;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
-    frontmatter_line_key, is_top_level_frontmatter_boundary, patch_accord_content,
-    patch_frontmatter_content, patch_resolution_content, replace_markdown_body,
+    patch_accord_content, patch_frontmatter_content, patch_resolution_content,
+    replace_markdown_body,
 };
 pub(crate) use write::write_atomic;
 
@@ -141,6 +141,14 @@ impl TandemProject {
 
     pub(crate) fn events_dir(&self) -> PathBuf {
         self.data_dir().join("events")
+    }
+
+    pub(crate) fn decisions_dir(&self) -> PathBuf {
+        self.data_dir().join("decisions")
+    }
+
+    pub(crate) fn rules_dir(&self) -> PathBuf {
+        self.data_dir().join("rules")
     }
 
     pub(crate) fn actor_events_path(&self, actor: &str) -> PathBuf {

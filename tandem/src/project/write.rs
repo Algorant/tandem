@@ -119,7 +119,27 @@ pub(crate) fn create_new_sequential_document_after<F>(
 where
     F: FnMut(&str) -> String,
 {
-    create_new_sequential_file_after(&project.tasks_dir, prefix, last_allocated, content_for_id)
+    create_new_sequential_document_in_dir_after(
+        &project.tasks_dir,
+        prefix,
+        last_allocated,
+        content_for_id,
+    )
+}
+
+/// Creates a new sequential document under an explicit directory (for example
+/// the durable decisions store). Decisions are active durable records in
+/// `.tandem/decisions/` per the protocol 0.3.0 layout.
+pub(crate) fn create_new_sequential_document_in_dir_after<F>(
+    dir: &Path,
+    prefix: &str,
+    last_allocated: usize,
+    content_for_id: F,
+) -> Result<CreatedDocument, CliError>
+where
+    F: FnMut(&str) -> String,
+{
+    create_new_sequential_file_after(dir, prefix, last_allocated, content_for_id)
 }
 
 pub(crate) fn create_new_sequential_file_after<F>(
