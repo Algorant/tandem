@@ -1,9 +1,12 @@
 ---
 id: papercut-10
 title: "TUI: Papercuts section is not Tab-reachable and its section tab is not clickable"
-status: open
+status: "resolved"
 createdAt: "2026-08-31T02:27:15Z"
-updatedAt: "2026-08-31T02:27:15Z"
+updatedAt: "2026-08-31T02:58:09Z"
+resolution:
+  note: "fixed on main by task-250 (squash 357f510)"
+  resolvedAt: "2026-08-31T02:58:09Z"
 ---
 The Papercuts Board section (fourth section, derived from tag=papercut) cannot be reached like the other sections.
 

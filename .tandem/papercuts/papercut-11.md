@@ -1,9 +1,12 @@
 ---
 id: papercut-11
 title: "CLI: bare landing page lacks the old grouped command surface"
-status: open
+status: "resolved"
 createdAt: "2026-08-31T02:40:00Z"
-updatedAt: "2026-08-31T02:40:00Z"
+updatedAt: "2026-08-31T02:58:09Z"
+resolution:
+  note: "fixed on main by task-250 (squash 357f510)"
+  resolvedAt: "2026-08-31T02:58:09Z"
 ---
 The 0.3.0 landing page (landing.rs) is a three-line summary:
 
