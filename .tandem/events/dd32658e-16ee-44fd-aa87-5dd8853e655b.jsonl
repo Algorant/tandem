@@ -63,3 +63,5 @@
 {"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-5","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":63}
 {"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-6","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":64}
 {"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule context-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":65}
+{"ts":"2026-08-31T21:17:41Z","event":"task.updated","id":"task-7","summary":"Updated task-7 metadata: body","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":66}
+{"ts":"2026-08-31T21:17:41Z","event":"task.completed","id":"task-7","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":67}
