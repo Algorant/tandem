@@ -2,6 +2,54 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.12.0
+
+Tandem v0.12.0 is the protocol 0.3.0 cutover: a rewritten clap-derived CLI, a new storage layout, and mandatory work agreements. The full contract is recorded in `decision-12`. This is a **breaking** release — read Compatibility before upgrading.
+
+### Protocol
+
+- Protocol version `0.3.0` with a new workspace layout: `.tandem/tasks/`, `decisions/`, `rules/`, `logs/`, and per-actor `events/`. "Board" is now a UI concept, not a directory.
+- Every active Task carries a mandatory Accord with at least one acceptance criterion. `claim` assigns; `deliver` requires a summary and evidence; `complete` accepts a delivered Accord and archives atomically; `fail` archives as failed; `release` returns work to `ready`; `resume` unblocks.
+- Task state is `todo`, `in-progress`, `validation`. Validation is entered only through explicit human escalation (`review <id> --criterion --note`); the `review.status` field is removed.
+- Papercuts are low-priority Tasks tagged `papercut`, with a dedicated TUI section and tag filtering.
+- Archived Logs preserve the full Task and Accord plus minimal `resolution{outcome,note,reviewer}` metadata; delivery evidence is not duplicated.
+- Rules live one per Markdown file in `.tandem/rules/` with composite IDs (`always-12`). Decisions remain first-class ADR records with automatic dates.
+- Every durable mutation appends a structured per-actor event.
+
+### CLI
+
+- The handwritten parser is replaced by a clap-derived model: 23 invocable commands, generated help on all 27 root/family/leaf surfaces, and global `-h/--help`, `-V/--version`, `-j/--json`. Every removed command and flag now fails with usage.
+- Typed `add task|decision`; unified `show`/`list`/`search`/`update` across Tasks, Decisions, and Rules with `--scope active|archived|all`.
+- `update` is deterministic: repeated flags replace the whole list, absent means unchanged, `--clear <field>` removes a value. Prose accepts leading hyphens; repeated scalar options are usage errors.
+- Accord lifecycle `claim|deliver|rework|block|resume|release|fail`; `review` escalates to exceptional human validation; `complete` accepts and archives; `cancel`/`fail` archive with reasons.
+- One global JSON envelope for success and failure with stable error codes; human results on stdout, warnings/errors on stderr; exit codes 0/1/2.
+- Landing page restored to a grouped, descriptive command reference.
+
+### TUI
+
+- Four top-level views (Board, Logs, Rules, Decisions) preserved; Board gains a fourth section, Papercuts, derived from tagged Tasks and navigable by keyboard and mouse like the others.
+- Quick-add and direct state movement are removed; Validation is adapted to exceptional review, accept→archive, and request-changes.
+- Themes, mouse, hot reload, `$EDITOR`, and the State/Epic arrangement stay.
+
+### Web
+
+- The read-only web interface serves the 0.3.0 read models (resolution + validation surfaces; Papercuts as tagged Tasks).
+
+### Fixed
+
+- `<command> --help` now works on every surface — previously only 2 of 46 (papercut-1).
+- Metadata lists can now be replaced and cleared via deterministic update + `--clear` (papercut-9).
+- The TUI Papercuts section was not Tab-reachable or clickable; it is now a full peer section (papercut-10).
+- The landing page had collapsed to four bare lines; grouped descriptions restored (papercut-11).
+- Retained Add/quick-add and direct-Move actions from the previous TUI are fully removed (papercut-12).
+
+### Compatibility
+
+- **Breaking:** the new binary supports protocol `0.3.0` workspaces only. There is no `upgrade`/`migrate` command, converter, backup, or compatibility reader; older workspaces fail clearly. Migrating an existing workspace's coordination data is project-owner work, handled workspace by workspace.
+- Removed commands: `upgrade`, `move`, `log list|show|search`, `decision list|show|update|withdraw`, `papercut add|list|show|resolve`, `version`, and `accord accept`.
+- Removed flags: `--description` (now `--body`), `update --state` / `--parent-id` / `--parentId`, per-command `--json` (now global), and the Decision prose flags `--context`/`--consequence`/`--alternative`/`--date`.
+- Scripts and integrations need updating to the new grammar and JSON envelope; the Pi adapter overhaul is tracked separately.
+
 ## 0.11.0
 
 Tandem v0.11.0 changes what `validation` means. It is no longer where delivered work waits by default; it now marks work that a human was explicitly asked to look at.
