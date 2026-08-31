@@ -244,3 +244,4 @@
 {"ts":"2026-08-31T02:41:13Z","event":"accord.claimed","id":"task-250","summary":"Accord claim for task-250","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":244}
 {"ts":"2026-08-31T02:41:13Z","event":"task.updated","id":"task-250","summary":"Updated task-250 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":245}
 {"ts":"2026-08-31T02:48:28Z","event":"papercut.created","id":"papercut-12","summary":"Created Papercut: TUI: removed a (Add) and m (Move) actions are still bound after the 0.3.0 cutover","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":246}
+{"ts":"2026-08-31T02:51:11Z","event":"task.updated","id":"task-250","summary":"Updated task-250 metadata: references","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":247}
