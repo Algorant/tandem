@@ -87,6 +87,86 @@ dev-reset:
 	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 	rm -f "$git_common_dir/tandem-dev-preview"
 
+# Build the latest dev release binary from this checkout.
+dev-build:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
+	binary="$repo_root/tandem/target/release/tandem"
+	echo "Built: $binary"
+	"$binary" --version
+
+# Create a fresh disposable 0.3.0 sandbox with the latest dev binary and seed
+# toy documents, ready for manual command testing. The sandbox lives under
+# tandem/target/dev-sandbox and is git-ignored.
+dev-sandbox:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	binary="$repo_root/tandem/target/release/tandem"
+	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
+	if [[ ! -x "$binary" ]]; then
+		echo "release binary missing: $binary" >&2
+		exit 2
+	fi
+	sandbox="$repo_root/tandem/target/dev-sandbox"
+	rm -rf "$sandbox"
+	mkdir -p "$sandbox"
+	ln -s "$binary" "$sandbox/tandem"
+	cd "$sandbox"
+	./tandem init --title "Tandem dev sandbox" >/dev/null
+	./tandem add task "Test the cutover" --kind epic --acceptance "all epic tasks complete" --tag plan >/dev/null
+	./tandem add task "Implement list filters" --parent task-1 --acceptance "list --tag papercut narrows rows" --priority high --effort small --tag cli >/dev/null
+	./tandem add task "Wire update --clear" --parent task-1 --acceptance "PC9 replacement and clearing work" --tag cli --blocker task-2 >/dev/null
+	./tandem add task "Substep demo" --parent task-2 --acceptance "subtask lifecycle works" >/dev/null
+	./tandem add task "Small friction" --acceptance "captured" --tag papercut --priority low >/dev/null
+	./tandem add task "Handoff demo" --acceptance "review and complete flows work" >/dev/null
+	./tandem add decision "Use clap for the CLI" --body "One static derive tree replaces the handwritten parser." --decider ivan --tag arch >/dev/null
+	./tandem accord claim task-5 --assignee pi >/dev/null
+	./tandem accord deliver task-5 --summary "delivered" --evidence "smoke passed" >/dev/null
+	./tandem rules add prefer "Smoke-test the sandbox before merging" --source task-1 >/dev/null
+	echo "Fresh sandbox: $sandbox"
+	echo "Workspace:"
+	ls .tandem/
+	echo "Documents:"
+	./tandem list
+
+# Open the dev sandbox for interactive testing: build, reset to a fresh seeded
+# workspace, then drop into a shell with the dev binary on PATH. Run in a real
+# terminal.
+dev-test:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	repo_root="$(git rev-parse --show-toplevel)"
+	just --justfile "$repo_root/justfile" dev-sandbox >/dev/null
+	sandbox="$repo_root/tandem/target/dev-sandbox"
+	cat <<-'EOF'
+	Tandem dev sandbox is ready. The dev binary is `./tandem` (release build).
+	ID layout: task-1 epic · task-2/3 epic tasks · task-2-1 subtask · task-4
+	           papercut-tagged · task-5 Handoff demo (claimed + delivered) ·
+	           decision-1.
+	
+	Try:
+	  ./tandem list --tag papercut
+	  ./tandem list --scope archived
+	  ./tandem search clap
+	  ./tandem review task-5 --criterion "smoke passed" --note "need human sign-off"
+	  ./tandem complete task-5
+	  ./tandem update task-2 --tag cli --tag api
+	  ./tandem update task-2 --clear tag
+	  ./tandem accord fail task-3 --note "not feasible"
+	  ./tandem rules list
+	  ./tandem tui
+	EOF
+	if [[ ! -t 1 ]]; then
+		echo "Not a terminal; run in a real terminal to get an interactive shell."
+		echo "cd $sandbox && ./tandem ..."
+		exit 0
+	fi
+	cd "$sandbox"
+	PATH="$sandbox:$PATH" exec "${SHELL:-bash}"
+
 # Verify the local docs runtime satisfies Astro's Node floor.
 _check-docs-node:
 	#!/usr/bin/env bash
