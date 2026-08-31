@@ -2,7 +2,7 @@
 id: task-248
 type: task
 title: "Align the project-local pi-tandem extension with protocol 0.3.0"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "large"
 blockers: ["task-247"]
@@ -10,7 +10,12 @@ references: ["task-246", "decision-12"]
 relatedFiles: ["extensions/pi-tandem/", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/README.md", "extensions/pi-tandem/tests/", "plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md"]
 tags: ["pi-tandem", "cli", "adapter"]
 createdAt: "2026-08-30T17:48:37Z"
-updatedAt: "2026-08-30T17:48:37Z"
+updatedAt: "2026-08-31T20:18:40Z"
+accord:
+  status: "claimed"
+  assignee: "pi"
+  claimedAt: "2026-08-31T20:18:40Z"
+  updatedAt: "2026-08-31T20:18:40Z"
 ---
 
 ## Description
