@@ -1,0 +1,24 @@
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":1}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":2}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":3}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":4}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":5}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":6}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":7}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":8}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":9}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":10}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":11}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 3 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":12}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 4 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":13}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":14}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 6 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":15}
+{"ts":"2026-08-31T20:52:14Z","event":"rules.updated","id":"rules","summary":"Added rule 1 to context","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":16}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-1","summary":"Use Astro Starlight and GitHub Pages for Tandem docs","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":17}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-2","summary":"Use Bun as the default JavaScript package manager and runner","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":18}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-3","summary":"Define the Tandem project stack and tooling realms","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":19}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-4","summary":"Curate concise public release notes without installation guidance","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":20}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-5","summary":"Distinguish Epic, Task, and Subtask roles and nomenclature","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":21}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-6","summary":"Define canonical protocol, project, app, and peer CLI/TUI architecture","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":22}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-7","summary":"Keep worktree-local actor identity non-configurable","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":23}
+{"ts":"2026-08-31T20:52:47Z","event":"decision.created","id":"decision-8","summary":"Adopt protocol 0.3.0 and a clap-derived minimal CLI","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":24}
