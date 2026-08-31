@@ -240,3 +240,7 @@
 {"ts":"2026-08-31T02:27:15Z","event":"papercut.created","id":"papercut-10","summary":"Created Papercut: TUI: Papercuts section is not Tab-reachable and its section tab is not clickable","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":240}
 {"ts":"2026-08-31T02:40:00Z","event":"papercut.created","id":"papercut-11","summary":"Created Papercut: CLI: bare landing page lacks the old grouped command surface","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":241}
 {"ts":"2026-08-31T02:40:14Z","event":"task.created","id":"task-250","summary":"Polish 0.3.0 TUI Papercuts section accessibility and CLI landing page","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":242}
+{"ts":"2026-08-31T02:40:56Z","event":"accord.claimed","id":"task-250","summary":"Accord claim for task-250","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":243}
+{"ts":"2026-08-31T02:41:13Z","event":"accord.claimed","id":"task-250","summary":"Accord claim for task-250","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":244}
+{"ts":"2026-08-31T02:41:13Z","event":"task.updated","id":"task-250","summary":"Updated task-250 metadata: assignee","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":245}
+{"ts":"2026-08-31T02:48:28Z","event":"papercut.created","id":"papercut-12","summary":"Created Papercut: TUI: removed a (Add) and m (Move) actions are still bound after the 0.3.0 cutover","actor":"3ba2bee6-e75b-41ec-8124-f68506643fea","seq":246}

@@ -2,13 +2,19 @@
 id: task-250
 type: task
 title: "Polish 0.3.0 TUI Papercuts section accessibility and CLI landing page"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "small"
 references: ["papercut-10", "papercut-11"]
 tags: ["tui", "cli", "papercuts"]
 createdAt: "2026-08-31T02:40:14Z"
-updatedAt: "2026-08-31T02:40:14Z"
+updatedAt: "2026-08-31T02:41:13Z"
+accord:
+  status: "claimed"
+  assignee: "worker-task-250-99bc722a"
+  claimedAt: "2026-08-31T02:41:13Z"
+  updatedAt: "2026-08-31T02:41:13Z"
+assignee: "worker-task-250-99bc722a"
 ---
 
 ## Description
