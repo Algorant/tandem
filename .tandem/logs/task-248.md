@@ -2,7 +2,6 @@
 id: task-248
 type: task
 title: "Align the project-local pi-tandem extension with protocol 0.3.0"
-state: "in-progress"
 priority: "high"
 effort: "large"
 blockers: ["task-247"]
@@ -10,13 +9,16 @@ references: ["task-246", "decision-12"]
 relatedFiles: ["extensions/pi-tandem/", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/README.md", "extensions/pi-tandem/tests/", "plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md"]
 tags: ["pi-tandem", "cli", "adapter"]
 createdAt: "2026-08-30T17:48:37Z"
-updatedAt: "2026-08-31T20:18:56Z"
+updatedAt: "2026-08-31T20:38:31Z"
 accord:
   status: "claimed"
   assignee: "worker-task-248-9d63cb99"
   claimedAt: "2026-08-31T20:18:56Z"
   updatedAt: "2026-08-31T20:18:56Z"
 assignee: "worker-task-248-9d63cb99"
+completedAt: "2026-08-31T20:38:31Z"
+completion:
+  summary: "Aligned the project-local pi-tandem adapter with protocol 0.3.0 as the release gate: builders emit the new grammar for existing tools (add task|decision, list/search with global --json, accord claim|deliver|rework|block|resume|release|fail, complete/cancel with --note, rules positional ids, papercut quick-capture as tagged task, log/decision reads via list/show), removed obsolete actions/flags, and updated all three smoke suites to the new JSON envelopes. Release gate verified: bun --check passes and smoke (16) + pi-runtime-smoke (2) + relationship-smoke (4) pass against the release binary. Integrates with the protocol 0.3.0 CLI shipped in tandem-v0.12.0."
 ---
 
 ## Description
