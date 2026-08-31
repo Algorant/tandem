@@ -254,7 +254,6 @@ release VERSION:
 	cargo build --profile dist
 	cargo clippy --all-targets --all-features -- -D warnings
 	cargo run -- --version
-	cargo run -- version
 	cd ../site
 	bun install --frozen-lockfile
 	bun run build
