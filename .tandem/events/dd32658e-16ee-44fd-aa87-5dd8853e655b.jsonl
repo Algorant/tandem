@@ -29,3 +29,37 @@
 {"ts":"2026-08-31T20:53:48Z","event":"task.created","id":"task-5","summary":"Conduct a collaborative full-product review of the Tandem web interface","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":29}
 {"ts":"2026-08-31T20:53:48Z","event":"task.created","id":"task-6","summary":"Explore a contextual lifecycle action picker for the TUI","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":30}
 {"ts":"2026-08-31T20:53:53Z","event":"task.created","id":"task-7","summary":"Fix 0.12.0 CLI defects surfaced by the protocol 0.3.0 migration","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":31}
+{"ts":"2026-08-31T21:09:23Z","event":"task.updated","id":"task-7","summary":"Updated task-7 metadata: references, body","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":32}
+{"ts":"2026-08-31T21:09:25Z","event":"accord.claimed","id":"task-7","summary":"Accord claim for task-7","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":33}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 5 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":34}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 6 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":35}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 7 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":36}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 8 to always","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":37}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 6 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":38}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 7 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":39}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 8 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":40}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 9 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":41}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 10 to never","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":42}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 7 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":43}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 8 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":44}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 9 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":45}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 10 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":46}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 11 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":47}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 12 to prefer","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":48}
+{"ts":"2026-08-31T21:16:49Z","event":"rules.updated","id":"rules","summary":"Added rule 2 to context","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":49}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule always-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":50}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule always-2","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":51}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule always-3","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":52}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule always-4","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":53}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule never-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":54}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule never-2","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":55}
+{"ts":"2026-08-31T21:16:59Z","event":"rules.updated","id":"rules","summary":"Added rule never-3","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":56}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule never-4","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":57}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule never-5","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":58}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":59}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-2","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":60}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-3","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":61}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-4","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":62}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-5","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":63}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule prefer-6","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":64}
+{"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule context-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":65}
