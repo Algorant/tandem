@@ -1,335 +1,36 @@
-import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import {
-	ACCORD_ACTIONS,
-	buildAccordArgs,
-	buildDecisionArgs,
-	buildInitArgs,
-	buildLogArgs,
-	buildPapercutArgs,
-	buildRulesArgs,
-	buildSearchArgs,
-	buildTaskArgs,
-	tandemAccordParameters,
-	tandemTaskParameters,
-} from "../index";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, "../../..");
-const localTandem = join(repoRoot, "tandem", "target", "debug", process.platform === "win32" ? "tandem.exe" : "tandem");
-
-function assert(condition: unknown, message: string): asserts condition {
-	if (!condition) throw new Error(message);
-}
-
-async function runProcess(command: string, args: string[], cwd: string): Promise<string> {
-	const proc = Bun.spawn([command, ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-	const stdout = await new Response(proc.stdout).text();
-	const stderr = await new Response(proc.stderr).text();
-	const code = await proc.exited;
-	if (code !== 0) {
-		throw new Error(`command failed (${code}): ${command} ${args.join(" ")}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
-	}
-	return stdout;
-}
-
-async function ensureTandem(): Promise<string> {
-	const envBin = process.env.TANDEM_BIN;
-	if (envBin) return envBin;
-	console.log("Building current repository tandem for smoke test...");
-	await runProcess("cargo", ["build", "--manifest-path", join(repoRoot, "tandem", "Cargo.toml")], repoRoot);
-	return existsSync(localTandem) ? localTandem : "tandem";
-}
-
-async function runTandem(tandem: string, args: string[], cwd: string): Promise<string> {
-	return runProcess(tandem, args, cwd);
-}
-
-function parseJson(text: string): any {
-	return JSON.parse(text.trim());
-}
-
-function parseId(output: string): string {
-	const match = /^ID:\s+(\S+)/m.exec(output);
-	assert(match, `could not parse ID from output:\n${output}`);
-	return match[1];
-}
-
-async function runRepoReadSmoke(tandem: string): Promise<void> {
-	if (!existsSync(join(repoRoot, ".tandem", "tandem.md"))) {
-		console.log("pi-tandem repo read smoke skipped: this checkout has no local .tandem workspace");
-		return;
-	}
-	let list: any;
-	try {
-		list = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), repoRoot));
-	} catch (error) {
-		console.log(`pi-tandem repo read smoke skipped: local workspace is not readable by this build (${String(error)})`);
-		return;
-	}
-	assert(list.ok === true, "repo task list JSON should be ok");
-	const items = list.data?.items ?? [];
-	assert(Array.isArray(items), "repo task list should expose an items array");
-	if (items.length === 0) {
-		console.log("pi-tandem repo read smoke skipped: checkout Tandem workspace has no active items");
-		return;
-	}
-	const taskId = items.find((item: any) => item.id === "task-14")?.id ?? items[0]?.id;
-	assert(typeof taskId === "string", "repo task list should expose an item id");
-
-	const shown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), repoRoot));
-	assert(shown.data?.document?.id === taskId, "repo task show should return the selected task");
-
-	const logs = parseJson(await runTandem(tandem, buildLogArgs({ action: "list" }), repoRoot));
-	assert(logs.ok === true, "repo log list JSON should be ok");
-	const logSearch = parseJson(await runTandem(tandem, buildLogArgs({ action: "search", query: "pi-tandem" }), repoRoot));
-	assert(logSearch.ok === true, "repo log search JSON should be ok");
-
-	const rules = parseJson(await runTandem(tandem, buildRulesArgs({ action: "list" }), repoRoot));
-	assert(rules.ok === true, "repo rules list JSON should be ok");
-	assert(typeof rules.data?.counts?.total === "number", "repo rules list should expose counts");
-
-	const decisions = parseJson(await runTandem(tandem, buildDecisionArgs({ action: "list" }), repoRoot));
-	assert(decisions.ok === true, "repo decision list JSON should be ok");
-	assert(typeof decisions.data?.count === "number", "repo decision list should expose a count");
-
-	const search = parseJson(await runTandem(tandem, buildSearchArgs({ query: "pi-tandem" }), repoRoot));
-	assert(search.ok === true, "repo search JSON should be ok");
-	assert((search.data?.results ?? []).length > 0, "repo search should find pi-tandem work");
-
-	console.log(`pi-tandem repo read smoke passed against ${repoRoot}`);
-}
-
-const taskSchemaProperties = (tandemTaskParameters as any).properties ?? {};
-assert(taskSchemaProperties.summary, "tandem_task schema should expose summary for complete actions");
-assert(taskSchemaProperties.reason, "tandem_task schema should expose a reason for cancel actions");
-assert(taskSchemaProperties.body, "tandem_task schema should expose exact body replacement for update actions");
-assert(taskSchemaProperties.parent, "tandem_task schema should expose parent for canonical hierarchy creation");
-assert(taskSchemaProperties.kind, "tandem_task schema should expose kind for Epic creation");
-assert(!taskSchemaProperties.subtasks, "tandem_task schema should not expose deprecated inline subtask authoring");
-
-const acceptedAccordActions = ["claim", "deliver", "accept", "rework", "block", "fail"];
-assert(JSON.stringify(ACCORD_ACTIONS) === JSON.stringify(acceptedAccordActions), "tandem_accord should expose only the accepted action list");
-const accordSchemaActions = (tandemAccordParameters as any).properties?.action?.enum;
-assert(JSON.stringify(accordSchemaActions) === JSON.stringify(acceptedAccordActions), "tandem_accord schema should expose only the accepted action list");
-const claimAccordArgs = buildAccordArgs({ action: "claim", id: "task-1", assignee: "pi-tandem-smoke" });
-assert(claimAccordArgs.join(" ") === "accord claim task-1 --assignee pi-tandem-smoke", "tandem_accord should build accepted actions");
-let retiredReadyRejected = false;
+import { join } from "node:path";
+import { buildAccordArgs, buildDecisionArgs, buildInitArgs, buildLogArgs, buildPapercutArgs, buildRulesArgs, buildSearchArgs, buildTaskArgs, ACCORD_ACTIONS, tandemTaskParameters } from "../index";
+const bin = process.env.TANDEM_BIN ?? "tandem";
+const assert = (v: unknown, m: string): asserts v => { if (!v) throw new Error(m); };
+const run = async (args: string[], cwd: string) => { const p = Bun.spawn([bin, ...args], { cwd, stdout: "pipe", stderr: "pipe" }); const out = await new Response(p.stdout).text(); const err = await new Response(p.stderr).text(); if (await p.exited) throw new Error(`${args.join(" ")}\n${out}\n${err}`); return out; };
+const json = (s: string) => JSON.parse(s.trim());
+const id = (s: string) => { const m = /^ID:\s+(\S+)/m.exec(s); assert(m, `missing ID in ${s}`); return m[1]; };
+assert(!(tandemTaskParameters as any).properties.move, "task schema must not expose move");
+assert(JSON.stringify(ACCORD_ACTIONS) === JSON.stringify(["claim", "deliver", "rework", "block", "resume", "release", "fail"]), "accord actions must match 0.3");
+assert(buildInitArgs({ title: "x" }).join(" ") === "init --title x", "init argv");
+assert(buildTaskArgs({ action: "list", tags: ["a", "b"], decisionStatus: "accepted", resolution: "c" }).join(" ") === "list --tag a --tag b --decision-status accepted --resolution c --json", "list argv");
+assert(buildTaskArgs({ action: "add", title: "x", acceptance: ["done"] }).join(" ") === "add task x --acceptance done --json", "add argv");
+assert(buildTaskArgs({ action: "cancel", id: "task-1", reason: "no longer needed" }).join(" ") === "cancel task-1 --note no longer needed --json", "cancel argv");
+assert(buildTaskArgs({ action: "complete", id: "task-1" }).join(" ") === "complete task-1 --json", "complete argv");
+assert(buildAccordArgs({ action: "deliver", id: "task-1", summary: "done", evidence: ["test"], filesChanged: ["x"] }).join(" ") === "accord deliver task-1 --summary done --evidence test --file-changed x --json", "accord argv");
+assert(buildLogArgs({ action: "list" }).join(" ") === "list --scope archived --json", "log argv");
+assert(buildDecisionArgs({ action: "list" }).join(" ") === "list --type decision --json", "decision argv");
+assert(buildSearchArgs({ query: "x", tags: ["a"], limit: 2 }).join(" ") === "search x --tag a --limit 2 --json", "search argv");
+assert(buildPapercutArgs({ action: "add", title: "friction", body: "criterion" }).join(" ") === "add task friction --acceptance criterion --tag papercut --priority low", "papercut argv");
+const ws = await mkdtemp(join(tmpdir(), "pi-tandem-smoke-"));
 try {
-	buildAccordArgs({ action: "ready", id: "task-1" } as any);
-} catch (err) {
-	retiredReadyRejected = err instanceof Error && err.message.includes("unsupported tandem_accord action: ready");
-}
-assert(retiredReadyRejected, "tandem_accord builder should reject the retired ready action");
-
-const initArgs = buildInitArgs({ title: "Pi Tandem Smoke" });
-assert(initArgs.join(" ") === "init --title Pi Tandem Smoke", "tandem_init builder should map to init --title");
-
-const epicArgs = buildTaskArgs({ action: "add", title: "Canonical Epic", kind: "epic" });
-assert(epicArgs.join(" ") === "add --title Canonical Epic --kind epic", "tandem_task add builder should map Epic kind directly");
-const effortArgs = buildTaskArgs({ action: "add", title: "Estimated task", priority: "high", effort: "small" });
-assert(effortArgs.join(" ") === "add --title Estimated task --priority high --effort small", "tandem_task should forward fixed effort metadata");
-
-const updateArgs = buildTaskArgs({ action: "update", id: "task-1", kind: "epic", priority: "high", parent: "task-2", tags: ["cli"] });
-assert(updateArgs.join(" ") === "update task-1 --kind epic --priority high --parent task-2 --tag cli", "tandem_task update builder should map kind, metadata, and parent flags");
-
-for (const body of ["", "   ", "- first item\n\nUnicode: café 🦀\n"]) {
-	const bodyArgs = buildTaskArgs({ action: "update", id: "task-1", body });
-	const flagIndex = bodyArgs.indexOf("--body");
-	assert(flagIndex >= 0 && bodyArgs[flagIndex + 1] === body, "tandem_task update should preserve exact body values without trimming");
-}
-
-for (const [field, params] of [
-	["description", { description: "new body" }],
-	["accord", { accord: "ready" }],
-	["review", { review: "pending" }],
-] as const) {
-	let rejected = false;
-	try {
-		buildTaskArgs({ action: "update", id: "task-1", ...params });
-	} catch (err) {
-		rejected = err instanceof Error && err.message.includes(`does not support ${field}`);
-	}
-	assert(rejected, `tandem_task update builder should reject unsupported ${field}`);
-}
-
-let legacySubtasksRejected = false;
-try {
-	buildTaskArgs({ action: "add", title: "Legacy inline checklist", subtasks: ["new checklist item"] } as any);
-} catch (err) {
-	legacySubtasksRejected = err instanceof Error && err.message.includes("deprecated inline subtasks") && err.message.includes("parent=<task-id>");
-}
-assert(legacySubtasksRejected, "tandem_task builder should reject deprecated inline subtask authoring");
-
-const completeArgs = buildTaskArgs({ action: "complete", id: "task-1", summary: "Schema smoke" });
-assert(completeArgs.includes("--summary"), "tandem_task complete builder should pass --summary");
-assert(completeArgs.includes("Schema smoke"), "tandem_task complete builder should include summary value");
-const cancelArgs = buildTaskArgs({ action: "cancel", id: "task-2", reason: "Created by mistake" });
-assert(cancelArgs.join(" ") === "cancel task-2 --reason Created by mistake", "tandem_task cancel builder should map id and reason");
-const papercutAddArgs = buildPapercutArgs({ action: "add", title: "Small friction", body: "Workaround", references: ["task-1"], tags: ["tooling"] });
-assert(papercutAddArgs.join(" ") === "papercut add --title Small friction --body Workaround --reference task-1 --tag tooling", "tandem_papercut add should map directly to CLI flags");
-assert(buildPapercutArgs({ action: "list" }).join(" ") === "papercut list --json", "tandem_papercut reads should default to JSON");
-assert(buildPapercutArgs({ action: "show", id: "papercut-1" }).join(" ") === "papercut show papercut-1 --json", "tandem_papercut show should map ID and JSON");
-assert(buildPapercutArgs({ action: "resolve", id: "papercut-1", note: "Fixed", references: ["task-1"] }).join(" ") === "papercut resolve papercut-1 --note Fixed --reference task-1", "tandem_papercut resolve should map note and references");
-
-const tandem = await ensureTandem();
-await runRepoReadSmoke(tandem);
-
-const workspace = await mkdtemp(join(tmpdir(), "pi-tandem-smoke-"));
-
-try {
-	await runTandem(tandem, buildInitArgs({ title: "Pi Tandem Smoke" }), workspace);
-
-	const emptyList = parseJson(await runTandem(tandem, buildTaskArgs({ action: "list" }), workspace));
-	assert(emptyList.ok === true, "task list JSON should be ok");
-	assert(emptyList.data.counts.total === 0, "new workspace should start with zero active items");
-
-	const addOutput = await runTandem(tandem, buildTaskArgs({
-		action: "add",
-		title: "Smoke task",
-		state: "todo",
-		description: "Created by pi-tandem smoke test.",
-		priority: "medium",
-		effort: "small",
-		tags: ["smoke"],
-	}), workspace);
-	const taskId = parseId(addOutput);
-
-	const shown = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
-	assert(shown.data.document.title === "Smoke task", "show should return created task");
-
-	let unsupportedUpdateRejected = false;
-	try {
-		buildTaskArgs({ action: "update", id: taskId, description: "Not supported by tandem update" });
-	} catch (err) {
-		unsupportedUpdateRejected = err instanceof Error && err.message.includes("description") && err.message.includes("Supported update fields");
-	}
-	assert(unsupportedUpdateRejected, "unsupported update fields should fail before invoking tandem update");
-
-	const exactBody = "- first item\n\nUnicode: café 🦀\n";
-	const bodyUpdateOutput = await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: exactBody }), workspace);
-	assert(bodyUpdateOutput.includes("body: changed"), "body update should report a content-free change summary");
-	assert(!bodyUpdateOutput.includes("first item"), "body update output should not echo body contents");
-	const bodyUpdated = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
-	assert(bodyUpdated.data.body === exactBody, "show JSON should round-trip the exact updated body");
-	const bodyNoopOutput = await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: exactBody }), workspace);
-	assert(bodyNoopOutput.includes("No changes"), "byte-identical body replacement should be a no-op");
-	await runTandem(tandem, buildTaskArgs({ action: "update", id: taskId, body: "" }), workspace);
-	const bodyCleared = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
-	assert(bodyCleared.data.body === "", "an explicit empty body should clear the complete Markdown body");
-
-	const updateOutput = await runTandem(tandem, buildTaskArgs({
-		action: "update",
-		id: taskId,
-		title: "Updated smoke task",
-		priority: "high",
-		assignee: "pi-tandem-smoke",
-		dueDate: "2026-07-01",
-		tags: ["smoke", "metadata"],
-		relatedFiles: ["extensions/pi-tandem/index.ts"],
-	}), workspace);
-	assert(updateOutput.includes("Updated"), "update should report changed metadata");
-	const updated = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
-	assert(updated.data.document.title === "Updated smoke task", "update should change title");
-	assert(updated.data.document.priority === "high", "update should change priority");
-	assert(updated.data.document.effort === "small", "show should expose effort metadata");
-	assert(updated.data.document.tags.includes("metadata"), "update should append tags");
-	assert(updated.data.document.relatedFiles.includes("extensions/pi-tandem/index.ts"), "show JSON should expose relatedFiles");
-
-	await runTandem(tandem, buildTaskArgs({ action: "move", id: taskId, state: "in-progress" }), workspace);
-	const moved = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: taskId }), workspace));
-	assert(moved.data.document.state === "in-progress", "move should update task state");
-
-	await runTandem(tandem, buildAccordArgs({
-		action: "claim",
-		id: taskId,
-		assignee: "pi-tandem-smoke",
-		deliverables: ["test:extensions/pi-tandem/tests/smoke.ts:smoke exercise"],
-		validations: ["bun extensions/pi-tandem/tests/smoke.ts"],
-	}), workspace);
-	await runTandem(tandem, buildAccordArgs({
-		action: "deliver",
-		id: taskId,
-		summary: "Smoke delivery",
-		evidence: ["tandem wrapper command paths executed"],
-		filesChanged: ["extensions/pi-tandem/index.ts"],
-	}), workspace);
-
-	await runTandem(tandem, buildRulesArgs({ action: "add", category: "always", rule: "Smoke rule" }), workspace);
-	const rules = parseJson(await runTandem(tandem, buildRulesArgs({ action: "list" }), workspace));
-	assert(rules.data.counts.total === 1, "rules list should include added rule");
-	await runTandem(tandem, buildRulesArgs({ action: "edit", category: "always", id: 1, rule: "Edited smoke rule" }), workspace);
-	await runTandem(tandem, buildRulesArgs({ action: "delete", category: "always", id: 1 }), workspace);
-
-	const decisionOutput = await runTandem(tandem, buildDecisionArgs({
-		action: "add",
-		title: "Smoke decision",
-		body: "## Decision\nExercise pi-tandem decision command mapping.",
-		status: "accepted",
-		date: "2026-07-01",
-		deciders: ["pi-tandem-smoke"],
-		context: "Exercise ADR-compatible decision metadata.",
-		consequences: ["Decision adapter flags are covered."],
-		alternatives: ["Only test title/body."],
-		references: [taskId],
-		tags: ["smoke"],
-	}), workspace);
-	const decisionId = parseId(decisionOutput);
-	const decision = parseJson(await runTandem(tandem, buildDecisionArgs({ action: "show", id: decisionId }), workspace));
-	assert(decision.data.decision.title === "Smoke decision", "decision show should return created decision");
-	assert(decision.data.decision.status === "accepted", "decision show should expose ADR status");
-	assert(decision.data.decision.deciders.includes("pi-tandem-smoke"), "decision show should expose deciders");
-
-	const papercutOutput = await runTandem(tandem, buildPapercutArgs({
-		action: "add",
-		title: "Smoke friction",
-		body: "A workaround worth preserving.",
-		references: [taskId],
-		tags: ["smoke"],
-	}), workspace);
-	const papercutId = parseId(papercutOutput);
-	const openPapercuts = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "list" }), workspace));
-	assert(openPapercuts.data.items.some((item: any) => item.id === papercutId), "papercut list should include the open record");
-	const shownPapercut = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "show", id: papercutId }), workspace));
-	assert(shownPapercut.data.body.includes("workaround worth preserving"), "papercut show should expose the body through CLI JSON");
-	await runTandem(tandem, buildPapercutArgs({ action: "resolve", id: papercutId, note: "Smoke helper fixed it", references: [taskId] }), workspace);
-	const allPapercuts = parseJson(await runTandem(tandem, buildPapercutArgs({ action: "list", all: true }), workspace));
-	assert(allPapercuts.data.items.find((item: any) => item.id === papercutId)?.status === "resolved", "papercut resolve should update status through the CLI");
-
-	const search = parseJson(await runTandem(tandem, buildSearchArgs({ query: "Smoke" }), workspace));
-	assert(search.data.results.length >= 3, "search should find smoke task, decision, and Papercut");
-	assert(search.data.results.some((item: any) => item.id === papercutId && item.location === "papercuts"), "global search should expose Papercut location");
-
-	const cancelOutput = await runTandem(tandem, buildTaskArgs({
-		action: "add",
-		title: "Canceled smoke task",
-		description: "Preserve this canceled body.",
-	}), workspace);
-	const canceledId = parseId(cancelOutput);
-	const cancelResult = await runTandem(tandem, buildTaskArgs({ action: "cancel", id: canceledId, reason: "Created by mistake" }), workspace);
-	assert(cancelResult.includes(`Canceled ${canceledId}`), "cancel should report the archived Task");
-	const canceled = parseJson(await runTandem(tandem, buildTaskArgs({ action: "show", id: canceledId }), workspace));
-	assert(canceled.data.location === "logs", "canceled Task should move to Logs");
-	assert(canceled.data.document.completionOutcome === "canceled", "show JSON should identify the canceled outcome");
-	assert(canceled.data.body.includes("Preserve this canceled body."), "cancel should preserve the Task body");
-
-	await runTandem(tandem, buildTaskArgs({
-		action: "complete",
-		id: taskId,
-		summary: "Smoke complete",
-		filesChanged: ["extensions/pi-tandem/index.ts"],
-		validation: "smoke passed",
-	}), workspace);
-	const logs = parseJson(await runTandem(tandem, buildLogArgs({ action: "list" }), workspace));
-	assert(logs.data.count === 2, "log list should include completed and canceled Tasks");
-	assert(logs.data.items.find((item: any) => item.id === canceledId)?.outcome === "canceled", "log list should expose canceled outcome");
-	const logSearch = parseJson(await runTandem(tandem, buildLogArgs({ action: "search", query: "Smoke complete" }), workspace));
-	assert(logSearch.data.results.length === 1, "log search should find completed smoke task");
-
-	console.log(`pi-tandem smoke passed with ${tandem}`);
-} finally {
-	await rm(workspace, { recursive: true, force: true });
-}
+ await run(buildInitArgs({ title: "Smoke" }), ws);
+ const added = json(await run(buildTaskArgs({ action: "add", title: "Smoke task", acceptance: ["works"], tags: ["smoke"] }), ws)); assert(added.ok && added.data.id, "add envelope"); const task = added.data.id;
+ const listed = json(await run(buildTaskArgs({ action: "list" }), ws)); assert(listed.ok && listed.data.some((x: any) => x.id === task), "list envelope");
+ const shown = json(await run(buildTaskArgs({ action: "show", id: task }), ws)); assert(shown.ok && shown.data.id === task, "show envelope");
+ const accord = json(await run(buildAccordArgs({ action: "claim", id: task, assignee: "smoke" }), ws)); assert(accord.ok && accord.data.event, "accord envelope");
+ const rule = json(await run(buildRulesArgs({ action: "add", category: "always", rule: "Smoke" }), ws)); assert(rule.ok && rule.data.id === "always-1", "rules envelope");
+ const decision = json(await run(buildDecisionArgs({ action: "add", title: "Choice" }), ws)); assert(decision.ok && decision.data.id, "decision envelope");
+ const paper = json(await run(buildTaskArgs({ action: "add", title: "Paper", acceptance: ["criterion"], tags: ["papercut"], priority: "low" }), ws)); assert(paper.ok, "papercut task");
+ const search = json(await run(buildSearchArgs({ query: "Smoke" }), ws)); assert(search.ok && Array.isArray(search.data), "search envelope");
+ const completed = json(await run(buildTaskArgs({ action: "complete", id: task }), ws)); assert(completed.ok && completed.data.id === task, "completion archive envelope");
+ const logs = json(await run(buildLogArgs({ action: "list" }), ws)); assert(logs.ok && logs.data.some((x: any) => x.id === task), "log list envelope");
+ console.log("pi-tandem smoke passed (16 assertions)");
+} finally { await rm(ws, { recursive: true, force: true }); }

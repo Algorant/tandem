@@ -41,7 +41,7 @@ export type InitToolParams = CwdFlag & {
 };
 
 export type TaskToolParams = CwdFlag & ReadJsonFlag & {
-	action: "list" | "show" | "add" | "move" | "update" | "complete" | "cancel";
+	action: "list" | "show" | "add" | "update" | "complete" | "cancel";
 	id?: string;
 	title?: string;
 	state?: string;
@@ -53,6 +53,12 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	kind?: "epic";
 	tags?: string[];
 	assignee?: string;
+	acceptance?: string[];
+	constraints?: string[];
+	validations?: string[];
+	decisionStatus?: string;
+	resolution?: string;
+	limit?: number;
 	dueDate?: string;
 	parent?: string;
 	blockers?: string[];
@@ -65,9 +71,12 @@ export type TaskToolParams = CwdFlag & ReadJsonFlag & {
 	validation?: string;
 	reviewer?: string;
 	reason?: string;
+	deciders?: string[];
+	supersedes?: string[];
+	clear?: string[];
 };
 
-export const ACCORD_ACTIONS = ["claim", "deliver", "accept", "rework", "block", "fail"] as const;
+export const ACCORD_ACTIONS = ["claim", "deliver", "rework", "block", "resume", "release", "fail"] as const;
 export type AccordAction = (typeof ACCORD_ACTIONS)[number];
 
 export type AccordToolParams = CwdFlag & {
@@ -90,6 +99,7 @@ export type LogToolParams = CwdFlag & ReadJsonFlag & {
 	id?: string;
 	query?: string;
 	limit?: number;
+	scope?: "active" | "archived" | "all";
 };
 
 export type RulesToolParams = CwdFlag & ReadJsonFlag & {
@@ -121,7 +131,10 @@ export type SearchToolParams = CwdFlag & ReadJsonFlag & {
 	query: string;
 	state?: string;
 	type?: string;
+	tags?: string[];
 	parent?: string;
+	limit?: number;
+	scope?: "active" | "archived" | "all";
 };
 
 export type PapercutToolParams = CwdFlag & ReadJsonFlag & {
@@ -231,7 +244,7 @@ export function buildInitArgs(params: InitToolParams): string[] {
 export function buildTaskArgs(params: TaskToolParams): string[] {
 	rejectDeprecatedInlineSubtasks(params);
 	const action = params.action;
-	if (params.body !== undefined && action !== "update") {
+	if (params.body !== undefined && action !== "update" && action !== "add") {
 		throw new Error("tandem_task body is supported only for action=update; use description when creating a Task");
 	}
 	if (action === "list") {
@@ -240,11 +253,13 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		addOptionalFlag(args, "--type", params.type);
 		addOptionalFlag(args, "--priority", params.priority);
 		addOptionalFlag(args, "--effort", params.effort);
-		addOptionalFlag(args, "--parent", params.parent);
-		addOptionalFlag(args, "--tag", params.tags?.[0]);
+		addRepeatedFlag(args, "--tag", params.tags);
 		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--accord", params.accord);
-		addOptionalFlag(args, "--review", params.review);
+		addOptionalFlag(args, "--decision-status", params.decisionStatus);
+		addOptionalFlag(args, "--resolution", params.resolution);
+		addOptionalFlag(args, "--parent", params.parent);
+		if (params.limit !== undefined) args.push("--limit", String(requirePositiveInteger(params.limit, "tandem_task list limit must be a positive integer")));
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
@@ -254,49 +269,70 @@ export function buildTaskArgs(params: TaskToolParams): string[] {
 		return args;
 	}
 	if (action === "add") {
-		const args = ["add", "--title", requireString(params.title, "tandem_task add requires title")];
-		addOptionalFlag(args, "--state", params.state);
-		addOptionalFlag(args, "--description", params.description);
+		const title = requireString(params.title, "tandem_task add requires title");
+		if (params.type === "decision") {
+			const args = ["add", "decision", title];
+			addOptionalFlag(args, "--body", params.body ?? params.description);
+			addRepeatedFlag(args, "--decider", params.deciders);
+			addRepeatedFlag(args, "--supersedes", params.supersedes);
+			addRepeatedFlag(args, "--reference", params.references);
+			addRepeatedFlag(args, "--tag", params.tags);
+			return args;
+		}
+		const acceptance = params.acceptance ?? (params.description ? [params.description] : []);
+		if (!acceptance.length) throw new Error("tandem_task add requires acceptance (or description as the add-time acceptance criterion)");
+		const args = ["add", "task", title];
+		addRepeatedFlag(args, "--acceptance", acceptance);
+		addOptionalFlag(args, "--body", params.body);
+		addOptionalFlag(args, "--kind", params.kind);
 		addOptionalFlag(args, "--priority", params.priority);
 		addOptionalFlag(args, "--effort", params.effort);
-		addOptionalFlag(args, "--kind", params.kind);
 		addRepeatedFlag(args, "--tag", params.tags);
-		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--due-date", params.dueDate);
 		addOptionalFlag(args, "--parent", params.parent);
 		addRepeatedFlag(args, "--blocker", params.blockers);
 		addRepeatedFlag(args, "--reference", params.references);
 		addRepeatedFlag(args, "--related-file", params.relatedFiles);
+		addRepeatedFlag(args, "--constraint", params.constraints);
+		addRepeatedFlag(args, "--validation", params.validations);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
-	if (action === "move") {
-		return ["move", requireString(params.id, "tandem_task move requires id"), "--state", requireString(params.state, "tandem_task move requires state")];
+	if ((action as string) === "move") {
+		throw new Error("tandem_task move was removed; use tandem_accord or tandem_task action=update");
 	}
 	if (action === "update") {
 		rejectUnsupportedUpdateFields(params);
 		const args = ["update", requireString(params.id, "tandem_task update requires id")];
 		addOptionalFlag(args, "--title", params.title);
 		addPresentStringFlag(args, "--body", params.body);
-		addOptionalFlag(args, "--kind", params.kind);
 		addOptionalFlag(args, "--priority", params.priority);
 		addOptionalFlag(args, "--effort", params.effort);
-		addOptionalFlag(args, "--assignee", params.assignee);
 		addOptionalFlag(args, "--due-date", params.dueDate);
 		addOptionalFlag(args, "--parent", params.parent);
 		addRepeatedFlag(args, "--tag", params.tags);
 		addRepeatedFlag(args, "--blocker", params.blockers);
 		addRepeatedFlag(args, "--reference", params.references);
 		addRepeatedFlag(args, "--related-file", params.relatedFiles);
+		addRepeatedFlag(args, "--acceptance", params.acceptance);
+		addRepeatedFlag(args, "--constraint", params.constraints);
+		addRepeatedFlag(args, "--validation", params.validations);
+		addOptionalFlag(args, "--status", params.state);
+		addRepeatedFlag(args, "--decider", params.deciders);
+		addRepeatedFlag(args, "--supersedes", params.supersedes);
+		addRepeatedFlag(args, "--clear", params.clear);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (action === "cancel") {
-		return ["cancel", requireString(params.id, "tandem_task cancel requires id"), "--reason", requireString(params.reason, "tandem_task cancel requires reason")];
+		const args = ["cancel", requireString(params.id, "tandem_task cancel requires id"), "--note", requireString(params.reason, "tandem_task cancel requires reason")];
+		if (wantsJson(params)) args.push("--json");
+		return args;
 	}
 	if (action === "complete") {
-		const args = ["complete", requireString(params.id, "tandem_task complete requires id"), "--summary", requireString(params.summary, "tandem_task complete requires summary")];
-		addRepeatedFlag(args, "--file-changed", params.filesChanged);
-		addOptionalFlag(args, "--validation", params.validation);
+		const args = ["complete", requireString(params.id, "tandem_task complete requires id")];
 		addOptionalFlag(args, "--reviewer", params.reviewer);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	throw new Error(`unsupported tandem_task action: ${String(action)}`);
@@ -310,31 +346,27 @@ export function buildAccordArgs(params: AccordToolParams): string[] {
 	const args = ["accord", action, requireString(params.id, "tandem_accord requires id")];
 	addOptionalFlag(args, "--assignee", params.assignee);
 	addOptionalFlag(args, "--summary", params.summary);
-	addOptionalFlag(args, "--reviewer", params.reviewer);
 	addOptionalFlag(args, "--note", params.note);
-	addOptionalFlag(args, "--reason", params.reason);
-	addRepeatedFlag(args, "--deliverable", params.deliverables);
-	addRepeatedFlag(args, "--validation", params.validations);
-	addRepeatedFlag(args, "--constraint", params.constraints);
 	addRepeatedFlag(args, "--evidence", params.evidence);
 	addRepeatedFlag(args, "--file-changed", params.filesChanged);
+	if (wantsJson(params as any)) args.push("--json");
 	return args;
 }
 
 export function buildLogArgs(params: LogToolParams): string[] {
 	if (params.action === "list") {
-		const args = ["log", "list"];
+		const args = ["list", "--scope", params.scope ?? "archived"];
 		if (params.limit !== undefined) args.push("--limit", String(requirePositiveInteger(params.limit, "tandem_log list limit must be a positive integer")));
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "show") {
-		const args = ["log", "show", requireString(params.id, "tandem_log show requires id")];
+		const args = ["show", requireString(params.id, "tandem_log show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "search") {
-		const args = ["log", "search", requireString(params.query, "tandem_log search requires query")];
+		const args = ["search", requireString(params.query, "tandem_log search requires query"), "--scope", params.scope ?? "archived"];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
@@ -344,50 +376,55 @@ export function buildLogArgs(params: LogToolParams): string[] {
 export function buildRulesArgs(params: RulesToolParams): string[] {
 	if (params.action === "list") {
 		const args = ["rules", "list"];
-		addOptionalFlag(args, "--category", params.category);
+		if (params.category) args.push(params.category);
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "add") {
-		const args = ["rules", "add", "--category", requireString(params.category, "tandem_rules add requires category"), "--rule", requireString(params.rule, "tandem_rules add requires rule")];
+		const args = ["rules", "add", requireString(params.category, "tandem_rules add requires category"), requireString(params.rule, "tandem_rules add requires rule")];
 		addOptionalFlag(args, "--source", params.source);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "edit") {
-		const args = ["rules", "edit", "--category", requireString(params.category, "tandem_rules edit requires category"), "--id", String(requirePositiveInteger(params.id, "tandem_rules edit requires a positive id")), "--rule", requireString(params.rule, "tandem_rules edit requires rule")];
+		const args = ["rules", "edit", `${requireString(params.category, "tandem_rules edit requires category")}-${String(requirePositiveInteger(params.id, "tandem_rules edit requires a positive id"))}`, requireString(params.rule, "tandem_rules edit requires rule")];
 		addOptionalFlag(args, "--source", params.source);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "delete") {
-		return ["rules", "delete", "--category", requireString(params.category, "tandem_rules delete requires category"), "--id", String(requirePositiveInteger(params.id, "tandem_rules delete requires a positive id"))];
+		const args = ["rules", "delete", `${requireString(params.category, "tandem_rules delete requires category")}-${String(requirePositiveInteger(params.id, "tandem_rules delete requires a positive id"))}`];
+		if (wantsJson(params)) args.push("--json");
+		return args;
 	}
 	throw new Error(`unsupported tandem_rules action: ${String(params.action)}`);
 }
 
 export function buildDecisionArgs(params: DecisionToolParams): string[] {
 	if (params.action === "list") {
-		const args = ["decision", "list"];
+		const args = ["list", "--type", "decision"];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "show") {
-		const args = ["decision", "show", requireString(params.id, "tandem_decision show requires id")];
+		const args = ["show", requireString(params.id, "tandem_decision show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "add") {
-		const args = ["decision", "add", "--title", requireString(params.title, "tandem_decision add requires title")];
+		const args = ["add", "decision", requireString(params.title, "tandem_decision add requires title")];
 		addOptionalFlag(args, "--body", params.body);
 		addOptionalFlag(args, "--status", params.status);
 		addOptionalFlag(args, "--date", params.date);
 		addRepeatedFlag(args, "--decider", params.deciders);
-		addOptionalFlag(args, "--context", params.context);
+			addOptionalFlag(args, "--context", params.context);
 		addRepeatedFlag(args, "--consequence", params.consequences);
 		addRepeatedFlag(args, "--alternative", params.alternatives);
 		addRepeatedFlag(args, "--supersedes", params.supersedes);
 		addRepeatedFlag(args, "--superseded-by", params.supersededBy);
 		addRepeatedFlag(args, "--reference", params.references);
 		addRepeatedFlag(args, "--tag", params.tags);
+		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	throw new Error(`unsupported tandem_decision action: ${String(params.action)}`);
@@ -397,36 +434,35 @@ export function buildSearchArgs(params: SearchToolParams): string[] {
 	const args = ["search", requireString(params.query, "tandem_search requires query")];
 	addOptionalFlag(args, "--state", params.state);
 	addOptionalFlag(args, "--type", params.type);
+	addRepeatedFlag(args, "--tag", params.tags);
 	addOptionalFlag(args, "--parent", params.parent);
+	if (params.limit !== undefined) args.push("--limit", String(requirePositiveInteger(params.limit, "tandem_search limit must be a positive integer")));
+	if (params.scope) args.push("--scope", params.scope);
 	if (wantsJson(params)) args.push("--json");
 	return args;
 }
 
 export function buildPapercutArgs(params: PapercutToolParams): string[] {
 	if (params.action === "add") {
-		const args = ["papercut", "add", "--title", requireString(params.title, "tandem_papercut add requires title")];
-		addPresentStringFlag(args, "--body", params.body);
-		addRepeatedFlag(args, "--reference", params.references);
-		addRepeatedFlag(args, "--tag", params.tags);
+		const args = ["add", "task", requireString(params.title, "tandem_papercut add requires title"), "--acceptance", requireString(params.body, "tandem_papercut add requires body")];
+		args.push("--tag", "papercut", "--priority", "low");
 		return args;
 	}
 	if (params.action === "list") {
 		if (params.all && params.status) throw new Error("tandem_papercut list cannot combine all and status");
-		const args = ["papercut", "list"];
-		addOptionalFlag(args, "--status", params.status);
-		if (params.all) args.push("--all");
+		const args = ["list", "--tag", "papercut"];
+		if (params.all) args.push("--scope", "all");
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "show") {
-		const args = ["papercut", "show", requireString(params.id, "tandem_papercut show requires id")];
+		const args = ["show", requireString(params.id, "tandem_papercut show requires id")];
 		if (wantsJson(params)) args.push("--json");
 		return args;
 	}
 	if (params.action === "resolve") {
-		const args = ["papercut", "resolve", requireString(params.id, "tandem_papercut resolve requires id"), "--note", requireString(params.note, "tandem_papercut resolve requires note")];
-		addRepeatedFlag(args, "--reference", params.references);
-		return args;
+		if (params.status === "open") throw new Error("tandem_papercut resolve cannot reopen a Task");
+		return ["complete", requireString(params.id, "tandem_papercut resolve requires id")];
 	}
 	throw new Error(`unsupported tandem_papercut action: ${String(params.action)}`);
 }
@@ -593,9 +629,9 @@ async function buildStatusText(baseCwd: string, params: CwdFlag = {}, signal?: A
 	if (workspaceRoot) {
 		const list = await runTandem(["list", "--json"], cwd, signal, params.timeoutMs);
 		if (list.ok) {
-			const parsed = parseJsonIfPossible(list.stdout) as { data?: { counts?: unknown } } | undefined;
+			const parsed = parseJsonIfPossible(list.stdout) as { data?: unknown[] } | undefined;
 			lines.push("tandem list --json: ok");
-			if (parsed?.data?.counts) lines.push(`counts: ${JSON.stringify(parsed.data.counts)}`);
+			if (Array.isArray(parsed?.data)) lines.push(`items: ${parsed.data.length}`);
 			return { content: [{ type: "text", text: lines.join("\n") }], details: { cwd, workspaceRoot, help, list, parsedJson: parsed } };
 		}
 		const diagnostic = classifyFailure(list);
@@ -618,7 +654,7 @@ const jsonSchema = {
 export const tandemTaskParameters = Type.Object({
 	...cwdSchema,
 	...jsonSchema,
-	action: StringEnum(["list", "show", "add", "move", "update", "complete", "cancel"] as const),
+	action: StringEnum(["list", "show", "add", "update", "complete", "cancel"] as const),
 	id: Type.Optional(Type.String()),
 	title: Type.Optional(Type.String()),
 	state: Type.Optional(Type.String()),
@@ -629,7 +665,12 @@ export const tandemTaskParameters = Type.Object({
 	effort: Type.Optional(Type.String({ description: "Optional fixed effort: trivial, small, medium, or large." })),
 	kind: Type.Optional(StringEnum(["epic"] as const, { description: "Optional task classifier for add/update. Use kind=epic only for a root global task; Epics cannot have parentId and are not delegation roots." })),
 	tags: Type.Optional(Type.Array(Type.String())),
-	assignee: Type.Optional(Type.String()),
+	acceptance: Type.Optional(Type.Array(Type.String())),
+	constraints: Type.Optional(Type.Array(Type.String())),
+	validations: Type.Optional(Type.Array(Type.String())),
+	decisionStatus: Type.Optional(Type.String()),
+	resolution: Type.Optional(Type.String()),
+	limit: Type.Optional(Type.Number()),
 	dueDate: Type.Optional(Type.String()),
 	parent: Type.Optional(Type.String({ description: "Existing Tandem document ID passed directly to add/update as --parent, or used by list to filter exact parentId matches. On add, the CLI resolves the parent role: an Epic gets a global-ID Task, a Task gets a parent-derived Subtask, and a decision/custom document gets a global-ID Task with a generic parent relationship. pi-tandem never allocates IDs or classifies roles. Create or inspect the parent first." })),
 	blockers: Type.Optional(Type.Array(Type.String(), { description: "Existing Tandem document IDs that block this task. These are strict core references; missing IDs make tandem add fail." })),
@@ -638,10 +679,9 @@ export const tandemTaskParameters = Type.Object({
 	accord: Type.Optional(Type.String({ description: "Filter value for action=list only. Use tandem_accord for accord lifecycle changes; action=update intentionally rejects this field." })),
 	review: Type.Optional(Type.String({ description: "Filter value for action=list only. Review metadata is managed by review/validation flows; action=update intentionally rejects this field." })),
 	filesChanged: Type.Optional(Type.Array(Type.String())),
-	summary: Type.Optional(Type.String({ description: "Required for action=complete; maps to `tandem complete --summary`." })),
 	validation: Type.Optional(Type.String()),
 	reviewer: Type.Optional(Type.String()),
-	reason: Type.Optional(Type.String({ description: "Required for action=cancel; maps to `tandem cancel --reason` and is retained in the canceled Log summary." })),
+	reason: Type.Optional(Type.String({ description: "Required for action=cancel; maps to `tandem cancel --note`." })),
 });
 
 export const tandemAccordParameters = Type.Object({
@@ -654,7 +694,7 @@ export const tandemAccordParameters = Type.Object({
 	note: Type.Optional(Type.String()),
 	reason: Type.Optional(Type.String()),
 	deliverables: Type.Optional(Type.Array(Type.String())),
-	validations: Type.Optional(Type.Array(Type.String({ description: "Validation commands/descriptions; maps to repeated `--validation`." }))),
+	validations: Type.Optional(Type.Array(Type.String())),
 	constraints: Type.Optional(Type.Array(Type.String())),
 	evidence: Type.Optional(Type.Array(Type.String())),
 	filesChanged: Type.Optional(Type.Array(Type.String())),
@@ -662,7 +702,7 @@ export const tandemAccordParameters = Type.Object({
 
 export function tandemPromptGuidance(workspaceRoot?: string): string {
 	const workspaceLine = workspaceRoot ? `A Tandem workspace is present at ${workspaceRoot}.` : "No Tandem workspace is currently detected from the working directory.";
-	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_papercut, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update for supported active Task edits: body replaces the exact complete Markdown body; title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles edit metadata. State remains action=move, description remains an add-time convenience field, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Use tandem_task action=cancel only when the user or orchestrator explicitly asks to archive abandoned or mistaken work. Provide a reason; Tandem preserves an auditable canceled Log and rejects cancellation while active descendants remain.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, accepting, reworking, blocking, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Record a Papercut with tandem_papercut when small, non-blocking friction causes confusion, avoidable retries, or a workaround worth preserving. Then continue the current work. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts. Use the blocking lifecycle for blockers and create a Task when corrective work needs planning or ownership.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
+	return `\n\n## Tandem coordination guidance\n\n${workspaceLine}\n\n- Prefer pi-tandem tools (tandem_status, tandem_init, tandem_task, tandem_accord, tandem_log, tandem_rules, tandem_decision, tandem_papercut, tandem_search) over manual edits to .tandem files for durable coordination.\n- Use tandem_status before tandem_init; if tandem_status reports no workspace, ask before initializing a new Tandem workspace. Do not create .tandem state implicitly.\n- Keep Tandem behavior in the tandem CLI/protocol; use pi-tandem as a thin adapter and diagnostics layer.\n- Use workflow state \`validation\` for delivered work awaiting acceptance, rejection, redirection, or human/product judgment; existing \`state: review\` files are legacy reads, not the preferred new state.\n- Keep workflow state, accord status, and \`review:\` metadata distinct. Review metadata can record reviewer decisions/status without renaming it to validation.\n- Use tandem_decision for durable project/product/architecture decisions, including ADR-compatible records; do not model decisions as task lifecycle state or a separate ADR type.\n- Create each independently tracked work unit with tandem_task action=add and pass parent directly to Tandem. The CLI resolves canonical roles and IDs: Epics are root global \`task-N\` documents, their direct children are global-ID Tasks with \`parentRelationship: epic-task\`, and a Task's direct children are leaf, parent-derived \`task-N-M\` Subtasks with \`parentRelationship: subtask\`. Decision/custom parents produce global-ID Tasks with generic \`parent\`. Never allocate IDs or reclassify CLI output in Pi. Inline checklist subtasks are legacy read-only metadata. Use blockers for strict dependencies, references for related Tandem docs, and relatedFiles for project paths.\n- Only Task-role roots are delegated initially. Epics and Subtasks are not delegation roots; one Task worker owns its direct Subtasks through the todo projection and produces one Task-root handoff. Child workers report evidence but do not accept, complete, or archive Tandem work.\n- Use tandem_task action=update for supported active Task edits: body replaces the exact complete Markdown body; title, kind, priority, assignee, dueDate, parent, tags, blockers, references, and relatedFiles edit metadata. State remains action=move, description remains an add-time convenience field, and accord changes go through tandem_accord. Role-changing or ID-invalidating reparenting is rejected by Tandem.\n- Use tandem_task action=cancel only when the user or orchestrator explicitly asks to archive abandoned or mistaken work. Provide a reason; Tandem preserves an auditable canceled Log and rejects cancellation while active descendants remain.\n- Epics are ordinary root tasks with \`type: task\` plus \`kind: epic\`; use references for loose context. Do not invent \`type: epic\`, ADR-style epic records, custom folders, or special epic lifecycle behavior.\n- Use tandem_accord for claiming, delivering, reworking, blocking, resuming, releasing, or failing work agreements. Deliver finished agent work into Validation; child/subagent workers must only report and deliver evidence, never accept, complete, or archive tasks themselves.\n- Record a Papercut with tandem_papercut when small, non-blocking friction causes confusion, avoidable retries, or a workaround worth preserving. Then continue the current work. Expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts. Use the blocking lifecycle for blockers and create a Task when corrective work needs planning or ownership.\n- Use tandem_log and tandem_search for completed-work history instead of treating logs as trash/archive only.\n`;
 }
 
 function promptMentionsDurableCoordination(prompt: string): boolean {
@@ -714,8 +754,8 @@ export default function piTandem(pi: ExtensionAPI) {
 		name: "tandem_task",
 		label: "Tandem Task",
 		...createTandemToolRenderer("tandem_task", "Tandem Task"),
-		description: "Run task-oriented `tandem` commands: list, show, add, move, update, complete, or cancel. Update supports exact Markdown body replacement plus supported metadata edits; cancel archives an active Task with an auditable canceled outcome. Add/update pass kind and parent directly to the CLI: Epics contain global-ID Tasks, Tasks contain parent-derived leaf Subtasks, and generic parents retain global Task IDs. pi-tandem never allocates IDs or reclassifies CLI relationships. Deprecated inline checklist subtasks are not authored. Read actions default to `--json`; mutations preserve human-readable CLI output.",
-		promptSnippet: "Use tandem_task for Tandem task list/show/add/move/update/complete/cancel operations instead of editing .tandem files directly.",
+		description: "Run task-oriented `tandem` commands: list, show, add, update, complete, or cancel. Reads and mutations use the global JSON envelope.",
+		promptSnippet: "Use tandem_task for Tandem task list/show/add/update/complete/cancel operations instead of editing .tandem files directly.",
 		promptGuidelines: [
 			"Use tandem_task for active Tandem task reads and mutations when `.tandem/tandem.md` exists.",
 			"Prefer tandem_task read actions with the default JSON output for reliable task inspection.",
