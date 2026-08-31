@@ -259,9 +259,7 @@ release VERSION:
 	bun run build
 	bun audit --audit-level=high
 	cd ..
-	node --check tandem/src/web/app.js
-	node --check tandem/src/web/api.js
-	node --check tandem/src/web/ui.js
+	bun build --no-bundle tandem/src/web/app.js tandem/src/web/api.js tandem/src/web/ui.js --outdir /tmp/tandem-web-syntax-check
 	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
 	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
