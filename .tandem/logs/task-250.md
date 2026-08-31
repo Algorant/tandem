@@ -2,19 +2,21 @@
 id: task-250
 type: task
 title: "Polish 0.3.0 TUI Papercuts section accessibility and CLI landing page"
-state: "in-progress"
 priority: "medium"
 effort: "small"
 references: ["papercut-10", "papercut-11", "papercut-12"]
 tags: ["tui", "cli", "papercuts"]
 createdAt: "2026-08-31T02:40:14Z"
-updatedAt: "2026-08-31T02:51:11Z"
+updatedAt: "2026-08-31T02:57:53Z"
 accord:
   status: "claimed"
   assignee: "worker-task-250-99bc722a"
   claimedAt: "2026-08-31T02:41:13Z"
   updatedAt: "2026-08-31T02:41:13Z"
 assignee: "worker-task-250-99bc722a"
+completedAt: "2026-08-31T02:57:53Z"
+completion:
+  summary: "Resolved papercut-10 (Papercuts Board section now Tab/h-l reachable with a clickable section tab, i kept as the inbox popover), papercut-11 (landing restored to grouped descriptive sections for the 23-command surface), and papercut-12 (removed the retained TUI Add/quick-add and direct-Move bindings, picker actions, hit dispatch, and tests; Rules/Decisions a actions preserved; landing review copy corrected to 'request exceptional human validation'). Verified: 233 unit + 5 process tests, fmt/clippy clean, release build, rendered Herdr pane shows Tab+click reaching Papercuts, footer without Add/Move, a/m inert."
 ---
 
 ## Description
