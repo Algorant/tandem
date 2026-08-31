@@ -121,3 +121,27 @@ If using claude code, codex, etc
 ## License
 
 Tandem is available under the [MIT License](LICENSE).
+
+## Migrating a workspace to protocol 0.3.0
+
+Tested procedure (2026-08-31) for moving an existing pre-0.3.0 coordination
+workspace to the protocol 0.3.0 binary. There is deliberately no
+`upgrade`/`migrate` command, converter, or compatibility reader — the new
+binary only opens 0.3.0 workspaces, so migration is owner-side and
+semi-manual. This procedure is a working draft and may be removed once the
+migration surface stabilizes.
+
+1. **Install and verify the new binary.** `curl -fsSL https://trytandem.dev/install.sh | sh` then confirm `tandem --version` reports the 0.12.x release.
+2. **Archive the old workspace in git.** Move the whole `.tandem` directory aside (for example `.tandem mv .tandem .tandem_old`), add the ignored actor identity (`printf '.tandem_old/actor-id\n' >> .gitignore`), and commit. The archived state stays recoverable and the board/log/papercut history is not destroyed.
+3. **Initialize the new workspace.** `tandem init --title "..."` creates a minimal protocol 0.3.0 config (states, empty rule categories).
+4. **Transpose durable records by recreating them.** The fresh workspace uses new IDs and mandatory Accord, so recreate rather than copy:
+   - Active state: `tandem add task "..." --acceptance "criterion" [...]` for each retained Task (mandatory Accord acceptance). Add Papercut-tagged low-priority Tasks for friction notes. Old references and provenance can be dropped; a one-line "continued from task-N, archived under .tandem_old" note preserves context without dangling references.
+   - Rules: `tandem rules add <category> "<text>"` per rule. Omit `--source` when it pointed at archived records.
+   - Key ADR decisions: `tandem add decision "..." --body ...` then set `status: accepted` and `decidedAt` (at present the CLI cannot update decision documents — see below).
+5. **Verify.** `tandem list`, `show`, `search`, `rules list`, `accord claim/deliver`, and the TUI should behave normally against the fresh workspace.
+
+Defects surfaced by the first run of this procedure (tracked as papercut-tagged
+Tasks and a fix Task in the workspace): `tandem update` rejects decision
+documents; `add decision` wrote files to `.tandem/tasks` instead of
+`.tandem/decisions` (place them there when this is seen); and rules are still
+config-backed with flat ids instead of per-file composite-id records.
