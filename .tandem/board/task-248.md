@@ -10,12 +10,13 @@ references: ["task-246", "decision-12"]
 relatedFiles: ["extensions/pi-tandem/", "extensions/pi-tandem/index.ts", "extensions/pi-tandem/README.md", "extensions/pi-tandem/tests/", "plan/cli-protocol-cutover.md", "tandem/plan/clap-migration-research.md"]
 tags: ["pi-tandem", "cli", "adapter"]
 createdAt: "2026-08-30T17:48:37Z"
-updatedAt: "2026-08-31T20:18:40Z"
+updatedAt: "2026-08-31T20:18:56Z"
 accord:
   status: "claimed"
-  assignee: "pi"
-  claimedAt: "2026-08-31T20:18:40Z"
-  updatedAt: "2026-08-31T20:18:40Z"
+  assignee: "worker-task-248-9d63cb99"
+  claimedAt: "2026-08-31T20:18:56Z"
+  updatedAt: "2026-08-31T20:18:56Z"
+assignee: "worker-task-248-9d63cb99"
 ---
 
 ## Description
