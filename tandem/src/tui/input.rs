@@ -13,10 +13,6 @@ impl TuiApp {
             return Ok(KeyAction::Quit);
         }
 
-        if self.quick_add.is_some() {
-            self.handle_quick_add_key(key);
-            return Ok(KeyAction::Continue);
-        }
         if matches!(
             self.validation_prompt,
             Some(ValidationPrompt::Rework { .. })
@@ -121,7 +117,6 @@ impl TuiApp {
             KeyCode::Char(ch) if TuiView::from_digit(ch).is_some() => {
                 self.switch_view(TuiView::from_digit(ch).unwrap())
             }
-            KeyCode::Char('a') if self.view == TuiView::Board => self.start_quick_add(),
             KeyCode::Char('a') if self.view == TuiView::Rules => self.start_rule_add_prompt(),
             KeyCode::Char('a') if self.view == TuiView::Decisions => {
                 self.start_decision_add_prompt()
@@ -135,9 +130,12 @@ impl TuiApp {
             }
             KeyCode::Char('b') if self.view == TuiView::Board => self.toggle_board_arrangement(),
             KeyCode::Char('f') if self.view == TuiView::Board => self.start_filter_picker(),
-            KeyCode::Char('m') if self.view == TuiView::Board => self.start_move_picker(),
             KeyCode::Char('v') if self.view == TuiView::Board => self.start_validation_picker(),
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
+            // State Board tabs are peers, including the derived Papercuts tab.
+            // `i` intentionally remains the read-only inbox popover shortcut.
+            KeyCode::Tab if self.view == TuiView::Board => self.next_state(),
+            KeyCode::BackTab if self.view == TuiView::Board => self.previous_state(),
             KeyCode::Tab => self.focus_next(),
             KeyCode::BackTab => self.focus_previous(),
             KeyCode::Enter if self.view == TuiView::Board => self.toggle_board_expansion(),
@@ -178,7 +176,6 @@ impl TuiApp {
             || self.validation_prompt.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
-            || self.quick_add.is_some()
             || self.log_search_input.is_some()
         {
             if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
@@ -211,7 +208,8 @@ impl TuiApp {
                     match hit.action {
                         HitAction::SwitchView(view) => self.switch_view(view),
                         HitAction::SelectState(index) if self.view == TuiView::Board => {
-                            self.selected_state = index.min(self.states.len().saturating_sub(1));
+                            self.selected_state =
+                                index.min(self.board_section_count().saturating_sub(1));
                             self.selected_item = 0;
                             self.detail_scroll = 0;
                             self.focus = FocusPane::Board;
@@ -221,7 +219,8 @@ impl TuiApp {
                         HitAction::SelectBoardItem(state_index, item_index)
                             if self.view == TuiView::Board =>
                         {
-                            let state_index = state_index.min(self.states.len().saturating_sub(1));
+                            let state_index =
+                                state_index.min(self.board_section_count().saturating_sub(1));
                             let was_selected = self.selected_state == state_index
                                 && self.selected_item == item_index
                                 && self.focus == FocusPane::Board;
@@ -247,22 +246,13 @@ impl TuiApp {
                             self.toggle_board_arrangement()
                         }
                         HitAction::ToggleBoardArrangement => {}
-                        HitAction::StartQuickAdd if self.view == TuiView::Board => {
-                            self.start_quick_add()
-                        }
-                        HitAction::StartQuickAdd => {}
                         HitAction::OpenFilterPicker if self.view == TuiView::Board => {
                             self.start_filter_picker()
-                        }
-                        HitAction::OpenMovePicker if self.view == TuiView::Board => {
-                            self.start_move_picker()
                         }
                         HitAction::OpenValidationPicker if self.view == TuiView::Board => {
                             self.start_validation_picker()
                         }
-                        HitAction::OpenFilterPicker
-                        | HitAction::OpenMovePicker
-                        | HitAction::OpenValidationPicker => {}
+                        HitAction::OpenFilterPicker | HitAction::OpenValidationPicker => {}
                         HitAction::SelectPickerOption(_)
                         | HitAction::ActivatePicker
                         | HitAction::CancelPicker => {}

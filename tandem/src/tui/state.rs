@@ -229,108 +229,6 @@ impl TuiApp {
         }
     }
 
-    pub(super) fn handle_quick_add_key(&mut self, key: KeyEvent) {
-        match key.code {
-            KeyCode::Esc => {
-                self.quick_add = None;
-                self.status = "Quick add canceled.".to_string();
-            }
-            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r') => self.finish_quick_add(),
-            KeyCode::Char('m') | KeyCode::Char('j')
-                if key.modifiers.contains(KeyModifiers::CONTROL) =>
-            {
-                self.finish_quick_add()
-            }
-            KeyCode::Backspace => {
-                if let Some(input) = self.quick_add.as_mut() {
-                    input.title.pop();
-                }
-                self.refresh_quick_add_status();
-            }
-            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if let Some(input) = self.quick_add.as_mut() {
-                    input.title.clear();
-                }
-                self.refresh_quick_add_status();
-            }
-            KeyCode::Char(ch)
-                if !key.modifiers.contains(KeyModifiers::CONTROL)
-                    && !key.modifiers.contains(KeyModifiers::ALT) =>
-            {
-                if let Some(input) = self.quick_add.as_mut() {
-                    input.title.push(ch);
-                }
-                self.refresh_quick_add_status();
-            }
-            _ => {}
-        }
-    }
-
-    pub(super) fn start_quick_add(&mut self) {
-        if !self.hierarchy.errors.is_empty() {
-            self.status =
-                "Quick add disabled: fix the persistent Board hierarchy errors and reload first."
-                    .to_string();
-            return;
-        }
-        let (state, fallback_note) = quick_add_state_for_selection(
-            &self.configured_states,
-            &self.states,
-            self.selected_state,
-        );
-        self.quick_add = Some(QuickAddInput {
-            state,
-            title: String::new(),
-            fallback_note,
-        });
-        self.focus = FocusPane::Board;
-        self.refresh_quick_add_status();
-    }
-
-    fn refresh_quick_add_status(&mut self) {
-        if let Some(input) = self.quick_add.as_ref() {
-            self.status = quick_add_status(input);
-        }
-    }
-
-    fn finish_quick_add(&mut self) {
-        let Some(input) = self.quick_add.as_ref() else {
-            return;
-        };
-        let title = input.title.trim().to_string();
-        if title.is_empty() {
-            self.status = format!(
-                "Quick add needs a title. Add task in {}: type title, Enter create, Esc cancel",
-                input.state
-            );
-            return;
-        }
-        let state = input.state.clone();
-        self.quick_add = None;
-
-        match app::tasks::add(
-            &self.workspace,
-            AddOptions {
-                title: Some(title.clone()),
-                state: Some(state.clone()),
-                ..AddOptions::default()
-            },
-        ) {
-            Ok(outcome) => {
-                let reload_note = self.reload().warning_note();
-                self.select_document_by_id(&outcome.id);
-                self.status = format!(
-                    "Created {} in {}: {}{}",
-                    outcome.id, outcome.state, outcome.title, reload_note
-                );
-            }
-            Err(error) => {
-                let reload_note = self.reload().warning_note();
-                self.status = format!("Add error: {}{}", error.message, reload_note);
-            }
-        }
-    }
-
     pub(super) fn start_log_search(&mut self) {
         self.log_search_input = Some(self.log_search_filter.clone());
         self.focus = FocusPane::Board;
@@ -372,39 +270,6 @@ impl TuiApp {
             self.clamp_selection();
         } else if self.focus == FocusPane::Detail {
             self.focus = FocusPane::Board;
-        }
-    }
-
-    pub(super) fn move_selected_task_to_state(&mut self, doc_id: &str, target_state: &str) {
-        match app::tasks::move_to_state(&self.workspace, doc_id, target_state) {
-            Ok(outcome) => {
-                let reload_note = self.reload().warning_note();
-                self.select_document_by_id(&outcome.id);
-                self.status = if outcome.changed {
-                    format!(
-                        "Moved {}: {} -> {}{}{}",
-                        outcome.id,
-                        outcome.from,
-                        outcome.to,
-                        outcome
-                            .accord_sync
-                            .as_deref()
-                            .map(|sync| format!("; accord {sync}"))
-                            .unwrap_or_default(),
-                        reload_note
-                    )
-                } else {
-                    format!(
-                        "{} is already in state {}{}",
-                        outcome.id, outcome.to, reload_note
-                    )
-                };
-            }
-            Err(error) => {
-                let reload_note = self.reload().warning_note();
-                self.select_document_by_id(doc_id);
-                self.status = format!("Move error: {}{}", error.message, reload_note);
-            }
         }
     }
 
@@ -656,7 +521,7 @@ impl TuiApp {
         }
     }
 
-    fn previous_state(&mut self) {
+    pub(super) fn previous_state(&mut self) {
         if self.board_arrangement == BoardArrangement::Epic {
             self.status =
                 "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
@@ -670,18 +535,28 @@ impl TuiApp {
         self.clamp_selection();
     }
 
-    fn next_state(&mut self) {
+    pub(super) fn next_state(&mut self) {
         if self.board_arrangement == BoardArrangement::Epic {
             self.status =
                 "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
             return;
         }
-        if self.selected_state + 1 < self.states.len() {
+        if self.selected_state + 1 < self.board_section_count() {
             self.selected_state += 1;
             self.selected_item = 0;
             self.detail_scroll = 0;
         }
         self.clamp_selection();
+    }
+
+    pub(super) fn board_section_count(&self) -> usize {
+        board_subview_tabs(&self.states, &self.docs, &self.board_filters).len()
+    }
+
+    fn selected_board_state(&self) -> Option<String> {
+        board_subview_tabs(&self.states, &self.docs, &self.board_filters)
+            .get(self.selected_state)
+            .map(|tab| tab.state.clone())
     }
 
     pub(super) fn previous_item(&mut self) {
@@ -776,8 +651,9 @@ impl TuiApp {
         if self.states.is_empty() {
             self.states.push("todo".to_string());
         }
-        if self.selected_state >= self.states.len() {
-            self.selected_state = self.states.len().saturating_sub(1);
+        let section_count = self.board_section_count();
+        if self.selected_state >= section_count {
+            self.selected_state = section_count.saturating_sub(1);
         }
         let count = self.selected_state_count();
         if count == 0 {
@@ -802,9 +678,8 @@ impl TuiApp {
         if self.board_arrangement == BoardArrangement::Epic {
             return self.epic_board_entries().len();
         }
-        self.states
-            .get(self.selected_state)
-            .map(|state| self.state_board_entries(state).len())
+        self.selected_board_state()
+            .map(|state| self.state_board_entries(&state).len())
             .unwrap_or(0)
     }
 
@@ -816,8 +691,8 @@ impl TuiApp {
                 .nth(self.selected_item)
                 .map(|entry| entry.doc);
         }
-        let state = self.states.get(self.selected_state)?;
-        self.state_board_entries(state)
+        let state = self.selected_board_state()?;
+        self.state_board_entries(&state)
             .into_iter()
             .nth(self.selected_item)
             .map(|entry| entry.doc)
@@ -1382,47 +1257,6 @@ pub(super) fn append_load_error_lines(lines: &mut Vec<Line<'static>>, load_error
         )));
     }
     lines.push(Line::from(""));
-}
-
-pub(super) fn quick_add_state_for_selection(
-    configured_states: &[String],
-    visible_states: &[String],
-    selected_state: usize,
-) -> (String, Option<String>) {
-    let fallback = configured_states
-        .first()
-        .cloned()
-        .unwrap_or_else(|| "todo".to_string());
-    let Some(selected) = visible_states.get(selected_state) else {
-        return (fallback, Some("no selected state".to_string()));
-    };
-    if configured_states.iter().any(|state| state == selected) {
-        (selected.clone(), None)
-    } else {
-        (
-            fallback,
-            Some(format!(
-                "selected bucket `{selected}` is not a configured state"
-            )),
-        )
-    }
-}
-
-pub(super) fn quick_add_status(input: &QuickAddInput) -> String {
-    let fallback = input
-        .fallback_note
-        .as_ref()
-        .map(|note| format!(" ({note})"))
-        .unwrap_or_default();
-    let title = if input.title.is_empty() {
-        "<title>".to_string()
-    } else {
-        input.title.clone()
-    };
-    format!(
-        "Add task in {}{}: {} · Enter create · Esc cancel",
-        input.state, fallback, title
-    )
 }
 
 pub(super) fn validation_prompt_lines(

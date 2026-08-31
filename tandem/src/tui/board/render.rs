@@ -248,7 +248,8 @@ impl TuiApp {
             action: HitAction::SelectState(state_index),
         });
 
-        let Some(state_name) = self.states.get(state_index) else {
+        let subviews = board_subview_tabs(&self.states, &self.docs, &self.board_filters);
+        let Some(state_name) = subviews.get(state_index).map(|tab| tab.state.as_str()) else {
             return;
         };
         let entries = self.state_board_entries(state_name);
@@ -256,8 +257,8 @@ impl TuiApp {
         let state_task_count = self
             .docs
             .iter()
-            .filter(|doc| is_board_visible_doc(doc))
-            .filter(|doc| document_state_label(doc) == state_name.as_str())
+            .filter(|doc| is_board_visible_doc(doc) && !is_papercut_doc(doc))
+            .filter(|doc| document_state_label(doc) == state_name)
             .filter(|doc| board_filters_match(doc, &self.board_filters))
             .count();
         let content_width = area.width.saturating_sub(4) as usize;

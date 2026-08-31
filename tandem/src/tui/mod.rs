@@ -26,7 +26,6 @@ use ratatui::{
 };
 
 use crate::app;
-use crate::app::tasks::AddOptions;
 use crate::project::rules::{empty_rules, parse_rules_from_yaml};
 use crate::project::write::{file_signature, FileSignature, HierarchyLock};
 use crate::project::{
@@ -180,9 +179,7 @@ enum HitAction {
     ToggleBoardExpansion,
     ToggleBoardDetail,
     ToggleBoardArrangement,
-    StartQuickAdd,
     OpenFilterPicker,
-    OpenMovePicker,
     OpenValidationPicker,
     SelectPickerOption(usize),
     ActivatePicker,
@@ -222,13 +219,6 @@ struct HitRegion {
     action: HitAction,
 }
 
-#[derive(Debug, Clone)]
-struct QuickAddInput {
-    state: String,
-    title: String,
-    fallback_note: Option<String>,
-}
-
 struct TuiApp {
     workspace: TandemProject,
     title: String,
@@ -265,7 +255,6 @@ struct TuiApp {
     show_help: bool,
     help_scroll: u16,
     help_section: usize,
-    quick_add: Option<QuickAddInput>,
     board_picker: Option<BoardPicker>,
     validation_prompt: Option<ValidationPrompt>,
     rules_view: RulesState,
@@ -312,7 +301,6 @@ impl TuiApp {
             observed_status: String::new(),
             status_updated_at: Instant::now(),
             show_help: false,
-            quick_add: None,
             validation_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
@@ -1098,9 +1086,6 @@ in-progress = "active"
             assert!(!rendered.contains("No active items"), "{rendered}");
             assert!(!rendered.contains("No epic groups"), "{rendered}");
         }
-        app.start_quick_add();
-        assert!(app.quick_add.is_none());
-        assert!(app.status.contains("Quick add disabled"));
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -2674,7 +2659,6 @@ tone = "success"
             show_help: false,
             help_scroll: 0,
             help_section: 0,
-            quick_add: None,
             board_picker: None,
             validation_prompt: None,
             rules_view: RulesState::default(),
@@ -3101,14 +3085,12 @@ tone = "success"
     #[test]
     fn mouse_footer_action_hits_reuse_keyboard_paths() {
         let mut app = keyboard_test_app();
-        let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
-        terminal.draw(|frame| app.draw(frame)).unwrap();
-
-        assert!(!app
-            .hits
-            .iter()
-            .any(|hit| hit.action == HitAction::StartQuickAdd));
-        assert!(app.quick_add.is_none());
+        let selected = app.selected_doc().map(|doc| doc.id().to_string());
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::Char('m'))).unwrap();
+        assert_eq!(app.selected_doc().map(Document::id), selected.as_deref());
+        assert!(app.board_picker.is_none());
+        assert!(app.status.is_empty());
     }
 
     #[test]
@@ -3336,6 +3318,36 @@ tone = "success"
     }
 
     #[test]
+    fn board_section_cycle_includes_papercuts_for_keys_and_mouse() {
+        let mut app = keyboard_test_app();
+        app.docs
+            .push(papercut_item("task-10", "Inbox item", "Body"));
+        app.refresh_papercuts();
+
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        app.handle_key(key(KeyCode::Char('l'))).unwrap();
+        assert_eq!(app.selected_state, 2);
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+        app.handle_key(key(KeyCode::Char('h'))).unwrap();
+        assert_eq!(app.selected_state, 1);
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        assert_eq!(app.selected_state, 2);
+
+        let mut terminal = Terminal::new(TestBackend::new(120, 28)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let tab = app
+            .hits
+            .iter()
+            .find(|hit| hit.action == HitAction::SelectState(2))
+            .cloned()
+            .expect("Papercuts section tab should have a mouse target");
+        app.selected_state = 0;
+        app.handle_mouse(left_click(tab.rect.x, tab.rect.y));
+        assert_eq!(app.selected_state, 2);
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+    }
+
+    #[test]
     fn editor_key_requests_open_for_board_and_marks_read_only_views() {
         let mut app = keyboard_test_app();
         assert_eq!(
@@ -3417,7 +3429,6 @@ tone = "success"
         }
 
         assert_eq!(app.view, TuiView::Board);
-        assert!(app.quick_add.is_none());
         assert!(matches!(
             app.validation_prompt,
             Some(ValidationPrompt::Rework { ref feedback, .. }) if feedback == "nae/"
@@ -3506,11 +3517,11 @@ tone = "success"
 
         let add_error = app::tasks::add(
             &workspace,
-            AddOptions {
+            crate::app::tasks::AddOptions {
                 title: Some("Must not be created".to_string()),
                 acceptance: vec!["preserve hierarchy".to_string()],
                 state: Some("todo".to_string()),
-                ..AddOptions::default()
+                ..crate::app::tasks::AddOptions::default()
             },
         )
         .unwrap_err();
@@ -3790,29 +3801,6 @@ tone = "success"
     }
 
     #[test]
-    fn quick_add_uses_selected_configured_state() {
-        let configured = vec!["todo".to_string(), "in-progress".to_string()];
-        let visible = vec![
-            "todo".to_string(),
-            "blocked".to_string(),
-            "in-progress".to_string(),
-        ];
-        assert_eq!(
-            quick_add_state_for_selection(&configured, &visible, 2),
-            ("in-progress".to_string(), None)
-        );
-    }
-
-    #[test]
-    fn quick_add_falls_back_for_unconfigured_state() {
-        let configured = vec!["todo".to_string(), "in-progress".to_string()];
-        let visible = vec!["unfiled".to_string()];
-        let (state, note) = quick_add_state_for_selection(&configured, &visible, 0);
-        assert_eq!(state, "todo");
-        assert!(note.unwrap().contains("not a configured state"));
-    }
-
-    #[test]
     fn board_subview_tabs_count_visible_states() {
         let mut decision = decision_doc("decision-1");
         decision
@@ -3866,13 +3854,9 @@ tone = "success"
             assert!(!app.papercuts_open());
         }
         app.handle_key(key(KeyCode::Char('a'))).unwrap();
-        for printable in ['q', '?', 'i'] {
-            app.handle_key(key(KeyCode::Char(printable))).unwrap();
-        }
-        assert_eq!(
-            app.quick_add.as_ref().map(|input| input.title.as_str()),
-            Some("q?i")
-        );
+        app.handle_key(key(KeyCode::Char('m'))).unwrap();
+        assert!(app.board_picker.is_none());
+        assert!(app.status.is_empty());
         let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
         assert!(app.hits.iter().any(|hit| hit.action == HitAction::ShowHelp));
@@ -3995,9 +3979,6 @@ tone = "success"
         app.board_picker = None;
         app.board_filters = BoardFilters::default();
         app.selected_state = 0;
-        app.start_move_picker();
-        assert_eq!(app.board_picker.as_ref().unwrap().selected, 1);
-
         app.board_picker = None;
         app.selected_state = 1;
         app.docs[1]

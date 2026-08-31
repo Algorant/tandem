@@ -1,11 +1,10 @@
-//! Board action pickers. Filter, move, and Validation use one interaction grammar.
+//! Board action pickers. Filter and Validation use one interaction grammar.
 
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PickerKind {
     Filter,
-    Move,
     Validation,
 }
 
@@ -15,7 +14,6 @@ enum PickerAction {
     SetPriority(Option<String>),
     SetDeliveredUntriaged(bool),
     ClearAll,
-    Move(String),
     Validation(&'static str),
 }
 
@@ -148,44 +146,6 @@ impl TuiApp {
         self.board_picker = Some(picker);
         self.status =
             "Filter picker: choose an available filter; Enter applies, Esc cancels.".into();
-    }
-
-    pub(super) fn start_move_picker(&mut self) {
-        let Some(doc) = self.selected_doc() else {
-            self.status = "No selected task to move.".into();
-            return;
-        };
-        let id = doc.id().to_string();
-        let current = document_state_label(doc);
-        let options = self
-            .configured_states
-            .iter()
-            .map(|state| PickerOption {
-                label: display_state_label(state),
-                detail: if *state == current {
-                    "Disabled: current state".into()
-                } else {
-                    format!("Move to `{state}`")
-                },
-                enabled: *state != current,
-                action: PickerAction::Move(state.clone()),
-            })
-            .collect();
-        let mut picker = BoardPicker {
-            kind: PickerKind::Move,
-            selected: 0,
-            title: "Move task".into(),
-            context: format!(
-                "{id} — {} · current state: {}",
-                doc.title(),
-                display_state_label(&current)
-            ),
-            options,
-        };
-        picker.select_first_enabled();
-        self.board_picker = Some(picker);
-        self.status =
-            "Move picker: select a configured target state; Enter confirms, Esc cancels.".into();
     }
 
     pub(super) fn start_validation_picker(&mut self) {
@@ -338,11 +298,6 @@ impl TuiApp {
             PickerAction::ClearAll => {
                 self.board_filters = BoardFilters::default();
                 self.restore_filtered_selection(selected_id.as_deref());
-            }
-            PickerAction::Move(state) => {
-                if let Some(id) = selected_id {
-                    self.move_selected_task_to_state(&id, &state);
-                }
             }
             PickerAction::Validation(action) => self.show_validation_action_hint(action),
         }

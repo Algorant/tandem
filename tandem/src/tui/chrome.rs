@@ -404,12 +404,8 @@ impl TuiApp {
     }
 
     pub(super) fn draw_footer(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let mut footer_line = if let Some(input) = self.quick_add.as_ref() {
-            Line::from(Span::styled(
-                quick_add_status(input),
-                self.theme.status_style(StatusTone::Warning),
-            ))
-        } else if self.log_search_input.is_some() || self.validation_prompt.is_some() {
+        let mut footer_line = if self.log_search_input.is_some() || self.validation_prompt.is_some()
+        {
             Line::from(Span::styled(
                 self.status.clone(),
                 self.theme.status_style(StatusTone::Warning),
