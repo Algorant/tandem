@@ -1,11 +1,16 @@
-//! Shared project Rules mutation operations.
+//! Shared per-file Rules mutations (protocol 0.3.0, D46/D49).
+//!
+//! Each Rule is one Markdown file in `.tandem/rules/<category>-<id>.md` with a
+//! composite id, the category stored in the record, optional source, and the
+//! rule text as the body.
 
-use crate::app::support::{append_event, document_exists};
+use crate::app::support::{append_event, current_timestamp as now_timestamp, document_exists};
 use crate::app::Error;
-use crate::project::rules::{parse_rules_from_content, patch_rules_category_content};
-use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
-use crate::project::{write_atomic, TandemProject};
-use crate::protocol::config::{RuleItem, RULE_CATEGORIES};
+use crate::project::rules::{
+    delete_rule_file, next_rule_id, parse_rule_id, read_rule_files, write_rule_file, RuleRecord,
+};
+use crate::project::TandemProject;
+use crate::protocol::config::RULE_CATEGORIES;
 
 #[derive(Debug)]
 pub(crate) struct MutationOutcome {
@@ -28,39 +33,30 @@ pub(crate) fn add(
     source: Option<String>,
 ) -> Result<MutationOutcome, Error> {
     validate_rule_category(category)?;
-    let rule = require_rule_text(rule, "rules add requires --rule <text>")?;
+    let rule = require_rule_text(rule, "rules add requires rule text")?;
     let source = normalized_source(source);
     let warning = missing_source_warning(project, source.as_deref())?;
-    let (content, signature) = read_file_snapshot(&project.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &project.config_path)?;
-    let id = rules
-        .get(category)
-        .into_iter()
-        .flatten()
-        .map(|item| item.id)
-        .max()
-        .unwrap_or(0)
-        + 1;
-    rules
-        .entry(category.to_string())
-        .or_default()
-        .push(RuleItem {
-            id,
-            rule: rule.to_string(),
-            source,
-        });
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&project.config_path, &signature)?;
-    write_atomic(&project.config_path, &patched)?;
+    let id = next_rule_id(&project.rules_dir(), category).map_err(|e| Error::user(e.message))?;
+    let now = now_timestamp();
+    let record = RuleRecord {
+        id: id.clone(),
+        category: category.to_string(),
+        source,
+        created_at: Some(now.clone()),
+        updated_at: Some(now),
+        text: rule.to_string(),
+        path: project.rules_dir().join(format!("{id}.md")),
+    };
+    write_rule_file(&project.rules_dir(), &record).map_err(|e| Error::user(e.message))?;
     append_event(
         project,
         "rules.updated",
         "rules",
-        &format!("Added rule {id} to {category}"),
+        &format!("Added rule {id}"),
     )?;
     Ok(MutationOutcome {
         category: category.to_string(),
-        id,
+        id: record.id.rsplit_once('-').unwrap().1.parse().unwrap(),
         rule: rule.to_string(),
         warning,
     })
@@ -68,73 +64,65 @@ pub(crate) fn add(
 
 pub(crate) fn edit(
     project: &TandemProject,
-    category: &str,
-    id: usize,
+    id: &str,
     rule: &str,
     source: Option<String>,
+    clear_source: bool,
 ) -> Result<MutationOutcome, Error> {
-    validate_rule_category(category)?;
-    let rule = require_rule_text(rule, "rules edit requires --rule <text>")?;
-    let source = source.map(|value| normalized_source(Some(value)));
-    let warning = missing_source_warning(project, source.as_ref().and_then(Option::as_deref))?;
-    let (content, signature) = read_file_snapshot(&project.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &project.config_path)?;
-    let item = rules
-        .entry(category.to_string())
-        .or_default()
-        .iter_mut()
-        .find(|item| item.id == id)
-        .ok_or_else(|| Error::user(format!("rule not found: {category} #{id}")))?;
-    item.rule = rule.to_string();
-    if let Some(source) = source {
-        item.source = source;
-    }
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&project.config_path, &signature)?;
-    write_atomic(&project.config_path, &patched)?;
+    let (category, number) = parse_rule_id(id).ok_or_else(|| {
+        Error::usage(format!(
+            "invalid rule id `{id}`; expected <category>-<number>"
+        ))
+    })?;
+    let rule = require_rule_text(rule, "rules edit requires rule text")?;
+    let dir = project.rules_dir();
+    let mut record = read_rule_files(&dir)
+        .map_err(|e| Error::user(e.message))?
+        .into_iter()
+        .find(|record| record.id == id)
+        .ok_or_else(|| Error::user(format!("rule not found: {id}")))?;
+    let source = if clear_source {
+        None
+    } else {
+        normalized_source(source.or(record.source.clone()))
+    };
+    let warning = missing_source_warning(project, source.as_deref())?;
+    record.text = rule.to_string();
+    record.source = source;
+    record.updated_at = Some(now_timestamp());
+    write_rule_file(&dir, &record).map_err(|e| Error::user(e.message))?;
     append_event(
         project,
         "rules.updated",
         "rules",
-        &format!("Edited rule {id} in {category}"),
+        &format!("Edited rule {id}"),
     )?;
     Ok(MutationOutcome {
-        category: category.to_string(),
-        id,
+        category,
+        id: number,
         rule: rule.to_string(),
         warning,
     })
 }
 
-pub(crate) fn delete(
-    project: &TandemProject,
-    category: &str,
-    id: usize,
-) -> Result<DeleteOutcome, Error> {
-    validate_rule_category(category)?;
-    let (content, signature) = read_file_snapshot(&project.config_path)?;
-    let mut rules = parse_rules_from_content(&content, &project.config_path)?;
-    let items = rules.entry(category.to_string()).or_default();
-    let before = items.len();
-    items.retain(|item| item.id != id);
-    if items.len() == before {
-        return Err(Error::user(format!("rule not found: {category} #{id}")));
-    }
-    let patched = patch_rules_category_content(&content, category, &rules)?;
-    ensure_file_unchanged(&project.config_path, &signature)?;
-    write_atomic(&project.config_path, &patched)?;
+pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome, Error> {
+    let (category, number) = parse_rule_id(id).ok_or_else(|| {
+        Error::usage(format!(
+            "invalid rule id `{id}`; expected <category>-<number>"
+        ))
+    })?;
+    delete_rule_file(&project.rules_dir(), id).map_err(|e| Error::user(e.message))?;
     append_event(
         project,
         "rules.updated",
         "rules",
-        &format!("Deleted rule {id} from {category}"),
+        &format!("Deleted rule {id}"),
     )?;
     Ok(DeleteOutcome {
-        category: category.to_string(),
-        id,
+        category,
+        id: number,
     })
 }
-
 pub(crate) fn validate_rule_category(category: &str) -> Result<(), Error> {
     if RULE_CATEGORIES.contains(&category) {
         Ok(())
@@ -178,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn add_edit_delete_preserve_config_and_return_source_warning() {
+    fn add_edit_delete_round_trip_per_file_and_return_source_warning() {
         let root = std::env::temp_dir().join(format!(
             "tandem-app-rules-{}",
             SystemTime::now()
@@ -198,16 +186,22 @@ mod tests {
             added.warning.as_deref(),
             Some("rule source not found:  missing ")
         );
-        edit(&project, "always", 1, "Keep all", Some(String::new())).unwrap();
-        let edited = fs::read_to_string(&project.config_path).unwrap();
-        assert!(edited.contains("unknown: retain"));
-        assert!(edited.ends_with("body\n"));
-        assert!(edited.contains("Keep all"));
-        assert!(!edited.contains("source:"));
-        delete(&project, "always", 1).unwrap();
-        assert!(!fs::read_to_string(&project.config_path)
+        assert!(project.rules_dir().join("always-1.md").is_file());
+        let file = fs::read_to_string(project.rules_dir().join("always-1.md")).unwrap();
+        assert!(file.contains("id: always-1"));
+        assert!(file.contains("category: always"));
+        assert!(file.ends_with("Keep it\n"));
+
+        edit(&project, "always-1", "Keep all", None, false).unwrap();
+        assert!(!fs::read_to_string(project.rules_dir().join("always-1.md"))
+            .unwrap()
+            .contains("Keep it"));
+        assert!(fs::read_to_string(project.rules_dir().join("always-1.md"))
             .unwrap()
             .contains("Keep all"));
+
+        delete(&project, "always-1").unwrap();
+        assert!(!project.rules_dir().join("always-1.md").exists());
 
         let missing_source = add(
             &project,

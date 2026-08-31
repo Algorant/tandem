@@ -3,6 +3,7 @@
 //! Application errors use the crate-level `Error` value while this module
 //! otherwise depends only on project/protocol ownership boundaries.
 
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app::Error;
@@ -94,13 +95,28 @@ pub(crate) fn create_new_sequential_document<F>(
 where
     F: FnMut(&str) -> String,
 {
+    create_new_sequential_document_in(project, &project.tasks_dir, prefix, content_for_id)
+}
+
+/// Creates a new sequential document in an explicit directory (used for the
+/// durable `.tandem/decisions/` store). ID allocation scans all active
+/// documents for the prefix so the sequence stays global per type.
+pub(crate) fn create_new_sequential_document_in<F>(
+    project: &TandemProject,
+    dir: &Path,
+    prefix: &str,
+    content_for_id: F,
+) -> Result<project::write::CreatedDocument, Error>
+where
+    F: FnMut(&str) -> String,
+{
     let hierarchy = hierarchy_from_project(project)?;
     let last_allocated = crate::protocol::ids::next_sequential_number(
         hierarchy.documents.values().map(|document| document.id()),
         prefix,
     );
-    Ok(project::write::create_new_sequential_document_after(
-        project,
+    Ok(project::write::create_new_sequential_document_in_dir_after(
+        dir,
         prefix,
         last_allocated,
         content_for_id,

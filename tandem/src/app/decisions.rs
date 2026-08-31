@@ -4,8 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    append_event, create_new_sequential_document, current_timestamp, date_from_timestamp,
-    reference_target_exists,
+    append_event, create_new_sequential_document_in, current_timestamp, reference_target_exists,
 };
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
@@ -20,7 +19,6 @@ pub(crate) struct AddOptions {
     pub(crate) title: Option<String>,
     pub(crate) body: Option<String>,
     pub(crate) status: Option<String>,
-    pub(crate) date: Option<String>,
     pub(crate) deciders: Vec<String>,
     pub(crate) context: Option<String>,
     pub(crate) consequences: Vec<String>,
@@ -36,7 +34,6 @@ pub(crate) struct AddOutcome {
     pub(crate) id: String,
     pub(crate) title: String,
     pub(crate) status: String,
-    pub(crate) date: String,
     pub(crate) path: PathBuf,
     pub(crate) warnings: Vec<String>,
 }
@@ -73,45 +70,45 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
     validate_options(&options)?;
     let warnings = diagnostics(project, &options)?;
     let now = current_timestamp();
-    let date = match options.date.as_deref() {
-        Some(date) => {
-            require_nonempty(Some(date), "decision add --date must not be empty")?.to_string()
-        }
-        None => date_from_timestamp(&now),
-    };
-    let created = create_new_sequential_document(project, "decision", |decision_id| {
-        let mut lines = vec![
-            "---".to_string(),
-            format!("id: {decision_id}"),
-            "type: decision".to_string(),
-            format!("title: {}", yaml_double_quote(&title)),
-            format!("status: {}", yaml_double_quote(status)),
-            format!("date: {}", yaml_double_quote(&date)),
-        ];
-        push_array_line(&mut lines, "deciders", &options.deciders);
-        push_optional_line(&mut lines, "context", options.context.as_deref());
-        push_array_line(&mut lines, "consequences", &options.consequences);
-        push_array_line(&mut lines, "alternatives", &options.alternatives);
-        push_array_line(&mut lines, "supersedes", &options.supersedes);
-        push_array_line(&mut lines, "supersededBy", &options.superseded_by);
-        push_array_line(&mut lines, "references", &options.references);
-        push_array_line(&mut lines, "tags", &options.tags);
-        lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
-        lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
-        lines.push("---".to_string());
-        lines.push(String::new());
-        if let Some(body) = options.body.as_deref() {
-            lines.push(body.to_string());
-        }
-        lines.push(String::new());
-        lines.join("\n")
-    })?;
+    // Protocol 0.3.0 (D41): no manual decision date. decidedAt is written by
+    // the lifecycle layer when a Decision reaches accepted/rejected; new
+    // decisions start proposed without a date field.
+    let created = create_new_sequential_document_in(
+        project,
+        &project.decisions_dir(),
+        "decision",
+        |decision_id| {
+            let mut lines = vec![
+                "---".to_string(),
+                format!("id: {decision_id}"),
+                "type: decision".to_string(),
+                format!("title: {}", yaml_double_quote(&title)),
+                format!("status: {}", yaml_double_quote(status)),
+            ];
+            push_array_line(&mut lines, "deciders", &options.deciders);
+            push_optional_line(&mut lines, "context", options.context.as_deref());
+            push_array_line(&mut lines, "consequences", &options.consequences);
+            push_array_line(&mut lines, "alternatives", &options.alternatives);
+            push_array_line(&mut lines, "supersedes", &options.supersedes);
+            push_array_line(&mut lines, "supersededBy", &options.superseded_by);
+            push_array_line(&mut lines, "references", &options.references);
+            push_array_line(&mut lines, "tags", &options.tags);
+            lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
+            lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
+            lines.push("---".to_string());
+            lines.push(String::new());
+            if let Some(body) = options.body.as_deref() {
+                lines.push(body.to_string());
+            }
+            lines.push(String::new());
+            lines.join("\n")
+        },
+    )?;
     append_event(project, "decision.created", &created.id, &title)?;
     Ok(AddOutcome {
         id: created.id,
         title,
         status: status.to_string(),
-        date,
         path: created.path,
         warnings,
     })
