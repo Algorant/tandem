@@ -370,25 +370,18 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
     let project = app::project::open()?;
     match args.command {
         RulesCommand::List { category } => {
-            let rules = crate::project::rules::read_rules(&project.config_path)?;
-            let values = category
-                .as_deref()
-                .and_then(|c| rules.get(c))
-                .cloned()
-                .unwrap_or_else(|| rules.values().flatten().cloned().collect());
+            let mut values = crate::project::rules::read_rule_files(&project.rules_dir())?;
+            if let Some(category) = category.as_deref() {
+                values.retain(|rule| rule.category == category);
+            }
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"rule":r.rule})).collect::<Vec<_>>(),"warnings":[]})
+                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":[]})
                 );
             } else {
                 for r in values {
-                    println!(
-                        "{}-{}\t{}",
-                        category.as_deref().unwrap_or("rule"),
-                        r.id,
-                        r.rule
-                    );
+                    println!("{}\t{}", r.id, r.text);
                 }
             }
         }
@@ -408,20 +401,13 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             );
         }
         RulesCommand::Edit {
-            id, text, source, ..
+            id,
+            text,
+            source,
+            clear,
         } => {
-            let (category, number) = id
-                .split_once('-')
-                .ok_or_else(|| CliError::usage("rules edit requires <category-N>"))?;
-            let o = app::rules::edit(
-                &project,
-                category,
-                number
-                    .parse()
-                    .map_err(|_| CliError::usage("invalid rule id"))?,
-                &text,
-                source,
-            )?;
+            let clear_source = clear.iter().any(|field| field == "source");
+            let o = app::rules::edit(&project, &id, &text, source, clear_source)?;
             println!(
                 "{}",
                 if json {
@@ -432,16 +418,7 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             );
         }
         RulesCommand::Delete { id } => {
-            let (category, number) = id
-                .split_once('-')
-                .ok_or_else(|| CliError::usage("rules delete requires <category-N>"))?;
-            let o = app::rules::delete(
-                &project,
-                category,
-                number
-                    .parse()
-                    .map_err(|_| CliError::usage("invalid rule id"))?,
-            )?;
+            let o = app::rules::delete(&project, &id)?;
             println!(
                 "{}",
                 if json {

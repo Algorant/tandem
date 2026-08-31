@@ -82,11 +82,21 @@ impl TuiApp {
             .read_board_documents_tolerant(&mut load_errors);
         sort_documents(&mut docs);
 
+        // Rules are one file per rule under .tandem/rules/ (protocol 0.3.0).
+        let file_rules = match crate::project::rules::rules_by_category(&self.workspace.rules_dir())
+        {
+            Ok(rules) => rules,
+            Err(error) => {
+                load_errors.push(format!("Rules load failed: {}", error.message));
+                crate::project::rules::empty_rules()
+            }
+        };
+
         let (title, configured_states, rules) = match self.workspace.read_config_yaml() {
             Ok(root) => (
                 workspace_title_from_root(root.as_ref()).unwrap_or_else(|| "Tandem".to_string()),
                 workspace_states_from_root(root.as_ref()),
-                parse_rules_from_yaml(root.as_ref()),
+                file_rules,
             ),
             Err(error) => {
                 load_errors.push(format!("Config load failed: {}", error.message));

@@ -754,12 +754,13 @@ impl TuiApp {
     }
 
     fn finish_rule_edit(&mut self, category: String, id: usize, rule: String, source: String) {
+        let rule_id = format!("{category}-{id}");
         match app::rules::edit(
             &self.workspace,
-            &category,
-            id,
+            &rule_id,
             &rule,
             Some(normalized_rule_source(&source)),
+            false,
         ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
@@ -774,7 +775,8 @@ impl TuiApp {
     }
 
     fn finish_rule_delete(&mut self, category: String, id: usize) {
-        match app::rules::delete(&self.workspace, &category, id) {
+        let rule_id = format!("{category}-{id}");
+        match app::rules::delete(&self.workspace, &rule_id) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_rule_category(&outcome.category);

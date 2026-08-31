@@ -2,7 +2,7 @@
 
 use crate::app::support::hierarchy_from_project;
 use crate::app::Error;
-use crate::project::rules::parse_rules_from_content;
+use crate::project::rules::rules_by_category;
 use crate::project::write::HierarchyLock;
 use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{state_divergence_warning, status as accord_status};
@@ -116,7 +116,7 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> 
         .unwrap_or_else(|| crate::app::project::default_title(project.root()));
     let protocol_version = crate::app::project::protocol_version(project)?;
     let states = workflow_states(config_yaml.as_ref());
-    let rules = parse_rules_from_content(&config, &project.config_path)?;
+    let rules = rules_by_category(&project.rules_dir())?;
     let revision = crate::project::snapshot_revision(&config, &documents);
     let mut warnings = crate::app::project::warnings(project)?;
     for document in hierarchy.documents.values() {

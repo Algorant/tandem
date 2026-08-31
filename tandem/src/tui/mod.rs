@@ -26,7 +26,7 @@ use ratatui::{
 };
 
 use crate::app;
-use crate::project::rules::{empty_rules, parse_rules_from_yaml};
+use crate::project::rules::empty_rules;
 use crate::project::write::{file_signature, FileSignature, HierarchyLock};
 use crate::project::{
     display_path, yaml_mapping_value, yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex,
