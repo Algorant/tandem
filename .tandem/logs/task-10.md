@@ -2,19 +2,23 @@
 id: task-10
 type: task
 title: "Remove TUI validation escalation and unify accord field shapes"
-state: "in-progress"
 priority: "high"
 effort: "small"
 relatedFiles: ["tandem/src/tui/state.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/chrome.rs"]
 tags: ["tui", "validation"]
 accord:
-  status: "claimed"
+  status: "accepted"
   acceptance: ["The TUI validation picker no longer offers Request human validation, and its criterion/request plumbing is deleted rather than disabled", "v on an active task reports that validation actions apply to delivered work", "accord claim writes top-level assignee and release clears it; accord.assignee is removed from the record, renderer, and all readers", "tandem list --assignee returns claimed tasks", "accord.validation is one flat list matching acceptance and constraints; the nested commands form and the accord.validations fallback are removed", "add and every accord transition write the same accord block shape"]
-  assignee: "pi"
   claimedAt: "2026-09-01T17:52:19Z"
-  updatedAt: "2026-09-01T17:52:19Z"
+  deliveredAt: "2026-09-01T17:57:34Z"
+  summary: "Escalation removed; assignee and validation shapes unified"
+  evidence: ["244 tests, clippy and fmt clean", "rendered pane: active task offers no action, validation accept/request-changes work end to end"]
+  updatedAt: "2026-09-01T17:57:34Z"
 createdAt: "2026-09-01T04:50:53Z"
-updatedAt: "2026-09-01T17:52:19Z"
+updatedAt: "2026-09-01T17:57:34Z"
+archivedAt: "2026-09-01T17:57:34Z"
+resolution:
+  outcome: "completed"
 ---
 ## Why
 
