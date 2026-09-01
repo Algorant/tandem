@@ -2,6 +2,31 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.12.2
+
+Tandem v0.12.2 repairs the accord and read paths left incomplete by the 0.12.0 cutover. Acceptance criteria no longer disappear when work starts, `show` returns a usable record again, and the accord block has one shape.
+
+### Fixed
+
+- Acceptance criteria survive the accord lifecycle. `claim` and every later transition rewrote the accord block without `accord.acceptance`, silently destroying the criteria a Task was created with. Escalation to validation then had no criterion to reference.
+- `update --acceptance`, `--constraint`, and `--validation` write their values. The flags were parsed and discarded while the CLI reported success.
+- `update` reports the fields it actually changed, or that nothing changed. It previously printed `Updated <id>` even when it wrote nothing, contradicting its own JSON `changes` array.
+- `show --json` returns the full record: frontmatter, body, the whole accord including acceptance criteria, parent and children, validation, resolution, decision metadata, and `location`. It previously returned only `id`, `type`, and `title`, leaving no read path for machine consumers.
+- `list --assignee` matches claimed work. Claim wrote `accord.assignee` while the filter read the top-level `assignee`, so filtering by assignee returned nothing.
+- Document IDs sort numerically. `task-10` sorted between `task-1` and `task-2` everywhere IDs were ordered: the Board, `list`, `search`, logs, decisions, and the web read API.
+
+### Changed
+
+- Ownership is the top-level `assignee` only, as specified. `claim` sets it, `release` clears it, and `accord.assignee` is removed.
+- `accord.validation` is a flat list of strings, matching `acceptance` and `constraints`. The nested `validation.commands` form and the `accord.validations` spelling are removed. Creation and transitions now render the accord block through one code path, so the shape cannot drift.
+- The TUI no longer offers "Request human validation" on an active task. Escalation is an agent asking a human for judgment, and `tandem review <id> --criterion --note` is that path. Accept and archive and Request changes on delivered work are unchanged.
+- Human `show` output is a short identity-and-status block: ID, type, title, location, state, accord, assignee. The TUI remains the human read surface.
+
+### Compatibility
+
+- Tasks claimed under 0.12.0 or 0.12.1 have no acceptance criteria left in the file. Restore them with `tandem update <id> --acceptance <text>`, which now works.
+- Records written before this release carry `accord.assignee` and, after any transition, `validation.commands`. Neither is read anymore. Active Tasks recover their assignee on the next `claim`; archived Logs will display none. Re-supply planned validation with `tandem update <id> --validation <text>` where it matters.
+
 ## 0.12.1
 
 Tandem v0.12.1 fixes two storage defects found while migrating a workspace to the protocol 0.3.0 cutover.
