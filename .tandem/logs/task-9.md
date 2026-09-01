@@ -2,19 +2,24 @@
 id: task-9
 type: task
 title: "Make accord acceptance durable and show output agent-readable"
-state: "in-progress"
 priority: "high"
 effort: "medium"
 relatedFiles: ["tandem/src/protocol/accord.rs", "tandem/src/app/accord.rs", "tandem/src/cli/commands.rs"]
 tags: ["protocol", "cli", "accord"]
 accord:
-  status: "claimed"
+  status: "accepted"
   acceptance: ["accord.acceptance survives every accord transition", "update writes accord definition fields and reports only real changes", "show --json returns the full record including body, accord, and location", "All three subtasks are completed in order: persistence, repair, then read output"]
   assignee: "pi"
   claimedAt: "2026-09-01T04:42:14Z"
-  updatedAt: "2026-09-01T04:51:02Z"
+  deliveredAt: "2026-09-01T04:51:32Z"
+  summary: "All three subtasks landed"
+  evidence: ["244 tests passing"]
+  updatedAt: "2026-09-01T04:51:32Z"
 createdAt: "2026-09-01T04:33:41Z"
-updatedAt: "2026-09-01T04:51:02Z"
+updatedAt: "2026-09-01T04:51:32Z"
+archivedAt: "2026-09-01T04:51:32Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description

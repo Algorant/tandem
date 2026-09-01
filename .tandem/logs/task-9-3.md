@@ -2,17 +2,25 @@
 id: task-9-3
 type: task
 title: "update silently drops accord fields and reports success"
-state: todo
 priority: "high"
 effort: "small"
 parentId: "task-9"
 relatedFiles: ["tandem/src/app/tasks.rs", "tandem/src/cli/commands.rs"]
 tags: ["cli", "accord"]
 accord:
-  status: ready
+  status: "accepted"
   acceptance: ["update --acceptance, --constraint, and --validation write their values to the accord block", "An update that applies no changes does not print Updated <id>; it reports that nothing changed", "Human output and the JSON changes array agree in every case", "A test asserts each accord flag round-trips through update and appears in the file"]
+  assignee: "pi"
+  claimedAt: "2026-09-01T04:51:29Z"
+  deliveredAt: "2026-09-01T04:51:29Z"
+  summary: "implemented and verified"
+  evidence: ["cargo test: 244 passing", "rendered Herdr pane check"]
+  updatedAt: "2026-09-01T04:51:29Z"
 createdAt: "2026-09-01T04:38:13Z"
-updatedAt: "2026-09-01T04:38:13Z"
+updatedAt: "2026-09-01T04:51:29Z"
+archivedAt: "2026-09-01T04:51:29Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description

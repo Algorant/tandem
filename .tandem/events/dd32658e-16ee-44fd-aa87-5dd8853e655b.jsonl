@@ -77,3 +77,14 @@
 {"ts":"2026-09-01T04:50:53Z","event":"task.created","id":"task-10","summary":"Validation escalation prompt hides the criterion field","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":77}
 {"ts":"2026-09-01T04:50:57Z","event":"task.updated","id":"task-9-1","summary":"Updated task-9-1 metadata: acceptance","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":78}
 {"ts":"2026-09-01T04:51:02Z","event":"task.updated","id":"task-9","summary":"Updated task-9 metadata: acceptance","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":79}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.claimed","id":"task-9-1","summary":"Accord claim for task-9-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":80}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.delivered","id":"task-9-1","summary":"Accord deliver for task-9-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":81}
+{"ts":"2026-09-01T04:51:29Z","event":"task.completed","id":"task-9-1","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":82}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.claimed","id":"task-9-2","summary":"Accord claim for task-9-2","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":83}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.delivered","id":"task-9-2","summary":"Accord deliver for task-9-2","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":84}
+{"ts":"2026-09-01T04:51:29Z","event":"task.completed","id":"task-9-2","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":85}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.claimed","id":"task-9-3","summary":"Accord claim for task-9-3","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":86}
+{"ts":"2026-09-01T04:51:29Z","event":"accord.delivered","id":"task-9-3","summary":"Accord deliver for task-9-3","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":87}
+{"ts":"2026-09-01T04:51:29Z","event":"task.completed","id":"task-9-3","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":88}
+{"ts":"2026-09-01T04:51:32Z","event":"accord.delivered","id":"task-9","summary":"Accord deliver for task-9","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":89}
+{"ts":"2026-09-01T04:51:32Z","event":"task.completed","id":"task-9","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":90}

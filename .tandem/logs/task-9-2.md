@@ -2,7 +2,6 @@
 id: task-9-2
 type: task
 title: "Return the full record from show --json"
-state: todo
 priority: "high"
 effort: "small"
 parentId: "task-9"
@@ -10,10 +9,19 @@ blockers: ["task-9-1"]
 relatedFiles: ["tandem/src/cli/commands.rs", "tandem/src/web.rs"]
 tags: ["cli", "protocol"]
 accord:
-  status: ready
+  status: "accepted"
   acceptance: ["show --json returns frontmatter and body: kind, state, priority, effort, assignee, dueDate, parentId, parent relationship, tags, blockers, references, relatedFiles, the whole accord object, validation, timestamps, decision metadata for decisions, resolution for logs", "The JSON projection is shared with the web read models rather than written a second time", "Human show output remains a short identity-and-status block and does not replicate the TUI", "A test asserts a claimed task returns its acceptance criteria through show --json"]
+  assignee: "pi"
+  claimedAt: "2026-09-01T04:51:29Z"
+  deliveredAt: "2026-09-01T04:51:29Z"
+  summary: "implemented and verified"
+  evidence: ["cargo test: 244 passing", "rendered Herdr pane check"]
+  updatedAt: "2026-09-01T04:51:29Z"
 createdAt: "2026-09-01T04:34:00Z"
-updatedAt: "2026-09-01T04:38:26Z"
+updatedAt: "2026-09-01T04:51:29Z"
+archivedAt: "2026-09-01T04:51:29Z"
+resolution:
+  outcome: "completed"
 ---
 ## Problem
 
