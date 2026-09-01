@@ -107,6 +107,9 @@ pub(crate) struct UpdateOptions {
     pub(crate) blockers: Vec<String>,
     pub(crate) references: Vec<String>,
     pub(crate) related_files: Vec<String>,
+    pub(crate) acceptance: Vec<String>,
+    pub(crate) constraints: Vec<String>,
+    pub(crate) validations: Vec<String>,
     pub(crate) clear: Vec<String>,
 }
 
@@ -513,6 +516,7 @@ pub(crate) fn update(
             other => other,
         })
         .collect::<Vec<_>>();
+    let accord_updates = apply_accord_definition_update(&mut changes, &doc, &options)?;
     let clear_body = options.clear.iter().any(|field| field == "body");
     let replacement_body = options
         .body
@@ -551,6 +555,10 @@ pub(crate) fn update(
     updates.insert("updatedAt".to_string(), current_timestamp());
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let patched = patch_frontmatter_content(&content, &updates, &clear_fields)?;
+    let patched = match accord_updates {
+        Some(accord) => patch_accord_content(&patched, &accord)?,
+        None => patched,
+    };
     let patched = if let Some(body) = replacement_body {
         replace_markdown_body(&patched, body)?
     } else {
@@ -714,6 +722,88 @@ fn apply_list_replace_update(
             new: display_list_value(&new_values),
         });
     }
+}
+
+/// Applies deterministic replacement (D36) to the accord definition fields.
+///
+/// Returns the accord record to write, or `None` when no definition field
+/// changed. Accord lifecycle fields are read from the document and rewritten
+/// unchanged, so an update never disturbs status or delivery data.
+fn apply_accord_definition_update(
+    changes: &mut Vec<UpdateChange>,
+    doc: &Document,
+    options: &UpdateOptions,
+) -> Result<Option<AccordRecord>, Error> {
+    let clears_acceptance = options
+        .clear
+        .iter()
+        .any(|field| field == "acceptance" || field == "criterion");
+    if clears_acceptance {
+        return Err(Error::user(format!(
+            "Validation failed: {} cannot clear acceptance; an active task requires at least one criterion",
+            doc.id()
+        )));
+    }
+
+    let mut accord = AccordRecord::from_document(doc, &current_timestamp());
+    let mut changed = false;
+    let mut apply = |changes: &mut Vec<UpdateChange>,
+                     field: &str,
+                     current: &mut Vec<String>,
+                     replacement: &[String],
+                     cleared: bool| {
+        let new_values = if cleared {
+            Vec::new()
+        } else if replacement.is_empty() {
+            return;
+        } else {
+            replacement.to_vec()
+        };
+        if new_values == *current {
+            return;
+        }
+        changes.push(UpdateChange {
+            field: field.to_string(),
+            old: display_list_value(current),
+            new: display_list_value(&new_values),
+        });
+        *current = new_values;
+        changed = true;
+    };
+
+    let cleared = |name: &str| options.clear.iter().any(|field| field == name);
+    let mut acceptance = accord.acceptance.clone();
+    apply(
+        changes,
+        "acceptance",
+        &mut acceptance,
+        &options.acceptance,
+        false,
+    );
+    let mut constraints = accord.constraints.clone();
+    apply(
+        changes,
+        "constraints",
+        &mut constraints,
+        &options.constraints,
+        cleared("constraint") || cleared("constraints"),
+    );
+    let mut validations = accord.validations.clone();
+    apply(
+        changes,
+        "validation",
+        &mut validations,
+        &options.validations,
+        cleared("validation") || cleared("validations"),
+    );
+
+    if !changed {
+        return Ok(None);
+    }
+    accord.acceptance = acceptance;
+    accord.constraints = constraints;
+    accord.validations = validations;
+    Ok(Some(accord))
 }
 
 fn display_list_value(values: &[String]) -> String {
@@ -1214,6 +1304,104 @@ mod tests {
         assert!(archived.contains("archivedAt"));
         assert!(!archived.contains("completion:"));
         fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn update_writes_accord_definition_fields_and_reports_only_real_changes() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-update-accord-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let created = add(
+            &project,
+            AddOptions {
+                acceptance: vec!["original".to_string()],
+                title: Some("Accord update".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        let replaced = update(
+            &project,
+            UpdateOptions {
+                id: created.id.clone(),
+                acceptance: vec!["first".to_string(), "second".to_string()],
+                constraints: vec!["no new deps".to_string()],
+                validations: vec!["cargo test".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let fields = replaced
+            .changes
+            .iter()
+            .map(|change| change.field.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(fields, vec!["acceptance", "constraints", "validation"]);
+        let content = std::fs::read_to_string(&replaced.path).unwrap();
+        assert!(content.contains("first") && content.contains("second"));
+        assert!(content.contains("no new deps"));
+        assert!(content.contains("cargo test"));
+        assert!(!content.contains("original"));
+
+        let repeated = update(
+            &project,
+            UpdateOptions {
+                id: created.id.clone(),
+                acceptance: vec!["first".to_string(), "second".to_string()],
+                constraints: vec!["no new deps".to_string()],
+                validations: vec!["cargo test".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(
+            repeated.changes.is_empty(),
+            "an identical update must report no changes: {:?}",
+            repeated.changes
+        );
+
+        let cleared = update(
+            &project,
+            UpdateOptions {
+                id: created.id.clone(),
+                clear: vec!["constraint".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            cleared
+                .changes
+                .iter()
+                .map(|change| change.field.as_str())
+                .collect::<Vec<_>>(),
+            vec!["constraints"]
+        );
+        let content = std::fs::read_to_string(&cleared.path).unwrap();
+        assert!(!content.contains("no new deps"));
+        assert!(content.contains("first"));
+
+        let rejected = update(
+            &project,
+            UpdateOptions {
+                id: created.id.clone(),
+                clear: vec!["acceptance".to_string()],
+                ..Default::default()
+            },
+        );
+        assert!(rejected.is_err(), "clearing acceptance must be rejected");
+
+        std::fs::remove_dir_all(project.root()).unwrap();
     }
 
     #[test]

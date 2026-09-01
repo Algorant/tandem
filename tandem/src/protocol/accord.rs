@@ -5,6 +5,7 @@ use super::document::{parse_field_values, Document};
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AccordRecord {
     pub(crate) status: String,
+    pub(crate) acceptance: Vec<String>,
     pub(crate) assignee: Option<String>,
     pub(crate) claimed_at: Option<String>,
     pub(crate) delivered_at: Option<String>,
@@ -24,6 +25,10 @@ impl AccordRecord {
     pub(crate) fn from_document(doc: &Document, updated_at: &str) -> Self {
         Self {
             status: status(doc).unwrap_or("missing").to_string(),
+            acceptance: doc
+                .field("accord.acceptance")
+                .map(parse_field_values)
+                .unwrap_or_default(),
             assignee: doc.field("accord.assignee").map(str::to_string),
             claimed_at: doc.field("accord.claimedAt").map(str::to_string),
             delivered_at: doc.field("accord.deliveredAt").map(str::to_string),

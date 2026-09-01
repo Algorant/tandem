@@ -134,17 +134,14 @@ fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let project = app::project::open()?;
     if let Some(doc) = project.find_document(&args.id)? {
         if json {
+            let read = app::queries::load_read(&project)?;
+            let detail = app::dto::detail(&read, &doc)?;
             println!(
                 "{}",
-                serde_json::json!({"ok":true,"data":{"id":doc.id(),"type":doc.doc_type(),"title":doc.title()},"warnings":[]})
+                serde_json::json!({"ok":true,"data":detail,"warnings":read.warnings})
             );
         } else {
-            println!(
-                "ID: {}\nType: {}\nTitle: {}",
-                doc.id(),
-                doc.doc_type(),
-                doc.title()
-            );
+            print!("{}", show_text(&doc));
         }
         return Ok(super::StartupRequest::Exit);
     }
@@ -163,6 +160,30 @@ fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
         return Ok(super::StartupRequest::Exit);
     }
     Err(CliError::user(format!("document not found: {}", args.id)))
+}
+
+/// Renders the short human identity-and-status block for `show`.
+///
+/// This is deliberately not a terminal rendering of the whole record. The TUI
+/// is the human read surface; `--json` is the machine read surface.
+fn show_text(doc: &crate::project::StoredDocument) -> String {
+    let mut lines = vec![
+        format!("ID: {}", doc.id()),
+        format!("Type: {}", doc.doc_type()),
+        format!("Title: {}", doc.title()),
+        format!("Location: {}", doc.location.as_str()),
+    ];
+    if let Some(state) = doc.field("state") {
+        lines.push(format!("State: {state}"));
+    }
+    if let Some(status) = crate::protocol::accord::status(doc) {
+        lines.push(format!("Accord: {status}"));
+    }
+    if let Some(assignee) = doc.field("assignee") {
+        lines.push(format!("Assignee: {assignee}"));
+    }
+    lines.push(String::new());
+    lines.join("\n")
 }
 
 fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliError> {
@@ -221,6 +242,9 @@ fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliErro
             blockers: args.blocker,
             references: args.reference,
             related_files: args.related_file,
+            acceptance: args.acceptance,
+            constraints: args.constraint,
+            validations: args.validation,
             clear: args.clear,
             ..Default::default()
         },
@@ -230,8 +254,19 @@ fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliErro
             "{}",
             serde_json::json!({"ok":true,"data":{"id":outcome.id,"changes":outcome.changes.iter().map(|c| &c.field).collect::<Vec<_>>()},"warnings":outcome.warnings})
         );
+    } else if outcome.changes.is_empty() {
+        println!("No changes for {}", outcome.id);
     } else {
-        println!("Updated {}", outcome.id);
+        println!(
+            "Updated {}: {}",
+            outcome.id,
+            outcome
+                .changes
+                .iter()
+                .map(|change| change.field.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
     }
     Ok(super::StartupRequest::Exit)
 }

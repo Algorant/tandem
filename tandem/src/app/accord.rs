@@ -579,6 +579,109 @@ mod tests {
     }
 
     #[test]
+    fn accord_definition_fields_survive_every_transition() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-acceptance-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let path = project.tasks_dir.join("task-1.md");
+        fs::write(
+            &path,
+            "---\nid: task-1\ntype: task\ntitle: Durable accord\nstate: todo\naccord:\n  status: ready\n  acceptance: [\"criterion one\", \"criterion two\"]\n  constraints: [\"no new deps\"]\n---\n# Body\n",
+        )
+        .unwrap();
+
+        let assert_definition_intact = |label: &str| {
+            let content = fs::read_to_string(&path).unwrap();
+            assert!(
+                content.contains("criterion one") && content.contains("criterion two"),
+                "acceptance criteria lost after {label}: {content}"
+            );
+            assert!(
+                content.contains("no new deps"),
+                "constraints lost after {label}: {content}"
+            );
+        };
+
+        let options = |extra: AccordOptions| AccordOptions {
+            id: "task-1".to_string(),
+            ..extra
+        };
+
+        transition(
+            &project,
+            "claim",
+            options(AccordOptions {
+                assignee: Some("worker-a".to_string()),
+                ..AccordOptions::default()
+            }),
+        )
+        .unwrap();
+        assert_definition_intact("claim");
+
+        transition(
+            &project,
+            "block",
+            options(AccordOptions {
+                note: Some("waiting".to_string()),
+                ..AccordOptions::default()
+            }),
+        )
+        .unwrap();
+        assert_definition_intact("block");
+
+        transition(&project, "resume", options(AccordOptions::default())).unwrap();
+        assert_definition_intact("resume");
+
+        transition(
+            &project,
+            "deliver",
+            options(AccordOptions {
+                summary: Some("Ready".to_string()),
+                evidence: vec!["tests pass".to_string()],
+                ..AccordOptions::default()
+            }),
+        )
+        .unwrap();
+        assert_definition_intact("deliver");
+
+        transition(
+            &project,
+            "rework",
+            options(AccordOptions {
+                note: Some("fix it".to_string()),
+                ..AccordOptions::default()
+            }),
+        )
+        .unwrap();
+        assert_definition_intact("rework");
+
+        transition(
+            &project,
+            "release",
+            options(AccordOptions {
+                note: Some("reassigning".to_string()),
+                ..AccordOptions::default()
+            }),
+        )
+        .unwrap();
+        assert_definition_intact("release");
+
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
     fn validation_rework_uses_supplied_actor_in_document_and_event() {
         use std::fs;
         use std::time::{SystemTime, UNIX_EPOCH};

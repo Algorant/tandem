@@ -180,6 +180,7 @@ fn render_accord_block(accord: &AccordRecord) -> String {
         "accord:".to_string(),
         format!("  status: {}", yaml_double_quote(&accord.status)),
     ];
+    push_nested_array_line(&mut lines, "acceptance", &accord.acceptance);
     push_optional_nested_line(&mut lines, "assignee", accord.assignee.as_deref());
     push_optional_nested_line(&mut lines, "claimedAt", accord.claimed_at.as_deref());
     push_optional_nested_line(&mut lines, "deliveredAt", accord.delivered_at.as_deref());

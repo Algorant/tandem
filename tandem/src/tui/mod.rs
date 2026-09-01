@@ -3415,6 +3415,37 @@ tone = "success"
     }
 
     #[test]
+    fn validation_escalation_prefills_the_documented_acceptance_criterion() {
+        let mut app = keyboard_test_app();
+        app.selected_state = 0;
+        app.docs[0]
+            .fields
+            .insert("accord.status".to_string(), "claimed".to_string());
+        app.docs[0].fields.insert(
+            "accord.acceptance".to_string(),
+            "[\"renders the board without flicker\"]".to_string(),
+        );
+
+        app.start_validation_request();
+
+        match app.validation_prompt {
+            Some(ValidationPrompt::Rework {
+                ref criterion,
+                request,
+                ..
+            }) => {
+                assert!(request);
+                assert_eq!(
+                    criterion.as_deref(),
+                    Some("renders the board without flicker"),
+                    "escalation must prefill the documented criterion, not the placeholder"
+                );
+            }
+            ref other => panic!("expected a rework escalation prompt, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn rework_prompt_owns_hotkey_characters_as_text_input() {
         let mut app = keyboard_test_app();
         app.selected_state = 1;

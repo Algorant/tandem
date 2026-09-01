@@ -72,3 +72,8 @@
 {"ts":"2026-09-01T04:34:00Z","event":"task.created","id":"task-9-2","summary":"Return the full record from show --json","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":72}
 {"ts":"2026-09-01T04:38:13Z","event":"task.created","id":"task-9-3","summary":"update silently drops accord fields and reports success","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":73}
 {"ts":"2026-09-01T04:38:26Z","event":"task.updated","id":"task-9-2","summary":"Updated task-9-2 metadata: body","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":74}
+{"ts":"2026-09-01T04:42:14Z","event":"accord.claimed","id":"task-9","summary":"Accord claim for task-9","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":75}
+{"ts":"2026-09-01T04:42:14Z","event":"accord.claimed","id":"task-9-1","summary":"Accord claim for task-9-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":76}
+{"ts":"2026-09-01T04:50:53Z","event":"task.created","id":"task-10","summary":"Validation escalation prompt hides the criterion field","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":77}
+{"ts":"2026-09-01T04:50:57Z","event":"task.updated","id":"task-9-1","summary":"Updated task-9-1 metadata: acceptance","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":78}
+{"ts":"2026-09-01T04:51:02Z","event":"task.updated","id":"task-9","summary":"Updated task-9 metadata: acceptance","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":79}

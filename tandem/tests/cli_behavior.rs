@@ -116,3 +116,77 @@ fn removed_commands_fail_usage() {
         assert_eq!(output.status.code(), Some(2), "{command}");
     }
 }
+
+#[test]
+fn show_json_returns_the_full_record_body_and_location() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let root = std::env::temp_dir().join(format!(
+        "tandem-cli-show-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let run = |args: &[&str]| {
+        let output = bin().args(args).current_dir(&root).output().unwrap();
+        assert!(
+            output.status.success(),
+            "{args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).to_string()
+    };
+    let data = |args: &[&str]| -> serde_json::Value {
+        let text = run(args);
+        serde_json::from_str::<serde_json::Value>(&text).unwrap()["data"].clone()
+    };
+
+    run(&["init", "--title", "show contract"]);
+    run(&[
+        "add",
+        "task",
+        "alpha",
+        "--acceptance",
+        "criterion one exactly",
+        "--body",
+        "real body text",
+    ]);
+    run(&["add", "decision", "a choice", "--body", "decision body"]);
+    run(&["accord", "claim", "task-1", "--assignee", "worker-a"]);
+
+    let claimed = data(&["show", "task-1", "--json"]);
+    assert_eq!(
+        claimed["accord"]["acceptance"][0], "criterion one exactly",
+        "a claimed task must still report its acceptance criteria: {claimed}"
+    );
+    assert!(claimed["body"].as_str().unwrap().contains("real body text"));
+    assert_eq!(claimed["location"], "board");
+    assert_eq!(claimed["state"], "in-progress");
+    assert_eq!(claimed["accordStatus"], "claimed");
+
+    let decision = data(&["show", "decision-1", "--json"]);
+    assert_eq!(decision["location"], "board");
+    assert_eq!(decision["type"], "decision");
+    assert!(decision["decision"].is_object());
+
+    run(&[
+        "accord",
+        "deliver",
+        "task-1",
+        "--summary",
+        "s",
+        "--evidence",
+        "e",
+    ]);
+    run(&["complete", "task-1"]);
+    let archived = data(&["show", "task-1", "--json"]);
+    assert_eq!(
+        archived["location"], "logs",
+        "location is the archived signal: {archived}"
+    );
+    assert_eq!(archived["accord"]["acceptance"][0], "criterion one exactly");
+
+    std::fs::remove_dir_all(&root).unwrap();
+}

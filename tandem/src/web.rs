@@ -16,15 +16,15 @@ use serde::Serialize;
 use tokio::sync::Semaphore;
 
 use crate::app;
+use crate::app::dto::{self, DecisionDto, DocumentDetailDto, DocumentSummaryDto};
 use crate::app::queries::{ListFilter, ReadSnapshot};
 use crate::project::{StoredDocument as Document, TandemProject};
-use crate::protocol::accord::{status as accord_status, AccordRecord};
+use crate::protocol::accord::status as accord_status;
 use crate::protocol::document::parse_field_values;
-use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
+use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
-    resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
-    state_matches_filter,
+    resolution_note, resolution_outcome, resolution_reviewer, state_matches_filter,
 };
 use crate::CliError;
 
@@ -652,86 +652,31 @@ fn sort_documents(documents: &mut [Document]) {
 }
 
 fn summary_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentSummaryDto, ApiFailure> {
-    let role = read
-        .snapshot
-        .hierarchy
-        .task_role(document)
-        .map_err(ApiFailure::from_diagnostic)?;
-    let relationship = read
-        .snapshot
-        .hierarchy
-        .relationship(document)
-        .map_err(ApiFailure::from_diagnostic)?;
-    Ok(DocumentSummaryDto {
-        id: document.id().to_string(),
-        document_type: document.doc_type().to_string(),
-        kind: document.kind().map(str::to_string),
-        role: role.map(TaskRole::as_str),
-        title: document.title().to_string(),
-        location: document.location.as_str(),
-        state: document.field("state").map(str::to_string),
-        priority: document.field("priority").map(str::to_string),
-        effort: document.field("effort").map(str::to_string),
-        assignee: document.field("assignee").map(str::to_string),
-        parent_id: document.field("parentId").map(str::to_string),
-        parent_relationship: relationship.map(ParentRelationship::as_str),
-        tags: values(document, "tags"),
-        accord_status: accord_status(document).map(str::to_string),
+    dto::summary(read, document).map_err(|error| ApiFailure::from_cli(error.into()))
+}
+
+/// The web read API serves rendered Markdown alongside the shared projection.
+fn detail_dto(
+    read: &ReadSnapshot,
+    document: &Document,
+) -> Result<WebDocumentDetailDto, ApiFailure> {
+    let detail = dto::detail(read, document).map_err(|error| ApiFailure::from_cli(error.into()))?;
+    Ok(WebDocumentDetailDto {
+        body_html: render_markdown(&detail.body),
+        detail,
     })
 }
 
-fn detail_dto(read: &ReadSnapshot, document: &Document) -> Result<DocumentDetailDto, ApiFailure> {
-    let summary = summary_dto(read, document)?;
-    let parent = document
-        .field("parentId")
-        .and_then(|id| read.snapshot.document(id))
-        .map(|parent| summary_dto(read, &parent))
-        .transpose()?;
-    let children = read
-        .snapshot
-        .children(document)
-        .map_err(|error| ApiFailure::from_cli(error.into()))?
-        .iter()
-        .map(|child| summary_dto(read, child))
-        .collect::<Result<Vec<_>, _>>()?;
-    let resolution = (document.location == DocumentLocation::Logs && document.doc_type() == "task")
-        .then(|| ResolutionDto {
-            outcome: resolution_outcome(document).to_string(),
-            note: resolution_note(document).map(str::to_string),
-            files_changed: resolution_files_changed(document),
-            reviewer: resolution_reviewer(document).map(str::to_string),
-        });
-    let accord = accord_status(document).map(|_| {
-        AccordDto::from(AccordRecord::from_document(
-            document,
-            document.field("updatedAt").unwrap_or(""),
-        ))
-    });
-    let validation = (document.field("state") == Some("validation")).then(|| ValidationDto {
-        state: "validation".to_string(),
-        criterion: document.field("validation.criterion").map(str::to_string),
-        note: document.field("validation.note").map(str::to_string),
-        reviewer: document.field("validation.reviewer").map(str::to_string),
-        requested_at: document.field("validation.requestedAt").map(str::to_string),
-    });
-    Ok(DocumentDetailDto {
-        summary,
-        body: document.body.clone(),
-        body_html: render_markdown(&document.body),
-        due_date: document.field("dueDate").map(str::to_string),
-        created_at: document.field("createdAt").map(str::to_string),
-        updated_at: document.field("updatedAt").map(str::to_string),
-        completed_at: document.field("completedAt").map(str::to_string),
-        blockers: values(document, "blockers"),
-        references: values(document, "references"),
-        related_files: values(document, "relatedFiles"),
-        parent: parent.map(Box::new),
-        children,
-        accord,
-        validation,
-        resolution,
-        decision: (document.doc_type() == "decision").then(|| decision_dto(document)),
-    })
+fn decision_dto(document: &Document) -> DecisionDto {
+    dto::decision(document)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebDocumentDetailDto {
+    #[serde(flatten)]
+    detail: DocumentDetailDto,
+    body_html: String,
 }
 
 fn log_summary_dto(document: &Document) -> LogSummaryDto {
@@ -743,27 +688,6 @@ fn log_summary_dto(document: &Document) -> LogSummaryDto {
         outcome: resolution_outcome(document).to_string(),
         note: resolution_note(document).map(str::to_string),
         reviewer: resolution_reviewer(document).map(str::to_string),
-    }
-}
-
-fn decision_dto(document: &Document) -> DecisionDto {
-    DecisionDto {
-        id: document.id().to_string(),
-        title: document.title().to_string(),
-        status: document.field("status").map(str::to_string),
-        date: document.field("date").map(str::to_string),
-        deciders: values(document, "deciders"),
-        context: document.field("context").map(str::to_string),
-        consequences: values(document, "consequences"),
-        alternatives: values(document, "alternatives"),
-        supersedes: values(document, "supersedes"),
-        superseded_by: values(document, "supersededBy"),
-        summary: document
-            .body
-            .lines()
-            .map(str::trim)
-            .find(|line| !line.is_empty())
-            .map(str::to_string),
     }
 }
 
@@ -964,105 +888,6 @@ struct AttentionDto {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DocumentSummaryDto {
-    id: String,
-    #[serde(rename = "type")]
-    document_type: String,
-    kind: Option<String>,
-    role: Option<&'static str>,
-    title: String,
-    location: &'static str,
-    state: Option<String>,
-    priority: Option<String>,
-    effort: Option<String>,
-    assignee: Option<String>,
-    parent_id: Option<String>,
-    parent_relationship: Option<&'static str>,
-    tags: Vec<String>,
-    accord_status: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DocumentDetailDto {
-    #[serde(flatten)]
-    summary: DocumentSummaryDto,
-    body: String,
-    body_html: String,
-    due_date: Option<String>,
-    created_at: Option<String>,
-    updated_at: Option<String>,
-    completed_at: Option<String>,
-    blockers: Vec<String>,
-    references: Vec<String>,
-    related_files: Vec<String>,
-    parent: Option<Box<DocumentSummaryDto>>,
-    children: Vec<DocumentSummaryDto>,
-    accord: Option<AccordDto>,
-    validation: Option<ValidationDto>,
-    resolution: Option<ResolutionDto>,
-    decision: Option<DecisionDto>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct AccordDto {
-    status: String,
-    assignee: Option<String>,
-    claimed_at: Option<String>,
-    delivered_at: Option<String>,
-    deliverables: Vec<String>,
-    validations: Vec<String>,
-    constraints: Vec<String>,
-    summary: Option<String>,
-    evidence: Vec<String>,
-    files_changed: Vec<String>,
-    reviewer: Option<String>,
-    note: Option<String>,
-    reason: Option<String>,
-}
-
-impl From<AccordRecord> for AccordDto {
-    fn from(record: AccordRecord) -> Self {
-        Self {
-            status: record.status,
-            assignee: record.assignee,
-            claimed_at: record.claimed_at,
-            delivered_at: record.delivered_at,
-            deliverables: record.deliverables,
-            validations: record.validations,
-            constraints: record.constraints,
-            summary: record.summary,
-            evidence: record.evidence,
-            files_changed: record.files_changed,
-            reviewer: record.reviewer,
-            note: record.note,
-            reason: record.reason,
-        }
-    }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ValidationDto {
-    state: String,
-    criterion: Option<String>,
-    note: Option<String>,
-    reviewer: Option<String>,
-    requested_at: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ResolutionDto {
-    outcome: String,
-    note: Option<String>,
-    files_changed: Vec<String>,
-    reviewer: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 struct LogsDto {
     total: usize,
     limit: usize,
@@ -1100,22 +925,6 @@ struct RuleDto {
 #[serde(rename_all = "camelCase")]
 struct DecisionsDto {
     items: Vec<DecisionDto>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DecisionDto {
-    id: String,
-    title: String,
-    status: Option<String>,
-    date: Option<String>,
-    deciders: Vec<String>,
-    context: Option<String>,
-    consequences: Vec<String>,
-    alternatives: Vec<String>,
-    supersedes: Vec<String>,
-    superseded_by: Vec<String>,
-    summary: Option<String>,
 }
 
 #[cfg(test)]

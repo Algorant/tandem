@@ -35,7 +35,7 @@ Each Rule is one Markdown file in `rules/` with composite ID `<category>-N`, cat
 
 ## Accord
 
-Active statuses are `ready`, `claimed`, `delivered`, `rework`, and `blocked`; `accepted` and `failed` occur only in Logs. Every active Task has at least one `accord.acceptance` criterion. Optional accord fields are `constraints`, planned `validation`, current `note`, and delivery data.
+Active statuses are `ready`, `claimed`, `delivered`, `rework`, and `blocked`; `accepted` and `failed` occur only in Logs. Every active Task has at least one `accord.acceptance` criterion. Optional accord fields are `constraints`, planned `validation`, current `note`, and delivery data. Accord definition fields — `acceptance`, `constraints`, and planned `validation` — are durable: every status transition preserves them unchanged. Only an explicit `update` may rewrite them.
 
 `claim` sets top-level `assignee`; `deliver` requires `summary` and one or more `evidence`; `rework`, `block`, `release`, and `fail` take one note; `resume` changes blocked to claimed; `release` clears assignee and returns to ready. `complete` atomically accepts delivered work and archives it. `fail` atomically archives failure.
 

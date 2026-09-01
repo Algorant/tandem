@@ -2,17 +2,20 @@
 id: task-9-1
 type: task
 title: "Persist accord.acceptance across accord transitions"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 parentId: "task-9"
 relatedFiles: ["tandem/src/protocol/accord.rs", "tandem/src/app/accord.rs", "tandem/src/tui/validation.rs"]
 tags: ["protocol", "accord"]
 accord:
-  status: ready
-  acceptance: ["AccordRecord carries acceptance and every transition round-trips it", "claim, deliver, rework, block, release, and fail preserve acceptance criteria unchanged", "A regression test asserts acceptance survives a full claim-to-deliver cycle", "TUI validation escalation prefills the real criterion for a claimed task, not the placeholder"]
+  status: "claimed"
+  acceptance: ["AccordRecord carries acceptance and every transition round-trips it", "claim, deliver, rework, block, resume, and release preserve acceptance criteria unchanged", "A regression test asserts acceptance survives a full transition cycle and fails without the fix", "TUI validation escalation reads the real criterion from accord.acceptance, covered by a unit test; the prompt's rendering defect is task-10"]
+  assignee: "pi"
+  claimedAt: "2026-09-01T04:42:14Z"
+  updatedAt: "2026-09-01T04:50:57Z"
 createdAt: "2026-09-01T04:33:50Z"
-updatedAt: "2026-09-01T04:33:50Z"
+updatedAt: "2026-09-01T04:50:57Z"
 ---
 
 ## Description
