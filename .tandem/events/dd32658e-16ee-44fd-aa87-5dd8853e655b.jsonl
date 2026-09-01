@@ -67,3 +67,6 @@
 {"ts":"2026-08-31T21:17:41Z","event":"task.completed","id":"task-7","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":67}
 {"ts":"2026-09-01T04:08:46Z","event":"task.created","id":"task-8","summary":"Sort task IDs numerically instead of lexicographically","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":68}
 {"ts":"2026-09-01T04:15:47Z","event":"task.completed","id":"task-8","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":69}
+{"ts":"2026-09-01T04:33:41Z","event":"task.created","id":"task-9","summary":"Make accord acceptance durable and show output agent-readable","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":70}
+{"ts":"2026-09-01T04:33:50Z","event":"task.created","id":"task-9-1","summary":"Persist accord.acceptance across accord transitions","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":71}
+{"ts":"2026-09-01T04:34:00Z","event":"task.created","id":"task-9-2","summary":"Return the full record from show --json","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":72}
