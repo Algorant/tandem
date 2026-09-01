@@ -9,6 +9,7 @@ use crate::project::{
 };
 use crate::protocol::accord::status as accord_status;
 use crate::protocol::document::parse_field_values;
+use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
     resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
 };
@@ -49,7 +50,7 @@ pub(super) fn sort_logs_by_recency(docs: &mut [Document]) {
         b.field("completedAt")
             .unwrap_or("")
             .cmp(a.field("completedAt").unwrap_or(""))
-            .then_with(|| a.id().cmp(b.id()))
+            .then_with(|| compare_ids(a.id(), b.id()))
     });
 }
 

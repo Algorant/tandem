@@ -15,6 +15,7 @@ use super::{
 use crate::app;
 use crate::project::{display_path, StoredDocument as Document};
 use crate::protocol::document::parse_field_values;
+use crate::protocol::ids::compare_ids;
 
 #[derive(Debug, Default)]
 pub(super) struct DecisionsState {
@@ -347,7 +348,7 @@ impl TuiApp {
             .iter()
             .filter(|doc| is_decision_doc(doc))
             .collect::<Vec<_>>();
-        docs.sort_by(|a, b| a.id().cmp(b.id()));
+        docs.sort_by(|a, b| compare_ids(a.id(), b.id()));
         docs
     }
 

@@ -65,3 +65,4 @@
 {"ts":"2026-08-31T21:17:00Z","event":"rules.updated","id":"rules","summary":"Added rule context-1","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":65}
 {"ts":"2026-08-31T21:17:41Z","event":"task.updated","id":"task-7","summary":"Updated task-7 metadata: body","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":66}
 {"ts":"2026-08-31T21:17:41Z","event":"task.completed","id":"task-7","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":67}
+{"ts":"2026-09-01T04:08:46Z","event":"task.created","id":"task-8","summary":"Sort task IDs numerically instead of lexicographically","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":68}

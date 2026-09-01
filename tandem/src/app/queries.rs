@@ -9,6 +9,7 @@ use crate::protocol::accord::{state_divergence_warning, status as accord_status}
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
+use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{state_matches_filter, workflow_states};
 
 pub(crate) struct Snapshot {
@@ -40,18 +41,17 @@ pub(crate) fn documents_for_scope(
     project: &TandemProject,
     scope: Scope,
 ) -> Result<Vec<Document>, Error> {
-    match scope {
-        Scope::Active => project
-            .read_documents()
-            .map(|docs| {
-                docs.into_iter()
-                    .filter(|doc| doc.location != DocumentLocation::Logs)
-                    .collect()
-            })
-            .map_err(Into::into),
-        Scope::Archived => project.read_log_documents().map_err(Into::into),
-        Scope::All => project.read_documents().map_err(Into::into),
-    }
+    let mut documents = match scope {
+        Scope::Active => project.read_documents().map(|docs| {
+            docs.into_iter()
+                .filter(|doc| doc.location != DocumentLocation::Logs)
+                .collect()
+        }),
+        Scope::Archived => project.read_log_documents(),
+        Scope::All => project.read_documents(),
+    }?;
+    documents.sort_by(|a, b| compare_ids(a.id(), b.id()));
+    Ok(documents)
 }
 
 /// One coherent, UI-neutral project read used by long-running peer interfaces.
@@ -256,7 +256,7 @@ pub(crate) fn children_for(
                     .unwrap_or("")
                     .cmp(b.field("state").unwrap_or(""))
             })
-            .then_with(|| a.id().cmp(b.id()))
+            .then_with(|| compare_ids(a.id(), b.id()))
     });
     Ok(children)
 }
@@ -298,7 +298,7 @@ pub(crate) fn search_documents(
         })
         .filter_map(|doc| search_match(doc, filter.query))
         .collect::<Vec<_>>();
-    results.sort_by(|a, b| a.doc.id().cmp(b.doc.id()));
+    results.sort_by(|a, b| compare_ids(a.doc.id(), b.doc.id()));
     results
 }
 

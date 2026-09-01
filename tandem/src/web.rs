@@ -21,6 +21,7 @@ use crate::project::{StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
+use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
     resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
     state_matches_filter,
@@ -376,7 +377,7 @@ async fn logs_api(State(state): State<WebState>, uri: Uri) -> Response {
             b.field("completedAt")
                 .unwrap_or("")
                 .cmp(a.field("completedAt").unwrap_or(""))
-                .then_with(|| a.id().cmp(b.id()))
+                .then_with(|| compare_ids(a.id(), b.id()))
         });
         let total = documents.len();
         documents.truncate(limit);
@@ -424,7 +425,7 @@ async fn decisions_api(State(state): State<WebState>) -> Response {
             .into_iter()
             .filter(|document| document.doc_type() == "decision")
             .collect::<Vec<_>>();
-        decisions.sort_by(|a, b| a.id().cmp(b.id()));
+        decisions.sort_by(|a, b| compare_ids(a.id(), b.id()));
         Ok(DecisionsDto {
             items: decisions.iter().map(decision_dto).collect(),
         })
@@ -646,7 +647,7 @@ fn sort_documents(documents: &mut [Document]) {
         a.field("state")
             .unwrap_or("")
             .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| a.id().cmp(b.id()))
+            .then_with(|| compare_ids(a.id(), b.id()))
     });
 }
 

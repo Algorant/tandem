@@ -36,6 +36,7 @@ use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
+use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
     self, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
     RESOLUTION_OUTCOME_COMPLETED,
@@ -91,7 +92,7 @@ fn sort_documents(docs: &mut [Document]) {
         a.field("state")
             .unwrap_or("")
             .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| a.id().cmp(b.id()))
+            .then_with(|| compare_ids(a.id(), b.id()))
     });
 }
 

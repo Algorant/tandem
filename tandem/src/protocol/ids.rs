@@ -3,6 +3,27 @@
 //! These functions operate only on resolved document IDs. Project code owns
 //! Board/Logs scanning, locks, and atomic reservations.
 
+use std::cmp::Ordering;
+
+/// Orders document IDs by prefix, then by each numeric segment as a number.
+///
+/// `task-2` precedes `task-10`, and `task-2-2` precedes `task-2-10`. IDs whose
+/// segments are not canonical numbers sort before numbered IDs sharing their
+/// prefix, ordered by raw text.
+pub(crate) fn compare_ids(a: &str, b: &str) -> Ordering {
+    sort_key(a).cmp(&sort_key(b))
+}
+
+fn sort_key(id: &str) -> (&str, Vec<usize>, &str) {
+    let (prefix, rest) = id.split_once('-').unwrap_or((id, ""));
+    let numbers = rest
+        .split('-')
+        .map(positive_canonical_number)
+        .collect::<Option<Vec<_>>>()
+        .unwrap_or_default();
+    (prefix, numbers, id)
+}
+
 /// Returns the positive numeric suffix of a global `task-N` ID.
 pub(crate) fn global_task_number(id: &str) -> Option<usize> {
     id.strip_prefix("task-")
@@ -53,6 +74,39 @@ mod tests {
         assert_eq!(global_task_number("task-01"), None);
         assert_eq!(subtask_suffix("task-12-3", "task-12"), Some(3));
         assert_eq!(subtask_suffix("task-12-03", "task-12"), None);
+    }
+
+    #[test]
+    fn orders_numeric_segments_as_numbers() {
+        let mut ids = vec![
+            "task-10",
+            "task-2",
+            "task-1",
+            "decision-8",
+            "task-2-10",
+            "task-2-2",
+            "decision-10",
+        ];
+        ids.sort_by(|a, b| compare_ids(a, b));
+        assert_eq!(
+            ids,
+            vec![
+                "decision-8",
+                "decision-10",
+                "task-1",
+                "task-2",
+                "task-2-2",
+                "task-2-10",
+                "task-10",
+            ]
+        );
+    }
+
+    #[test]
+    fn orders_noncanonical_ids_before_numbered_ids_of_the_same_prefix() {
+        let mut ids = vec!["task-2", "task-04", "task", "task-1"];
+        ids.sort_by(|a, b| compare_ids(a, b));
+        assert_eq!(ids, vec!["task", "task-04", "task-1", "task-2"]);
     }
 
     #[test]
