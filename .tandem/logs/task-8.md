@@ -2,16 +2,18 @@
 id: task-8
 type: task
 title: "Sort task IDs numerically instead of lexicographically"
-state: todo
 priority: "medium"
 effort: "small"
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/web.rs", "tandem/src/tui/decisions.rs", "tandem/src/app/queries.rs"]
 tags: ["tui", "protocol", "bug"]
 accord:
-  status: ready
-  acceptance: ["Board TODO column orders #1, #2, #3, #4, #5, #10", "CLI list, search, logs, and decisions use the same numeric ordering", "Subtask IDs order task-2-2 before task-2-10", "Unit tests cover the ordering helper, including mixed prefixes and subtask suffixes", "Verified in a rendered Herdr pane, not only by unit test"]
+  status: "ready"
+  updatedAt: "2026-09-01T04:15:47Z"
 createdAt: "2026-09-01T04:08:46Z"
-updatedAt: "2026-09-01T04:08:46Z"
+updatedAt: "2026-09-01T04:15:47Z"
+archivedAt: "2026-09-01T04:15:47Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
