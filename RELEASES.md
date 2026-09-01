@@ -2,6 +2,20 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.12.1
+
+Tandem v0.12.1 fixes two storage defects found while migrating a workspace to the protocol 0.3.0 cutover.
+
+### Fixed
+
+- `tandem add decision` now writes decision documents to `.tandem/decisions/` instead of `.tandem/tasks/`, and no longer writes a manual `date` field (dates are automatic; `decidedAt` is set when a Decision reaches accepted or rejected).
+- Rules are now stored one file per rule under `.tandem/rules/` with composite ids such as `always-12`. `rules add|edit|delete` operate on the per-file store, `rules edit` supports `--clear source`, and `rules list` prints composite ids and filters by category. The TUI Rules view and web rules API read the same files.
+
+### Compatibility
+
+- Rules created with 0.12.0 live in the workspace config (`tandem.md`) with flat numeric ids. Workspaces that added rules under 0.12.0 should recreate them with `tandem rules add` so they land in the new per-file store, then remove the `rules:` block from `tandem.md`.
+- Deadline-adjacent `tandem update` for decision documents is unchanged in this release.
+
 ## 0.12.0
 
 Tandem v0.12.0 is the protocol 0.3.0 cutover: a rewritten clap-derived CLI, a new storage layout, and mandatory work agreements. The full contract is recorded in `decision-12`. This is a **breaking** release — read Compatibility before upgrading.
