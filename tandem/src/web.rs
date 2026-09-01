@@ -958,7 +958,7 @@ mod tests {
         .unwrap();
         fs::write(
             project.tasks_dir.join("task-1.md"),
-            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\naccord:\n  status: delivered\n  assignee: worker\n  summary: Ready to inspect\n  validation:\n    commands: [cargo test]\nvalidation:\n  criterion: verify the API\n  note: needs human confirmation\n  reviewer: owner\n  requestedAt: 2026-08-05T00:00:00Z\n---\n\n## Body\n",
+            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: validation\npriority: high\ntags: [web]\nassignee: worker\naccord:\n  status: delivered\n  summary: Ready to inspect\n  validation: [cargo test]\nvalidation:\n  criterion: verify the API\n  note: needs human confirmation\n  reviewer: owner\n  requestedAt: 2026-08-05T00:00:00Z\n---\n\n## Body\n",
         )
         .unwrap();
         fs::write(
@@ -1014,7 +1014,7 @@ mod tests {
         let (_, detail) = json_request(app, "/api/v1/documents/task-1").await;
         assert_eq!(detail["data"]["role"], "task");
         assert_eq!(detail["data"]["accordStatus"], "delivered");
-        assert_eq!(detail["data"]["accord"]["assignee"], "worker");
+        assert_eq!(detail["data"]["assignee"], "worker");
         assert_eq!(detail["data"]["accord"]["validations"][0], "cargo test");
         assert_eq!(detail["data"]["validation"]["state"], "validation");
         assert_eq!(detail["data"]["validation"]["criterion"], "verify the API");

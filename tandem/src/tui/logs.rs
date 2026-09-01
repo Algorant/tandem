@@ -408,12 +408,11 @@ fn compact_metadata(doc: &Document) -> Vec<String> {
 
 fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &TuiTheme) {
     let has_accord_detail = [
-        "accord.assignee",
         "accord.claimedAt",
         "accord.deliveredAt",
         "accord.summary",
         "accord.evidence",
-        "accord.validation.commands",
+        "accord.validation",
         "accord.deliverables",
         "accord.filesChanged",
         "accord.note",
@@ -428,7 +427,6 @@ fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &T
 
     lines.push(Line::from(""));
     lines.push(section_heading("Accord detail", theme));
-    push_compact_optional(lines, "assignee", doc.field("accord.assignee"), theme);
     push_compact_optional(lines, "claimed", doc.field("accord.claimedAt"), theme);
     push_compact_optional(lines, "delivered", doc.field("accord.deliveredAt"), theme);
     push_compact_optional(lines, "summary", doc.field("accord.summary"), theme);
@@ -436,9 +434,7 @@ fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &T
     push_array_detail_lines(
         lines,
         "validation commands",
-        doc.field("accord.validation.commands")
-            .or_else(|| doc.field("accord.validation"))
-            .or_else(|| doc.field("accord.validations")),
+        doc.field("accord.validation"),
         theme,
     );
     push_array_detail_lines(

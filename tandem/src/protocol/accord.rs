@@ -6,7 +6,6 @@ use super::document::{parse_field_values, Document};
 pub(crate) struct AccordRecord {
     pub(crate) status: String,
     pub(crate) acceptance: Vec<String>,
-    pub(crate) assignee: Option<String>,
     pub(crate) claimed_at: Option<String>,
     pub(crate) delivered_at: Option<String>,
     pub(crate) deliverables: Vec<String>,
@@ -29,7 +28,6 @@ impl AccordRecord {
                 .field("accord.acceptance")
                 .map(parse_field_values)
                 .unwrap_or_default(),
-            assignee: doc.field("accord.assignee").map(str::to_string),
             claimed_at: doc.field("accord.claimedAt").map(str::to_string),
             delivered_at: doc.field("accord.deliveredAt").map(str::to_string),
             deliverables: doc
@@ -37,9 +35,7 @@ impl AccordRecord {
                 .map(parse_field_values)
                 .unwrap_or_default(),
             validations: doc
-                .field("accord.validation.commands")
-                .or_else(|| doc.field("accord.validation"))
-                .or_else(|| doc.field("accord.validations"))
+                .field("accord.validation")
                 .map(parse_field_values)
                 .unwrap_or_default(),
             constraints: doc

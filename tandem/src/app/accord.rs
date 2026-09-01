@@ -94,11 +94,6 @@ fn apply_accord_action(
         }
         _ => {}
     }
-    if action == "release" {
-        accord.assignee = None;
-    } else if let Some(value) = options.assignee.as_deref().filter(|v| !v.trim().is_empty()) {
-        accord.assignee = Some(value.to_string());
-    }
     if let Some(value) = options
         .note
         .as_deref()
@@ -406,6 +401,14 @@ pub(crate) fn transition(
     let patched = patch_accord_content(&content, &accord)?;
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now.clone());
+    // Protocol 0.3.0 (D23): ownership is the top-level assignee. Claim sets it
+    // and release clears it; there is no accord-nested copy.
+    let mut assignee_removes: Vec<&str> = Vec::new();
+    if action == "release" {
+        assignee_removes.push("assignee");
+    } else if let Some(value) = options.assignee.as_deref().filter(|v| !v.trim().is_empty()) {
+        updates.insert("assignee".to_string(), value.to_string());
+    }
     let previous_state = doc.field("state").unwrap_or("-").to_string();
     let effect = accord::state_effect(action, &previous_state);
     let synced_state = if let Some(state) = effect.state {
@@ -415,19 +418,17 @@ pub(crate) fn transition(
     } else {
         None
     };
-    let removes = if action == "rework" {
-        [
+    let mut removes = assignee_removes;
+    if action == "rework" {
+        removes.extend([
             "validation.state",
             "validation.criterion",
             "validation.note",
             "validation.reviewer",
             "validation.requestedAt",
-        ]
-        .as_slice()
-    } else {
-        [].as_slice()
-    };
-    let patched = patch_frontmatter_content(&patched, &updates, removes)?;
+        ]);
+    }
+    let patched = patch_frontmatter_content(&patched, &updates, &removes)?;
     // Protocol 0.3.0 (D21): fail means the agreed outcome cannot be achieved;
     // it atomically archives the Task as failed with the transition note.
     if action == "fail" {

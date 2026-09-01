@@ -1740,14 +1740,7 @@ pub(super) fn validation_inline_preview_sections(
     let mut lines = Vec::new();
     lines.extend(inline_preview_list_section(
         "Validation",
-        first_accord_list(
-            doc,
-            &[
-                "accord.validation.commands",
-                "accord.validation",
-                "accord.validations",
-            ],
-        ),
+        first_accord_list(doc, &["accord.validation"]),
         theme,
         content_width,
     ));
@@ -2342,12 +2335,6 @@ pub(super) fn push_board_accord_detail_section(
         accord_state_signal(status),
         theme,
     ));
-    push_optional_detail_line(
-        lines,
-        "Accord assignee",
-        doc.field("accord.assignee"),
-        theme,
-    );
     push_optional_detail_line(lines, "Claimed", doc.field("accord.claimedAt"), theme);
     push_optional_detail_line(lines, "Delivered", doc.field("accord.deliveredAt"), theme);
     push_optional_detail_list_line(
@@ -2359,14 +2346,7 @@ pub(super) fn push_board_accord_detail_section(
     push_optional_detail_list_line(
         lines,
         "Validation",
-        first_accord_list(
-            doc,
-            &[
-                "accord.validation.commands",
-                "accord.validation",
-                "accord.validations",
-            ],
-        ),
+        first_accord_list(doc, &["accord.validation"]),
         theme,
     );
     push_optional_detail_list_line(

@@ -170,11 +170,8 @@ impl TuiApp {
         };
         let reason = match selected.as_ref() {
             None => "Disabled: no selected task".to_string(),
-            Some((_, _, state, status)) if state != "validation" && status == "missing" => {
-                "Disabled: task has no Accord".into()
-            }
             Some((_, _, state, _)) if state != "validation" => {
-                "Request exceptional human validation".into()
+                "Disabled: validation actions apply to delivered work".into()
             }
             Some((_, _, _, status)) if normalized_accord_status(status) != "delivered" => {
                 format!("Disabled: accord {status}")
@@ -188,10 +185,10 @@ impl TuiApp {
             context,
             options: if active_task {
                 vec![PickerOption {
-                    label: "Request human validation".into(),
+                    label: "Accept and archive".into(),
                     detail: reason,
-                    enabled: true,
-                    action: PickerAction::Validation("request"),
+                    enabled: false,
+                    action: PickerAction::Validation("accept"),
                 }]
             } else {
                 vec![

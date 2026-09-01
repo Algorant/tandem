@@ -13,8 +13,8 @@ use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
     self, patch_accord_content, patch_frontmatter_content, patch_resolution_content,
-    replace_markdown_body, write_atomic, yaml_double_quote, ProjectHierarchy as HierarchyIndex,
-    StoredDocument as Document, TandemProject,
+    render_accord_block, replace_markdown_body, write_atomic, yaml_double_quote,
+    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
@@ -45,6 +45,19 @@ fn push_array_line(lines: &mut Vec<String>, key: &str, values: &[String]) {
     if !values.is_empty() {
         lines.push(format!("{key}: {}", inline_array(values)));
     }
+}
+
+/// Renders the accord block for a new task through the one shared renderer,
+/// so creation and transitions can never write different shapes.
+fn render_accord_block_for_new_task(options: &AddOptions, now: &str) -> String {
+    render_accord_block(&AccordRecord {
+        status: "ready".to_string(),
+        acceptance: options.acceptance.clone(),
+        constraints: options.constraints.clone(),
+        validations: options.validations.clone(),
+        updated_at: now.to_string(),
+        ..AccordRecord::default()
+    })
 }
 
 fn push_array_line_indented(lines: &mut Vec<String>, key: &str, values: &[String]) {
@@ -254,11 +267,11 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             push_array_line(&mut lines, "references", &options.references);
             push_array_line(&mut lines, "relatedFiles", &options.related_files);
             push_array_line(&mut lines, "tags", &options.tags);
-            lines.push("accord:".to_string());
-            lines.push("  status: ready".to_string());
-            push_array_line_indented(&mut lines, "acceptance", &options.acceptance);
-            push_array_line_indented(&mut lines, "constraints", &options.constraints);
-            push_array_line_indented(&mut lines, "validation", &options.validations);
+            lines.push(
+                render_accord_block_for_new_task(&options, &now)
+                    .trim_end()
+                    .to_string(),
+            );
             lines.push(format!("createdAt: {}", yaml_double_quote(&now)));
             lines.push(format!("updatedAt: {}", yaml_double_quote(&now)));
             lines.push("---".to_string());

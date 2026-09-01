@@ -212,7 +212,7 @@ export function renderDetail(detail, kind = 'document') {
   ]);
   if (detail.accord) sections.push(detailSection('Accord', [
     ['Status', badge('Status', detail.accord.status, statusTone(detail.accord.status))],
-    ['Assignee', detail.accord.assignee], ['Claimed', detail.accord.claimedAt], ['Delivered', detail.accord.deliveredAt],
+    ['Claimed', detail.accord.claimedAt], ['Delivered', detail.accord.deliveredAt],
     ['Summary', detail.accord.summary], ['Deliverables', listValue(detail.accord.deliverables)],
     ['Validation', listValue(detail.accord.validations)], ['Constraints', listValue(detail.accord.constraints)],
     ['Evidence', listValue(detail.accord.evidence)], ['Files changed', listValue(detail.accord.filesChanged)],

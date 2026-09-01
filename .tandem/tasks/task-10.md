@@ -1,38 +1,41 @@
 ---
 id: task-10
 type: task
-title: "Validation escalation prompt hides the criterion field"
-state: todo
+title: "Remove TUI validation escalation and unify accord field shapes"
+state: "in-progress"
 priority: "high"
 effort: "small"
 relatedFiles: ["tandem/src/tui/state.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/chrome.rs"]
 tags: ["tui", "validation"]
 accord:
-  status: ready
-  acceptance: ["The escalation prompt renders the criterion field and its prefilled value", "Typed characters go to the field the prompt shows as focused", "A human can complete a validation escalation from the TUI without guessing which buffer has focus"]
+  status: "claimed"
+  acceptance: ["The TUI validation picker no longer offers Request human validation, and its criterion/request plumbing is deleted rather than disabled", "v on an active task reports that validation actions apply to delivered work", "accord claim writes top-level assignee and release clears it; accord.assignee is removed from the record, renderer, and all readers", "tandem list --assignee returns claimed tasks", "accord.validation is one flat list matching acceptance and constraints; the nested commands form and the accord.validations fallback are removed", "add and every accord transition write the same accord block shape"]
+  assignee: "pi"
+  claimedAt: "2026-09-01T17:52:19Z"
+  updatedAt: "2026-09-01T17:52:19Z"
 createdAt: "2026-09-01T04:50:53Z"
-updatedAt: "2026-09-01T04:50:53Z"
+updatedAt: "2026-09-01T17:52:19Z"
 ---
+## Why
 
-## Description
+Three separate divergences, all cleanup rather than new behavior.
 
-## Reproduction
+### 1. TUI validation escalation is the wrong feature for the surface
 
-Verified in a rendered Herdr pane against a claimed task with one acceptance criterion.
+`v` on an active task offers only "Request human validation", which has never worked: `validation_prompt_lines` (`tui/state.rs:1287`) renders only the feedback field while input in escalation mode appends to an unrendered `criterion` buffer.
 
-1. Press `v`, choose Request human validation, press Enter.
-2. The popup titled "Request rework" shows only "Feedback to append durably: <type feedback>".
-3. Type any text. Nothing appears.
-4. Press Enter. Status reads "Validation request requires a note."
+It is not worth fixing. Escalation is an agent asking a human for judgment (D15, rule always-12), and `tandem review <id> --criterion --note` is that path. A human in the TUI escalating to themselves has no meaning. Delete the entry and its plumbing; keep Accept and archive and Request changes, which act on work already waiting for a human.
 
-The escalation is unfinishable from the TUI.
+### 2. assignee contradicts D23 and breaks a filter
 
-## Cause
+D23: "Keep only top-level `assignee`. Claim sets it; release clears it. Remove `accord.assignee`." The implementation does the opposite. `list --assignee` filters top-level `assignee` (`app/queries.rs:361`), which claim never writes, so filtering by assignee silently returns nothing for claimed work.
 
-`start_validation_request` (`tui/validation.rs:36`) opens `ValidationPrompt::Rework` with `request: true` and `editing_criterion: true`, and prefills `criterion` from `accord.acceptance`.
+### 3. Accord block shape flips on first transition
 
-`validation_prompt_lines` (`tui/state.rs:1287`) destructures only `feedback` and renders only the feedback field. It ignores `criterion`, `request`, and `editing_criterion` entirely. Keyboard input in criterion mode appends to `criterion` (`tui/validation.rs:247`), which is never drawn, so the visible field stays empty and Enter rejects the empty note.
+`add` writes `validation: [...]` flat (`app/tasks.rs:258`) while `render_accord_block` writes `validation:\n  commands: [...]`. `AccordRecord::from_document` tolerates both plus a third `accord.validations` spelling. Now that `show --json` exposes the accord to agents, one shape must win.
 
-## Scope note
+Canonical is the flat list, matching `acceptance` and `constraints` and the repeated `--validation` flags. Remove the nested form and both fallbacks. No live workspace data uses the nested shape.
 
-Found while verifying task-9-1. The prefill itself works and is covered by a unit test. This is the rendering and focus defect, not the data path.
+## Direction
+
+Route `add` through the same accord rendering path as transitions so the shape cannot drift again.

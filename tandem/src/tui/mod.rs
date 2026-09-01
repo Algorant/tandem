@@ -2323,7 +2323,7 @@ tone = "success"
             "Implemented changes:\n\n- preserved bullets\n- kept table rows\n\n| Command | Result |\n| --- | --- |\n| cargo test | pass |".to_string(),
         );
         doc.fields.insert(
-            "accord.validation.commands".to_string(),
+            "accord.validation".to_string(),
             "[\"cargo test\"]".to_string(),
         );
         doc.fields.insert(
@@ -3415,34 +3415,21 @@ tone = "success"
     }
 
     #[test]
-    fn validation_escalation_prefills_the_documented_acceptance_criterion() {
+    fn an_active_task_has_no_validation_action() {
         let mut app = keyboard_test_app();
         app.selected_state = 0;
         app.docs[0]
             .fields
             .insert("accord.status".to_string(), "claimed".to_string());
-        app.docs[0].fields.insert(
-            "accord.acceptance".to_string(),
-            "[\"renders the board without flicker\"]".to_string(),
+
+        app.handle_key(key(KeyCode::Char('v'))).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+
+        assert!(
+            app.validation_prompt.is_none(),
+            "an active task must not open a validation prompt: {:?}",
+            app.validation_prompt
         );
-
-        app.start_validation_request();
-
-        match app.validation_prompt {
-            Some(ValidationPrompt::Rework {
-                ref criterion,
-                request,
-                ..
-            }) => {
-                assert!(request);
-                assert_eq!(
-                    criterion.as_deref(),
-                    Some("renders the board without flicker"),
-                    "escalation must prefill the documented criterion, not the placeholder"
-                );
-            }
-            ref other => panic!("expected a rework escalation prompt, got {other:?}"),
-        }
     }
 
     #[test]
@@ -3738,8 +3725,7 @@ tone = "success"
         doc.fields
             .insert("accord.status".to_string(), "delivered".to_string());
         doc.fields.insert("effort".to_string(), "small".to_string());
-        doc.fields
-            .insert("accord.assignee".to_string(), "pi".to_string());
+        doc.fields.insert("assignee".to_string(), "pi".to_string());
         doc.fields.insert(
             "accord.deliveredAt".to_string(),
             "2026-06-28T01:00:00Z".to_string(),
@@ -3749,7 +3735,7 @@ tone = "success"
             "[\"code:src/lib.rs\", \"docs:README.md\"]".to_string(),
         );
         doc.fields.insert(
-            "accord.validation.commands".to_string(),
+            "accord.validation".to_string(),
             "[\"cargo test\", \"cargo build\"]".to_string(),
         );
         doc.fields.insert(
@@ -3782,7 +3768,7 @@ tone = "success"
         assert!(texts.iter().any(|text| text.contains(
             "Signal: Delivered: inspect summary/evidence, then accept or request rework."
         )));
-        assert!(texts.contains(&"Accord assignee: pi".to_string()));
+        assert!(texts.contains(&"Assignee: pi".to_string()));
         assert!(texts.contains(&"Deliverables: code:src/lib.rs, docs:README.md".to_string()));
         assert!(texts.contains(&"Validation: cargo test, cargo build".to_string()));
         assert!(texts.contains(&"Constraints: do not mutate task state".to_string()));

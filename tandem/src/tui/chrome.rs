@@ -540,7 +540,6 @@ impl TuiApp {
 
     pub(super) fn show_validation_action_hint(&mut self, action: &str) {
         match action {
-            "request" => self.start_validation_request(),
             "accept" => self.start_validation_accept(),
             "changes" => self.start_validation_rework(),
             _ => self.status = format!("Unknown Validation action `{action}`."),

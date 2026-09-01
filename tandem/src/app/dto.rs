@@ -62,7 +62,6 @@ pub(crate) struct DocumentDetailDto {
 pub(crate) struct AccordDto {
     pub(crate) status: String,
     pub(crate) acceptance: Vec<String>,
-    pub(crate) assignee: Option<String>,
     pub(crate) claimed_at: Option<String>,
     pub(crate) delivered_at: Option<String>,
     pub(crate) deliverables: Vec<String>,
@@ -81,7 +80,6 @@ impl From<AccordRecord> for AccordDto {
         Self {
             status: record.status,
             acceptance: record.acceptance,
-            assignee: record.assignee,
             claimed_at: record.claimed_at,
             delivered_at: record.delivered_at,
             deliverables: record.deliverables,

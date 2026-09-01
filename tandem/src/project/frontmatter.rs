@@ -175,23 +175,16 @@ fn render_resolution_block(resolution: &ResolutionRecord) -> String {
     lines.join("\n")
 }
 
-fn render_accord_block(accord: &AccordRecord) -> String {
+pub(crate) fn render_accord_block(accord: &AccordRecord) -> String {
     let mut lines = vec![
         "accord:".to_string(),
         format!("  status: {}", yaml_double_quote(&accord.status)),
     ];
     push_nested_array_line(&mut lines, "acceptance", &accord.acceptance);
-    push_optional_nested_line(&mut lines, "assignee", accord.assignee.as_deref());
     push_optional_nested_line(&mut lines, "claimedAt", accord.claimed_at.as_deref());
     push_optional_nested_line(&mut lines, "deliveredAt", accord.delivered_at.as_deref());
     push_nested_array_line(&mut lines, "deliverables", &accord.deliverables);
-    if !accord.validations.is_empty() {
-        lines.push("  validation:".to_string());
-        lines.push(format!(
-            "    commands: {}",
-            inline_array(&accord.validations)
-        ));
-    }
+    push_nested_array_line(&mut lines, "validation", &accord.validations);
     push_nested_array_line(&mut lines, "constraints", &accord.constraints);
     push_optional_nested_line(&mut lines, "summary", accord.summary.as_deref());
     push_nested_array_line(&mut lines, "evidence", &accord.evidence);
@@ -284,7 +277,7 @@ mod tests {
         let input = "---\nid: task-1\ntitle: Demo\naccord:\n  status: ready\n  assignee: pi\nreview:\n  status: pending\n---\n\nBody\n";
         let accord = AccordRecord {
             status: "delivered".to_string(),
-            assignee: Some("pi".to_string()),
+            acceptance: vec!["ships".to_string()],
             delivered_at: Some("2026-06-26T00:00:00Z".to_string()),
             summary: Some("Done".to_string()),
             validations: vec!["cargo test".to_string()],
@@ -294,9 +287,9 @@ mod tests {
         };
         let output = patch_accord_content(input, &accord).unwrap();
         assert!(output.contains("accord:\n  status: \"delivered\"\n"));
-        assert!(output.contains("  assignee: \"pi\"\n"));
+        assert!(output.contains("  acceptance: [\"ships\"]\n"));
         assert!(output.contains("  deliveredAt: \"2026-06-26T00:00:00Z\"\n"));
-        assert!(output.contains("  validation:\n    commands: [\"cargo test\"]\n"));
+        assert!(output.contains("  validation: [\"cargo test\"]\n"));
         assert!(output.contains("  summary: \"Done\"\n"));
         assert!(output.contains("  evidence: [\"cargo test passed\"]\n"));
         assert!(output.contains("review:\n  status: pending\n"));

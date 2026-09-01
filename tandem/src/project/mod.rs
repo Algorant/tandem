@@ -29,7 +29,7 @@ pub(crate) mod rules;
 mod rules_contract_tests;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
-    patch_accord_content, patch_frontmatter_content, patch_resolution_content,
+    patch_accord_content, patch_frontmatter_content, patch_resolution_content, render_accord_block,
     replace_markdown_body,
 };
 pub(crate) use write::write_atomic;
