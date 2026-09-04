@@ -92,3 +92,9 @@
 {"ts":"2026-09-01T17:52:19Z","event":"accord.claimed","id":"task-10","summary":"Accord claim for task-10","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":92}
 {"ts":"2026-09-01T17:57:34Z","event":"accord.delivered","id":"task-10","summary":"Accord deliver for task-10","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":93}
 {"ts":"2026-09-01T17:57:34Z","event":"task.completed","id":"task-10","summary":"Completed","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":94}
+{"ts":"2026-09-01T19:40:58Z","event":"task.created","id":"task-11","summary":"CLI: init emits no JSON envelope on success","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":95}
+{"ts":"2026-09-01T19:41:09Z","event":"task.created","id":"task-12","summary":"CLI: review accepts a criterion that is not in the accord","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":96}
+{"ts":"2026-09-01T19:41:53Z","event":"task.created","id":"task-13","summary":"CLI: config rules block is silently ignored after the per-file migration","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":97}
+{"ts":"2026-09-04T01:36:29Z","event":"task.created","id":"task-13","summary":"CLI: init emits no JSON envelope on success","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":98}
+{"ts":"2026-09-04T01:36:35Z","event":"task.created","id":"task-14","summary":"CLI: review accepts a criterion that is not in the accord","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":99}
+{"ts":"2026-09-04T01:45:19Z","event":"accord.claimed","id":"task-11","summary":"Accord claim for task-11","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":100}
