@@ -2,6 +2,15 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.12.3
+
+Tandem v0.12.3 fixes two silent-zero defects: the TUI Decisions view now loads decision documents, and workspaces with pre-cutover embedded rules get a visible diagnostic instead of an empty list.
+
+### Fixed
+
+- The TUI Decisions tab lists every document in `.tandem/decisions/`, matching `tandem list --type decision`. Reload only read board documents, so the tab always showed zero. The reload fingerprint now covers the decisions directory, so decisions created or edited outside the running TUI appear after the reload interval. Board filtering is unchanged.
+- `tandem rules list` and the TUI Rules view warn when `tandem.md` still carries a populated `rules:` block. The warning names the legacy location and states plainly that those rules are not active, instead of reporting zero rules silently. The same warning is present in the `--json` envelope. Embedded rules are not auto-migrated; move them to individual files under `.tandem/rules/`.
+
 ## 0.12.2
 
 Tandem v0.12.2 repairs the accord and read paths left incomplete by the 0.12.0 cutover. Acceptance criteria no longer disappear when work starts, `show` returns a usable record again, and the accord block has one shape.
