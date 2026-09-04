@@ -209,6 +209,18 @@ impl TandemProject {
         read_documents_tolerant(&self.tasks_dir, DocumentLocation::Board, "Board", warnings)
     }
 
+    pub(crate) fn read_decision_documents_tolerant(
+        &self,
+        warnings: &mut Vec<String>,
+    ) -> Vec<StoredDocument> {
+        read_documents_tolerant(
+            &self.decisions_dir(),
+            DocumentLocation::Board,
+            "Decisions",
+            warnings,
+        )
+    }
+
     pub(crate) fn read_log_documents_tolerant(
         &self,
         warnings: &mut Vec<String>,

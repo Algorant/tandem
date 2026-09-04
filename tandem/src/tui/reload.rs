@@ -80,6 +80,10 @@ impl TuiApp {
         let mut docs = self
             .workspace
             .read_board_documents_tolerant(&mut load_errors);
+        docs.extend(
+            self.workspace
+                .read_decision_documents_tolerant(&mut load_errors),
+        );
         sort_documents(&mut docs);
 
         // Rules are one file per rule under .tandem/rules/ (protocol 0.3.0).

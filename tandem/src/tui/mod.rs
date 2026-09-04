@@ -3662,6 +3662,42 @@ tone = "success"
     }
 
     #[test]
+    fn reload_loads_decisions_and_detects_external_decision_changes() {
+        let root = unique_test_dir("tandem-decisions-reload");
+        let workspace = temp_workspace(&root);
+        fs::create_dir_all(workspace.decisions_dir()).unwrap();
+        write_task_doc(&workspace, "task-1", "Board task", "todo");
+        fs::write(
+            workspace.decisions_dir().join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: First decision\nstatus: proposed\n---\n\nKeep the first choice.\n",
+        )
+        .unwrap();
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.switch_view(TuiView::Decisions);
+        assert_eq!(
+            app.docs.iter().filter(|doc| is_decision_doc(doc)).count(),
+            1
+        );
+        assert!(line_text(&app.view_tab_line(96)).contains("[4] Decisions (1)"));
+        assert_eq!(app.state_board_entries("todo").len(), 1);
+
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        fs::write(
+            workspace.decisions_dir().join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Updated decision\nstatus: proposed\n---\n\nKeep the updated choice.\n",
+        )
+        .unwrap();
+        assert!(app.reload_if_changed());
+        assert!(app
+            .docs
+            .iter()
+            .any(|doc| doc.id() == "decision-1" && doc.title() == "Updated decision"));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn tui_load_has_no_legacy_compatibility_warnings() {
         let root = unique_test_dir("tandem-tui-compatibility");
         let workspace = temp_workspace(&root);
