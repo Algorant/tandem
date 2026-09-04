@@ -85,8 +85,13 @@ pub(crate) fn ensure_current_protocol(project: &TandemProject) -> Result<(), Err
     }
 }
 
-pub(crate) fn warnings(_project: &TandemProject) -> Result<Vec<String>, Error> {
-    Ok(Vec::new())
+pub(crate) fn warnings(project: &TandemProject) -> Result<Vec<String>, Error> {
+    let config = project.read_config_yaml()?;
+    Ok(
+        crate::protocol::config::embedded_rules_warning(config.as_ref())
+            .into_iter()
+            .collect(),
+    )
 }
 
 pub(crate) fn default_title(root: &std::path::Path) -> String {

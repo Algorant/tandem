@@ -3621,6 +3621,36 @@ tone = "success"
     }
 
     #[test]
+    fn reload_warns_for_legacy_embedded_rules() {
+        let root = unique_test_dir("tandem-embedded-rules");
+        let data_dir = root.join(".tandem");
+        fs::create_dir_all(data_dir.join("board")).unwrap();
+        fs::write(
+            data_dir.join("tandem.md"),
+            "---\nprotocolVersion: 0.3.0\ntype: workspace\ntitle: Embedded\nstates: [todo]\nrules:\n  always:\n    - id: always-1\n      rule: Keep this visible\n---\n",
+        )
+        .unwrap();
+        let workspace = TandemProject {
+            root,
+            data_dir: data_dir.clone(),
+            tasks_dir: data_dir.join("board"),
+            logs_dir: data_dir.join("logs"),
+            config_path: data_dir.join("tandem.md"),
+            events_path: data_dir.join("events.jsonl"),
+        };
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.view = TuiView::Rules;
+        let outcome = app.reload();
+        assert!(outcome
+            .first_warning
+            .as_deref()
+            .is_some_and(|warning| warning.contains("rules:` block in tandem.md")
+                && warning.contains("not active")));
+        assert!(app.rules.is_empty() || app.rules.values().all(Vec::is_empty));
+        let _ = fs::remove_dir_all(app.workspace.root());
+    }
+
+    #[test]
     fn reload_surfaces_parse_errors_without_panicking() {
         let root = unique_test_dir("tandem-reload-error");
         let workspace = temp_workspace(&root);
