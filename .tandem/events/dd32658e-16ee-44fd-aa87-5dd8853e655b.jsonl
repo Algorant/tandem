@@ -98,3 +98,4 @@
 {"ts":"2026-09-04T01:36:29Z","event":"task.created","id":"task-13","summary":"CLI: init emits no JSON envelope on success","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":98}
 {"ts":"2026-09-04T01:36:35Z","event":"task.created","id":"task-14","summary":"CLI: review accepts a criterion that is not in the accord","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":99}
 {"ts":"2026-09-04T01:45:19Z","event":"accord.claimed","id":"task-11","summary":"Accord claim for task-11","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":100}
+{"ts":"2026-09-04T02:06:22Z","event":"accord.claimed","id":"task-12","summary":"Accord claim for task-12","actor":"dd32658e-16ee-44fd-aa87-5dd8853e655b","seq":101}
