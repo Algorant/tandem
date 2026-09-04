@@ -1,0 +1,2 @@
+{"ts":"2026-09-03T23:26:13Z","event":"task.created","id":"task-11","summary":"TUI Decisions view is always empty because reload never reads the decisions directory","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":1}
+{"ts":"2026-09-03T23:26:43Z","event":"task.created","id":"task-12","summary":"Workspaces with rules embedded in tandem.md lose every rule silently","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":2}
