@@ -53,6 +53,9 @@ fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), E
     if let Some((value, message)) = requirement {
         require_nonempty(value, &message)?;
     }
+    if action == "deliver" {
+        accord::validate_delivery_evidence(&options.evidence).map_err(Error::usage)?;
+    }
     Ok(())
 }
 
@@ -514,6 +517,85 @@ mod tests {
             normalize_accord_status("changes_requested"),
             "changes-requested"
         );
+    }
+
+    #[test]
+    fn deliver_rejects_empty_evidence_without_mutating_record_or_events() {
+        use std::fs;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-delivery-evidence-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let created = crate::app::tasks::add(
+            &project,
+            crate::app::tasks::AddOptions {
+                title: Some("Evidence task".to_string()),
+                acceptance: vec!["acceptance".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        transition(
+            &project,
+            "claim",
+            AccordOptions {
+                id: created.id.clone(),
+                assignee: Some("worker".to_string()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let path = created.path;
+        let before = fs::read_to_string(&path).unwrap();
+        let events_before = project.read_events_tolerant(&mut Vec::new()).len();
+        for evidence in [Vec::new(), vec![String::new()], vec!["  \n\t".to_string()]] {
+            let error = transition(
+                &project,
+                "deliver",
+                AccordOptions {
+                    id: created.id.clone(),
+                    summary: Some("observed".to_string()),
+                    evidence,
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+            assert!(error.message.contains("non-empty --evidence"));
+            assert_eq!(fs::read_to_string(&path).unwrap(), before);
+            assert_eq!(
+                project.read_events_tolerant(&mut Vec::new()).len(),
+                events_before
+            );
+        }
+        transition(
+            &project,
+            "deliver",
+            AccordOptions {
+                id: created.id,
+                summary: Some("observed".to_string()),
+                evidence: vec!["observed output".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert!(after.contains("status: \"delivered\""));
+        assert!(after.contains("observed output"));
+        assert_eq!(
+            project.read_events_tolerant(&mut Vec::new()).len(),
+            events_before + 1
+        );
+        fs::remove_dir_all(project.root()).unwrap();
     }
 
     #[test]

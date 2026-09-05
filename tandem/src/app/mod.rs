@@ -8,6 +8,7 @@ pub(crate) mod error;
 #[allow(unused_imports)]
 pub(crate) use error::{Error, ErrorKind};
 pub(crate) mod accord;
+pub(crate) mod assignment;
 pub(crate) mod decisions;
 pub(crate) mod dto;
 pub(crate) mod project;

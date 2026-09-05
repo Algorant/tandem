@@ -13,6 +13,7 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
         }
         Command::Add(args) => add(args, json),
         Command::Show(args) => show(args, json),
+        Command::Assignment(args) => assignment(args, json),
         Command::List(args) => list(args, json),
         Command::Search(args) => search(args, json),
         Command::Update(args) => update(args, json),
@@ -86,6 +87,35 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                     outcome.id, outcome.title
                 );
             }
+        }
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn assignment(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    let outcome = app::assignment::read(&project, &args.id)?;
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":outcome.data,"warnings":outcome.warnings})
+        );
+    } else {
+        for warning in &outcome.warnings {
+            eprintln!("Warning: {warning}");
+        }
+        println!(
+            "Assignment {}\nDefinition token: {}\nDependencies clear: {}\nMilestones: {}",
+            outcome.data.root.id,
+            outcome.data.definition_token,
+            outcome.data.dependency_readiness.all_clear,
+            outcome.data.milestones.len()
+        );
+        for issue in outcome.data.dependency_readiness.issues {
+            println!(
+                "Blocked by {} ({}): {}",
+                issue.id, issue.status, issue.reason
+            );
         }
     }
     Ok(super::StartupRequest::Exit)

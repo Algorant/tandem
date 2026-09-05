@@ -7,6 +7,7 @@
 //! boundary.
 
 pub(crate) mod accord;
+pub(crate) mod assignment;
 pub(crate) mod config;
 pub(crate) mod diagnostic;
 pub(crate) mod document;

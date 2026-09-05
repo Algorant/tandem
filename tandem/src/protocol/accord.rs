@@ -83,6 +83,17 @@ pub(crate) fn is_known_status(status: &str) -> bool {
     STATUSES.contains(&status) || LEGACY_STATUSES.contains(&status)
 }
 
+/// Delivery evidence is meaningful only when at least one supplied entry has
+/// non-whitespace content. Empty entries are not evidence and are rejected
+/// before the application writes the transition or event.
+pub(crate) fn validate_delivery_evidence(evidence: &[String]) -> Result<(), String> {
+    if evidence.iter().any(|entry| !entry.trim().is_empty()) {
+        Ok(())
+    } else {
+        Err("accord deliver requires at least one non-empty --evidence <text>".to_string())
+    }
+}
+
 pub(crate) fn status_for_action(action: &str) -> Option<&'static str> {
     match action {
         "claim" => Some("claimed"),
@@ -188,6 +199,15 @@ mod tests {
             }
         );
         assert_eq!(state_effect("rework", "in-progress").state, None);
+    }
+
+    #[test]
+    fn delivery_requires_meaningful_evidence() {
+        for evidence in [Vec::new(), vec![String::new()], vec!["  \n\t".to_string()]] {
+            assert!(validate_delivery_evidence(&evidence).is_err());
+        }
+        assert!(validate_delivery_evidence(&["observed output".to_string()]).is_ok());
+        assert!(validate_delivery_evidence(&["  observed output  ".to_string()]).is_ok());
     }
 
     #[test]

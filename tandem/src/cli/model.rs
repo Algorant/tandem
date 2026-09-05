@@ -18,6 +18,7 @@ pub(crate) enum Command {
     Init(InitArgs),
     Add(AddArgs),
     Show(IdArgs),
+    Assignment(IdArgs),
     List(ListArgs),
     Search(SearchArgs),
     Update(UpdateArgs),

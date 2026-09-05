@@ -6,6 +6,7 @@ pub(crate) fn print() {
     println!("  init                 Create a Tandem workspace");
     println!("  add task|decision    Add a task or decision");
     println!("  show                 Show a task or decision");
+    println!("  assignment           Show a complete Task assignment and milestones");
     println!("  list                 List active tasks and decisions");
     println!("  search               Search active and completed work");
     println!("  update               Update task metadata and content");
