@@ -178,7 +178,6 @@ impl TuiApp {
             WorkflowPrompt::Claim { id, assignee, .. } => {
                 let id = id.clone();
                 let assignee = assignee.trim().to_string();
-                self.workflow_prompt = None;
                 self.finish_workflow_transition("claim", &id, Some(assignee), None);
             }
             WorkflowPrompt::Deliver {
@@ -194,25 +193,29 @@ impl TuiApp {
                     "Delivery evidence is required; type it and press Enter to submit.".into();
             }
             WorkflowPrompt::Deliver {
-                evidence,
-                field: DeliveryField::Evidence,
-                ..
-            } if evidence.trim().is_empty() => {
-                self.status =
-                    "Deliver requires at least one evidence item. Type evidence and press Enter."
-                        .into();
-            }
-            WorkflowPrompt::Deliver {
                 id,
                 summary,
                 evidence,
+                field: DeliveryField::Evidence,
                 ..
             } => {
+                let Some(evidence) = parse_evidence_input(evidence) else {
+                    self.status = "Deliver requires one non-empty evidence item. Commas are preserved as literal text; type evidence and press Enter.".into();
+                    return;
+                };
+                if let Err(error) = accord::validate_delivery_evidence(&evidence) {
+                    self.status = error;
+                    return;
+                }
                 let id = id.clone();
                 let summary = summary.trim().to_string();
-                let evidence = parse_prompt_values(evidence);
-                self.workflow_prompt = None;
                 self.finish_workflow_transition("deliver", &id, Some(summary), Some(evidence));
+            }
+            WorkflowPrompt::Deliver {
+                field: DeliveryField::Summary,
+                ..
+            } => {
+                unreachable!("summary delivery prompt is handled above");
             }
             WorkflowPrompt::Block { note, .. } if note.trim().is_empty() => {
                 self.status = "Block requires a note. Type the reason work is blocked.".into();
@@ -220,12 +223,10 @@ impl TuiApp {
             WorkflowPrompt::Block { id, note, .. } => {
                 let id = id.clone();
                 let note = note.trim().to_string();
-                self.workflow_prompt = None;
                 self.finish_workflow_transition("block", &id, Some(note), None);
             }
             WorkflowPrompt::Complete { id, .. } => {
                 let id = id.clone();
-                self.workflow_prompt = None;
                 self.finish_workflow_completion(&id);
             }
         }
@@ -252,6 +253,7 @@ impl TuiApp {
         );
         match result {
             Ok(outcome) => {
+                self.workflow_prompt = None;
                 let reload_note = self.reload().warning_note();
                 self.status = format!("Accord {}: {}{}", outcome.id, outcome.status, reload_note);
             }
@@ -271,6 +273,7 @@ impl TuiApp {
             },
         ) {
             Ok(outcome) => {
+                self.workflow_prompt = None;
                 let warning = outcome.warnings.first().cloned();
                 let reload_note = self.reload().warning_note();
                 self.status = match warning {
@@ -444,11 +447,16 @@ fn workflow_input_line(label: &str, value: &str, theme: &TuiTheme) -> Line<'stat
     ])
 }
 
-fn parse_prompt_values(value: &str) -> Vec<String> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
+fn parse_evidence_input(value: &str) -> Option<Vec<String>> {
+    let value = value.trim();
+    if value.is_empty()
+        || value
+            .chars()
+            .all(|character| character == ',' || character.is_whitespace())
+    {
+        return None;
+    }
+    // Evidence is one opaque item per prompt. Commas remain literal so prose
+    // such as `tests, with coverage` is never silently rewritten or split.
+    Some(vec![value.to_string()])
 }

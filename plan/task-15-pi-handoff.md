@@ -2,7 +2,7 @@
 
 ## Version and scope
 
-- Implemented against Tandem `0.12.3` (`735c4cf` published baseline; parent baseline `3d179b0`).
+- Implemented against Tandem `0.12.3`; Task-13 native evidence validation is integrated on main as `a7a60dc` (not merged or rebased into this Worker).
 - Production changes are limited to `tandem/src/tui/**`.
 - No Pi/session scraping, agent-launch controls, separate workflow state machine, inline milestone store, or broad layout redesign was added.
 
@@ -27,20 +27,23 @@ Two lightweight approaches were compared:
 
 Recommendation: the bounded picker is the smallest durable parity interface. `task-6` remains an unclaimed research proposal and was not mutated or treated as completed research.
 
-## Native API request / risk
+## Native API dependency
 
-The current native signatures consumed are sufficient for durable writes. One version-matched mismatch remains for the orchestrator to reconcile with Task-13: protocol README 0.3.0 says deliver requires at least one evidence item, while the current native `app::accord::transition` input validation only requires `summary`. The TUI prompt requires evidence and passes it as `AccordOptions.evidence`, but the native app should enforce this for CLI/TUI parity. Exact requested native adjustment: `validate_accord_inputs("deliver", options)` should reject empty `options.evidence` with a usage error; no TUI workaround should replace that app-layer rule.
+The TUI continues to use the existing `app::accord::transition` and `app::tasks::complete` signatures. After the Task-13 integration, the delivery prompt also calls native `protocol::accord::validate_delivery_evidence(&[String]) -> Result<(), String>` before invoking the app layer. The prompt treats evidence as one opaque item so commas in prose are preserved; empty, whitespace-only, and punctuation-only comma input stays in the prompt. Native app validation remains final and rejects before any record/event write with `accord deliver requires at least one non-empty --evidence <text>`.
 
 ## Validation
 
-- `cargo test --manifest-path tandem/Cargo.toml tui::tests`: **107 passed** (including actual keyboard prompt -> native record tests for claim, block, resume, deliver, complete; invalid transition, missing input, cancellation, and rendered acceptance/blocker/progress/evidence assertions).
+- Before adding the Task-13 API call, old-base `cargo test --manifest-path tandem/Cargo.toml tui::tests` passed **111 tests**. Those results are TUI regression evidence only and are not proof of the integrated native fix; rerun after refreshing this source onto main `a7a60dc`.
+- Added actual keyboard and mouse picker/modal paths, missing assignee/block note/evidence assertions, comma-preserving evidence, cancellation, stale-record native error retention, role-correct Task/Subtask rendering, archived completed/canceled/failed outcomes, long detail scrolling, and final log evidence assertions.
 - `cargo build --manifest-path tandem/Cargo.toml --release`: passed.
 - `cargo fmt --manifest-path tandem/Cargo.toml -- --check`: passed after formatting changed TUI files.
 - Release ANSI inspection: launched the release TUI in Herdr pane `w4P:p2` and read `--format ansi`. Board rendered title, state tabs/counts, selected task row, and `a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help`. The action picker also rendered in the narrow preview pane. Temporal flicker/resize latency and taste criteria remain unverified.
 
 ## Reproducible preview
 
-The disposable fixture was created by the native release CLI at:
+The disposable fixture was created and then deliberately enriched with the native CLI. Task 1 retains the owner probe's delivered empty-evidence state, now also has blocker `task-2` and milestone child `task-1-1`; archived `task-2` contains valid final evidence. This is an intentional mixed-state preview, not an untouched initial workspace.
+
+The disposable fixture is at:
 
 `/tmp/tandem-task-15-preview`
 
@@ -52,6 +55,12 @@ mkdir -p /tmp/tandem-task-15-preview
 cd /tmp/tandem-task-15-preview
 /home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem init --title 'Task 15 TUI workflow preview'
 /home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview durable workflow actions' --acceptance 'Claim, deliver, block, resume, and complete from the TUI' --acceptance 'Show acceptance, blockers, milestone progress, and evidence'
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview blocking dependency' --acceptance 'Dependency can be archived before parent completion'
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview milestone child' --acceptance 'Milestone status appears under its parent Task' --parent task-1
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem update task-1 --blocker task-2
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord claim task-2 --assignee preview
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord deliver task-2 --summary 'Dependency evidence recorded' --evidence 'native CLI deliver and show'
+/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem complete task-2
 /home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem tui
 ```
 

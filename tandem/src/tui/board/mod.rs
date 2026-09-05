@@ -810,7 +810,6 @@ pub(super) fn relationship_context_for_doc_with_hierarchy(
         completed_logs
             .iter()
             .filter(|child| is_task_doc(child))
-            .filter(|child| resolution_outcome(child) == RESOLUTION_OUTCOME_COMPLETED)
             .filter(|child| normalized_parent_id(child).as_deref() == Some(doc.id()))
             .filter(|child| child.id() != doc.id())
             .map(|child| related_child_summary(child, true))
@@ -835,7 +834,7 @@ pub(super) fn related_child_summary(doc: &Document, completed: bool) -> BoardRel
         id: doc.id().to_string(),
         title: doc.title().to_string(),
         state: if completed {
-            "log".to_string()
+            resolution_outcome(doc).to_string()
         } else {
             document_state_label(doc)
         },
@@ -1371,7 +1370,7 @@ pub(super) fn relationship_detail_summary(context: &BoardRelationshipContext) ->
     }
     if hints.completed_children > 0 {
         parts.push(format!(
-            "{} completed {} in Logs",
+            "{} archived {} in Logs",
             hints.completed_children,
             if hints.completed_children == 1 {
                 "child"
@@ -1767,8 +1766,8 @@ pub(super) fn inline_relationship_preview_lines(
     if relationship_context.task_role == Some(TaskRole::Epic) || relationship_context.has_children()
     {
         let (heading, children_label) = match relationship_context.task_role {
-            Some(TaskRole::Epic) => ("Epic", "Tasks"),
-            Some(TaskRole::Task) => ("Task", "Subtasks"),
+            Some(TaskRole::Epic) => ("Epic", "Assignments"),
+            Some(TaskRole::Task) => ("Task", "Milestones"),
             Some(TaskRole::Subtask) => ("Subtask", "Children"),
             None => ("Relationships", "Children"),
         };
@@ -2279,8 +2278,8 @@ pub(super) fn detail_lines_for_doc_with_context(
     }
     if relationship_context.has_children() {
         let label = match relationship_context.task_role {
-            Some(TaskRole::Epic) => "Tasks",
-            Some(TaskRole::Task) => "Subtasks",
+            Some(TaskRole::Epic) => "Assignments",
+            Some(TaskRole::Task) => "Milestones",
             _ => "Children",
         };
         lines.push(detail_field_line(
@@ -2290,9 +2289,13 @@ pub(super) fn detail_lines_for_doc_with_context(
         ));
         let hints = relationship_context.hints();
         lines.push(detail_field_line(
-            "Milestone progress",
+            if relationship_context.task_role == Some(TaskRole::Task) {
+                "Milestone progress"
+            } else {
+                "Assignment progress"
+            },
             &format!(
-                "{} active · {} completed in Logs · {} total",
+                "{} active · {} archived in Logs · {} total",
                 hints.active_children,
                 hints.completed_children,
                 hints.total_children()
@@ -2489,8 +2492,12 @@ pub(super) fn accord_state_signal(status: &str) -> &'static str {
     match normalized_accord_status(status).as_str() {
         "ready" => "Legacy ready: treat as unclaimed and claim when an owner is known.",
         "claimed" => "Claimed: an owner is actively working the accord.",
-        "delivered" => "Delivered: inspect summary/evidence, then accept or request rework.",
-        "accepted" => "Accepted: accord review passed; completion/logging is still separate.",
+        "delivered" => {
+            "Delivered: inspect summary/evidence, then complete or request human Validation."
+        }
+        "accepted" => {
+            "Accepted: accord review passed; the Task is ready for routine completion/archive."
+        }
         "rework" => "Rework: changes were requested before the accord can be accepted.",
         "blocked" => "Blocked: work cannot proceed until the recorded reason is resolved.",
         "failed" => "Failed: the accord attempt ended unsuccessfully and needs review.",
@@ -2503,10 +2510,10 @@ pub(super) fn accord_next_action(status: &str) -> &'static str {
     match normalized_accord_status(status).as_str() {
         "ready" => "Legacy status: claim the accord when an owner is known.",
         "claimed" => "Deliver when complete, or block/fail with a reason if work cannot proceed.",
-        "delivered" => "Inspect the delivery, then accept it or request rework.",
-        "accepted" => "Complete/archive the task when it is ready to leave the Board.",
+        "delivered" => "Complete/archive the delivery, or request human Validation.",
+        "accepted" => "Complete/archive the Task when it is ready to leave the Board.",
         "rework" => "Apply requested changes, then deliver again with a fresh summary.",
-        "blocked" => "Resolve the blocker, then claim/deliver; fail only if unrecoverable.",
+        "blocked" => "Resume when the blocker is resolved, or fail if the work is unrecoverable.",
         "failed" => "Review the failure and claim again if retrying the work.",
         "missing" | "" => "Claim the accord when an owner is known.",
         _ => "Inspect current metadata before choosing the next accord action.",
@@ -2519,20 +2526,14 @@ pub(super) fn accord_cli_hint(id: &str, status: &str) -> String {
         "claimed" => format!(
             "tandem accord deliver {id} --summary <text> --evidence <text> [--file-changed <path>]"
         ),
-        "delivered" => format!(
-            "tandem accord accept {id} [--reviewer <name>] [--note <text>] OR tandem accord rework {id} --note <text>"
-        ),
-        "accepted" => format!(
-            "tandem complete {id} --summary <text> [--validation <text>] [--reviewer <name>]"
-        ),
+        "delivered" => {
+            format!("tandem complete {id} OR tandem review {id} --criterion <text> --note <text>")
+        }
+        "accepted" => format!("tandem complete {id}"),
         "rework" => format!("tandem accord deliver {id} --summary <text> --evidence <text>"),
-        "blocked" => format!(
-            "tandem accord claim {id} --assignee <name> OR tandem accord fail {id} --reason <text>"
-        ),
+        "blocked" => format!("tandem accord resume {id} OR tandem accord fail {id} --note <text>"),
         "failed" => format!("tandem accord claim {id} --assignee <name>"),
-        "missing" | "" => format!(
-            "tandem accord claim {id} --assignee <name> [--deliverable <spec>] [--validation <command>]"
-        ),
+        "missing" | "" => format!("tandem accord claim {id} --assignee <name>"),
         _ => format!("tandem show {id}  # inspect accord metadata before mutating"),
     }
 }

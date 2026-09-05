@@ -711,9 +711,8 @@ mod tests {
         .collect::<Vec<_>>()
         .join("\n");
         assert!(expanded_text.contains("Epic"));
-        assert!(
-            expanded_text.contains("Tasks: 1 active child, 1 completed child in Logs (2 total)")
-        );
+        assert!(expanded_text
+            .contains("Assignments: 1 active child, 1 archived child in Logs (2 total)"));
         assert!(expanded_text.contains("Task task-81"));
         assert!(expanded_text.contains("Task task-82"));
 
@@ -722,10 +721,11 @@ mod tests {
             .map(line_text)
             .collect::<Vec<_>>();
         assert!(parent_detail.contains(&"Kind: epic".to_string()));
+        assert!(parent_detail.contains(
+            &"Assignments: 1 active child, 1 archived child in Logs (2 total)".to_string()
+        ));
         assert!(parent_detail
-            .contains(&"Tasks: 1 active child, 1 completed child in Logs (2 total)".to_string()));
-        assert!(parent_detail
-            .contains(&"Milestone progress: 1 active · 1 completed in Logs · 2 total".to_string()));
+            .contains(&"Assignment progress: 1 active · 1 archived in Logs · 2 total".to_string()));
 
         let child_detail = detail_lines_for_doc_with_context(&active_child, &theme, &child_context)
             .iter()
@@ -1604,7 +1604,11 @@ in-progress = "active"
         assert_eq!(entries[0].active_descendants, 0);
         assert_eq!(entries[0].completed_descendants, 0);
         let relationship = relationship_context_for_doc(&docs[0], &docs, &logs);
-        assert!(relationship.completed_children.is_empty());
+        assert_eq!(relationship.completed_children.len(), 1);
+        assert_eq!(
+            relationship.completed_children[0].state,
+            RESOLUTION_OUTCOME_CANCELED
+        );
     }
 
     #[test]
@@ -1904,7 +1908,7 @@ in-progress = "active"
             "detail pane should include task kind: {rendered}"
         );
         assert!(
-            rendered.contains("Tasks: 2 active children, 1 completed child in Logs (3 total)"),
+            rendered.contains("Assignments: 2 active children, 1 archived child in Logs (3 total)"),
             "detail pane should include derived child summary: {rendered}"
         );
         fs::remove_dir_all(root).unwrap();
@@ -2519,6 +2523,10 @@ tone = "success"
         for ch in text.chars() {
             app.handle_key(key(KeyCode::Char(ch))).unwrap();
         }
+    }
+
+    fn ctrl_u() -> KeyEvent {
+        KeyEvent::new(KeyCode::Char('u'), KeyModifiers::CONTROL)
     }
 
     fn unique_test_dir(prefix: &str) -> PathBuf {
@@ -3543,11 +3551,16 @@ tone = "success"
     fn workflow_actions_drive_native_records_through_claim_block_resume_deliver_complete() {
         let root = unique_test_dir("tandem-tui-workflow-actions");
         let workspace = temp_workspace(&root);
-        fs::write(
-            workspace.tasks_dir.join("task-1.md"),
-            "---\nid: task-1\ntype: task\ntitle: Durable workflow\nstate: todo\naccord:\n  status: ready\n  acceptance: [\"ship the workflow\"]\n---\n\nBody.\n",
+        let added = app::tasks::add(
+            &workspace,
+            crate::app::tasks::AddOptions {
+                title: Some("Durable workflow".to_string()),
+                acceptance: vec!["ship the workflow".to_string()],
+                ..Default::default()
+            },
         )
         .unwrap();
+        assert_eq!(added.id, "task-1");
         let mut app = TuiApp::load(workspace.clone()).unwrap();
 
         // Claim: the prompt path must write the native accord and workflow state.
@@ -3611,6 +3624,7 @@ tone = "success"
             .unwrap();
         assert_eq!(log.location, DocumentLocation::Logs);
         assert_eq!(log.field("accord.status"), Some("accepted"));
+        assert_eq!(log.field("accord.evidence"), Some("[\"cargo test\"]"));
         assert_eq!(log.field("resolution.outcome"), Some("completed"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -3627,6 +3641,7 @@ tone = "success"
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         app.selected_state = 1;
         app.clamp_selection();
+        let before = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
         app.handle_key(key(KeyCode::Char('a'))).unwrap();
         app.select_picker_option(0);
         app.handle_key(key(KeyCode::Enter)).unwrap();
@@ -3635,7 +3650,6 @@ tone = "success"
             "unexpected status: {}",
             app.status
         );
-        let before = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
         assert_eq!(
             fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap(),
             before
@@ -3649,6 +3663,136 @@ tone = "success"
         assert_eq!(
             fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap(),
             before
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn workflow_prompts_reject_missing_fields_preserve_commas_and_retain_native_errors() {
+        let root = unique_test_dir("tandem-tui-workflow-inputs");
+        let workspace = temp_workspace(&root);
+        app::tasks::add(
+            &workspace,
+            crate::app::tasks::AddOptions {
+                title: Some("Prompt validation".to_string()),
+                acceptance: vec!["preserve input".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        let task_path = workspace.tasks_dir.join("task-1.md");
+        let before = fs::read_to_string(&task_path).unwrap();
+
+        app.start_workflow_action("claim");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("requires an assignee"));
+        assert!(app.workflow_prompt.is_some());
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert_eq!(fs::read_to_string(&task_path).unwrap(), before);
+
+        app.start_workflow_action("block");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("requires a note"));
+        assert!(app.workflow_prompt.is_some());
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert_eq!(fs::read_to_string(&task_path).unwrap(), before);
+
+        app.start_workflow_action("deliver");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "Owner probe");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "   ");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("requires one non-empty evidence"));
+        assert!(app.workflow_prompt.is_some());
+        app.handle_key(ctrl_u()).unwrap();
+        type_text(&mut app, ",,,");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("requires one non-empty evidence"));
+        assert!(app.workflow_prompt.is_some());
+        app.handle_key(ctrl_u()).unwrap();
+        type_text(&mut app, "tests, with coverage");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let delivered = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(delivered.field("accord.status"), Some("delivered"));
+        assert_eq!(
+            delivered
+                .field("accord.evidence")
+                .map(crate::protocol::document::parse_field_values),
+            Some(vec!["tests, with coverage".to_string()])
+        );
+
+        // Delete the selected record while its prompt is open. The native error
+        // is shown and the prompt remains available instead of losing input.
+        app.start_workflow_action("claim");
+        fs::remove_file(&task_path).unwrap();
+        type_text(&mut app, "stale-owner");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("active task not found"));
+        assert!(app.workflow_prompt.is_some());
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn workflow_picker_mouse_selects_confirms_and_cancels_native_actions() {
+        let root = unique_test_dir("tandem-tui-workflow-mouse");
+        let workspace = temp_workspace(&root);
+        app::tasks::add(
+            &workspace,
+            crate::app::tasks::AddOptions {
+                title: Some("Mouse workflow".to_string()),
+                acceptance: vec!["use mouse path".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(110, 30)).unwrap();
+
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let option = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::SelectPickerOption(0)))
+            .map(|hit| hit.rect)
+            .unwrap();
+        app.handle_mouse(left_click(option.x, option.y));
+        let apply = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::ActivatePicker))
+            .map(|hit| hit.rect)
+            .unwrap();
+        app.handle_mouse(left_click(apply.x, apply.y));
+        type_text(&mut app, "mouse-owner");
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let confirm = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::ConfirmModal))
+            .map(|hit| hit.rect)
+            .unwrap();
+        app.handle_mouse(left_click(confirm.x, confirm.y));
+        let claimed = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(claimed.field("accord.status"), Some("claimed"));
+        assert_eq!(claimed.field("assignee"), Some("mouse-owner"));
+
+        let before_cancel = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let cancel_picker = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::CancelPicker))
+            .map(|hit| hit.rect)
+            .unwrap();
+        app.handle_mouse(left_click(cancel_picker.x, cancel_picker.y));
+        assert_eq!(
+            fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap(),
+            before_cancel
         );
         fs::remove_dir_all(root).unwrap();
     }
@@ -3920,6 +4064,107 @@ tone = "success"
     }
 
     #[test]
+    fn long_acceptance_and_delivery_evidence_remain_scrollable_detail_context() {
+        let mut doc = doc_with_state("task-44", Some("validation"));
+        doc.fields.insert(
+            "accord.acceptance".to_string(),
+            "[\"acceptance criterion one with enough prose to wrap\", \"acceptance criterion two\", \"acceptance criterion three\", \"acceptance criterion four\"]".to_string(),
+        );
+        doc.fields.insert(
+            "accord.evidence".to_string(),
+            "[\"evidence one: cargo test --all\", \"evidence two: release build output\", \"evidence three: ANSI pane inspection\", \"evidence four: native record reread\"]".to_string(),
+        );
+        let lines = detail_lines_for_doc(&doc, &TuiTheme::default_dark());
+        let texts = lines.iter().map(line_text).collect::<Vec<_>>().join("\n");
+        for expected in [
+            "acceptance criterion one",
+            "acceptance criterion four",
+            "evidence one: cargo test --all",
+            "evidence four: native record reread",
+        ] {
+            assert!(
+                texts.contains(expected),
+                "missing detail context: {expected}"
+            );
+        }
+        let root = unique_test_dir("tandem-tui-detail-scroll");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.tasks_dir.join("task-44.md"),
+            "---\nid: task-44\ntype: task\ntitle: Long detail\nstate: validation\naccord:\n  status: delivered\n  acceptance: [\"acceptance criterion one with enough prose to wrap\", \"acceptance criterion two\", \"acceptance criterion three\", \"acceptance criterion four\"]\n  evidence: [\"evidence one: cargo test --all\", \"evidence two: release build output\", \"evidence three: ANSI pane inspection\", \"evidence four: native record reread\"]\n---\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.selected_state = 2;
+        app.clamp_selection();
+        app.show_board_detail = true;
+        app.focus = FocusPane::Detail;
+        app.handle_key(key(KeyCode::End)).unwrap();
+        assert!(app.detail_scroll > 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn task_detail_labels_milestones_and_preserves_archived_outcomes() {
+        let mut task = doc_with_state("task-30", Some("in-progress"));
+        task.fields
+            .insert("title".to_string(), "Assignment task".to_string());
+        let mut active = doc_with_state("task-30-1", Some("in-progress"));
+        active
+            .fields
+            .insert("parentId".to_string(), "task-30".to_string());
+        let mut completed = doc_with_state("task-30-2", Some("validation"));
+        completed.location = DocumentLocation::Logs;
+        completed
+            .fields
+            .insert("parentId".to_string(), "task-30".to_string());
+        completed.fields.insert(
+            "resolution.outcome".to_string(),
+            RESOLUTION_OUTCOME_COMPLETED.to_string(),
+        );
+        let mut canceled = doc_with_state("task-30-3", Some("in-progress"));
+        canceled.location = DocumentLocation::Logs;
+        canceled
+            .fields
+            .insert("parentId".to_string(), "task-30".to_string());
+        canceled.fields.insert(
+            "resolution.outcome".to_string(),
+            RESOLUTION_OUTCOME_CANCELED.to_string(),
+        );
+        let mut failed = doc_with_state("task-30-4", Some("in-progress"));
+        failed.location = DocumentLocation::Logs;
+        failed
+            .fields
+            .insert("parentId".to_string(), "task-30".to_string());
+        failed.fields.insert(
+            "resolution.outcome".to_string(),
+            crate::protocol::workflow::RESOLUTION_OUTCOME_FAILED.to_string(),
+        );
+        let active_docs = vec![task.clone(), active];
+        let logs = vec![completed, canceled, failed];
+        let context = relationship_context_for_doc(&task, &active_docs, &logs);
+        let texts = detail_lines_for_doc_with_context(&task, &TuiTheme::default_dark(), &context)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        assert!(texts.contains(&"Role: task".to_string()));
+        assert!(texts.contains(
+            &"Milestones: 1 active child, 3 archived children in Logs (4 total)".to_string()
+        ));
+        assert!(texts
+            .contains(&"Milestone progress: 1 active · 3 archived in Logs · 4 total".to_string()));
+        let preview = inline_relationship_preview_lines(&context, &TuiTheme::default_dark())
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(preview.contains("IN PROGRESS"));
+        assert!(preview.contains("COMPLETED"));
+        assert!(preview.contains("CANCELED"));
+        assert!(preview.contains("FAILED"));
+    }
+
+    #[test]
     fn board_detail_includes_accord_metadata_hints_and_preserves_body() {
         let mut doc = doc_with_state("task-1", Some("validation"));
         doc.fields
@@ -3974,7 +4219,7 @@ tone = "success"
         assert!(texts.contains(&"Acceptance: criterion one, criterion two".to_string()));
         assert!(texts.contains(&"Blockers: task-9".to_string()));
         assert!(texts.iter().any(|text| text.contains(
-            "Signal: Delivered: inspect summary/evidence, then accept or request rework."
+            "Signal: Delivered: inspect summary/evidence, then complete or request human Validation."
         )));
         assert!(texts.contains(&"Assignee: pi".to_string()));
         assert!(texts.contains(&"Deliverables: code:src/lib.rs, docs:README.md".to_string()));
@@ -3983,13 +4228,11 @@ tone = "success"
         assert!(texts.contains(&"Summary: Rendered accord metadata".to_string()));
         assert!(texts.contains(&"Evidence: tests passed".to_string()));
         assert!(texts.contains(&"Files changed: src/lib.rs".to_string()));
+        assert!(texts.iter().any(|text| text
+            .contains("Next: Complete/archive the delivery, or request human Validation.")));
         assert!(texts
             .iter()
-            .any(|text| text
-                .contains("Next: Inspect the delivery, then accept it or request rework.")));
-        assert!(texts
-            .iter()
-            .any(|text| text.contains("CLI hint: tandem accord accept task-1")));
+            .any(|text| text.contains("CLI hint: tandem complete task-1 OR tandem review task-1")));
         assert!(texts
             .iter()
             .any(|text| text.contains("Board Validation: v opens human accept/rework")));
@@ -4021,7 +4264,7 @@ tone = "success"
         assert_ne!(accepted, blocked);
         assert_ne!(rework, blocked);
         assert!(accord_state_signal("delivered").starts_with("Delivered:"));
-        assert!(accord_state_signal("accepted").contains("completion/logging is still separate"));
+        assert!(accord_state_signal("accepted").contains("routine completion/archive"));
         assert!(accord_state_signal("rework").starts_with("Rework:"));
         assert!(accord_state_signal("blocked").starts_with("Blocked:"));
     }
