@@ -1,2 +1,7 @@
 {"ts":"2026-09-03T23:26:13Z","event":"task.created","id":"task-11","summary":"TUI Decisions view is always empty because reload never reads the decisions directory","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":1}
 {"ts":"2026-09-03T23:26:43Z","event":"task.created","id":"task-12","summary":"Workspaces with rules embedded in tandem.md lose every rule silently","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":2}
+{"ts":"2026-09-05T21:03:22Z","event":"task.created","id":"task-13","summary":"Provide a complete current assignment contract for native coordination clients","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":3}
+{"ts":"2026-09-05T21:03:46Z","event":"task.created","id":"task-14","summary":"Checkpoint tracked Tandem state natively at work boundaries","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":4}
+{"ts":"2026-09-05T21:04:08Z","event":"task.created","id":"task-15","summary":"Make durable Task and milestone workflow usable through the TUI","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":5}
+{"ts":"2026-09-05T22:07:28Z","event":"task.created","id":"task-16","summary":"CLI: init emits no JSON envelope on success","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":6}
+{"ts":"2026-09-05T22:07:42Z","event":"task.created","id":"task-17","summary":"CLI: review accepts a criterion that is not in the accord","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":7}
