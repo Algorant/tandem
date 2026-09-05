@@ -29,8 +29,8 @@ use crate::app;
 use crate::project::rules::empty_rules;
 use crate::project::write::{file_signature, FileSignature, HierarchyLock};
 use crate::project::{
-    display_path, yaml_mapping_value, yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex,
-    StoredDocument as Document, TandemProject,
+    display_path, yaml_mapping_value, yaml_scalar_to_string, CheckpointOutcome, CheckpointStatus,
+    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::config::RulesByCategory;

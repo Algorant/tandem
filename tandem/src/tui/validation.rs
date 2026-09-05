@@ -2,6 +2,16 @@
 
 use super::*;
 
+fn validation_checkpoint_note(outcome: &CheckpointOutcome) -> String {
+    match &outcome.status {
+        CheckpointStatus::Checkpointed => "; Git checkpointed".to_string(),
+        CheckpointStatus::Clean => "; Git checkpoint clean".to_string(),
+        CheckpointStatus::Failed { message } => {
+            format!("; RECORD WRITTEN but Git checkpoint FAILED: {message}")
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum ValidationPrompt {
     Accept {
@@ -210,7 +220,12 @@ impl TuiApp {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
-                self.status = format!("Accepted sign-off for {}{}", outcome.id, reload_note);
+                self.status = format!(
+                    "Accepted sign-off for {}{}{}",
+                    outcome.id,
+                    validation_checkpoint_note(&outcome.checkpoint),
+                    reload_note
+                );
             }
             Err(error) => {
                 let reload_note = self.reload().warning_note();
@@ -237,8 +252,11 @@ impl TuiApp {
                 let reload_note = self.reload().warning_note();
                 self.select_document_by_id(&outcome.id);
                 self.status = format!(
-                    "Requested rework for {}; moved to {}{}",
-                    outcome.id, outcome.state, reload_note
+                    "Requested rework for {}; moved to {}{}{}",
+                    outcome.id,
+                    outcome.state,
+                    validation_checkpoint_note(&outcome.checkpoint),
+                    reload_note
                 );
             }
             Err(error) => {

@@ -48,6 +48,20 @@ Every durable mutation writes one event to `.tandem/events/<actor-id>.jsonl`; re
 
 Required fields are `ts`, `seq`, `actor`, `event`, `id`, and structured event-specific `data`. Full bodies are never copied into events.
 
+## Native Git checkpoints
+
+The native Rust application writes records and events immediately, then stages
+and commits only the owning `.tandem/` path at explicit lifecycle boundaries:
+claim/start, delivery, block/pause, resume/rework/release, terminal failure or
+cancel, completion, and exceptional review/validation actions. Intermediate
+metadata and progress writes do not commit. Checkpoints use the fixed subject
+`chore(tandem): checkpoint metadata`, never amend, and serialize through a
+lock in Git's common directory so linked worktrees share one boundary. Git
+checkpoint failure is returned separately from the successful record result;
+there is no fallback or force path. See
+[`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the consumer
+JSON contract and cutover sequence.
+
 ## CLI contract
 
 The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 24 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure.

@@ -22,12 +22,14 @@ use crate::protocol::hierarchy::{
 };
 use crate::CliError;
 
+pub(crate) mod checkpoint;
 pub(crate) mod events;
 pub(crate) mod frontmatter;
 pub(crate) mod rules;
 #[cfg(test)]
 mod rules_contract_tests;
 pub(crate) mod write;
+pub(crate) use checkpoint::{checkpoint, CheckpointOutcome, CheckpointStatus};
 pub(crate) use frontmatter::{
     patch_accord_content, patch_frontmatter_content, patch_resolution_content, render_accord_block,
     replace_markdown_body,

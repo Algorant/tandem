@@ -1,6 +1,48 @@
 //! Typed CLI-to-application conversion and dispatch.
 use super::model::*;
+use crate::project::{CheckpointOutcome, CheckpointStatus};
 use crate::{app, CliError};
+
+fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
+    match &outcome.status {
+        CheckpointStatus::Checkpointed => serde_json::json!({
+            "status": "checkpointed",
+            "commit": outcome.commit.as_deref(),
+            "amended": false,
+        }),
+        CheckpointStatus::Clean => serde_json::json!({
+            "status": "clean",
+            "commit": serde_json::Value::Null,
+            "amended": false,
+        }),
+        CheckpointStatus::Failed { message } => serde_json::json!({
+            "status": "failed",
+            "commit": serde_json::Value::Null,
+            "amended": false,
+            "error": message,
+        }),
+    }
+}
+
+fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
+    match &outcome.status {
+        CheckpointStatus::Checkpointed => format!(
+            "checkpointed{}",
+            outcome
+                .commit
+                .as_deref()
+                .map(|commit| format!(" ({commit})"))
+                .unwrap_or_default()
+        ),
+        CheckpointStatus::Clean => "clean (no Tandem changes to checkpoint)".to_string(),
+        CheckpointStatus::Failed { message } => format!("FAILED: {message}"),
+    }
+}
+
+fn checkpoint_warning(outcome: &CheckpointOutcome) -> Option<String> {
+    matches!(outcome.status, CheckpointStatus::Failed { .. })
+        .then(|| format!("; Git checkpoint {}", checkpoint_text(outcome)))
+}
 
 pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupRequest, CliError> {
     match command {
@@ -364,10 +406,18 @@ fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliErro
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"status":outcome.status,"event":outcome.event_name},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"status":outcome.status,"event":outcome.event_name,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
         );
     } else {
-        println!("Accord {}: {}", outcome.id, outcome.status);
+        println!(
+            "Accord {}: {} (record written; Git {})",
+            outcome.id,
+            outcome.status,
+            checkpoint_text(&outcome.checkpoint)
+        );
+        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
+            eprintln!("Warning: {warning}");
+        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -388,10 +438,17 @@ fn review(args: ReviewArgs, json: bool) -> Result<super::StartupRequest, CliErro
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"state":outcome.state},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"state":outcome.state,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
         );
     } else {
-        println!("Validation requested for {}", outcome.id);
+        println!(
+            "Validation requested for {} (record written; Git {})",
+            outcome.id,
+            checkpoint_text(&outcome.checkpoint)
+        );
+        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
+            eprintln!("Warning: {warning}");
+        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -409,10 +466,17 @@ fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, Cli
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":outcome.warnings})
         );
     } else {
-        println!("Completed {}", outcome.id);
+        println!(
+            "Completed {} (record written; Git {})",
+            outcome.id,
+            checkpoint_text(&outcome.checkpoint)
+        );
+        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
+            eprintln!("Warning: {warning}");
+        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -423,10 +487,17 @@ fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliErro
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":outcome.id,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
         );
     } else {
-        println!("Canceled {}", outcome.id);
+        println!(
+            "Canceled {} (record written; Git {})",
+            outcome.id,
+            checkpoint_text(&outcome.checkpoint)
+        );
+        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
+            eprintln!("Warning: {warning}");
+        }
     }
     Ok(super::StartupRequest::Exit)
 }

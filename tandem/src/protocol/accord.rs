@@ -121,15 +121,25 @@ pub(crate) fn event_name(action: &str) -> &'static str {
 }
 
 pub(crate) fn validate_transition(action: &str, previous_status: &str) -> Result<(), String> {
-    match action {
-        "rework" if previous_status != "delivered" && previous_status != "rework" => Err(
-            format!("accord rework requires current accord.status=delivered; current status is {previous_status}"),
-        ),
-        "claim" | "deliver" | "block" | "fail" | "release" | "resume" if previous_status == "accepted" => Err(
-            format!("accepted accord cannot transition with `tandem accord {action}`"),
-        ),
-        _ => Ok(()),
+    if action == "rework" && previous_status != "delivered" {
+        return Err(format!(
+            "accord rework requires current accord.status=delivered; current status is {previous_status}"
+        ));
     }
+    if matches!(previous_status, "accepted") {
+        return Err(format!(
+            "accepted accord cannot transition with `tandem accord {action}`"
+        ));
+    }
+    // A boundary result can report a successful native write with a failed
+    // Git checkpoint. Rejecting a transition to its current status makes a
+    // retry fail clearly instead of replaying the already-consumed mutation.
+    if status_for_action(action) == Some(previous_status) {
+        return Err(format!(
+            "accord is already in status {previous_status}; refusing to repeat `tandem accord {action}`"
+        ));
+    }
+    Ok(())
 }
 
 /// Only the legacy-ready/claimed alignment is a visual suggestion. Delivered,

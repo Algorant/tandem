@@ -5,6 +5,20 @@
 
 use super::*;
 
+fn checkpoint_note(outcome: &CheckpointOutcome) -> String {
+    match &outcome.status {
+        CheckpointStatus::Checkpointed => outcome
+            .commit
+            .as_deref()
+            .map(|commit| format!("; Git checkpointed at {commit}"))
+            .unwrap_or_else(|| "; Git checkpointed".to_string()),
+        CheckpointStatus::Clean => "; Git checkpoint clean".to_string(),
+        CheckpointStatus::Failed { message } => {
+            format!("; RECORD WRITTEN but Git checkpoint FAILED: {message}")
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DeliveryField {
     Summary,
@@ -255,7 +269,13 @@ impl TuiApp {
             Ok(outcome) => {
                 self.workflow_prompt = None;
                 let reload_note = self.reload().warning_note();
-                self.status = format!("Accord {}: {}{}", outcome.id, outcome.status, reload_note);
+                self.status = format!(
+                    "Accord {}: {}{}{}",
+                    outcome.id,
+                    outcome.status,
+                    checkpoint_note(&outcome.checkpoint),
+                    reload_note
+                );
             }
             Err(error) => {
                 let reload_note = self.reload().warning_note();
@@ -278,10 +298,18 @@ impl TuiApp {
                 let reload_note = self.reload().warning_note();
                 self.status = match warning {
                     Some(warning) => format!(
-                        "Completed {} with warning: {}{}",
-                        outcome.id, warning, reload_note
+                        "Completed {} with warning: {}{}{}",
+                        outcome.id,
+                        warning,
+                        checkpoint_note(&outcome.checkpoint),
+                        reload_note
                     ),
-                    None => format!("Completed {}{}", outcome.id, reload_note),
+                    None => format!(
+                        "Completed {}{}{}",
+                        outcome.id,
+                        checkpoint_note(&outcome.checkpoint),
+                        reload_note
+                    ),
                 };
             }
             Err(error) => {

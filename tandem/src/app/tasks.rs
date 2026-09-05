@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    active_task_descendant_ids, append_event, current_timestamp,
+    active_task_descendant_ids, append_event, checkpoint_boundary, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
     resolve_parent_relationship, unresolved_blockers_in_hierarchy, validate_state,
     validate_task_document_against_hierarchy, workspace_deprecation_warnings,
@@ -13,7 +13,7 @@ use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
     self, patch_accord_content, patch_frontmatter_content, patch_resolution_content,
-    render_accord_block, replace_markdown_body, write_atomic, yaml_double_quote,
+    render_accord_block, replace_markdown_body, write_atomic, yaml_double_quote, CheckpointOutcome,
     ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{status as accord_status, AccordRecord};
@@ -156,6 +156,7 @@ pub(crate) struct CompleteOutcome {
     pub(crate) log_path: PathBuf,
     pub(crate) warnings: Vec<String>,
     pub(crate) has_completion_warnings: bool,
+    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 #[derive(Debug, Default)]
@@ -170,6 +171,7 @@ pub(crate) struct CancelOutcome {
     pub(crate) reason: String,
     pub(crate) board_path: PathBuf,
     pub(crate) log_path: PathBuf,
+    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 /// Create a Task, Epic, or Subtask after canonical hierarchy validation.
@@ -937,12 +939,14 @@ pub(crate) fn complete(
         "completed",
     )?;
     append_event(workspace, "task.completed", doc.id(), &summary)?;
+    let checkpoint = checkpoint_boundary(workspace);
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
         board_path: doc.path,
         log_path,
         warnings,
         has_completion_warnings,
+        checkpoint,
     })
 }
 
@@ -1008,12 +1012,14 @@ pub(crate) fn cancel(
         workspace, &doc.path, &signature, &patched, "canceled",
     )?;
     append_event(workspace, "task.canceled", doc.id(), &summary)?;
+    let checkpoint = checkpoint_boundary(workspace);
 
     Ok(CancelOutcome {
         id: doc.id().to_string(),
         reason,
         board_path: doc.path,
         log_path,
+        checkpoint,
     })
 }
 

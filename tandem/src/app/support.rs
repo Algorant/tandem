@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app::Error;
 use crate::project::{
-    self, display_path, parse_frontmatter_fields, split_frontmatter, ProjectHierarchy,
-    StoredDocument as Document, TandemProject,
+    self, display_path, parse_frontmatter_fields, split_frontmatter, CheckpointOutcome,
+    ProjectHierarchy, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::diagnostic::{metadata_diagnostics, Severity};
 use crate::protocol::document::{parse_field_values, validate_task_kind};
@@ -46,6 +46,13 @@ pub(crate) fn current_timestamp() -> String {
         .unwrap_or_default()
         .as_secs();
     format_unix_timestamp(seconds)
+}
+
+/// Checkpoint only at an explicit lifecycle boundary. The native record and
+/// event writes happen before this call; a Git failure is therefore data in the
+/// outcome, never a request to replay the lifecycle mutation.
+pub(crate) fn checkpoint_boundary(project: &TandemProject) -> CheckpointOutcome {
+    project::checkpoint(project)
 }
 
 pub(crate) fn append_event(
