@@ -7,7 +7,7 @@ fn validation_checkpoint_note(outcome: &CheckpointOutcome) -> String {
         CheckpointStatus::Batched => {
             "; milestone/grouping write batched to assignment boundary".to_string()
         }
-        CheckpointStatus::Checkpointed => "; Git checkpointed".to_string(),
+        CheckpointStatus::Checkpointed => "; record written; Git checkpointed".to_string(),
         CheckpointStatus::Clean => "; Git checkpoint clean".to_string(),
         CheckpointStatus::Failed { message } => {
             format!("; RECORD WRITTEN but Git checkpoint FAILED: {message}")

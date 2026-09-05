@@ -461,6 +461,19 @@ impl TuiApp {
         let Some(base) = hints.strip_suffix(&suffix) else {
             return Line::from(Span::styled(hints, hint_style));
         };
+        if let Some(rendered_status) = durable_outcome_footer_status(status) {
+            // Durable-write/checkpoint outcomes lead the footer so the
+            // mutation result remains visible before command hints consume
+            // the narrow terminal width. The full error remains in status.
+            return Line::from(vec![
+                Span::styled(
+                    rendered_status,
+                    self.theme.status_style(status_tone_for_message(status)),
+                ),
+                Span::styled(" · ", separator_style),
+                Span::styled(base.to_string(), hint_style),
+            ]);
+        }
         Line::from(vec![
             Span::styled(base.to_string(), hint_style),
             Span::styled(" · ", separator_style),
@@ -744,6 +757,20 @@ impl TuiApp {
             action: HitAction::CloseHelp,
         });
     }
+}
+
+fn durable_outcome_footer_status(status: &str) -> Option<String> {
+    let lower = status.to_ascii_lowercase();
+    if !lower.contains("record written") || !lower.contains("checkpoint") {
+        return None;
+    }
+    if let Some(index) = status.find("checkpoint FAILED:") {
+        return Some(status[..index + "checkpoint FAILED".len()].to_string());
+    }
+    if let Some(index) = status.find("Git checkpointed") {
+        return Some(status[..index + "Git checkpointed".len()].to_string());
+    }
+    Some(status.to_string())
 }
 
 pub(super) fn status_tone_for_message(message: &str) -> StatusTone {

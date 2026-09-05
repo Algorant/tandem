@@ -3590,9 +3590,15 @@ tone = "success"
             "status: {}",
             app.status
         );
-        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
-        terminal.draw(|frame| app.draw(frame)).unwrap();
-        assert!(terminal_text(&terminal).contains("Git checkpointed"));
+        for width in [80, 120] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            let rendered = terminal_text(&terminal);
+            assert!(
+                rendered.contains("record written; Git checkpointed"),
+                "width {width} rendered success: {rendered}"
+            );
+        }
 
         app::tasks::add(
             &workspace,
@@ -3626,12 +3632,73 @@ tone = "success"
             "status: {}",
             app.status
         );
-        terminal.draw(|frame| app.draw(frame)).unwrap();
-        let rendered = terminal_text(&terminal);
+        for width in [80, 120] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            let rendered = terminal_text(&terminal);
+            assert!(
+                rendered.contains("RECORD WRITTEN but Git checkpoint FAILED"),
+                "width {width} rendered failure: {rendered}"
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn validation_render_prioritizes_checkpoint_failure_at_bounded_widths() {
+        let root = unique_test_dir("tandem-tui-validation-checkpoint");
+        fs::create_dir_all(&root).unwrap();
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {:?}", output.stderr);
+        };
+        git(&["init", "--quiet"]);
+        git(&["config", "user.name", "Tandem Validation Tests"]);
+        git(&["config", "user.email", "validation@example.invalid"]);
+        let workspace = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Validation checkpoint\nstate: validation\naccord:\n  status: delivered\n  acceptance: [\"validate outcome\"]\n  summary: delivered\n---\n",
+        )
+        .unwrap();
+        git(&["add", ".tandem"]);
+        git(&["commit", "--quiet", "-m", "validation baseline"]);
+        let hook = root.join(".git/hooks/pre-commit");
+        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&hook).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&hook, permissions).unwrap();
+        }
+        let mut app = TuiApp::load(workspace).unwrap();
+        assert!(app.select_document_by_id("task-1"));
+        app.start_validation_accept();
+        app.handle_validation_prompt_key(key(KeyCode::Enter));
         assert!(
-            rendered.contains("RECORD WRITTEN but Git chec"),
-            "rendered status: {rendered}"
+            app.status
+                .contains("RECORD WRITTEN but Git checkpoint FAILED"),
+            "status: {}",
+            app.status
         );
+        for width in [80, 120] {
+            let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            let rendered = terminal_text(&terminal);
+            assert!(
+                rendered.contains("RECORD WRITTEN but Git checkpoint FAILED"),
+                "width {width} rendered validation failure: {rendered}"
+            );
+        }
         fs::remove_dir_all(root).unwrap();
     }
 
