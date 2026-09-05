@@ -67,4 +67,10 @@ cd /tmp/tandem-task-15-preview
 
 ## Consumer/version handoff
 
+Integrated on local `main` at `4c0cd80448bbf1b65cc9c5311fd0c22a8faaf4fb`.
+The orchestrator reran the full merged suite and independently verified the
+comma-only rejection and comma-preserving success paths in the release TUI.
+No release, installation, or push was performed; use a build containing this
+commit rather than assuming the installed `0.12.3` binary has these changes.
+
 The consumer is the native Rust TUI in the same `tandem` `0.12.3` binary. No extension or Pi adapter changes are required. Native delivery validation is now supplied by Task-13 and consumed directly by the TUI prompt.
