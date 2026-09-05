@@ -2,17 +2,19 @@
 id: task-11
 type: task
 title: "TUI Decisions view is always empty because reload never reads the decisions directory"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 relatedFiles: ["tandem/src/tui/reload.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/state.rs", "tandem/src/project/mod.rs"]
 tags: ["tui", "decisions", "bug"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The TUI Decisions tab lists every document in .tandem/decisions/, with the tab count matching `tandem list --type decision`.", "Selecting a decision renders its detail, and the Board tab still excludes decisions.", "A decision created or edited outside the running TUI appears after the reload interval, so the reload fingerprint covers the decisions directory.", "A regression test loads a workspace containing at least one decision and asserts the Decisions view is non-empty, so a future refactor cannot silently reintroduce a board-only load."]
-  updatedAt: "2026-09-03T23:26:13Z"
+  claimedAt: "2026-09-04T01:45:19Z"
+  updatedAt: "2026-09-04T01:45:19Z"
 createdAt: "2026-09-03T23:26:13Z"
-updatedAt: "2026-09-03T23:26:13Z"
+updatedAt: "2026-09-04T01:45:19Z"
+assignee: "worker-task-11-690d1eb5"
 ---
 
 ## Description

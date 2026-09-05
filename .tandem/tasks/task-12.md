@@ -2,17 +2,19 @@
 id: task-12
 type: task
 title: "Workspaces with rules embedded in tandem.md lose every rule silently"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "small"
 relatedFiles: ["tandem/src/project/rules.rs", "tandem/src/tui/reload.rs", "tandem/src/project/mod.rs", "tandem/src/app/rules.rs"]
 tags: ["rules", "migration", "bug", "data-loss"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A workspace with a non-empty rules block in tandem.md and no .tandem/rules directory produces a visible diagnostic from `tandem rules list` and in the TUI Rules view, rather than reporting zero rules silently.", "The diagnostic names the legacy location and states plainly that those rules are not active.", "If migration is implemented, embedded rules become per-rule files under .tandem/rules with categories and source fields preserved, and the operation is reported rather than silent.", "A test covers a workspace fixture carrying embedded rules and asserts the diagnostic or the migration, so the silent-zero path cannot return."]
-  updatedAt: "2026-09-03T23:26:43Z"
+  claimedAt: "2026-09-04T02:06:22Z"
+  updatedAt: "2026-09-04T02:06:22Z"
 createdAt: "2026-09-03T23:26:43Z"
-updatedAt: "2026-09-03T23:26:43Z"
+updatedAt: "2026-09-04T02:06:22Z"
+assignee: "worker-task-12-3ec94bce"
 ---
 
 ## Description

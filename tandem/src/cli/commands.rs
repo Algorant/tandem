@@ -409,12 +409,16 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             if let Some(category) = category.as_deref() {
                 values.retain(|rule| rule.category == category);
             }
+            let warnings = app::project::warnings(&project)?;
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":[]})
+                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":warnings})
                 );
             } else {
+                for warning in &warnings {
+                    println!("Warning: {warning}");
+                }
                 for r in values {
                     println!("{}\t{}", r.id, r.text);
                 }

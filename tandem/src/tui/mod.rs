@@ -3621,6 +3621,36 @@ tone = "success"
     }
 
     #[test]
+    fn reload_warns_for_legacy_embedded_rules() {
+        let root = unique_test_dir("tandem-embedded-rules");
+        let data_dir = root.join(".tandem");
+        fs::create_dir_all(data_dir.join("board")).unwrap();
+        fs::write(
+            data_dir.join("tandem.md"),
+            "---\nprotocolVersion: 0.3.0\ntype: workspace\ntitle: Embedded\nstates: [todo]\nrules:\n  always:\n    - id: always-1\n      rule: Keep this visible\n---\n",
+        )
+        .unwrap();
+        let workspace = TandemProject {
+            root,
+            data_dir: data_dir.clone(),
+            tasks_dir: data_dir.join("board"),
+            logs_dir: data_dir.join("logs"),
+            config_path: data_dir.join("tandem.md"),
+            events_path: data_dir.join("events.jsonl"),
+        };
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.view = TuiView::Rules;
+        let outcome = app.reload();
+        assert!(outcome
+            .first_warning
+            .as_deref()
+            .is_some_and(|warning| warning.contains("rules:` block in tandem.md")
+                && warning.contains("not active")));
+        assert!(app.rules.is_empty() || app.rules.values().all(Vec::is_empty));
+        let _ = fs::remove_dir_all(app.workspace.root());
+    }
+
+    #[test]
     fn reload_surfaces_parse_errors_without_panicking() {
         let root = unique_test_dir("tandem-reload-error");
         let workspace = temp_workspace(&root);
@@ -3658,6 +3688,42 @@ tone = "success"
 
         assert!(app.docs.iter().any(|doc| doc.id() == "task-2"));
         assert!(app.status.contains("External changes detected"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reload_loads_decisions_and_detects_external_decision_changes() {
+        let root = unique_test_dir("tandem-decisions-reload");
+        let workspace = temp_workspace(&root);
+        fs::create_dir_all(workspace.decisions_dir()).unwrap();
+        write_task_doc(&workspace, "task-1", "Board task", "todo");
+        fs::write(
+            workspace.decisions_dir().join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: First decision\nstatus: proposed\n---\n\nKeep the first choice.\n",
+        )
+        .unwrap();
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.switch_view(TuiView::Decisions);
+        assert_eq!(
+            app.docs.iter().filter(|doc| is_decision_doc(doc)).count(),
+            1
+        );
+        assert!(line_text(&app.view_tab_line(96)).contains("[4] Decisions (1)"));
+        assert_eq!(app.state_board_entries("todo").len(), 1);
+
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        fs::write(
+            workspace.decisions_dir().join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Updated decision\nstatus: proposed\n---\n\nKeep the updated choice.\n",
+        )
+        .unwrap();
+        assert!(app.reload_if_changed());
+        assert!(app
+            .docs
+            .iter()
+            .any(|doc| doc.id() == "decision-1" && doc.title() == "Updated decision"));
+
         fs::remove_dir_all(root).unwrap();
     }
 
