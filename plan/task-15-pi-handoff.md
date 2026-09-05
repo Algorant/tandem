@@ -2,7 +2,7 @@
 
 ## Version and scope
 
-- Implemented against Tandem `0.12.3`; Task-13 native evidence validation is integrated on main as `a7a60dc` (not merged or rebased into this Worker).
+- Final validation ran on Tandem `0.12.3` after Task-13 native evidence validation (`a7a60dc`) was integrated on main `361345f`.
 - Production changes are limited to `tandem/src/tui/**`.
 - No Pi/session scraping, agent-launch controls, separate workflow state machine, inline milestone store, or broad layout redesign was added.
 
@@ -33,11 +33,12 @@ The TUI continues to use the existing `app::accord::transition` and `app::tasks:
 
 ## Validation
 
-- Before adding the Task-13 API call, old-base `cargo test --manifest-path tandem/Cargo.toml tui::tests` passed **111 tests**. Those results are TUI regression evidence only and are not proof of the integrated native fix; rerun after refreshing this source onto main `a7a60dc`.
-- Added actual keyboard and mouse picker/modal paths, missing assignee/block note/evidence assertions, comma-preserving evidence, cancellation, stale-record native error retention, role-correct Task/Subtask rendering, archived completed/canceled/failed outcomes, long detail scrolling, and final log evidence assertions.
-- `cargo build --manifest-path tandem/Cargo.toml --release`: passed.
-- `cargo fmt --manifest-path tandem/Cargo.toml -- --check`: passed after formatting changed TUI files.
-- Release ANSI inspection: launched the release TUI in Herdr pane `w4P:p2` and read `--format ansi`. Board rendered title, state tabs/counts, selected task row, and `a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help`. The action picker also rendered in the narrow preview pane. Temporal flicker/resize latency and taste criteria remain unverified.
+- Full current `cargo test --manifest-path tandem/Cargo.toml`: **254 unit + 1 accord integration + 5 assignment integration + 6 CLI integration passed**.
+- Native evidence cases passed in the same run: protocol rejects empty/blank evidence; app and CLI reject it without changing records/events; successful evidence remains observable.
+- TUI action tests passed for comma-preserving prose, empty/whitespace/comma-only evidence, missing assignee/note, cancellation, stale-record native error retention, keyboard and mouse picker/modal paths, role-correct Task/Subtask rendering, archived completed/canceled/failed outcomes, long detail scrolling, final log evidence, and the rendered `Editing evidence (commas preserved)` prompt label.
+- `cargo build --manifest-path tandem/Cargo.toml --release`: passed on the integrated source.
+- `cargo fmt --manifest-path tandem/Cargo.toml -- --check`: passed; `git diff --check`: passed.
+- Release ANSI inspection: launched the final release TUI against the enriched fixture in Herdr pane `w4P:p3` (zoomed to 140 columns) and read `--format ansi`. It rendered the selected delivered Task, active milestone child, state counts, and the `Task actions` picker with Claim, Deliver, and Complete options. Temporal flicker/resize latency remains unmeasured; no human-review gate is requested.
 
 ## Reproducible preview
 
@@ -66,4 +67,4 @@ cd /tmp/tandem-task-15-preview
 
 ## Consumer/version handoff
 
-The consumer is the native Rust TUI in the same `tandem` `0.12.3` binary. No extension or Pi adapter changes are required. Task-13 should reconcile native deliver evidence validation before claiming complete parity.
+The consumer is the native Rust TUI in the same `tandem` `0.12.3` binary. No extension or Pi adapter changes are required. Native delivery validation is now supplied by Task-13 and consumed directly by the TUI prompt.

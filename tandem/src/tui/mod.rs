@@ -3702,6 +3702,9 @@ tone = "success"
         app.handle_key(key(KeyCode::Enter)).unwrap();
         type_text(&mut app, "Owner probe");
         app.handle_key(key(KeyCode::Enter)).unwrap();
+        let mut prompt_terminal = Terminal::new(TestBackend::new(90, 24)).unwrap();
+        prompt_terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(terminal_text(&prompt_terminal).contains("Editing evidence (commas preserved)"));
         type_text(&mut app, "   ");
         app.handle_key(key(KeyCode::Enter)).unwrap();
         assert!(app.status.contains("requires one non-empty evidence"));
@@ -4099,7 +4102,21 @@ tone = "success"
         app.clamp_selection();
         app.show_board_detail = true;
         app.focus = FocusPane::Detail;
-        app.handle_key(key(KeyCode::End)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(70, 20)).unwrap();
+        let mut rendered_over_scroll = String::new();
+        for offset in 0..80u16 {
+            app.detail_scroll = offset;
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            rendered_over_scroll.push_str(&terminal_text(&terminal));
+        }
+        assert!(
+            rendered_over_scroll.contains("criterion four"),
+            "rendered detail never reached final acceptance: {rendered_over_scroll}"
+        );
+        assert!(
+            rendered_over_scroll.contains("evidence four:"),
+            "rendered detail never reached final evidence: {rendered_over_scroll}"
+        );
         assert!(app.detail_scroll > 0);
         fs::remove_dir_all(root).unwrap();
     }

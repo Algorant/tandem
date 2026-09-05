@@ -371,7 +371,7 @@ impl TuiApp {
                     if *field == DeliveryField::Summary {
                         "Editing summary"
                     } else {
-                        "Editing required evidence (comma-separated)"
+                        "Editing evidence (commas preserved)"
                     },
                     self.theme.muted_style(),
                 )));
