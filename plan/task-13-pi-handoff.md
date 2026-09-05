@@ -124,9 +124,13 @@ projection plus a definition-only token, not a duplicate single-document
 
 ## Availability
 
-Corrected source candidate commit: **`c29488acaddf36462c737db5a3666d37293e54ea`** (`fix(tandem): harden assignment freshness and evidence`).
+Integrated on local `main` as **`a7a60dc378bb42c5763dfe8506e272f80e1cf1a3`**.
+Worktrunk squashed the reviewed candidate (`c29488acaddf36462c737db5a3666d37293e54ea`)
+and its documentation; use the integrated commit for availability checks.
+The orchestrator reran the complete merged suite and the independent
+multiple-milestone reorder probe successfully.
 
 The installed `tandem 0.12.3` binary is not changed by this source work. Pi
-must use a build containing the corrected source commit; do not assume the
+must use a build containing the integrated commit; do not assume the
 published/installed 0.12.3 binary has `assignment` or the evidence validation
 until verified.
