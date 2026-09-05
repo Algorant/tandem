@@ -5,3 +5,11 @@
 {"ts":"2026-09-05T21:04:08Z","event":"task.created","id":"task-15","summary":"Make durable Task and milestone workflow usable through the TUI","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":5}
 {"ts":"2026-09-05T22:07:28Z","event":"task.created","id":"task-16","summary":"CLI: init emits no JSON envelope on success","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":6}
 {"ts":"2026-09-05T22:07:42Z","event":"task.created","id":"task-17","summary":"CLI: review accepts a criterion that is not in the accord","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":7}
+{"ts":"2026-09-05T22:09:46Z","event":"task.updated","id":"task-13","summary":"Updated task-13 metadata: relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":8}
+{"ts":"2026-09-05T22:10:16Z","event":"task.updated","id":"task-15","summary":"Updated task-15 metadata: references, relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":9}
+{"ts":"2026-09-05T22:10:46Z","event":"task.updated","id":"task-14","summary":"Updated task-14 metadata: blockers, relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":10}
+{"ts":"2026-09-05T22:11:10Z","event":"accord.claimed","id":"task-13","summary":"Accord claim for task-13","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":11}
+{"ts":"2026-09-05T22:11:29Z","event":"accord.claimed","id":"task-15","summary":"Accord claim for task-15","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":12}
+{"ts":"2026-09-05T22:22:37Z","event":"task.updated","id":"task-13","summary":"Updated task-13 metadata: relatedFiles, constraints","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":13}
+{"ts":"2026-09-05T22:25:06Z","event":"task.updated","id":"task-13","summary":"Updated task-13 metadata: constraints","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":14}
+{"ts":"2026-09-05T22:26:22Z","event":"task.updated","id":"task-15","summary":"Updated task-15 metadata: blockers","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":15}
