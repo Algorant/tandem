@@ -422,6 +422,7 @@ impl TuiApp {
 mod tests {
     use std::collections::HashMap;
     use std::fs;
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use ratatui::{backend::TestBackend, Terminal};
@@ -3546,6 +3547,93 @@ tone = "success"
     }
 
     // The former bulk-apply flow was removed by the 0.3.0 validation model.
+
+    #[test]
+    fn workflow_render_reports_native_checkpoint_success_and_failure() {
+        let root = unique_test_dir("tandem-tui-checkpoint-outcome");
+        fs::create_dir_all(&root).unwrap();
+        let git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {:?}", output.stderr);
+        };
+        git(&["init", "--quiet"]);
+        git(&["config", "user.name", "Tandem TUI Tests"]);
+        git(&["config", "user.email", "tui@example.invalid"]);
+        let workspace = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        app::tasks::add(
+            &workspace,
+            crate::app::tasks::AddOptions {
+                title: Some("TUI checkpoint success".to_string()),
+                acceptance: vec!["render success".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        git(&["add", ".tandem"]);
+        git(&["commit", "--quiet", "-m", "baseline"]);
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        assert!(app.select_document_by_id("task-1"));
+        app.start_workflow_action("claim");
+        app.handle_workflow_prompt_key(key(KeyCode::Enter));
+        type_text(&mut app, "tui-worker");
+        app.handle_workflow_prompt_key(key(KeyCode::Enter));
+        assert!(
+            app.status.contains("Git checkpointed"),
+            "status: {}",
+            app.status
+        );
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(terminal_text(&terminal).contains("Git checkpointed"));
+
+        app::tasks::add(
+            &workspace,
+            crate::app::tasks::AddOptions {
+                title: Some("TUI checkpoint failure".to_string()),
+                acceptance: vec!["render failure".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        git(&["add", ".tandem"]);
+        git(&["commit", "--quiet", "-m", "second baseline"]);
+        let hook = root.join(".git/hooks/pre-commit");
+        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&hook).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&hook, permissions).unwrap();
+        }
+        app.reload();
+        assert!(app.select_document_by_id("task-2"));
+        app.start_workflow_action("claim");
+        app.handle_workflow_prompt_key(key(KeyCode::Enter));
+        type_text(&mut app, "tui-worker");
+        app.handle_workflow_prompt_key(key(KeyCode::Enter));
+        assert!(
+            app.status
+                .contains("RECORD WRITTEN but Git checkpoint FAILED"),
+            "status: {}",
+            app.status
+        );
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let rendered = terminal_text(&terminal);
+        assert!(
+            rendered.contains("RECORD WRITTEN but Git chec"),
+            "rendered status: {rendered}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn workflow_actions_drive_native_records_through_claim_block_resume_deliver_complete() {

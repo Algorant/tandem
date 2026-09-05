@@ -279,7 +279,8 @@ fn apply_validation_action(
                 doc.id(),
                 &format!("Accepted sign-off for {}", doc.id()),
             )?;
-            let checkpoint = checkpoint_boundary(workspace);
+            drop(_hierarchy_lock);
+            let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
                 state: "archived".to_string(),
@@ -320,7 +321,8 @@ fn apply_validation_action(
                 doc.id(),
                 &format!("Requested rework for {}", doc.id()),
             )?;
-            let checkpoint = checkpoint_boundary(workspace);
+            drop(_hierarchy_lock);
+            let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
                 state: "in-progress".to_string(),
@@ -479,7 +481,8 @@ pub(crate) fn transition(
             doc.id(),
             &format!("Accord {action} for {}", doc.id()),
         )?;
-        let checkpoint = checkpoint_boundary(workspace);
+        drop(_hierarchy_lock);
+        let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
         return Ok(AccordTransitionOutcome {
             id: doc.id().to_string(),
             previous_status,
@@ -501,7 +504,8 @@ pub(crate) fn transition(
         doc.id(),
         &format!("Accord {action} for {}", doc.id()),
     )?;
-    let checkpoint = checkpoint_boundary(workspace);
+    drop(_hierarchy_lock);
+    let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
 
     Ok(AccordTransitionOutcome {
         id: doc.id().to_string(),

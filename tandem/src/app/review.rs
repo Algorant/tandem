@@ -93,7 +93,8 @@ pub(crate) fn transition(
         doc.id(),
         &format!("Requested validation for {}", doc.id()),
     )?;
-    let checkpoint = checkpoint_boundary(workspace);
+    drop(_lock);
+    let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
     Ok(ReviewOutcome {
         id: doc.id().to_string(),
         state: "validation".to_string(),

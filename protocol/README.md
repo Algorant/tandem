@@ -50,10 +50,13 @@ Required fields are `ts`, `seq`, `actor`, `event`, `id`, and structured event-sp
 
 ## Native Git checkpoints
 
-The native Rust application writes records and events immediately, then stages
-and commits only the owning `.tandem/` path at explicit lifecycle boundaries:
-claim/start, delivery, block/pause, resume/rework/release, terminal failure or
-cancel, completion, and exceptional review/validation actions. Intermediate
+The native Rust application writes records and events immediately. Root Tasks
+and direct Tasks beneath an Epic are assignments: their claim/start,
+delivery, block/pause, resume/rework/release, terminal failure or cancel,
+completion, and exceptional review/validation actions stage and commit the
+owning `.tandem/` path. Epics are grouping records and Subtasks are assignment
+milestones: their lifecycle writes return `batched` and remain durable without
+creating a commit until an assignment boundary captures them. Intermediate
 metadata and progress writes do not commit. Checkpoints use the fixed subject
 `chore(tandem): checkpoint metadata`, never amend, and serialize through a
 lock in Git's common directory so linked worktrees share one boundary. Git

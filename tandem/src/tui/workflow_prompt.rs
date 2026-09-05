@@ -7,6 +7,9 @@ use super::*;
 
 fn checkpoint_note(outcome: &CheckpointOutcome) -> String {
     match &outcome.status {
+        CheckpointStatus::Batched => {
+            "; milestone/grouping write batched to assignment boundary".to_string()
+        }
         CheckpointStatus::Checkpointed => outcome
             .commit
             .as_deref()

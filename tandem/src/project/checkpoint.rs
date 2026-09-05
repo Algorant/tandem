@@ -22,6 +22,10 @@ pub(crate) struct CheckpointOutcome {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CheckpointStatus {
+    /// The mutation belongs to a Subtask milestone or Epic grouping. Its
+    /// tracked write is durable, but the next assignment boundary owns the
+    /// checkpoint.
+    Batched,
     /// No `.tandem` changes were present after staging, so no commit was made.
     Clean,
     /// A new ordinary commit was created. Native checkpoints never amend.
@@ -31,6 +35,13 @@ pub(crate) enum CheckpointStatus {
 }
 
 impl CheckpointOutcome {
+    pub(crate) fn batched() -> Self {
+        Self {
+            status: CheckpointStatus::Batched,
+            commit: None,
+        }
+    }
+
     pub(crate) fn clean() -> Self {
         Self {
             status: CheckpointStatus::Clean,
@@ -204,9 +215,63 @@ fn format_git_error(args: &[&str], output: &std::process::Output) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_root(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "tandem-checkpoint-{label}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    fn git(root: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?}: {:?}", output.stderr);
+    }
+
     #[test]
     fn checkpoint_status_is_explicitly_non_amending() {
         assert_eq!(CHECKPOINT_SUBJECT, "chore(tandem): checkpoint metadata");
         assert_eq!(CheckpointOutcome::clean().status, CheckpointStatus::Clean);
+    }
+
+    #[test]
+    fn clean_boundary_does_not_create_an_empty_commit() {
+        let root = temp_root("clean");
+        fs::create_dir_all(&root).unwrap();
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        git(&root, &["init", "--quiet"]);
+        git(&root, &["config", "user.name", "Tandem Tests"]);
+        git(&root, &["config", "user.email", "tests@example.invalid"]);
+        git(&root, &["add", ".tandem"]);
+        git(&root, &["commit", "--quiet", "-m", "baseline"]);
+        let before = git_output(&root, &["rev-list", "--count", "HEAD"])
+            .unwrap()
+            .stdout
+            .trim()
+            .to_string();
+        let outcome = checkpoint(&project);
+        assert_eq!(outcome.status, CheckpointStatus::Clean);
+        assert_eq!(
+            git_output(&root, &["rev-list", "--count", "HEAD"])
+                .unwrap()
+                .stdout
+                .trim(),
+            before
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

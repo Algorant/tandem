@@ -179,11 +179,7 @@ impl TuiApp {
             ),
         ] {
             let transition = accord::validate_transition(action, &status);
-            // Keep the stable picker order for an already-consumed action so
-            // keyboard navigation remains predictable. The app layer still
-            // rejects the repeat before writing anything.
-            let repeat = accord::status_for_action(action) == Some(status.as_str());
-            let enabled = task && (transition.is_ok() || repeat);
+            let enabled = task && transition.is_ok();
             let detail = if !task {
                 "Unavailable: only task documents have Accord actions".to_string()
             } else if let Err(error) = transition {

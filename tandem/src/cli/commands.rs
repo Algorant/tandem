@@ -5,6 +5,11 @@ use crate::{app, CliError};
 
 fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
     match &outcome.status {
+        CheckpointStatus::Batched => serde_json::json!({
+            "status": "batched",
+            "commit": serde_json::Value::Null,
+            "amended": false,
+        }),
         CheckpointStatus::Checkpointed => serde_json::json!({
             "status": "checkpointed",
             "commit": outcome.commit.as_deref(),
@@ -26,6 +31,7 @@ fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
 
 fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
     match &outcome.status {
+        CheckpointStatus::Batched => "batched (awaiting assignment boundary)".to_string(),
         CheckpointStatus::Checkpointed => format!(
             "checkpointed{}",
             outcome

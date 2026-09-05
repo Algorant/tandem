@@ -51,8 +51,16 @@ pub(crate) fn current_timestamp() -> String {
 /// Checkpoint only at an explicit lifecycle boundary. The native record and
 /// event writes happen before this call; a Git failure is therefore data in the
 /// outcome, never a request to replay the lifecycle mutation.
-pub(crate) fn checkpoint_boundary(project: &TandemProject) -> CheckpointOutcome {
-    project::checkpoint(project)
+pub(crate) fn checkpoint_boundary(
+    project: &TandemProject,
+    hierarchy: &ProjectHierarchy,
+    document: &Document,
+) -> CheckpointOutcome {
+    match hierarchy.task_role(document) {
+        Ok(Some(TaskRole::Task)) => project::checkpoint(project),
+        Ok(Some(TaskRole::Epic | TaskRole::Subtask)) | Ok(None) => CheckpointOutcome::batched(),
+        Err(error) => CheckpointOutcome::failed(error.message),
+    }
 }
 
 pub(crate) fn append_event(

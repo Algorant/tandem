@@ -7,9 +7,9 @@ It calls the native Git checkpoint only after these writes at a lifecycle
 boundary. Intermediate `update`, `move`, and other progress/metadata writes do
 not commit.
 
-The boundary set is:
+The boundary set for an assignment is:
 
-- `accord claim`: root work start.
+- `accord claim`: root Task or direct Epic Task work start.
 - `accord deliver`: delivery.
 - `accord block`: pause/block.
 - `complete`: routine finish/archive.
@@ -19,16 +19,25 @@ The boundary set is:
 - `review` request, Validation rework, and Validation acceptance use the same
   app-owned checkpoint path. Acceptance archives the Task and is a finish.
 
-A Subtask and an Epic use the same policy as a root Task. There is no milestone
-or root-specific commit path. There is no daemon, attempt history, per-edit
-commit, or forced/amended commit.
+Native resolved hierarchy roles determine ownership. A root Task and a direct
+Task beneath an Epic are assignments and checkpoint all changed `.tandem`
+content at those boundaries. An Epic is grouping-only and a direct Subtask is
+an assignment milestone. Epic and Subtask lifecycle writes, including claim,
+deliver, block, resume, rework, release, fail, cancel, complete, and any
+allowed validation action, return `checkpoint.status=batched`: their record and
+event writes persist immediately, but no Git commit is made. The next actual
+assignment boundary captures them with the owning `.tandem` path. IDs are never
+used to infer this role. There is no daemon, attempt history, per-edit commit,
+or forced/amended commit.
 
 The checkpoint stages and commits only the discovered project's `.tandem/`
 path with the fixed subject `chore(tandem): checkpoint metadata`. It never
 stashes, resets, cleans, changes unrelated index entries, or touches unrelated
 worktree/untracked bytes. The lock file is `tandem-checkpoint.lock` in Git's
 common directory, so linked worktrees and independent processes serialize the
-Git add/commit sequence. The lock is outside the worktree and is not tracked.
+Git add/commit sequence. Application hierarchy/write locks are released before
+Git runs hooks; the coherent native result is retained in memory while the
+checkpoint runs. The lock is outside the worktree and is not tracked.
 `.tandem/actor-id` and other ignored runtime files remain uncommitted.
 
 Native checkpoints always create a new ordinary commit. They do not amend
@@ -46,8 +55,10 @@ outside that repository is rejected.
 ## Result contract
 
 Every lifecycle mutation returns a successful native record result even when
-its subsequent Git checkpoint fails. This prevents an interface from inviting
-a retry that repeats an already-successful mutation. The result has:
+its subsequent Git checkpoint fails. The result does not invite replay of the
+successful action: recovery uses the next real assignment boundary, which
+captures the still-staged durable write. There is no checkpoint-only CLI
+command in this cutover. The result has:
 
 ```json
 {
@@ -56,7 +67,7 @@ a retry that repeats an already-successful mutation. The result has:
     "id": "task-1",
     "recordWritten": true,
     "checkpoint": {
-      "status": "checkpointed|clean|failed",
+      "status": "checkpointed|batched|clean|failed",
       "commit": "<HEAD sha>|null",
       "amended": false,
       "error": "<message>"
@@ -83,8 +94,9 @@ cd /path/to/project
 /path/to/tandem/target/release/tandem --json complete task-1
 ```
 
-A successful boundary has `checkpoint.status=checkpointed` and a commit SHA.
-A repeated no-op boundary has `clean`. A hook failure has `failed` while
+A successful assignment boundary has `checkpoint.status=checkpointed` and a
+commit SHA. A milestone/grouping mutation has `batched`; a no-op assignment
+boundary has `clean`. A hook failure has `failed` while
 `recordWritten` remains true. The installed `tandem 0.12.3` binary is not
 updated by this task; availability means a build containing the integrated
 Task-14 commit.
@@ -99,16 +111,55 @@ uses disposable real Git repositories and the actual CLI binary. It proves:
 - claim, intermediate metadata update, delivery, and completion produce only
   actual boundary commits, with no empty commit and no amendment;
 - a genuine pre-commit hook failure reports `recordWritten=true` and a
-  distinct `checkpoint.status=failed`, leaves the change staged, and makes a
-  retry fail the already-consumed lifecycle transition;
+  distinct `checkpoint.status=failed`, leaves the change staged, and the next
+  assignment boundary captures it without replaying the original action;
+- milestone claim, block, resume, delivery, metadata progress, and completion
+  return `batched` with no HEAD change; a root boundary captures their logs and
+  events. Epic grouping is batched while direct Epic Tasks checkpoint;
+- staged additions, deletions, and partial index entries remain untouched;
+  clean no-op checkpointing, non-Git failure, nested workspaces, linked
+  worktrees, hook reads, and rendered TUI success/failure outcomes are covered;
 - two independent CLI processes can checkpoint separate Tasks concurrently
   without corrupting the repository or Git object database.
 
-The full Rust suite also passed on the predecessor-integrated source:
-`255` unit tests, `1` Accord integration test, `5` assignment integration
-tests, `6` CLI integration tests, and the five real-Git checkpoint tests.
+The full Rust suite also passed on the corrected source:
+`257` unit tests, `1` Accord integration test, `5` assignment integration
+tests, `6` CLI integration tests, and the nine real-Git checkpoint tests.
 `cargo build --manifest-path tandem/Cargo.toml --release` and
 `git diff --check` are required final checks.
+
+## Safe TUI preview
+
+For owner ANSI inspection, use only this disposable fixture and the release
+binary built from the integrated source:
+
+```sh
+BIN="$PWD/tandem/target/release/tandem"
+FIXTURE=/tmp/tandem-task14-tui-preview
+rm -rf "$FIXTURE"
+mkdir -p "$FIXTURE"
+cd "$FIXTURE"
+git init --quiet
+git config user.name 'Tandem TUI Preview'
+git config user.email preview@example.invalid
+"$BIN" init --title 'Task 14 TUI checkpoint preview'
+"$BIN" add task 'Preview checkpoint outcome' --acceptance 'inspect native result'
+git add .tandem && git commit --quiet -m baseline
+"$BIN" tui
+```
+
+Press `a`, choose Claim, enter an assignee, and inspect the footer for
+`record written; Git checkpointed`. To inspect failure rendering, exit the TUI,
+install a disposable failing hook, and relaunch:
+
+```sh
+printf '#!/bin/sh\nexit 1\n' > .git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
+"$BIN" tui
+```
+
+The footer must retain the durable result and visibly distinguish `RECORD
+WRITTEN but Git checkpoint FAILED`. Remove the fixture after inspection.
 
 ## Pi cutover
 
