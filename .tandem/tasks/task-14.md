@@ -4,7 +4,7 @@ type: task
 title: "Checkpoint tracked Tandem state natively at work boundaries"
 state: todo
 priority: "medium"
-relatedFiles: ["tandem/src/project/write.rs", "tandem/src/project/mod.rs", "tandem/src/app/accord.rs", "tandem/src/app/tasks.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/validation.rs", "protocol/README.md", "plan/task-14-pi-handoff.md"]
+relatedFiles: ["tandem/src/project/write.rs", "tandem/src/project/mod.rs", "tandem/src/app/accord.rs", "tandem/src/app/tasks.rs", "tandem/src/app/mod.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/workflow_prompt.rs", "protocol/README.md", "plan/task-14-pi-handoff.md"]
 tags: ["protocol", "git"]
 accord:
   status: "ready"
@@ -13,7 +13,7 @@ accord:
   constraints: ["No Pi adapter mutation in this core Task; provide explicit follow-up handoff. Keep one final native checkpoint path, with adapter retirement only after availability is verified.", "Keep all Tandem content tracked; never commit checkout-local actor identity, caches or credentials.", "No force/hook bypass, fallback Git path, attempt archive or one-commit-per-progress-item policy.", "Dispatch after task-13 and task-15 are integrated: their read/CLI and TUI implementation ownership overlaps required checkpoint result integration. This dependency is deliberate integration ordering, not a claim that task-14 needs a new assignment API.", "Implementation ownership after predecessors: new native project Git-checkpoint module/tests, project module registration/write locking as required, shared app boundary coordination and lifecycle outcomes in app/accord.rs and app/tasks.rs (plus review.rs only if needed for an existing completion path), CLI lifecycle result/error rendering, TUI lifecycle result/error rendering added by task-15, and dedicated checkpoint docs/tests. Do not redesign assignment queries or TUI interactions. Request approval for manifest dependencies or other ownership expansion.", "Use current protocol/README.md and accepted decision-8 for protocol 0.3.0 behavior. Keep protocol meaning native, Git/filesystem work in project, and shared boundary sequencing in app; CLI/TUI remain peers.", "Tests may initialize and mutate disposable repositories only. Do not let experimental checkpointing commit this checkout, another Worker's checkout, canonical coordination state, or user Git config. No install/release/push implied."]
   updatedAt: "2026-09-05T22:10:46Z"
 createdAt: "2026-09-05T21:03:46Z"
-updatedAt: "2026-09-05T22:10:46Z"
+updatedAt: "2026-09-05T22:43:30Z"
 blockers: ["task-13", "task-15"]
 ---
 
