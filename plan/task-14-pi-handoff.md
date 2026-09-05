@@ -1,5 +1,15 @@
 # Task 14 native checkpoint handoff
 
+## Verified availability
+
+Integrated on local `main` at `937a6207202a710dea4aed884e53e8633ff5e381`.
+The orchestrator independently reran the complete merged suite (258 unit,
+1 Accord, 5 assignment, 9 checkpoint, and 6 CLI tests), the real-Git owner
+probes, and actual release ANSI failure rendering. Normal and exceptional
+Validation tests show durable-write success and checkpoint failure at 80/120
+columns. The installed binary is unchanged; Pi adapter removal remains a
+separate coordinated cutover, not part of this source delivery.
+
 ## Native policy
 
 The Rust application writes the Tandem record and its actor event immediately.
