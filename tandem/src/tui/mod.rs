@@ -63,6 +63,7 @@ mod terminal;
 mod text;
 mod theme;
 mod validation;
+mod workflow_prompt;
 
 use bindings::{bindings_for, BindingScope};
 use board::*;
@@ -80,6 +81,7 @@ use terminal::TerminalSession;
 use text::markdownish_lines;
 use theme::{default_tag_tone, StatusTone, TuiTheme};
 use validation::ValidationPrompt;
+use workflow_prompt::WorkflowPrompt;
 
 pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
     let mut app = TuiApp::load(workspace)?;
@@ -258,6 +260,7 @@ struct TuiApp {
     help_section: usize,
     board_picker: Option<BoardPicker>,
     validation_prompt: Option<ValidationPrompt>,
+    workflow_prompt: Option<WorkflowPrompt>,
     rules_view: RulesState,
     decisions_view: DecisionsState,
     papercuts_view: PapercutsState,
@@ -303,6 +306,7 @@ impl TuiApp {
             status_updated_at: Instant::now(),
             show_help: false,
             validation_prompt: None,
+            workflow_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             papercuts_view: PapercutsState::default(),
@@ -394,6 +398,10 @@ impl TuiApp {
 
         if self.validation_prompt.is_some() {
             self.draw_validation_prompt(frame, area);
+        }
+
+        if self.workflow_prompt.is_some() {
+            self.draw_workflow_prompt(frame, area);
         }
 
         if self.rules_prompt_active() {
@@ -716,6 +724,8 @@ mod tests {
         assert!(parent_detail.contains(&"Kind: epic".to_string()));
         assert!(parent_detail
             .contains(&"Tasks: 1 active child, 1 completed child in Logs (2 total)".to_string()));
+        assert!(parent_detail
+            .contains(&"Milestone progress: 1 active · 1 completed in Logs · 2 total".to_string()));
 
         let child_detail = detail_lines_for_doc_with_context(&active_child, &theme, &child_context)
             .iter()
@@ -2505,6 +2515,12 @@ tone = "success"
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
+    fn type_text(app: &mut TuiApp, text: &str) {
+        for ch in text.chars() {
+            app.handle_key(key(KeyCode::Char(ch))).unwrap();
+        }
+    }
+
     fn unique_test_dir(prefix: &str) -> PathBuf {
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -2662,6 +2678,7 @@ tone = "success"
             help_section: 0,
             board_picker: None,
             validation_prompt: None,
+            workflow_prompt: None,
             rules_view: RulesState::default(),
             decisions_view: DecisionsState::default(),
             papercuts_view: PapercutsState::default(),
@@ -2740,7 +2757,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
         assert!(!app.board_footer_text().contains("TODO"));
         assert!(!app.board_footer_text().contains("row"));
@@ -3088,10 +3105,13 @@ tone = "success"
         let mut app = keyboard_test_app();
         let selected = app.selected_doc().map(|doc| doc.id().to_string());
         app.handle_key(key(KeyCode::Char('a'))).unwrap();
-        app.handle_key(key(KeyCode::Char('m'))).unwrap();
+        assert!(matches!(
+            app.board_picker.as_ref().map(|picker| picker.kind),
+            Some(pickers::PickerKind::Actions)
+        ));
+        app.handle_key(key(KeyCode::Esc)).unwrap();
         assert_eq!(app.selected_doc().map(Document::id), selected.as_deref());
         assert!(app.board_picker.is_none());
-        assert!(app.status.is_empty());
     }
 
     #[test]
@@ -3126,7 +3146,7 @@ tone = "success"
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
-            "e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
     }
 
@@ -3520,6 +3540,120 @@ tone = "success"
     // The former bulk-apply flow was removed by the 0.3.0 validation model.
 
     #[test]
+    fn workflow_actions_drive_native_records_through_claim_block_resume_deliver_complete() {
+        let root = unique_test_dir("tandem-tui-workflow-actions");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Durable workflow\nstate: todo\naccord:\n  status: ready\n  acceptance: [\"ship the workflow\"]\n---\n\nBody.\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+
+        // Claim: the prompt path must write the native accord and workflow state.
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "worker-a");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let claimed = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(claimed.location, DocumentLocation::Board);
+        assert_eq!(claimed.field("state"), Some("in-progress"));
+        assert_eq!(claimed.field("accord.status"), Some("claimed"));
+        assert_eq!(claimed.field("assignee"), Some("worker-a"));
+
+        // Block and resume are native transitions, not a TUI-side state machine.
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "waiting for dependency");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let blocked = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(blocked.field("accord.status"), Some("blocked"));
+        assert_eq!(blocked.field("accord.note"), Some("waiting for dependency"));
+
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let resumed = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(resumed.field("accord.status"), Some("claimed"));
+        assert_eq!(resumed.field("state"), Some("in-progress"));
+
+        // Deliver requires both summary and evidence before the native call.
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::Down)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "Implemented durable workflow");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        type_text(&mut app, "cargo test");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        let delivered = workspace.read_board_document("task-1").unwrap().unwrap();
+        assert_eq!(delivered.field("accord.status"), Some("delivered"));
+        assert_eq!(
+            delivered.field("accord.summary"),
+            Some("Implemented durable workflow")
+        );
+        assert_eq!(delivered.field("accord.evidence"), Some("[\"cargo test\"]"));
+
+        // Ordinary completion archives the native record and accepts delivered work.
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.handle_key(key(KeyCode::End)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(workspace.read_board_document("task-1").unwrap().is_none());
+        let log = workspace
+            .read_log_documents()
+            .unwrap()
+            .into_iter()
+            .find(|doc| doc.id() == "task-1")
+            .unwrap();
+        assert_eq!(log.location, DocumentLocation::Logs);
+        assert_eq!(log.field("accord.status"), Some("accepted"));
+        assert_eq!(log.field("resolution.outcome"), Some("completed"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn workflow_picker_uses_native_transition_validity_and_required_inputs_fail_clearly() {
+        let root = unique_test_dir("tandem-tui-workflow-invalid");
+        let workspace = temp_workspace(&root);
+        fs::write(
+            workspace.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Invalid workflow\nstate: in-progress\naccord:\n  status: accepted\n  acceptance: [\"criterion\"]\n---\n",
+        )
+        .unwrap();
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.selected_state = 1;
+        app.clamp_selection();
+        app.handle_key(key(KeyCode::Char('a'))).unwrap();
+        app.select_picker_option(0);
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(
+            app.status.contains("accepted accord cannot transition"),
+            "unexpected status: {}",
+            app.status
+        );
+        let before = fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap();
+        assert_eq!(
+            fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap(),
+            before
+        );
+
+        // Empty required fields never call the app mutation.
+        app.start_workflow_action("deliver");
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert!(app.status.contains("requires a summary"));
+        app.handle_key(key(KeyCode::Esc)).unwrap();
+        assert_eq!(
+            fs::read_to_string(workspace.tasks_dir.join("task-1.md")).unwrap(),
+            before
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn graph_sensitive_tui_mutations_fail_closed_on_fresh_invalid_snapshot() {
         let root = unique_test_dir("tandem-mutation-hierarchy-lock");
         let workspace = temp_workspace(&root);
@@ -3797,6 +3931,12 @@ tone = "success"
             "2026-06-28T01:00:00Z".to_string(),
         );
         doc.fields.insert(
+            "accord.acceptance".to_string(),
+            "[\"criterion one\", \"criterion two\"]".to_string(),
+        );
+        doc.fields
+            .insert("blockers".to_string(), "[\"task-9\"]".to_string());
+        doc.fields.insert(
             "accord.deliverables".to_string(),
             "[\"code:src/lib.rs\", \"docs:README.md\"]".to_string(),
         );
@@ -3831,6 +3971,8 @@ tone = "success"
         assert!(accord_index < body_index);
         assert!(texts.contains(&"Effort: small".to_string()));
         assert!(texts.contains(&"Status: delivered".to_string()));
+        assert!(texts.contains(&"Acceptance: criterion one, criterion two".to_string()));
+        assert!(texts.contains(&"Blockers: task-9".to_string()));
         assert!(texts.iter().any(|text| text.contains(
             "Signal: Delivered: inspect summary/evidence, then accept or request rework."
         )));
@@ -3850,7 +3992,7 @@ tone = "success"
             .any(|text| text.contains("CLI hint: tandem accord accept task-1")));
         assert!(texts
             .iter()
-            .any(|text| text.contains("Board Validation: A opens accept sign-off")));
+            .any(|text| text.contains("Board Validation: v opens human accept/rework")));
         assert!(texts.contains(&"Description".to_string()));
         assert!(texts.contains(&"Keep this body visible.".to_string()));
 
@@ -3938,9 +4080,9 @@ tone = "success"
             assert!(!app.papercuts_open());
         }
         app.handle_key(key(KeyCode::Char('a'))).unwrap();
-        app.handle_key(key(KeyCode::Char('m'))).unwrap();
+        assert!(app.board_picker.is_some());
+        app.handle_key(key(KeyCode::Esc)).unwrap();
         assert!(app.board_picker.is_none());
-        assert!(app.status.is_empty());
         let mut terminal = Terminal::new(TestBackend::new(100, 24)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
         assert!(app.hits.iter().any(|hit| hit.action == HitAction::ShowHelp));

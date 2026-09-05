@@ -249,7 +249,8 @@ impl TuiApp {
         matches!(
             self.validation_prompt,
             Some(ValidationPrompt::Rework { .. })
-        ) || self.log_search_input.is_some()
+        ) || self.workflow_prompt.is_some()
+            || self.log_search_input.is_some()
             || self.rules_text_prompt_active()
             || self.decision_prompt_active()
     }
@@ -257,6 +258,7 @@ impl TuiApp {
     pub(super) fn input_overlay_active(&self) -> bool {
         self.board_picker.is_some()
             || self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
             || self.log_search_input.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()

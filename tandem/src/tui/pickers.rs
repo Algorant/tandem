@@ -5,6 +5,7 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PickerKind {
     Filter,
+    Actions,
     Validation,
 }
 
@@ -15,6 +16,7 @@ enum PickerAction {
     SetDeliveredUntriaged(bool),
     ClearAll,
     Validation(&'static str),
+    Workflow(&'static str),
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +148,77 @@ impl TuiApp {
         self.board_picker = Some(picker);
         self.status =
             "Filter picker: choose an available filter; Enter applies, Esc cancels.".into();
+    }
+
+    pub(super) fn start_workflow_picker(&mut self) {
+        let Some(doc) = self.selected_doc() else {
+            self.status = "No selected Board task for workflow action.".into();
+            return;
+        };
+        let id = doc.id().to_string();
+        let title = doc.title().to_string();
+        let status = accord_status(doc).unwrap_or("missing").to_string();
+        let task = is_task_doc(doc);
+        let mut options = Vec::new();
+        for (action, label, detail) in [
+            (
+                "claim",
+                "Claim accord",
+                "Set the assignee and move todo work in-progress",
+            ),
+            (
+                "deliver",
+                "Deliver accord",
+                "Record a summary and required evidence",
+            ),
+            ("block", "Block accord", "Record why work cannot proceed"),
+            (
+                "resume",
+                "Resume accord",
+                "Clear the blocked state and continue claimed work",
+            ),
+        ] {
+            let transition = accord::validate_transition(action, &status);
+            let enabled = task && transition.is_ok();
+            let detail = if !task {
+                "Unavailable: only task documents have Accord actions".to_string()
+            } else if let Err(error) = transition {
+                error
+            } else {
+                detail.to_string()
+            };
+            options.push(PickerOption {
+                label: label.to_string(),
+                detail,
+                enabled,
+                action: PickerAction::Workflow(action),
+            });
+        }
+        options.push(PickerOption {
+            label: "Complete and archive".into(),
+            detail: if task {
+                "Run native completion checks and archive the Task".into()
+            } else {
+                "Unavailable: only task documents can be completed".into()
+            },
+            enabled: task,
+            action: PickerAction::Workflow("complete"),
+        });
+        self.board_picker = Some(BoardPicker {
+            kind: PickerKind::Actions,
+            selected: 0,
+            title: "Task actions".into(),
+            context: format!(
+                "{id} — {title} · state {} · accord {status}",
+                display_state_label(&document_state_label(doc))
+            ),
+            options,
+        });
+        if let Some(picker) = self.board_picker.as_mut() {
+            picker.select_first_enabled();
+        }
+        self.status =
+            "Task actions: choose a native action; Enter opens required input, Esc cancels.".into();
     }
 
     pub(super) fn start_validation_picker(&mut self) {
@@ -297,6 +370,7 @@ impl TuiApp {
                 self.restore_filtered_selection(selected_id.as_deref());
             }
             PickerAction::Validation(action) => self.show_validation_action_hint(action),
+            PickerAction::Workflow(action) => self.start_workflow_action(action),
         }
     }
 

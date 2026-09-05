@@ -129,6 +129,11 @@ pub(super) const BINDINGS: &[Binding] = &[
     },
     Binding {
         scope: BindingScope::Board,
+        keys: "a",
+        description: "open valid native Task actions for the selected row",
+    },
+    Binding {
+        scope: BindingScope::Board,
         keys: "e",
         description: "edit the selected active task",
     },
@@ -150,7 +155,7 @@ pub(super) const BINDINGS: &[Binding] = &[
     Binding {
         scope: BindingScope::Validation,
         keys: "v",
-        description: "choose accept, rework, or apply/archive when valid",
+        description: "choose exceptional human accept or rework when valid",
     },
     Binding {
         scope: BindingScope::Logs,

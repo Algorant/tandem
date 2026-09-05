@@ -361,6 +361,7 @@ impl TuiApp {
             || self.text_input_active()
             || self.board_picker.is_some()
             || self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
             || self.papercuts_open()
@@ -384,7 +385,7 @@ impl TuiApp {
         let commands = if self.focus == FocusPane::Detail {
             format!("e Edit · {arrangement_hint} · ? Help")
         } else {
-            format!("e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
+            format!("a Actions · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
         };
         self.with_status(commands)
     }
@@ -404,7 +405,9 @@ impl TuiApp {
     }
 
     pub(super) fn draw_footer(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        let mut footer_line = if self.log_search_input.is_some() || self.validation_prompt.is_some()
+        let mut footer_line = if self.log_search_input.is_some()
+            || self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
         {
             Line::from(Span::styled(
                 self.status.clone(),
@@ -601,6 +604,7 @@ impl TuiApp {
             return "Board action picker";
         }
         if self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
         {

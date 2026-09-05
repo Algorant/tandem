@@ -20,6 +20,10 @@ impl TuiApp {
             self.handle_validation_prompt_key(key);
             return Ok(KeyAction::Continue);
         }
+        if self.workflow_prompt.is_some() {
+            self.handle_workflow_prompt_key(key);
+            return Ok(KeyAction::Continue);
+        }
         if self.log_search_input.is_some() {
             self.handle_log_search_key(key);
             return Ok(KeyAction::Continue);
@@ -75,11 +79,15 @@ impl TuiApp {
             return Ok(KeyAction::Continue);
         }
 
-        if self.validation_prompt.is_some() || self.rules_prompt_active() {
+        if self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
+            || self.rules_prompt_active()
+        {
             match key.code {
                 KeyCode::Char('q') => return Ok(KeyAction::Quit),
                 KeyCode::Char('?') => self.open_help(),
                 _ if self.validation_prompt.is_some() => self.handle_validation_prompt_key(key),
+                _ if self.workflow_prompt.is_some() => self.handle_workflow_prompt_key(key),
                 _ => self.handle_rules_prompt_key(key),
             }
             return Ok(KeyAction::Continue);
@@ -130,6 +138,7 @@ impl TuiApp {
             }
             KeyCode::Char('b') if self.view == TuiView::Board => self.toggle_board_arrangement(),
             KeyCode::Char('f') if self.view == TuiView::Board => self.start_filter_picker(),
+            KeyCode::Char('a') if self.view == TuiView::Board => self.start_workflow_picker(),
             KeyCode::Char('v') if self.view == TuiView::Board => self.start_validation_picker(),
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
             // State Board tabs are peers, including the derived Papercuts tab.
@@ -174,6 +183,7 @@ impl TuiApp {
         }
         if self.board_picker.is_some()
             || self.validation_prompt.is_some()
+            || self.workflow_prompt.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
             || self.log_search_input.is_some()

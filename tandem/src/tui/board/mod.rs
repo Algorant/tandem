@@ -2288,6 +2288,17 @@ pub(super) fn detail_lines_for_doc_with_context(
             &relationship_detail_summary(relationship_context),
             theme,
         ));
+        let hints = relationship_context.hints();
+        lines.push(detail_field_line(
+            "Milestone progress",
+            &format!(
+                "{} active · {} completed in Logs · {} total",
+                hints.active_children,
+                hints.completed_children,
+                hints.total_children()
+            ),
+            theme,
+        ));
     }
     push_optional_detail_line(&mut lines, "Accord", accord_status(doc), theme);
     push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
@@ -2335,6 +2346,20 @@ pub(super) fn push_board_accord_detail_section(
         accord_state_signal(status),
         theme,
     ));
+    push_optional_detail_list_line(
+        lines,
+        "Acceptance",
+        first_accord_list(doc, &["accord.acceptance"]),
+        theme,
+    );
+    push_optional_detail_list_line(
+        lines,
+        "Blockers",
+        doc.field("blockers")
+            .map(parse_field_values)
+            .unwrap_or_default(),
+        theme,
+    );
     push_optional_detail_line(lines, "Claimed", doc.field("accord.claimedAt"), theme);
     push_optional_detail_line(lines, "Delivered", doc.field("accord.deliveredAt"), theme);
     push_optional_detail_list_line(
@@ -2384,12 +2409,12 @@ pub(super) fn push_board_accord_detail_section(
     ]));
     if document_state_label(doc) == "validation" {
         lines.push(Line::from(Span::styled(
-            "Board Validation: A opens accept sign-off confirmation, R opens feedback/rework, e opens the task; completion is intentionally separate.",
+            "Board Validation: v opens human accept/rework; a opens ordinary Task actions; e edits the task.",
             theme.muted_style(),
         )));
     } else {
         lines.push(Line::from(Span::styled(
-            "Board accord mutations beyond movement are CLI-guided from this detail pane.",
+            "Board actions: a opens native claim/deliver/block/resume/complete actions; v remains exceptional human review.",
             theme.muted_style(),
         )));
     }
@@ -2492,7 +2517,7 @@ pub(super) fn accord_cli_hint(id: &str, status: &str) -> String {
     match normalized_accord_status(status).as_str() {
         "ready" => format!("tandem accord claim {id} --assignee <name>"),
         "claimed" => format!(
-            "tandem accord deliver {id} --summary <text> [--evidence <text>] [--file-changed <path>]"
+            "tandem accord deliver {id} --summary <text> --evidence <text> [--file-changed <path>]"
         ),
         "delivered" => format!(
             "tandem accord accept {id} [--reviewer <name>] [--note <text>] OR tandem accord rework {id} --note <text>"
@@ -2500,7 +2525,7 @@ pub(super) fn accord_cli_hint(id: &str, status: &str) -> String {
         "accepted" => format!(
             "tandem complete {id} --summary <text> [--validation <text>] [--reviewer <name>]"
         ),
-        "rework" => format!("tandem accord deliver {id} --summary <text> [--evidence <text>]"),
+        "rework" => format!("tandem accord deliver {id} --summary <text> --evidence <text>"),
         "blocked" => format!(
             "tandem accord claim {id} --assignee <name> OR tandem accord fail {id} --reason <text>"
         ),
