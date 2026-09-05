@@ -2,22 +2,28 @@
 id: task-15
 type: task
 title: "Make durable Task and milestone workflow usable through the TUI"
-state: "in-progress"
 priority: "medium"
 references: ["task-6", "task-13"]
 relatedFiles: ["tandem/src/tui", "plan/task-15-pi-handoff.md"]
 tags: ["tui", "accord"]
 accord:
-  status: "claimed"
+  status: "accepted"
   acceptance: ["Version-matched audit identifies actual missing durable actions/context and reuses the native app layer, with task-6 relationship reconciled explicitly.", "TUI shows current acceptance, blockers, milestone progress and final delivery evidence without Pi/session scraping or duplicated inline checklist state.", "Task claim/deliver/block/resume and ordinary completion are usable via a minimal valid-action interface; exceptional human review remains distinct, and invalid transitions fail clearly.", "Action/render tests exercise state changes and resulting native records; no agent-launch controls or broad layout redesign are included."]
   claimedAt: "2026-09-05T22:11:29Z"
+  deliveredAt: "2026-09-05T22:42:24Z"
   validation: ["Run cargo test --manifest-path tandem/Cargo.toml (version-matched baseline 3d179b0: 241 unit plus 6 CLI tests passing), targeted TUI tests, release build, and git diff --check. Do not reformat unrelated Rust modules to remedy baseline formatting.", "Drive actual keyboard/mouse/modal action paths for claim, deliver with summary/evidence, block with note, resume and normal completion. Re-read resulting native records and assert exact Accord/state/assignee/evidence/location values; merely calling a helper or checking a rendered label is insufficient.", "Exercise missing required inputs, invalid native transitions, stale selected records, prompt cancellation and explicit error presentation. Use native validity predicates; do not duplicate workflow rules in TUI tables.", "Render long acceptance, blockers, milestone statuses and final evidence; test scrolling/selection and archived outcome visibility without truncating required context or replacing it with duplicate inline checklists.", "Build cargo build --manifest-path tandem/Cargo.toml --release. Prepare a reproducible disposable preview workspace via the built native CLI, not hand-authored .tandem records. Report its absolute path and launch command to the orchestrator early so the canonical just dev preview slot can point at this worktree. Inspect actual release TUI output including ANSI using the available Herdr presentation; if pane controls are unavailable, supply a ready fixture/build and request that inspection from the orchestrator. Snapshots do not prove flicker/resize latency; state any unresolved temporal/taste criteria explicitly.", "Handoff: clean source commit, changed paths, criterion-specific assertions and actual observations, two-approach/task-6 reconciliation, exact preview command/path, native API requests if any, and Pi consumer/version availability in plan/task-15-pi-handoff.md. No ready claim with acknowledged acceptance gaps."]
   constraints: ["Exclusive production/test ownership: tandem/src/tui/** only. Dedicated handoff/research notes may be written at plan/task-15-pi-handoff.md; no broad layout redesign, agent-launch controls, separate workflow state machine or inline milestone store.", "Use existing version-matched 0.12.3 native app/protocol APIs. Task-13 exclusively owns native read/protocol changes concurrently. If an existing capability is insufficient, report the exact signature/input/output needed to the orchestrator before implementing around it. Do not edit app, protocol, project, CLI, manifests or adapters.", "Task-6 is still an unclaimed research proposal, not completed findings. Explicitly reconcile it in the handoff: compare two lightweight interaction approaches, recommend the smallest valid-action interface, and implement only task-15's durable parity scope. Do not claim task-6 was completed or change its lifecycle.", "Use current protocol/README.md and accepted decision-8 for protocol 0.3.0 behavior; root AGENTS.md has superseded pre-cutover specifics. Preserve architectural ownership. Routine complete archives delivered work without requiring exceptional Validation.", "Source delivery is not installation/release. No push, merge, cleanup, or modification of real coordination records; use native CLI/app-created disposable workspaces for action testing."]
-  updatedAt: "2026-09-05T22:11:29Z"
+  summary: "Integrated native TUI workflow actions and durable context at 4c0cd80 after owner-verified corrections and combined task13 native evidence validation."
+  evidence: ["Owner reran complete suite on corrected source and integrated main: 254 unit, 1 Accord, 5 assignment, 6 CLI tests all pass; git diff --check passes.", "Owner inspected release ANSI pane w4P:p3: Task Actions, current delivered Task and milestone, counts and layout rendered; TestBackend tests verify prompt labels and final acceptance/evidence content across bounded scrolling.", "Owner actual terminal probe /tmp/tandem-task15-final-probe.py: comma-only evidence keeps prompt and exact full native record unchanged; subsequent successful submission preserves comma-containing evidence as one exact item.", "Reviewed keyboard/native-record path through claim/block/resume/deliver/complete, mouse picker/confirm/cancel, required inputs, stale-record error retention, role-correct assignments/milestones, distinct archived outcomes and final evidence preservation tests.", "Worktrunk fast-forward integrated reviewed commits cca5b67/ec78c34/4c0cd80 with --no-remove; task6 reconciliation and consumer handoff documented at plan/task-15-pi-handoff.md.", "Flicker/resize latency unmeasured and not claimed verified; no outstanding acceptance criterion requires human temporal/taste judgment. No installed binary changed."]
+  filesChanged: ["tandem/src/tui/bindings.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/workflow_prompt.rs", "plan/task-15-pi-handoff.md"]
+  updatedAt: "2026-09-05T22:42:32Z"
 createdAt: "2026-09-05T21:04:08Z"
-updatedAt: "2026-09-05T22:26:22Z"
+updatedAt: "2026-09-05T22:42:32Z"
 assignee: "worker-task-15-a66158c3"
 blockers: ["task-13"]
+archivedAt: "2026-09-05T22:42:32Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description

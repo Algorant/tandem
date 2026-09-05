@@ -15,3 +15,5 @@
 {"ts":"2026-09-05T22:26:22Z","event":"task.updated","id":"task-15","summary":"Updated task-15 metadata: blockers","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":15}
 {"ts":"2026-09-05T22:33:08Z","event":"accord.delivered","id":"task-13","summary":"Accord deliver for task-13","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":16}
 {"ts":"2026-09-05T22:33:16Z","event":"task.completed","id":"task-13","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":17}
+{"ts":"2026-09-05T22:42:24Z","event":"accord.delivered","id":"task-15","summary":"Accord deliver for task-15","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":18}
+{"ts":"2026-09-05T22:42:32Z","event":"task.completed","id":"task-15","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":19}
