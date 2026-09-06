@@ -2,6 +2,26 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.12.4
+
+Tandem v0.12.4 makes assignment workflows usable natively, with complete assignment reads, TUI lifecycle actions, and Git checkpoints at work boundaries.
+
+### Added
+
+- `tandem assignment <task-id> --json` returns complete Task and milestone definitions, blocker details, and an opaque scope token that stays stable during ordinary progress.
+- The TUI's `a` Actions menu supports claim, deliver, block, resume, and completion. Task details show acceptance, blockers, milestone progress, and final evidence, with distinct completed, canceled, and failed outcomes.
+- Native Git checkpoints commit only the owning `.tandem` path at assignment lifecycle boundaries. Milestone and Epic updates persist immediately but batch until an assignment boundary. Checkpoints never amend existing commits and preserve unrelated staged and working-tree changes.
+
+### Fixed
+
+- Delivery rejects missing or blank evidence before writing records or events. TUI evidence preserves commas in prose and retains entered values after errors.
+- Git hooks can read Tandem without deadlocking. Checkpoint failures are reported separately from successful record writes, with the distinction visible even in narrow TUI footers.
+
+### Changed
+
+- `just dev` now builds release mode and opens a fresh Git-backed sandbox; `just dev-project` explicitly targets real project records. `just dev-check` runs tests and a native workflow smoke check.
+- Integrations must not run their own checkpoint automation alongside the new native path. Lifecycle JSON results expose `recordWritten` and `checkpoint`; after a checkpoint failure, do not replay the successful lifecycle action.
+
 ## 0.12.3
 
 Tandem v0.12.3 fixes two silent-zero defects: the TUI Decisions view now loads decision documents, and workspaces with pre-cutover embedded rules get a visible diagnostic instead of an empty list.
