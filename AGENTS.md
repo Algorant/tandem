@@ -221,8 +221,10 @@ than on whether the work is visual.
 A rendered pane is evidence. Spawn a Herdr pane and read the result with
 `herdr pane read --format ansi` to check layout, counts, wrapping, colors, and
 attributes. Build release, not debug: debug builds render slowly enough to
-distort flicker, resize, and latency observations, which is what `just
-dev-release` is for.
+distort flicker, resize, and latency observations. `just dev` builds release
+and opens a disposable Git-backed sandbox; `just dev-project` explicitly targets
+the real project records. Use `just dev-check` for native tests and a Git-backed
+workflow smoke test.
 
 A snapshot cannot settle temporal behavior. Flicker, resize tearing, redraw
 latency, and cursor ghosting need a human at a terminal. So do density,

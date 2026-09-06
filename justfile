@@ -6,58 +6,18 @@ set positional-arguments
 tidy-history:
 	@./scripts/tidy_history.sh
 
-# Run the development TUI. A delegated visual task may temporarily route this
-# command through Git-local state to its worktree code and a safe fixture.
+# An explicit delegated preview route selects that worktree and fixture instead.
+# Build release and open a fresh, disposable Git-backed TUI sandbox.
 dev:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
-	route_file="$git_common_dir/tandem-dev-preview"
-	manifest="$repo_root/tandem/Cargo.toml"
-	workspace="$repo_root"
-	routed_preview=false
-	if [[ -f "$route_file" ]]; then
-		mapfile -t route < "$route_file"
-		if [[ "${#route[@]}" -ne 2 ]]; then
-			echo "Invalid dev preview route: $route_file" >&2
-			exit 2
-		fi
-		manifest="${route[0]}"
-		workspace="${route[1]}"
-		routed_preview=true
-	fi
-	test -f "$manifest"
-	test -f "$workspace/.tandem/tandem.md"
-	echo "Tandem code:      $manifest"
-	echo "Tandem workspace: $workspace"
-	cd "$workspace"
-	if $routed_preview && grep -Eq '^protocolVersion: *("?0\.1\.0"?)$' .tandem/tandem.md; then
-		case "$workspace/" in
-			"$repo_root/.pi/visual-lab/workspaces/"*) ;;
-			*) echo "Refusing to auto-upgrade non-visual-lab preview workspace: $workspace" >&2; exit 2 ;;
-		esac
-		echo "Upgrading delegated preview fixture to the current protocol..."
-		cargo run --manifest-path "$manifest" -- upgrade
-	fi
-	exec cargo run --manifest-path "$manifest" -- tui
+	@./scripts/dev.sh tui
+
+# Explicitly run the release TUI on real project records (actions may commit them).
+dev-project:
+	@./scripts/dev.sh project
 
 # Run the fixture-driven release workflow selector checks.
 test-release-checks:
 	@scripts/tests/test_release_checks.sh
-
-# Run the release TUI against this checkout for visual validation.
-# Use this instead of `just dev` for flicker, resize, and rendering checks:
-# debug builds render slowly enough to distort what you are looking for.
-# Run it in a real terminal window, not a multiplexer pane, so you are not
-# observing the multiplexer's own redraw behavior.
-dev-release:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
-	cd "$repo_root"
-	exec tandem/target/release/tandem tui
 
 # Start the local read-only Tandem web interface and open it in the browser.
 web:
@@ -79,7 +39,7 @@ dev-route manifest workspace:
 	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 	printf '%s\n%s\n' "$manifest" "$workspace" > "$git_common_dir/tandem-dev-preview"
 
-# Agent/orchestrator helper: restore `just dev` to the normal checkout.
+# Agent/orchestrator helper: restore `just dev` to its safe sandbox default.
 [private]
 dev-reset:
 	#!/usr/bin/env bash
@@ -87,85 +47,21 @@ dev-reset:
 	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
 	rm -f "$git_common_dir/tandem-dev-preview"
 
-# Build the latest dev release binary from this checkout.
+# Build the latest dev release binary from this checkout, without installation.
 dev-build:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
-	binary="$repo_root/tandem/target/release/tandem"
-	echo "Built: $binary"
-	"$binary" --version
+	@./scripts/dev.sh build
 
-# Create a fresh disposable 0.3.0 sandbox with the latest dev binary and seed
-# toy documents, ready for manual command testing. The sandbox lives under
-# tandem/target/dev-sandbox and is git-ignored.
+# Create a fresh seeded Git sandbox; print its absolute path on stdout.
 dev-sandbox:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	binary="$repo_root/tandem/target/release/tandem"
-	cargo build --manifest-path "$repo_root/tandem/Cargo.toml" --release
-	if [[ ! -x "$binary" ]]; then
-		echo "release binary missing: $binary" >&2
-		exit 2
-	fi
-	sandbox="$repo_root/tandem/target/dev-sandbox"
-	rm -rf "$sandbox"
-	mkdir -p "$sandbox"
-	ln -s "$binary" "$sandbox/tandem"
-	cd "$sandbox"
-	./tandem init --title "Tandem dev sandbox" >/dev/null
-	./tandem add task "Test the cutover" --kind epic --acceptance "all epic tasks complete" --tag plan >/dev/null
-	./tandem add task "Implement list filters" --parent task-1 --acceptance "list --tag papercut narrows rows" --priority high --effort small --tag cli >/dev/null
-	./tandem add task "Wire update --clear" --parent task-1 --acceptance "PC9 replacement and clearing work" --tag cli --blocker task-2 >/dev/null
-	./tandem add task "Substep demo" --parent task-2 --acceptance "subtask lifecycle works" >/dev/null
-	./tandem add task "Small friction" --acceptance "captured" --tag papercut --priority low >/dev/null
-	./tandem add task "Handoff demo" --acceptance "review and complete flows work" >/dev/null
-	./tandem add decision "Use clap for the CLI" --body "One static derive tree replaces the handwritten parser." --decider ivan --tag arch >/dev/null
-	./tandem accord claim task-5 --assignee pi >/dev/null
-	./tandem accord deliver task-5 --summary "delivered" --evidence "smoke passed" >/dev/null
-	./tandem rules add prefer "Smoke-test the sandbox before merging" --source task-1 >/dev/null
-	echo "Fresh sandbox: $sandbox"
-	echo "Workspace:"
-	ls .tandem/
-	echo "Documents:"
-	./tandem list
+	@./scripts/dev.sh sandbox
 
-# Open the dev sandbox for interactive testing: build, reset to a fresh seeded
-# workspace, then drop into a shell with the dev binary on PATH. Run in a real
-# terminal.
+# Open a shell in a fresh Git sandbox with the release binary first on PATH.
 dev-test:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	just --justfile "$repo_root/justfile" dev-sandbox >/dev/null
-	sandbox="$repo_root/tandem/target/dev-sandbox"
-	cat <<-'EOF'
-	Tandem dev sandbox is ready. The dev binary is `./tandem` (release build).
-	ID layout: task-1 epic · task-2/3 epic tasks · task-2-1 subtask · task-4
-	           papercut-tagged · task-5 Handoff demo (claimed + delivered) ·
-	           decision-1.
-	
-	Try:
-	  ./tandem list --tag papercut
-	  ./tandem list --scope archived
-	  ./tandem search clap
-	  ./tandem review task-5 --criterion "smoke passed" --note "need human sign-off"
-	  ./tandem complete task-5
-	  ./tandem update task-2 --tag cli --tag api
-	  ./tandem update task-2 --clear tag
-	  ./tandem accord fail task-3 --note "not feasible"
-	  ./tandem rules list
-	  ./tandem tui
-	EOF
-	if [[ ! -t 1 ]]; then
-		echo "Not a terminal; run in a real terminal to get an interactive shell."
-		echo "cd $sandbox && ./tandem ..."
-		exit 0
-	fi
-	cd "$sandbox"
-	PATH="$sandbox:$PATH" exec "${SHELL:-bash}"
+	@./scripts/dev.sh shell
+
+# Run native/CLI tests and a Git-backed assignment/checkpoint smoke test.
+dev-check:
+	@./scripts/dev.sh check
 
 # Verify the local docs runtime satisfies Astro's Node floor.
 _check-docs-node:

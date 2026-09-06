@@ -88,6 +88,25 @@ task-10       Epic (root `kind: epic`, global ID)
 
 Only Tasks are delegated initially. One Task worker owns its leaf Subtasks as a bounded execution checklist and returns one Task-level handoff; Epics and Subtasks are not independently delegated. Tandem rejects nested Epics, children beneath Subtasks, role/ID mismatches, and role-changing or ID-invalidating reparenting. See [Epics, Tasks, Subtasks, and related work](https://trytandem.dev/concepts/#epics-tasks-subtasks-and-related-work).
 
+## Development
+
+- **`just dev`** builds the current checkout in release mode and opens a fresh,
+  seeded TUI sandbox in its own temporary Git repository. Try `a` on task-5 for
+  lifecycle actions, task-2 for milestone context, and Logs for completed evidence.
+- **`just dev-project`** explicitly opens the real project workspace. Lifecycle
+  actions can commit its `.tandem` records.
+- **`just dev-test`** opens a shell in a fresh sandbox with the dev `tandem` first
+  on `PATH`; **`just dev-sandbox`** creates a sandbox and prints its path.
+- **`just dev-check`** runs the native/CLI suite and a Git-backed smoke test for
+  assignment freshness, evidence validation, milestone batching, and checkpoints
+  (requires `jq`). **`just dev-build`** only builds the release binary.
+
+No command installs the binary. Sandboxes are retained at the printed temporary
+path for inspection; each new invocation gets a fresh repository. Explicit
+agent-configured preview routes still make `just dev` use the selected worktree
+and fixture; clearing a route restores the safe sandbox default. No automatic
+workspace upgrade or fallback to the real project occurs.
+
 ## TUI
 
 [placeholder tui image/gif]
