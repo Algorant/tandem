@@ -1,12 +1,16 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildAccordArgs, buildDecisionArgs, buildInitArgs, buildLogArgs, buildPapercutArgs, buildRulesArgs, buildSearchArgs, buildTaskArgs, ACCORD_ACTIONS, tandemTaskParameters } from "../index";
+import piTandem, { buildAccordArgs, buildDecisionArgs, buildInitArgs, buildLogArgs, buildPapercutArgs, buildRulesArgs, buildSearchArgs, buildTaskArgs, ACCORD_ACTIONS, tandemTaskParameters } from "../index";
 const bin = process.env.TANDEM_BIN ?? "tandem";
 const assert = (v: unknown, m: string): asserts v => { if (!v) throw new Error(m); };
 const run = async (args: string[], cwd: string) => { const p = Bun.spawn([bin, ...args], { cwd, stdout: "pipe", stderr: "pipe" }); const out = await new Response(p.stdout).text(); const err = await new Response(p.stderr).text(); if (await p.exited) throw new Error(`${args.join(" ")}\n${out}\n${err}`); return out; };
 const json = (s: string) => JSON.parse(s.trim());
 const id = (s: string) => { const m = /^ID:\s+(\S+)/m.exec(s); assert(m, `missing ID in ${s}`); return m[1]; };
+const registered: Array<Record<string, unknown>> = [];
+piTandem({ registerTool: (tool: Record<string, unknown>) => registered.push(tool), registerCommand() {}, on() {} } as unknown as Parameters<typeof piTandem>[0]);
+assert(registered.length === 9, "all nine adapter tools register without machine-local rendering dependencies");
+assert(registered.every((tool) => tool.renderCall === undefined && tool.renderResult === undefined && tool.renderShell === undefined), "adapter tools use Pi's default rendering");
 assert(!(tandemTaskParameters as any).properties.move, "task schema must not expose move");
 assert(JSON.stringify(ACCORD_ACTIONS) === JSON.stringify(["claim", "deliver", "rework", "block", "resume", "release", "fail"]), "accord actions must match 0.3");
 assert(buildInitArgs({ title: "x" }).join(" ") === "init --title x", "init argv");
@@ -32,5 +36,5 @@ try {
  const search = json(await run(buildSearchArgs({ query: "Smoke" }), ws)); assert(search.ok && Array.isArray(search.data), "search envelope");
  const completed = json(await run(buildTaskArgs({ action: "complete", id: task }), ws)); assert(completed.ok && completed.data.id === task, "completion archive envelope");
  const logs = json(await run(buildLogArgs({ action: "list" }), ws)); assert(logs.ok && logs.data.some((x: any) => x.id === task), "log list envelope");
- console.log("pi-tandem smoke passed (16 assertions)");
+ console.log("pi-tandem smoke passed (default-renderer registration and native CLI assertions)");
 } finally { await rm(ws, { recursive: true, force: true }); }

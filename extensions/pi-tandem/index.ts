@@ -1,5 +1,4 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createTandemToolRenderer } from "/home/ivan/.dotfiles/pi/.pi/agent/extensions/pi-ui/tool-ui/custom-tools/tandem";
 import {
 	DEFAULT_MAX_BYTES,
 	DEFAULT_MAX_LINES,
@@ -713,7 +712,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_status",
 		label: "Tandem Status",
-		...createTandemToolRenderer("tandem_status", "Tandem Status"),
 		description: "Diagnose the installed `tandem` CLI and the nearest `.tandem` workspace.",
 		promptSnippet: "Use tandem_status to inspect Tandem/tandem health before durable project coordination or when .tandem diagnostics are needed.",
 		promptGuidelines: [
@@ -729,7 +727,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_init",
 		label: "Tandem Init",
-		...createTandemToolRenderer("tandem_init", "Tandem Init"),
 		description: "Initialize a Tandem workspace by running `tandem init --title <title>`.",
 		promptSnippet: "Use tandem_init only after tandem_status reports no workspace and the user confirms this directory should become a Tandem workspace.",
 		promptGuidelines: [
@@ -753,7 +750,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_task",
 		label: "Tandem Task",
-		...createTandemToolRenderer("tandem_task", "Tandem Task"),
 		description: "Run task-oriented `tandem` commands: list, show, add, update, complete, or cancel. Reads and mutations use the global JSON envelope.",
 		promptSnippet: "Use tandem_task for Tandem task list/show/add/update/complete/cancel operations instead of editing .tandem files directly.",
 		promptGuidelines: [
@@ -779,7 +775,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_accord",
 		label: "Tandem Accord",
-		...createTandemToolRenderer("tandem_accord", "Tandem Accord"),
 		description: "Run `tandem accord claim|deliver|accept|rework|block|fail` as a thin Pi wrapper.",
 		promptSnippet: "Use tandem_accord for Tandem work-agreement lifecycle actions (claim, deliver, accept, rework, block, fail).",
 		promptGuidelines: [
@@ -800,7 +795,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_log",
 		label: "Tandem Logs",
-		...createTandemToolRenderer("tandem_log", "Tandem Logs"),
 		description: "Run completed-work log reads: `tandem log list|show|search`. Defaults to JSON output.",
 		promptSnippet: "Use tandem_log for Tandem completed-work history list/show/search.",
 		promptGuidelines: [
@@ -826,7 +820,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_rules",
 		label: "Tandem Rules",
-		...createTandemToolRenderer("tandem_rules", "Tandem Rules"),
 		description: "Run `tandem rules list|add|edit|delete`. List defaults to JSON; mutations preserve human-readable CLI output.",
 		promptSnippet: "Use tandem_rules to inspect or update Tandem project rules through tandem.",
 		promptGuidelines: [
@@ -853,7 +846,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_decision",
 		label: "Tandem Decisions",
-		...createTandemToolRenderer("tandem_decision", "Tandem Decisions"),
 		description: "Run `tandem decision list|show|add`. Read actions default to JSON; add preserves human-readable CLI output and supports ADR-compatible metadata.",
 		promptSnippet: "Use tandem_decision for Tandem decision document list/show/add operations, including ADR-compatible durable records.",
 		promptGuidelines: [
@@ -891,7 +883,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_papercut",
 		label: "Tandem Papercuts",
-		...createTandemToolRenderer("tandem_papercut", "Tandem Papercuts"),
 		description: "Record and inspect small, non-blocking friction through `tandem papercut`. Read actions default to JSON. The adapter does not parse Papercut files or implement IDs, status, references, or storage.",
 		promptSnippet: "Use tandem_papercut for small, non-blocking friction worth preserving while the current work continues.",
 		promptGuidelines: [
@@ -924,7 +915,6 @@ export default function piTandem(pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "tandem_search",
 		label: "Tandem Search",
-		...createTandemToolRenderer("tandem_search", "Tandem Search"),
 		description: "Run `tandem search <query>` across active Tandem documents and completed logs. Defaults to JSON output.",
 		promptSnippet: "Use tandem_search for project work search across active Tandem documents and logs.",
 		promptGuidelines: [

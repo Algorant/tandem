@@ -16,6 +16,7 @@ Tandem v0.12.4 makes assignment workflows usable natively, with complete assignm
 
 - Delivery rejects missing or blank evidence before writing records or events. TUI evidence preserves commas in prose and retains entered values after errors.
 - Git hooks can read Tandem without deadlocking. Checkpoint failures are reported separately from successful record writes, with the distinction visible even in narrow TUI footers.
+- The project-local Pi adapter uses Pi's default tool rendering instead of importing a machine-specific UI module.
 
 ### Changed
 

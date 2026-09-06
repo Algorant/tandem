@@ -8,6 +8,9 @@
 - A Tandem workspace (`.tandem/tandem.md`) for normal task/log/rule/decision operations.
 - Pi extension runtime dependencies supplied by Pi (`@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, `typebox`).
 
+Tools use Pi's default call/result rendering. No machine-local Pi UI extension
+or absolute personal configuration path is required.
+
 ## Architecture
 
 ```text
