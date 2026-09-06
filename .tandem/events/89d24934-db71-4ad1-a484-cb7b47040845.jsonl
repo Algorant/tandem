@@ -21,3 +21,5 @@
 {"ts":"2026-09-05T22:44:00Z","event":"accord.claimed","id":"task-14","summary":"Accord claim for task-14","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":21}
 {"ts":"2026-09-05T23:17:34Z","event":"accord.delivered","id":"task-14","summary":"Accord deliver for task-14","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":22}
 {"ts":"2026-09-05T23:17:42Z","event":"task.completed","id":"task-14","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":23}
+{"ts":"2026-09-06T00:20:14Z","event":"task.created","id":"task-18","summary":"Release Tandem 0.12.4","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":24}
+{"ts":"2026-09-06T00:20:19Z","event":"accord.claimed","id":"task-18","summary":"Accord claim for task-18","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":25}
