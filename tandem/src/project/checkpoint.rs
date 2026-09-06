@@ -67,6 +67,7 @@ impl RepositoryLock {
     fn acquire(path: &Path) -> Result<Self, String> {
         let file = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(path)

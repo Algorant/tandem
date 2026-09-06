@@ -139,9 +139,9 @@ impl TuiApp {
                 self.advance_workflow_prompt()
             }
             KeyCode::Backspace => {
-                self.workflow_prompt_input_mut().map(|input| {
+                if let Some(input) = self.workflow_prompt_input_mut() {
                     input.pop();
-                });
+                }
                 self.refresh_workflow_prompt_status();
             }
             KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {

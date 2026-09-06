@@ -477,7 +477,7 @@ pub(crate) fn transition(
         )?;
         append_event(
             workspace,
-            &accord::event_name(action),
+            accord::event_name(action),
             doc.id(),
             &format!("Accord {action} for {}", doc.id()),
         )?;
