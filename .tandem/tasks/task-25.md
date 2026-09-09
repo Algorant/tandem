@@ -9,13 +9,17 @@ references: ["task-23"]
 relatedFiles: ["tandem/src/tui/logs.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs"]
 tags: ["tui", "accord", "delegation"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Logs detail (`detail_lines_for_log`) renders `Attempts: N`, `Reworks: N`, `Discarded: N` when any count is non-zero, using `logs::accord_counts` from the Task's events.", "The Board detail panel is reachable from the keyboard on the Board view and its toggle is listed in the Board footer; or, if the panel is intentionally retired, `draw_detail`/`toggle_board_detail`/`HitAction::ToggleBoardDetail` and the `board_detail_shows_accord_attempt_counts_when_present` test are removed and counts are surfaced in the Board row or another reachable place instead.", "Verified by rendering in a Herdr pane, not only by unit test."]
   claimedAt: "2026-09-09T15:05:20Z"
+  deliveredAt: "2026-09-09T15:14:48Z"
   validation: ["$ cargo test -p tandem", "Live: in a throwaway workspace claim/deliver/rework/release --disposition discarded/claim/deliver/complete a Task, open `tandem tui`, press 2, select it; the Log detail shows Attempts: 2, Reworks: 1, Discarded: 1. On the Board, select an active reworked Task and open its detail from the keyboard; the same labels appear."]
-  updatedAt: "2026-09-09T15:05:20Z"
+  summary: "Added Accord history counts to Log detail and made Board detail reachable with the d key and footer hint."
+  evidence: ["`cd tandem && cargo test` passes all 262 unit tests plus 24 integration tests.", "The release binary rendered in Herdr pane w38:p7. Board footer visibly contains `d Detail`; pressing d opened the selected task detail and rendered Attempts: 2, Reworks: 1, Discarded: 1.", "The same Herdr pane switched to Logs and selected task-7; Log detail visibly rendered Accord history with Attempts: 2, Reworks: 1, and Discarded: 1."]
+  filesChanged: ["tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/logs.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs"]
+  updatedAt: "2026-09-09T15:14:48Z"
 createdAt: "2026-09-09T14:51:01Z"
-updatedAt: "2026-09-09T15:05:20Z"
+updatedAt: "2026-09-09T15:14:48Z"
 assignee: "Algorant"
 ---
 
