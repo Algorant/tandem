@@ -48,3 +48,4 @@
 {"ts":"2026-09-09T15:14:55Z","event":"task.completed","id":"task-25","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":48}
 {"ts":"2026-09-09T15:15:16Z","event":"accord.claimed","id":"task-26","summary":"Accord claim for task-26","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":49}
 {"ts":"2026-09-09T15:15:42Z","event":"accord.delivered","id":"task-26","summary":"Accord deliver for task-26","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":50}
+{"ts":"2026-09-09T15:15:46Z","event":"task.completed","id":"task-26","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":51}

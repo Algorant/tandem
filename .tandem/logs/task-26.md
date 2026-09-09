@@ -2,12 +2,11 @@
 id: task-26
 type: task
 title: "Papercuts from task-23/24 verification: disposition exit code, `$ ` whitespace, released state"
-state: "in-progress"
 priority: "low"
 effort: "small"
 tags: ["protocol", "papercut", "accord"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["`accord release --disposition bogus` exits 2 (usage) instead of 1, matching the protocol's exit-code contract.", "`$   echo x` classifies as a command with text `echo x`: strip the `$ ` prefix and then leading whitespace, or document that only one space is removed.", "Decide and document whether `accord release` should return `state` to `todo`; today a released Task keeps `state: in-progress` with `accordStatus: ready`, so a discarded attempt sits in the WIP column with no assignee. If intentional, say so in protocol/README.md; if not, reset state on release."]
   claimedAt: "2026-09-09T15:15:16Z"
   deliveredAt: "2026-09-09T15:15:42Z"
@@ -15,10 +14,13 @@ accord:
   summary: "Resolved the verification papercuts: usage exit code, validation whitespace normalization, and released-task workflow state."
   evidence: ["`cd tandem && cargo test` passes all 262 unit tests plus 24 integration tests.", "Live release with `--disposition bogus` exits 2 and reports the usage error; `$   echo x` is returned by assignment JSON as a command with text `echo x`.", "Live valid release returns the Task to `state: todo` with `accordStatus: ready`, making it claimable again.", "Protocol documentation records the normalized validation command text and released-task state behavior."]
   filesChanged: ["protocol/README.md", "protocol/assignment.md", "tandem/src/app/assignment.rs", "tandem/src/app/error.rs", "tandem/src/main.rs", "tandem/src/protocol/accord.rs", "tandem/tests/accord_behavior.rs"]
-  updatedAt: "2026-09-09T15:15:42Z"
+  updatedAt: "2026-09-09T15:15:46Z"
 createdAt: "2026-09-09T14:51:09Z"
-updatedAt: "2026-09-09T15:15:42Z"
+updatedAt: "2026-09-09T15:15:46Z"
 assignee: "Algorant"
+archivedAt: "2026-09-09T15:15:46Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
