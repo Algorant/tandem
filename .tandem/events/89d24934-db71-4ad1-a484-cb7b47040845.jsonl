@@ -41,3 +41,6 @@
 {"ts":"2026-09-09T14:39:51Z","event":"accord.claimed","id":"task-24","summary":"Accord claim for task-24","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":41}
 {"ts":"2026-09-09T14:41:00Z","event":"accord.delivered","id":"task-24","summary":"Accord deliver for task-24","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":42}
 {"ts":"2026-09-09T14:41:07Z","event":"task.completed","id":"task-24","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":43}
+{"ts":"2026-09-09T14:51:01Z","event":"task.created","id":"task-25","summary":"Show Accord attempt/rework/discarded counts in a reachable TUI detail panel","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":44}
+{"ts":"2026-09-09T14:51:09Z","event":"task.created","id":"task-26","summary":"Papercuts from task-23/24 verification: disposition exit code, `$ ` whitespace, released state","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":45}
+{"ts":"2026-09-09T15:05:20Z","event":"accord.claimed","id":"task-25","summary":"Accord claim for task-25","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":46}
