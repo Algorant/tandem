@@ -4441,12 +4441,14 @@ tone = "success"
     #[test]
     fn board_detail_shows_accord_attempt_counts_when_present() {
         let doc = doc_with_state("task-1", Some("in-progress"));
-        let mut context = BoardRelationshipContext::default();
-        context.accord_counts = Some(crate::app::accord::AccordCounts {
-            attempt_count: 2,
-            rework_count: 1,
-            discarded_count: 1,
-        });
+        let context = BoardRelationshipContext {
+            accord_counts: Some(crate::app::accord::AccordCounts {
+                attempt_count: 2,
+                rework_count: 1,
+                discarded_count: 1,
+            }),
+            ..Default::default()
+        };
         let texts = detail_lines_for_doc_with_context(&doc, &TuiTheme::default_dark(), &context)
             .iter()
             .map(line_text)
