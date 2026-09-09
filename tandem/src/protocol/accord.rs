@@ -132,8 +132,8 @@ pub(crate) fn validate_transition(action: &str, previous_status: &str) -> Result
     }
 }
 
-/// Only the legacy-ready/claimed alignment is a visual suggestion. Delivered,
-/// accepted, blocked, failed, and rework statuses do not imply a workflow state.
+/// Claim, release, and rework-from-validation synchronize workflow state. Delivered,
+/// accepted, blocked, failed, and rework statuses otherwise do not imply a state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct StateEffect<'a> {
     pub(crate) state: Option<&'a str>,
@@ -152,6 +152,11 @@ pub(crate) fn state_effect<'a>(action: &str, current_state: &'a str) -> StateEff
     if action == "rework" && current_state == "validation" {
         return StateEffect {
             state: Some("in-progress"),
+        };
+    }
+    if action == "release" {
+        return StateEffect {
+            state: Some("todo"),
         };
     }
     StateEffect { state: None }
@@ -179,7 +184,7 @@ mod tests {
 
     #[test]
     fn state_effects_cover_all_accord_actions_and_rework() {
-        for action in ["deliver", "accept", "block", "fail", "release", "resume"] {
+        for action in ["deliver", "accept", "block", "fail", "resume"] {
             assert_eq!(
                 state_effect(action, "in-progress"),
                 StateEffect { state: None }
@@ -192,6 +197,7 @@ mod tests {
             }
         );
         assert_eq!(state_effect("claim", "in-progress").state, None);
+        assert_eq!(state_effect("release", "in-progress").state, Some("todo"));
         assert_eq!(
             state_effect("rework", "validation"),
             StateEffect {

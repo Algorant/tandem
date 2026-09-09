@@ -45,6 +45,32 @@ fn root(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
+fn release_rejects_invalid_disposition_with_usage_exit_code() {
+    let root_dir = root("invalid-disposition");
+    std::fs::create_dir_all(&root_dir).unwrap();
+    run(&root_dir, &["init", "--title", "invalid disposition"]);
+    run(
+        &root_dir,
+        &["add", "task", "Task", "--acceptance", "accept"],
+    );
+    let output = failed(
+        &root_dir,
+        &[
+            "accord",
+            "release",
+            "task-1",
+            "--note",
+            "invalid",
+            "--disposition",
+            "bogus",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("disposition"));
+    std::fs::remove_dir_all(root_dir).unwrap();
+}
+
+#[test]
 fn accord_counts_cover_rework_and_discarded_attempts_on_archived_tasks() {
     let root_dir = root("counts");
     std::fs::create_dir_all(&root_dir).unwrap();
@@ -97,6 +123,11 @@ fn accord_counts_cover_rework_and_discarded_attempts_on_archived_tasks() {
             "discarded",
         ],
     );
+    let released =
+        serde_json::from_str::<serde_json::Value>(&run(&root_dir, &["show", "task-1", "--json"]))
+            .unwrap();
+    assert_eq!(released["data"]["state"], "todo");
+    assert_eq!(released["data"]["accordStatus"], "ready");
     let released_event = event_bytes(&root_dir);
     assert!(String::from_utf8_lossy(&released_event)
         .contains("\"data\":{\"disposition\":\"discarded\"}"));

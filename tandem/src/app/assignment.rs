@@ -147,7 +147,7 @@ fn planned_validation(value: &str) -> PlannedValidationDto {
         .strip_prefix("$ ")
         .map(|command| PlannedValidationDto {
             kind: "command",
-            text: command.to_string(),
+            text: command.trim_start().to_string(),
         })
         .unwrap_or_else(|| PlannedValidationDto {
             kind: "manual",
@@ -250,6 +250,16 @@ mod tests {
             "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap()
+    }
+
+    #[test]
+    fn classifies_commands_and_trims_extra_prefix_whitespace() {
+        let command = planned_validation("$   echo x");
+        assert_eq!(command.kind, "command");
+        assert_eq!(command.text, "echo x");
+        let manual = planned_validation("Read the output");
+        assert_eq!(manual.kind, "manual");
+        assert_eq!(manual.text, "Read the output");
     }
 
     #[test]

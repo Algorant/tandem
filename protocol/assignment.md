@@ -54,7 +54,7 @@ returns a JSON envelope:
 `acceptance`, `constraints`, `plannedValidation`, `ownedScope` (the native
 `relatedFiles` list), and `dependencies`. They also include derived
 `attemptCount`, `reworkCount`, and `discardedCount` from the Task's Accord
-events. `plannedValidation` is an array of `{ "kind": "command" | "manual", "text": "..." }` items: values beginning with `$ ` are commands with the prefix removed, and all other values are manual checks. They also include current
+events. `plannedValidation` is an array of `{ "kind": "command" | "manual", "text": "..." }` items: values beginning with `$ ` are commands with the prefix and following leading whitespace removed, and all other values are manual checks. They also include current
 `location`, `state`, `accordStatus`, and archived `resolutionOutcome` where
 available. No body or list is truncated. Milestones are the direct Subtasks of
 the Task and are returned in native query order. Archived milestones remain

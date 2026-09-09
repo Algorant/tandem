@@ -53,7 +53,11 @@ impl From<protocol::diagnostic::Diagnostic> for CliError {
 
 impl From<app::Error> for CliError {
     fn from(error: app::Error) -> Self {
-        CliError::user(error.message)
+        if error.kind == app::ErrorKind::Usage {
+            CliError::usage(error.message)
+        } else {
+            CliError::user(error.message)
+        }
     }
 }
 

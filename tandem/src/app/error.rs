@@ -11,6 +11,7 @@ pub(crate) struct Error {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ErrorKind {
+    Usage,
     NotFound,
     Validation,
     Conflict,
@@ -20,7 +21,7 @@ pub(crate) enum ErrorKind {
 
 impl Error {
     pub(crate) fn usage(message: impl Into<String>) -> Self {
-        Self::new(ErrorKind::Validation, message)
+        Self::new(ErrorKind::Usage, message)
     }
 
     pub(crate) fn user(message: impl Into<String>) -> Self {
@@ -42,6 +43,7 @@ impl Error {
 
     pub(crate) fn code(&self) -> &'static str {
         match self.kind {
+            ErrorKind::Usage => "usage",
             ErrorKind::NotFound => "not_found",
             ErrorKind::Validation => "validation",
             ErrorKind::Conflict => "conflict",
@@ -53,7 +55,11 @@ impl Error {
 
 impl From<crate::CliError> for Error {
     fn from(error: crate::CliError) -> Self {
-        Self::user(error.message)
+        if error.code == 2 {
+            Self::usage(error.message)
+        } else {
+            Self::user(error.message)
+        }
     }
 }
 
@@ -75,6 +81,7 @@ mod tests {
 
     #[test]
     fn exposes_stable_operational_codes() {
+        assert_eq!(Error::usage("invalid").code(), "usage");
         assert_eq!(
             Error::new(ErrorKind::NotFound, "missing").code(),
             "not_found"
