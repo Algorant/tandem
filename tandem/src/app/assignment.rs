@@ -33,6 +33,13 @@ pub(crate) struct AssignmentDto {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct PlannedValidationDto {
+    pub(crate) kind: &'static str,
+    pub(crate) text: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct AssignmentNodeDto {
     pub(crate) id: String,
     #[serde(rename = "type")]
@@ -46,10 +53,12 @@ pub(crate) struct AssignmentNodeDto {
     pub(crate) resolution_outcome: Option<String>,
     pub(crate) acceptance: Vec<String>,
     pub(crate) constraints: Vec<String>,
-    pub(crate) planned_validation: Vec<String>,
+    pub(crate) planned_validation: Vec<PlannedValidationDto>,
     pub(crate) owned_scope: Vec<String>,
     pub(crate) dependencies: Vec<DependencyDto>,
     pub(crate) ready: bool,
+    #[serde(flatten)]
+    pub(crate) accord_counts: crate::app::accord::AccordCounts,
 }
 
 #[derive(Debug, Serialize)]
@@ -133,6 +142,19 @@ pub(crate) fn read(project: &TandemProject, id: &str) -> Result<AssignmentOutcom
     })
 }
 
+fn planned_validation(value: &str) -> PlannedValidationDto {
+    value
+        .strip_prefix("$ ")
+        .map(|command| PlannedValidationDto {
+            kind: "command",
+            text: command.to_string(),
+        })
+        .unwrap_or_else(|| PlannedValidationDto {
+            kind: "manual",
+            text: value.to_string(),
+        })
+}
+
 fn node(
     read: &ReadSnapshot,
     hierarchy: &ProjectHierarchy,
@@ -175,7 +197,13 @@ fn node(
             .unwrap_or_default(),
         planned_validation: accord
             .as_ref()
-            .map(|record| record.validations.clone())
+            .map(|record| {
+                record
+                    .validations
+                    .iter()
+                    .map(|validation| planned_validation(validation))
+                    .collect()
+            })
             .unwrap_or_default(),
         owned_scope: document
             .field("relatedFiles")
@@ -183,6 +211,7 @@ fn node(
             .unwrap_or_default(),
         dependencies,
         ready,
+        accord_counts: crate::app::accord::counts(&read.events, document.id()),
     })
 }
 
@@ -267,7 +296,9 @@ mod tests {
         assert!(last.body.contains("milestone body 10 MILESTONE-TAIL-10"));
         assert_eq!(last.acceptance, ["acceptance 10"]);
         assert_eq!(last.constraints, ["constraint 10"]);
-        assert_eq!(last.planned_validation, ["validation 10"]);
+        assert_eq!(last.planned_validation.len(), 1);
+        assert_eq!(last.planned_validation[0].kind, "manual");
+        assert_eq!(last.planned_validation[0].text, "validation 10");
         assert_eq!(last.owned_scope, ["src/milestone-10.rs"]);
         assert!(outcome.data.dependency_readiness.all_clear);
         fs::remove_dir_all(project.root()).unwrap();

@@ -391,6 +391,7 @@ fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliErro
             v.id,
             app::accord::AccordOptions {
                 note: Some(v.note),
+                disposition: v.disposition,
                 ..Default::default()
             },
         ),

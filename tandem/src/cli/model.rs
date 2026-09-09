@@ -202,7 +202,7 @@ pub(crate) enum AccordCommand {
     Rework(NoteArgs),
     Block(NoteArgs),
     Resume(IdArgs),
-    Release(NoteArgs),
+    Release(ReleaseArgs),
     Fail(NoteArgs),
 }
 #[derive(Debug, Args)]
@@ -226,6 +226,14 @@ pub(crate) struct NoteArgs {
     pub(crate) id: String,
     #[arg(long, allow_hyphen_values = true)]
     pub(crate) note: String,
+}
+#[derive(Debug, Args)]
+pub(crate) struct ReleaseArgs {
+    pub(crate) id: String,
+    #[arg(long, allow_hyphen_values = true)]
+    pub(crate) note: String,
+    #[arg(long)]
+    pub(crate) disposition: Option<String>,
 }
 #[derive(Debug, Args)]
 pub(crate) struct ReviewArgs {

@@ -28,6 +28,7 @@ pub(super) struct LogEvent {
     pub(super) ts: String,
     pub(super) event: String,
     pub(super) summary: String,
+    pub(super) disposition: Option<String>,
 }
 
 pub(super) type LogEventsById = BTreeMap<String, Vec<LogEvent>>;
@@ -63,12 +64,33 @@ pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<St
             ts: event.ts,
             event: event.event,
             summary: event.summary,
+            disposition: event
+                .data
+                .as_ref()
+                .and_then(|data| data.get("disposition"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string),
         });
     }
     for item_events in events.values_mut() {
         item_events.sort_by(|a, b| a.ts.cmp(&b.ts).then_with(|| a.event.cmp(&b.event)));
     }
     (events, warnings)
+}
+
+pub(super) fn accord_counts(events: &[LogEvent]) -> crate::app::accord::AccordCounts {
+    let mut counts = crate::app::accord::AccordCounts::default();
+    for event in events {
+        match event.event.as_str() {
+            "accord.claimed" => counts.attempt_count += 1,
+            "accord.rework" => counts.rework_count += 1,
+            "accord.released" if event.disposition.as_deref() == Some("discarded") => {
+                counts.discarded_count += 1;
+            }
+            _ => {}
+        }
+    }
+    counts
 }
 
 pub(super) fn filtered_log_indexes(

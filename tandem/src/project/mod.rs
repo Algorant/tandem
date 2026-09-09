@@ -433,6 +433,7 @@ pub(crate) struct ProjectEvent {
     pub(crate) summary: String,
     pub(crate) actor: Option<String>,
     pub(crate) seq: Option<u64>,
+    pub(crate) data: Option<serde_json::Value>,
 }
 
 impl ProjectEvent {
@@ -449,6 +450,9 @@ impl ProjectEvent {
         let seq = extract_json_u64(line, "seq")
             .filter(|seq| *seq > 0)
             .ok_or("missing required seq")?;
+        let data = serde_json::from_str::<serde_json::Value>(line)
+            .ok()
+            .and_then(|value| value.get("data").cloned());
         Ok(Self {
             id,
             event,
@@ -456,6 +460,7 @@ impl ProjectEvent {
             summary,
             actor: Some(actor),
             seq: Some(seq),
+            data,
         })
     }
 }

@@ -57,6 +57,7 @@ pub(crate) fn documents_for_scope(
 /// One coherent, UI-neutral project read used by long-running peer interfaces.
 pub(crate) struct ReadSnapshot {
     pub(crate) snapshot: Snapshot,
+    pub(crate) events: Vec<crate::project::ProjectEvent>,
     pub(crate) revision: String,
     pub(crate) title: String,
     pub(crate) protocol_version: String,
@@ -152,10 +153,12 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> 
             }
         }
     }
+    let events = project.read_events_tolerant(&mut warnings);
     warnings.sort();
     warnings.dedup();
     Ok(ReadSnapshot {
         snapshot: Snapshot { hierarchy },
+        events,
         revision,
         title,
         protocol_version,

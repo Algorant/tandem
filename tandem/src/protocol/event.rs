@@ -13,6 +13,7 @@ pub(crate) struct CanonicalEventEnvelope<'a> {
     pub(crate) summary: &'a str,
     pub(crate) actor: &'a str,
     pub(crate) seq: u64,
+    pub(crate) data: Option<&'a serde_json::Value>,
 }
 
 impl CanonicalEventEnvelope<'_> {
@@ -69,6 +70,7 @@ mod tests {
             summary: "Created task-1",
             actor: "pi",
             seq: 4,
+            data: None,
         };
         assert_eq!(
             CanonicalEventEnvelope::required_fields(),

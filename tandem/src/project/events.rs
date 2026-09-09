@@ -20,6 +20,17 @@ pub(crate) fn append_event(
     summary: &str,
     timestamp: &str,
 ) -> Result<(), CliError> {
+    append_event_with_data(project, event_name, id, summary, timestamp, None)
+}
+
+pub(crate) fn append_event_with_data(
+    project: &TandemProject,
+    event_name: &str,
+    id: &str,
+    summary: &str,
+    timestamp: &str,
+    data: Option<&serde_json::Value>,
+) -> Result<(), CliError> {
     debug_assert!(event::is_known_name(event_name));
     append_event_for_actor(
         project,
@@ -28,6 +39,7 @@ pub(crate) fn append_event(
         summary,
         timestamp,
         &actor_id(project)?,
+        data,
     )
 }
 
@@ -38,6 +50,7 @@ fn append_event_for_actor(
     summary: &str,
     timestamp: &str,
     actor: &str,
+    data: Option<&serde_json::Value>,
 ) -> Result<(), CliError> {
     let path = project.actor_events_path(actor);
     fs::create_dir_all(project.events_dir())?;
@@ -61,6 +74,7 @@ fn append_event_for_actor(
             summary,
             actor,
             seq,
+            data,
         });
         (&file).write_all(line.as_bytes()).and_then(|_| file.sync_data()).map_err(|error| {
             CliError::user(format!(
@@ -373,14 +387,19 @@ fn next_sequence(content: &str, actor: &str) -> Result<u64, CliError> {
 
 fn canonical_json_line(event: CanonicalEventEnvelope<'_>) -> String {
     debug_assert_eq!(CanonicalEventEnvelope::required_fields().len(), 6);
+    let data = event
+        .data
+        .map(|value| format!(",\"data\":{value}"))
+        .unwrap_or_default();
     format!(
-        "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{},\"actor\":{},\"seq\":{}}}\n",
+        "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{},\"actor\":{},\"seq\":{}{}}}\n",
         json_string(event.ts),
         json_string(event.event),
         json_string(event.id),
         json_string(event.summary),
         json_string(event.actor),
         event.seq,
+        data,
     )
 }
 
@@ -525,8 +544,16 @@ mod tests {
         let path = project.actor_events_path("tester");
         fs::create_dir_all(project.events_dir()).unwrap();
         fs::write(&path, "{\"ts\":\"old\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"old\",\"actor\":\"tester\",\"seq\":4}\n").unwrap();
-        append_event_for_actor(&project, "task.updated", "task-1", "next", "now", "tester")
-            .unwrap();
+        append_event_for_actor(
+            &project,
+            "task.updated",
+            "task-1",
+            "next",
+            "now",
+            "tester",
+            None,
+        )
+        .unwrap();
         let line = fs::read_to_string(path)
             .unwrap()
             .lines()
@@ -561,6 +588,7 @@ mod tests {
             "mentioned \"actor\":\"other\" and \"seq\":999",
             "now",
             "tester",
+            None,
         )
         .unwrap();
         append_event_for_actor(
@@ -570,6 +598,7 @@ mod tests {
             "next",
             "later",
             "tester",
+            None,
         )
         .unwrap();
         let content = fs::read_to_string(project.actor_events_path("tester")).unwrap();
@@ -601,6 +630,7 @@ mod tests {
                         &format!("{index}"),
                         "now",
                         "concurrent",
+                        None,
                     )
                     .unwrap();
                 })

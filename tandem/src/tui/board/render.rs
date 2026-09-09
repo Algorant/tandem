@@ -379,19 +379,29 @@ impl TuiApp {
 
         let focused = self.focus == FocusPane::Detail;
         let (title, lines) = match self.selected_doc() {
-            Some(doc) => (
-                format!(" Detail {} ", doc.id()),
-                detail_lines_for_doc_with_context(
+            Some(doc) => {
+                let mut context = relationship_context_for_doc_with_hierarchy(
                     doc,
-                    &self.theme,
-                    &relationship_context_for_doc_with_hierarchy(
-                        doc,
-                        &self.docs,
-                        &self.logs,
-                        self.hierarchy.index.as_ref(),
-                    ),
-                ),
-            ),
+                    &self.docs,
+                    &self.logs,
+                    self.hierarchy.index.as_ref(),
+                );
+                let counts = self
+                    .log_events
+                    .get(doc.id())
+                    .map(|events| logs::accord_counts(events));
+                if counts.is_some_and(|counts| {
+                    counts.attempt_count > 0
+                        || counts.rework_count > 0
+                        || counts.discarded_count > 0
+                }) {
+                    context.accord_counts = counts;
+                }
+                (
+                    format!(" Detail {} ", doc.id()),
+                    detail_lines_for_doc_with_context(doc, &self.theme, &context),
+                )
+            }
             None => (
                 " Detail ".to_string(),
                 vec![Line::from(Span::styled(

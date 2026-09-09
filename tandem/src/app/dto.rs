@@ -52,6 +52,8 @@ pub(crate) struct DocumentDetailDto {
     pub(crate) parent: Option<Box<DocumentSummaryDto>>,
     pub(crate) children: Vec<DocumentSummaryDto>,
     pub(crate) accord: Option<AccordDto>,
+    #[serde(flatten)]
+    pub(crate) accord_counts: Option<crate::app::accord::AccordCounts>,
     pub(crate) validation: Option<ValidationDto>,
     pub(crate) resolution: Option<ResolutionDto>,
     pub(crate) decision: Option<DecisionDto>,
@@ -202,6 +204,8 @@ pub(crate) fn detail(read: &ReadSnapshot, document: &Document) -> Result<Documen
         parent: parent.map(Box::new),
         children,
         accord,
+        accord_counts: (document.doc_type() == "task")
+            .then(|| crate::app::accord::counts(&read.events, document.id())),
         validation,
         resolution,
         decision: (document.doc_type() == "decision").then(|| decision(document)),

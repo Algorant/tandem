@@ -45,6 +45,95 @@ fn root(name: &str) -> std::path::PathBuf {
 }
 
 #[test]
+fn accord_counts_cover_rework_and_discarded_attempts_on_archived_tasks() {
+    let root_dir = root("counts");
+    std::fs::create_dir_all(&root_dir).unwrap();
+    run(&root_dir, &["init", "--title", "counts"]);
+    run(
+        &root_dir,
+        &["add", "task", "Task", "--acceptance", "accept"],
+    );
+    run(
+        &root_dir,
+        &["accord", "claim", "task-1", "--assignee", "worker"],
+    );
+    run(
+        &root_dir,
+        &[
+            "accord",
+            "deliver",
+            "task-1",
+            "--summary",
+            "first",
+            "--evidence",
+            "observed first",
+        ],
+    );
+    run(
+        &root_dir,
+        &["accord", "rework", "task-1", "--note", "fix it"],
+    );
+    run(
+        &root_dir,
+        &[
+            "accord",
+            "deliver",
+            "task-1",
+            "--summary",
+            "second",
+            "--evidence",
+            "observed second",
+        ],
+    );
+    run(
+        &root_dir,
+        &[
+            "accord",
+            "release",
+            "task-1",
+            "--note",
+            "discard first attempt",
+            "--disposition",
+            "discarded",
+        ],
+    );
+    let released_event = event_bytes(&root_dir);
+    assert!(String::from_utf8_lossy(&released_event)
+        .contains("\"data\":{\"disposition\":\"discarded\"}"));
+
+    run(
+        &root_dir,
+        &["accord", "claim", "task-1", "--assignee", "worker"],
+    );
+    run(
+        &root_dir,
+        &[
+            "accord",
+            "deliver",
+            "task-1",
+            "--summary",
+            "final",
+            "--evidence",
+            "observed final",
+        ],
+    );
+    run(&root_dir, &["complete", "task-1"]);
+
+    let shown: serde_json::Value =
+        serde_json::from_str(&run(&root_dir, &["show", "task-1", "--json"])).unwrap();
+    assert_eq!(shown["data"]["attemptCount"], 2);
+    assert_eq!(shown["data"]["reworkCount"], 1);
+    assert_eq!(shown["data"]["discardedCount"], 1);
+
+    let assignment: serde_json::Value =
+        serde_json::from_str(&run(&root_dir, &["assignment", "task-1", "--json"])).unwrap();
+    assert_eq!(assignment["data"]["root"]["attemptCount"], 2);
+    assert_eq!(assignment["data"]["root"]["reworkCount"], 1);
+    assert_eq!(assignment["data"]["root"]["discardedCount"], 1);
+    std::fs::remove_dir_all(root_dir).unwrap();
+}
+
+#[test]
 fn cli_deliver_rejects_empty_evidence_without_record_or_event_mutation() {
     let root_dir = root("evidence");
     std::fs::create_dir_all(&root_dir).unwrap();

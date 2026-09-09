@@ -96,6 +96,10 @@ fn assignment_json_is_complete_for_long_root_and_ten_milestones() {
     );
     assert_eq!(
         assignment["root"]["plannedValidation"],
+        serde_json::json!([{"kind": "manual", "text": "root validation"}])
+    );
+    assert_eq!(
+        root_show["accord"]["validations"],
         serde_json::json!(["root validation"])
     );
     assert_eq!(
@@ -121,7 +125,7 @@ fn assignment_json_is_complete_for_long_root_and_ten_milestones() {
         );
         assert_eq!(
             milestone["plannedValidation"],
-            serde_json::json!([format!("validation {index}")])
+            serde_json::json!([{"kind": "manual", "text": format!("validation {index}")}])
         );
         assert_eq!(
             milestone["ownedScope"],
@@ -131,6 +135,42 @@ fn assignment_json_is_complete_for_long_root_and_ten_milestones() {
     assert!(assignment["dependencyReadiness"]["allClear"]
         .as_bool()
         .unwrap());
+    std::fs::remove_dir_all(root_dir).unwrap();
+}
+
+#[test]
+fn assignment_classifies_command_validations_without_executing_them() {
+    let root_dir = root("validation-kinds");
+    std::fs::create_dir_all(&root_dir).unwrap();
+    run(&root_dir, &["init", "--title", "assignment"]);
+    run(
+        &root_dir,
+        &[
+            "add",
+            "task",
+            "Assignment",
+            "--acceptance",
+            "accept",
+            "--validation",
+            "$ true",
+            "--validation",
+            "Read the output",
+        ],
+    );
+
+    let assignment = data(&root_dir, &["assignment", "task-1", "--json"]);
+    assert_eq!(
+        assignment["root"]["plannedValidation"],
+        serde_json::json!([
+            {"kind": "command", "text": "true"},
+            {"kind": "manual", "text": "Read the output"}
+        ])
+    );
+    let shown = data(&root_dir, &["show", "task-1", "--json"]);
+    assert_eq!(
+        shown["accord"]["validations"],
+        serde_json::json!(["$ true", "Read the output"])
+    );
     std::fs::remove_dir_all(root_dir).unwrap();
 }
 

@@ -3,8 +3,10 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use serde::Serialize;
+
 use crate::app::support::{
-    append_event, checkpoint_boundary, current_timestamp,
+    append_event, append_event_with_data, checkpoint_boundary, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty, validate_state,
     validate_task_document_against_hierarchy,
 };
@@ -24,6 +26,7 @@ use crate::protocol::workflow::{
 pub(crate) struct AccordOptions {
     pub(crate) id: String,
     pub(crate) assignee: Option<String>,
+    pub(crate) disposition: Option<String>,
     pub(crate) summary: Option<String>,
     pub(crate) reviewer: Option<String>,
     pub(crate) note: Option<String>,
@@ -33,6 +36,36 @@ pub(crate) struct AccordOptions {
     pub(crate) constraints: Vec<String>,
     pub(crate) evidence: Vec<String>,
     pub(crate) files_changed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AccordCounts {
+    pub(crate) attempt_count: usize,
+    pub(crate) rework_count: usize,
+    pub(crate) discarded_count: usize,
+}
+
+pub(crate) fn counts(events: &[crate::project::ProjectEvent], id: &str) -> AccordCounts {
+    let mut counts = AccordCounts::default();
+    for event in events.iter().filter(|event| event.id == id) {
+        match event.event.as_str() {
+            "accord.claimed" => counts.attempt_count += 1,
+            "accord.rework" => counts.rework_count += 1,
+            "accord.released"
+                if event
+                    .data
+                    .as_ref()
+                    .and_then(|data| data.get("disposition"))
+                    .and_then(serde_json::Value::as_str)
+                    == Some("discarded") =>
+            {
+                counts.discarded_count += 1;
+            }
+            _ => {}
+        }
+    }
+    counts
 }
 
 fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), Error> {
@@ -56,6 +89,14 @@ fn validate_accord_inputs(action: &str, options: &AccordOptions) -> Result<(), E
     }
     if action == "deliver" {
         accord::validate_delivery_evidence(&options.evidence).map_err(Error::usage)?;
+    }
+    if action == "release" {
+        let disposition = options.disposition.as_deref().unwrap_or("reassign");
+        if !matches!(disposition, "discarded" | "reassign") {
+            return Err(Error::usage(
+                "accord release --disposition must be `discarded` or `reassign`",
+            ));
+        }
     }
     Ok(())
 }
@@ -498,11 +539,17 @@ pub(crate) fn transition(
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
     let event_name = accord::event_name(action).to_string();
-    append_event(
+    let event_data = (action == "release").then(|| {
+        serde_json::json!({
+            "disposition": options.disposition.as_deref().unwrap_or("reassign")
+        })
+    });
+    append_event_with_data(
         workspace,
         &event_name,
         doc.id(),
         &format!("Accord {action} for {}", doc.id()),
+        event_data.as_ref(),
     )?;
     drop(_hierarchy_lock);
     let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);

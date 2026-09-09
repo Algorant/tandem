@@ -170,6 +170,7 @@ pub(super) struct BoardRelationshipContext {
     pub(super) hierarchy_error: Option<String>,
     pub(super) active_children: Vec<BoardRelatedChild>,
     pub(super) completed_children: Vec<BoardRelatedChild>,
+    pub(super) accord_counts: Option<crate::app::accord::AccordCounts>,
 }
 
 impl BoardRelationshipContext {
@@ -826,6 +827,7 @@ pub(super) fn relationship_context_for_doc_with_hierarchy(
         hierarchy_error,
         active_children,
         completed_children,
+        accord_counts: None,
     }
 }
 
@@ -2304,6 +2306,23 @@ pub(super) fn detail_lines_for_doc_with_context(
         ));
     }
     push_optional_detail_line(&mut lines, "Accord", accord_status(doc), theme);
+    if let Some(counts) = relationship_context.accord_counts {
+        lines.push(detail_field_line(
+            "Attempts",
+            &counts.attempt_count.to_string(),
+            theme,
+        ));
+        lines.push(detail_field_line(
+            "Reworks",
+            &counts.rework_count.to_string(),
+            theme,
+        ));
+        lines.push(detail_field_line(
+            "Discarded",
+            &counts.discarded_count.to_string(),
+            theme,
+        ));
+    }
     push_optional_detail_line(&mut lines, "Updated", doc.field("updatedAt"), theme);
     lines.push(detail_field_line("Path", &display_path(&doc.path), theme));
     push_board_accord_detail_section(&mut lines, doc, theme);
