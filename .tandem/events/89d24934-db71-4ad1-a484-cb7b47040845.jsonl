@@ -29,3 +29,10 @@
 {"ts":"2026-09-06T00:35:58Z","event":"task.completed","id":"task-19","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":29}
 {"ts":"2026-09-06T00:36:15Z","event":"accord.delivered","id":"task-18","summary":"Accord deliver for task-18","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":30}
 {"ts":"2026-09-06T00:36:23Z","event":"task.completed","id":"task-18","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":31}
+{"ts":"2026-09-06T12:49:04Z","event":"task.created","id":"task-20","summary":"Explore and implement rule on/off toggles across protocol, context, and TUI","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":32}
+{"ts":"2026-09-06T14:20:33Z","event":"task.created","id":"task-21","summary":"Explore TUI Papercuts count/display mismatch for nested and related tasks","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":33}
+{"ts":"2026-09-07T13:41:48Z","event":"task.created","id":"task-22","summary":"Review modeling and TUI presentation of research and papercut tasks","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":34}
+{"ts":"2026-09-07T13:55:21Z","event":"task.updated","id":"task-21","summary":"Updated task-21 metadata: title, references, acceptance, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":35}
+{"ts":"2026-09-09T14:22:46Z","event":"task.created","id":"task-23","summary":"Expose attempt, rework, and discard counts on the Accord","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":36}
+{"ts":"2026-09-09T14:22:46Z","event":"task.created","id":"task-24","summary":"Define a runnable validation form in the protocol and assignment read","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":37}
+{"ts":"2026-09-09T14:30:35Z","event":"accord.claimed","id":"task-23","summary":"Accord claim for task-23","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":38}
