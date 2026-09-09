@@ -2,6 +2,25 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.0
+
+Tandem v0.13.0 makes Accord history and assignment validation visible to native clients and the TUI.
+
+### Added
+
+- Accord releases record a `reassign` or `discarded` disposition, and native reads derive attempt, rework, and discarded counts from the event history.
+- `assignment --json` classifies `$ ` validations as runnable commands while preserving raw validation strings in `show --json`.
+- Board and Logs detail panes show Accord history counts. Board detail is reachable with `d` and advertises the toggle in its footer.
+
+### Changed
+
+- Released Tasks return to workflow state `todo` with `accordStatus: ready`, making them claimable again.
+- Runnable validation commands are defined as executing from the Task repository root; Tandem classifies them but does not execute them.
+
+### Fixed
+
+- Invalid Accord release dispositions now use the CLI usage exit code 2.
+
 ## 0.12.4
 
 Tandem v0.12.4 makes assignment workflows usable natively, with complete assignment reads, TUI lifecycle actions, and Git checkpoints at work boundaries.
