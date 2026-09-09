@@ -2,17 +2,19 @@
 id: task-26
 type: task
 title: "Papercuts from task-23/24 verification: disposition exit code, `$ ` whitespace, released state"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "small"
 tags: ["protocol", "papercut", "accord"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["`accord release --disposition bogus` exits 2 (usage) instead of 1, matching the protocol's exit-code contract.", "`$   echo x` classifies as a command with text `echo x`: strip the `$ ` prefix and then leading whitespace, or document that only one space is removed.", "Decide and document whether `accord release` should return `state` to `todo`; today a released Task keeps `state: in-progress` with `accordStatus: ready`, so a discarded attempt sits in the WIP column with no assignee. If intentional, say so in protocol/README.md; if not, reset state on release."]
+  claimedAt: "2026-09-09T15:15:16Z"
   validation: ["$ cargo test -p tandem", "Live: rerun the three commands above in a throwaway workspace and observe the documented behavior."]
-  updatedAt: "2026-09-09T14:51:09Z"
+  updatedAt: "2026-09-09T15:15:16Z"
 createdAt: "2026-09-09T14:51:09Z"
-updatedAt: "2026-09-09T14:51:09Z"
+updatedAt: "2026-09-09T15:15:16Z"
+assignee: "Algorant"
 ---
 
 ## Description
