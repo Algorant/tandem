@@ -36,3 +36,4 @@
 {"ts":"2026-09-09T14:22:46Z","event":"task.created","id":"task-23","summary":"Expose attempt, rework, and discard counts on the Accord","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":36}
 {"ts":"2026-09-09T14:22:46Z","event":"task.created","id":"task-24","summary":"Define a runnable validation form in the protocol and assignment read","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":37}
 {"ts":"2026-09-09T14:30:35Z","event":"accord.claimed","id":"task-23","summary":"Accord claim for task-23","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":38}
+{"ts":"2026-09-09T14:39:31Z","event":"accord.delivered","id":"task-23","summary":"Accord deliver for task-23","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":39}
