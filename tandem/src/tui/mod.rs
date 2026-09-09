@@ -2751,6 +2751,20 @@ tone = "success"
     }
 
     #[test]
+    fn board_detail_has_keyboard_toggle_and_footer_hint() {
+        let mut app = keyboard_test_app();
+        assert!(!app.show_board_detail);
+        app.handle_key(key(KeyCode::Char('d'))).unwrap();
+        assert!(app.show_board_detail);
+        assert_eq!(app.focus, FocusPane::Detail);
+        assert!(app.board_footer_text().contains("d List"));
+        app.handle_key(key(KeyCode::Char('d'))).unwrap();
+        assert!(!app.show_board_detail);
+        assert_eq!(app.focus, FocusPane::Board);
+        assert!(app.board_footer_text().contains("d Detail"));
+    }
+
+    #[test]
     fn top_header_tabs_separate_shortcuts_labels_and_counts() {
         let app = keyboard_test_app();
         let line = line_text(&app.view_tab_line(96));
@@ -2766,7 +2780,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
         assert!(!app.board_footer_text().contains("TODO"));
         assert!(!app.board_footer_text().contains("row"));
@@ -2774,7 +2788,10 @@ tone = "success"
         assert!(!app.board_footer_text().contains("1..4"));
 
         app.focus = FocusPane::Detail;
-        assert_eq!(app.board_footer_text(), "e Edit · b Epic Board · ? Help");
+        assert_eq!(
+            app.board_footer_text(),
+            "d List · e Edit · b Epic Board · ? Help"
+        );
 
         app.switch_view(TuiView::Logs);
         app.status.clear();
@@ -3155,7 +3172,7 @@ tone = "success"
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
-            "a Actions · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
     }
 
@@ -4553,6 +4570,7 @@ tone = "success"
         refresh_test_hierarchy(&mut app);
         app.handle_key(key(KeyCode::Char('d'))).unwrap();
         assert_eq!(app.selected_item, 0);
+        app.handle_key(key(KeyCode::Char('d'))).unwrap();
         app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL))
             .unwrap();
         assert_eq!(app.selected_item, 5);

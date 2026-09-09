@@ -413,7 +413,7 @@ impl TuiApp {
             FocusPane::Board
         };
         self.status = if self.show_board_detail {
-            "Board detail pane shown; Tab or Esc returns to the list.".to_string()
+            "Board detail pane shown; d or Esc returns to the list.".to_string()
         } else {
             "Board detail pane hidden; Enter activates the selected row.".to_string()
         };

@@ -365,6 +365,7 @@ pub(super) fn detail_lines_for_log(
     }
 
     append_accord_lines(&mut lines, doc, theme);
+    append_accord_counts(&mut lines, events, theme);
     append_event_lines(&mut lines, events, theme);
 
     lines.push(Line::from(""));
@@ -473,6 +474,33 @@ fn append_accord_lines(lines: &mut Vec<Line<'static>>, doc: &Document, theme: &T
     );
     push_compact_optional(lines, "note", doc.field("accord.note"), theme);
     push_compact_optional(lines, "reason", doc.field("accord.reason"), theme);
+}
+
+fn append_accord_counts(lines: &mut Vec<Line<'static>>, events: &[LogEvent], theme: &TuiTheme) {
+    let counts = accord_counts(events);
+    if counts.attempt_count == 0 && counts.rework_count == 0 && counts.discarded_count == 0 {
+        return;
+    }
+    lines.push(Line::from(""));
+    lines.push(section_heading("Accord history", theme));
+    push_compact_optional(
+        lines,
+        "Attempts",
+        Some(&counts.attempt_count.to_string()),
+        theme,
+    );
+    push_compact_optional(
+        lines,
+        "Reworks",
+        Some(&counts.rework_count.to_string()),
+        theme,
+    );
+    push_compact_optional(
+        lines,
+        "Discarded",
+        Some(&counts.discarded_count.to_string()),
+        theme,
+    );
 }
 
 fn push_array_detail_lines(
@@ -749,6 +777,51 @@ mod tests {
 
         let row = line_text(&line_for_test_log(&doc, &theme, 80));
         assert_eq!(row, "task-36  [TASK] Completed the useful thing");
+    }
+
+    #[test]
+    fn log_detail_shows_accord_attempt_counts_when_present() {
+        let theme = TuiTheme::default_dark();
+        let doc = log_doc(
+            "task-38",
+            "Retried work",
+            "Completed after corrections",
+            "2026-06-28T19:00:00Z",
+            "Body",
+        );
+        let events = vec![
+            LogEvent {
+                ts: "2026-06-28T17:00:00Z".to_string(),
+                event: "accord.claimed".to_string(),
+                summary: "first claim".to_string(),
+                disposition: None,
+            },
+            LogEvent {
+                ts: "2026-06-28T18:00:00Z".to_string(),
+                event: "accord.rework".to_string(),
+                summary: "correction requested".to_string(),
+                disposition: None,
+            },
+            LogEvent {
+                ts: "2026-06-28T18:30:00Z".to_string(),
+                event: "accord.claimed".to_string(),
+                summary: "second claim".to_string(),
+                disposition: None,
+            },
+            LogEvent {
+                ts: "2026-06-28T18:45:00Z".to_string(),
+                event: "accord.released".to_string(),
+                summary: "discarded attempt".to_string(),
+                disposition: Some("discarded".to_string()),
+            },
+        ];
+        let lines = detail_lines_for_log(&doc, None, &events, &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        assert!(lines.iter().any(|line| line.contains("Attempts: 2")));
+        assert!(lines.iter().any(|line| line.contains("Reworks: 1")));
+        assert!(lines.iter().any(|line| line.contains("Discarded: 1")));
     }
 
     #[test]

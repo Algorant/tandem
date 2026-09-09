@@ -382,10 +382,15 @@ impl TuiApp {
             BoardArrangement::State => "b Epic Board",
             BoardArrangement::Epic => "b State Board",
         };
-        let commands = if self.focus == FocusPane::Detail {
-            format!("e Edit · {arrangement_hint} · ? Help")
+        let detail_hint = if self.focus == FocusPane::Detail {
+            "d List"
         } else {
-            format!("a Actions · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
+            "d Detail"
+        };
+        let commands = if self.focus == FocusPane::Detail {
+            format!("{detail_hint} · e Edit · {arrangement_hint} · ? Help")
+        } else {
+            format!("a Actions · {detail_hint} · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
         };
         self.with_status(commands)
     }
@@ -504,7 +509,12 @@ impl TuiApp {
                     "Enter expand",
                     HitAction::ToggleBoardExpansion,
                 );
-                self.register_footer_hit(area, text, "Tab board", HitAction::ToggleBoardDetail);
+                let detail_label = if self.focus == FocusPane::Detail {
+                    "d List"
+                } else {
+                    "d Detail"
+                };
+                self.register_footer_hit(area, text, detail_label, HitAction::ToggleBoardDetail);
                 self.register_footer_hit(
                     area,
                     text,

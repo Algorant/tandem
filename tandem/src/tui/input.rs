@@ -137,6 +137,9 @@ impl TuiApp {
                 self.status = "Decision editing remains available through the CLI.".into()
             }
             KeyCode::Char('b') if self.view == TuiView::Board => self.toggle_board_arrangement(),
+            KeyCode::Char('d') if self.view == TuiView::Board && key.modifiers.is_empty() => {
+                self.toggle_board_detail()
+            }
             KeyCode::Char('f') if self.view == TuiView::Board => self.start_filter_picker(),
             KeyCode::Char('a') if self.view == TuiView::Board => self.start_workflow_picker(),
             KeyCode::Char('v') if self.view == TuiView::Board => self.start_validation_picker(),
