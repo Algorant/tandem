@@ -2,14 +2,13 @@
 id: task-29
 type: task
 title: "Reference links: accept absolute URLs and scope unresolved warnings to the Board"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-2"]
 relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/protocol/document.rs", "tandem/src/web.rs", "tandem/src/web/ui.js", "tandem/src/cli/commands.rs", "tandem/tests/reference_behavior.rs", "tandem/Cargo.toml", "tandem/Cargo.lock", "protocol/README.md", "protocol/assignment.md", "docs/cli/index.md", "docs/guides/decisions.md"]
 tags: ["protocol", "validation", "ui"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["A reference holding an absolute http(s) URL produces no warning; an unresolved document-ID reference (for example missing-task) still warns.", "Board-scoped reads emit no 'references missing target' warnings for archived Logs records.", "Web detail renders URL references as external links and document-ID references as internal #document/<id> links.", "Protocol and CLI docs state that references accepts document IDs and absolute URLs, and that repo paths belong in relatedFiles.", "just dev-check passes with tests covering URL acceptance, unresolved-ID warning, and Log exclusion."]
   claimedAt: "2026-09-10T18:00:13Z"
   deliveredAt: "2026-09-10T18:14:03Z"
@@ -22,6 +21,9 @@ accord:
 createdAt: "2026-09-10T17:54:37Z"
 updatedAt: "2026-09-10T18:14:03Z"
 assignee: "worker-task-29-b95826a2"
+archivedAt: "2026-09-10T18:14:03Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
