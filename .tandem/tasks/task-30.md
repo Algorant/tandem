@@ -11,10 +11,11 @@ tags: ["tui"]
 accord:
   status: "ready"
   acceptance: ["TUI Board task detail renders a References row listing document IDs and URL values", "Rendering handles a record with no references without adding an empty row", "just dev-check passes"]
-  validation: ["just dev-check"]
-  updatedAt: "2026-09-10T17:54:53Z"
+  validation: ["$ just dev-check"]
+  constraints: ["Display-only plain text References row; no OSC-8 work, validation, storage, or lifecycle changes.", "Keep implementation and rendering regression tests in tandem/src/tui/board/mod.rs; Decisions and Papercuts are styling references, not mutation scope."]
+  updatedAt: "2026-09-10T18:00:01Z"
 createdAt: "2026-09-10T17:54:53Z"
-updatedAt: "2026-09-10T17:54:53Z"
+updatedAt: "2026-09-10T18:00:01Z"
 ---
 
 ## Description

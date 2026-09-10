@@ -2,19 +2,22 @@
 id: task-29
 type: task
 title: "Reference links: accept absolute URLs and scope unresolved warnings to the Board"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-2"]
-relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/web/ui.js", "protocol/README.md", "protocol/assignment.md", "docs/cli/index.md", "docs/guides/decisions.md"]
+relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/protocol/", "tandem/src/web/ui.js", "tandem/tests/", "protocol/README.md", "protocol/assignment.md", "docs/cli/index.md", "docs/guides/decisions.md"]
 tags: ["protocol", "validation", "ui"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A reference holding an absolute http(s) URL produces no warning; an unresolved document-ID reference (for example missing-task) still warns.", "Board-scoped reads emit no 'references missing target' warnings for archived Logs records.", "Web detail renders URL references as external links and document-ID references as internal #document/<id> links.", "Protocol and CLI docs state that references accepts document IDs and absolute URLs, and that repo paths belong in relatedFiles.", "just dev-check passes with tests covering URL acceptance, unresolved-ID warning, and Log exclusion."]
-  validation: ["just dev-check"]
-  updatedAt: "2026-09-10T17:54:37Z"
+  claimedAt: "2026-09-10T18:00:13Z"
+  validation: ["$ just dev-check"]
+  constraints: ["Keep URL reference classification semantics in protocol; app queries compose location-scoped warning behavior and web renders links.", "Do not modify TUI code; task-30 owns the Board References row.", "No adapter changes or workspace data cleanup."]
+  updatedAt: "2026-09-10T18:00:13Z"
 createdAt: "2026-09-10T17:54:37Z"
-updatedAt: "2026-09-10T17:54:37Z"
+updatedAt: "2026-09-10T18:00:13Z"
+assignee: "worker-task-29-b95826a2"
 ---
 
 ## Description

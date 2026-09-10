@@ -53,3 +53,6 @@
 {"ts":"2026-09-09T21:16:54Z","event":"task.created","id":"task-28","summary":"Epic closure: completing a parent epic with delivered children still warns 'complete normally follows a delivered Accord'","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":53}
 {"ts":"2026-09-10T17:54:37Z","event":"task.created","id":"task-29","summary":"Reference links: accept absolute URLs and scope unresolved warnings to the Board","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":54}
 {"ts":"2026-09-10T17:54:53Z","event":"task.created","id":"task-30","summary":"TUI Board detail: show a References row","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":55}
+{"ts":"2026-09-10T18:00:01Z","event":"task.updated","id":"task-29","summary":"Updated task-29 metadata: relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":56}
+{"ts":"2026-09-10T18:00:01Z","event":"task.updated","id":"task-30","summary":"Updated task-30 metadata: constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":57}
+{"ts":"2026-09-10T18:00:13Z","event":"accord.claimed","id":"task-29","summary":"Accord claim for task-29","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":58}
