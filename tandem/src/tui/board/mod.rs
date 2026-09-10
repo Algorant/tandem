@@ -2263,6 +2263,7 @@ pub(super) fn detail_lines_for_doc_with_context(
     push_optional_detail_line(&mut lines, "Assignee", doc.field("assignee"), theme);
     push_optional_detail_line(&mut lines, "Due", doc.field("dueDate"), theme);
     push_optional_detail_line(&mut lines, "Tags", doc.field("tags"), theme);
+    push_optional_detail_list_line(&mut lines, "References", doc.values("references"), theme);
     if let Some(parent_id) = relationship_context.parent_id.as_deref() {
         let parent = relationship_context
             .parent_title
@@ -2559,4 +2560,152 @@ pub(super) fn accord_cli_hint(id: &str, status: &str) -> String {
 
 pub(super) fn normalized_accord_status(status: &str) -> String {
     status.trim().to_ascii_lowercase().replace('_', "-")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::env;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use ratatui::{backend::TestBackend, Terminal};
+
+    use super::*;
+
+    fn task_doc_with_references(id: &str, references: Option<&str>) -> Document {
+        let mut fields = HashMap::new();
+        fields.insert("id".to_string(), id.to_string());
+        fields.insert("type".to_string(), "task".to_string());
+        fields.insert("title".to_string(), format!("Task {id}"));
+        fields.insert("state".to_string(), "todo".to_string());
+        if let Some(references) = references {
+            fields.insert("references".to_string(), references.to_string());
+        }
+        Document::new(
+            PathBuf::from(format!("{id}.md")),
+            DocumentLocation::Board,
+            fields,
+            String::new(),
+        )
+    }
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect()
+    }
+
+    fn unique_test_dir(prefix: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("{prefix}-{}-{nonce}", std::process::id()))
+    }
+
+    fn initialized_workspace(root: &Path) -> TandemProject {
+        TandemProject::initialize(
+            root,
+            &crate::protocol::config::default_project_config("Reference wrap test"),
+        )
+        .unwrap()
+    }
+
+    // Inner detail-pane rows without the surrounding border columns, so wrapped
+    // content can be reconstructed across lines.
+    fn detail_inner_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
+        let buffer = terminal.backend().buffer();
+        let area = *buffer.area();
+        let width = area.width as usize;
+        let content = buffer.content();
+        (1..area.height.saturating_sub(1) as usize)
+            .map(|y| {
+                (1..width.saturating_sub(1))
+                    .map(|x| content[y * width + x].symbol())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn board_detail_renders_reference_ids_and_urls() {
+        let theme = TuiTheme::default_dark();
+        let doc = task_doc_with_references(
+            "task-30",
+            Some("[\"task-29\", \"https://github.com/Algorant/tandem/issues/30\"]"),
+        );
+        let lines = detail_lines_for_doc(&doc, &theme);
+        let references = lines
+            .iter()
+            .find(|line| line_text(line).starts_with("References:"))
+            .expect("References row should render");
+        assert_eq!(
+            line_text(references),
+            "References: task-29, https://github.com/Algorant/tandem/issues/30"
+        );
+        // Display-only row keeps the same label/value styling as every other detail field.
+        assert_eq!(references.spans[0].style, theme.label_style());
+        assert_eq!(references.spans[1].style, theme.text_style());
+    }
+
+    #[test]
+    fn board_detail_omits_references_row_when_absent() {
+        let theme = TuiTheme::default_dark();
+        for doc in [
+            task_doc_with_references("task-31", None),
+            task_doc_with_references("task-32", Some("[]")),
+        ] {
+            let texts = detail_lines_for_doc(&doc, &theme)
+                .iter()
+                .map(line_text)
+                .collect::<Vec<_>>();
+            assert!(
+                !texts.iter().any(|text| text.starts_with("References:")),
+                "unexpected References row for {}",
+                doc.id()
+            );
+        }
+    }
+
+    #[test]
+    fn board_detail_wraps_long_reference_url() {
+        let url = "https://github.com/Algorant/tandem/issues/30?plain=1#board-detail-references-row-wrapping-check-and-full-survival";
+        let root = unique_test_dir("tandem-tui-reference-wrap");
+        let workspace = initialized_workspace(&root);
+        fs::write(
+            workspace.tasks_dir.join("task-33.md"),
+            format!(
+                "---\nid: task-33\ntype: task\ntitle: Wrapped reference\nstate: todo\naccord:\n  status: ready\n  acceptance: [\"Reference URL renders in full\"]\nreferences: [\"{url}\"]\n---\n"
+            ),
+        )
+        .unwrap();
+
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.selected_state = 0;
+        app.clamp_selection();
+        let mut terminal = Terminal::new(TestBackend::new(46, 24)).unwrap();
+        terminal
+            .draw(|frame| app.draw_detail(frame, frame.area()))
+            .unwrap();
+
+        let rows = detail_inner_rows(&terminal);
+        let reconstructed = rows
+            .join("")
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect::<String>();
+        assert!(
+            reconstructed.contains(url),
+            "wrapped URL did not survive across rendered lines: {rows:?}"
+        );
+        assert!(
+            !rows.iter().any(|row| row.contains(url)),
+            "long URL was not wrapped within the detail pane: {rows:?}"
+        );
+
+        fs::remove_dir_all(root).unwrap();
+    }
 }
