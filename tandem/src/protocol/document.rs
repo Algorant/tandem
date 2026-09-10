@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 
+use url::Url;
 use yaml_rust2::{Yaml, YamlLoader};
 
 pub(crate) const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
@@ -69,6 +70,46 @@ pub(crate) fn has_metadata(document: &Document, prefix: &str) -> bool {
 
 pub(crate) fn is_supported_document_type(doc_type: &str) -> bool {
     SUPPORTED_DOCUMENT_TYPES.contains(&doc_type)
+}
+
+/// A `references` value is either a document ID or an absolute HTTP(S) URL.
+///
+/// URL references are opaque loose links: Tandem never fetches them, never
+/// rewrites their stored or displayed text, and never warns about them as
+/// unresolved targets. Every other value is a document ID and remains subject
+/// to document-target validation.
+///
+/// The boundary is deliberately strict so URL recognition cannot be produced
+/// by parser repair. A value must start with an explicit, case-insensitive
+/// `http://` or `https://`, must contain no embedded whitespace or control
+/// characters, must have a non-empty authority, and must parse as an HTTP(S)
+/// URL with a host. Malformed values such as `https:///path`, `https://?q=x`,
+/// or `http://host:notaport` stay document IDs and keep warning.
+pub(crate) fn is_absolute_reference_url(value: &str) -> bool {
+    let value = value.trim();
+    let Some(rest) = strip_http_scheme(value) else {
+        return false;
+    };
+    if value.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if authority.is_empty() {
+        return false;
+    }
+    match Url::parse(value) {
+        Ok(url) => matches!(url.scheme(), "http" | "https") && url.host().is_some(),
+        Err(_) => false,
+    }
+}
+
+fn strip_http_scheme(value: &str) -> Option<&str> {
+    ["http://", "https://"].into_iter().find_map(|scheme| {
+        value
+            .get(..scheme.len())
+            .filter(|prefix| prefix.eq_ignore_ascii_case(scheme))
+            .map(|_| &value[scheme.len()..])
+    })
 }
 
 pub(crate) fn validate_task_kind(kind: &str) -> Result<(), String> {
@@ -224,6 +265,47 @@ mod tests {
         assert!(document.is_first_class_type());
         assert!(is_supported_document_type("decision"));
         assert!(!is_supported_document_type("bug"));
+    }
+
+    #[test]
+    fn classifies_only_absolute_well_formed_http_reference_urls() {
+        for accepted in [
+            "http://example.com",
+            "https://example.com/artifact/123",
+            "https://example.com/artifact/123?query=1#fragment",
+            "HTTPS://Example.COM/Path",
+            "http://localhost:3000/post",
+            "http://127.0.0.1:8080",
+            "https://[::1]:8443/post",
+            "https://user:pass@example.com/x",
+            "  https://example.com/x  ",
+        ] {
+            assert!(is_absolute_reference_url(accepted), "accepted: {accepted}");
+        }
+        for rejected in [
+            "ftp://example.com",
+            "mailto:someone@example.com",
+            "ssh://example.com/repo",
+            "javascript:alert(1)",
+            "//example.com/path",
+            "example.com/path",
+            "task-12",
+            "decision-4",
+            "docs/guide.md",
+            "https://",
+            "https:///path",
+            "https://?query=1",
+            "https://#fragment",
+            "http://exa mple.com",
+            "http://example.com/a\tb",
+            "http://host:port/path",
+            "http://host:99999/path",
+            "http://[::1/path",
+            "",
+            "   ",
+        ] {
+            assert!(!is_absolute_reference_url(rejected), "rejected: {rejected}");
+        }
     }
 
     #[test]

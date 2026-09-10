@@ -13,6 +13,7 @@ use crate::project::{
     TandemProject,
 };
 use crate::protocol::config::DECISION_STATUSES;
+use crate::protocol::document::is_absolute_reference_url;
 
 #[derive(Debug, Default)]
 pub(crate) struct AddOptions {
@@ -232,6 +233,9 @@ pub(crate) fn diagnostics(
 ) -> Result<Vec<String>, Error> {
     let mut warnings = Vec::new();
     for reference in &options.references {
+        if is_absolute_reference_url(reference) {
+            continue;
+        }
         if !reference_target_exists(project, reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
@@ -329,7 +333,12 @@ mod tests {
                 title: Some("Choose seam".to_string()),
                 body: Some("## Decision\nKeep bytes.  ".to_string()),
                 deciders: vec!["A".to_string()],
-                references: vec![papercut_id.clone(), "missing-task".to_string()],
+                references: vec![
+                    papercut_id.clone(),
+                    "missing-task".to_string(),
+                    "https://example.com/decisions/9".to_string(),
+                    "HTTPS://Example.COM/Upper?x=1#fragment".to_string(),
+                ],
                 supersedes: vec!["missing-decision".to_string()],
                 ..Default::default()
             },
@@ -346,7 +355,7 @@ mod tests {
         let source = fs::read_to_string(outcome.path).unwrap();
         assert!(source.contains("deciders: [\"A\"]"));
         assert!(source.contains(&format!(
-            "references: [\"{papercut_id}\", \"missing-task\"]"
+            "references: [\"{papercut_id}\", \"missing-task\", \"https://example.com/decisions/9\", \"HTTPS://Example.COM/Upper?x=1#fragment\"]"
         )));
         assert!(source.contains("## Decision\nKeep bytes.  \n"));
         fs::remove_dir_all(root).unwrap();

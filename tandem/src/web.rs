@@ -20,7 +20,7 @@ use crate::app::dto::{self, DecisionDto, DocumentDetailDto, DocumentSummaryDto};
 use crate::app::queries::{ListFilter, ReadSnapshot};
 use crate::project::{StoredDocument as Document, TandemProject};
 use crate::protocol::accord::status as accord_status;
-use crate::protocol::document::parse_field_values;
+use crate::protocol::document::{is_absolute_reference_url, parse_field_values};
 use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
@@ -661,9 +661,18 @@ fn detail_dto(
     document: &Document,
 ) -> Result<WebDocumentDetailDto, ApiFailure> {
     let detail = dto::detail(read, document).map_err(|error| ApiFailure::from_cli(error.into()))?;
+    let reference_links = detail
+        .references
+        .iter()
+        .map(|value| ReferenceLinkDto {
+            value: value.clone(),
+            external: is_absolute_reference_url(value),
+        })
+        .collect();
     Ok(WebDocumentDetailDto {
         body_html: render_markdown(&detail.body),
         detail,
+        reference_links,
     })
 }
 
@@ -677,6 +686,17 @@ struct WebDocumentDetailDto {
     #[serde(flatten)]
     detail: DocumentDetailDto,
     body_html: String,
+    reference_links: Vec<ReferenceLinkDto>,
+}
+
+/// Web-only reference presentation metadata. Stored text is preserved exactly;
+/// `external` is protocol-owned classification for `references` values that are
+/// absolute HTTP(S) URLs. The shared `references` string array is unchanged.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReferenceLinkDto {
+    value: String,
+    external: bool,
 }
 
 fn log_summary_dto(document: &Document) -> LogSummaryDto {
@@ -1021,6 +1041,43 @@ mod tests {
         assert_eq!(detail["data"]["body"], "\n## Body\n");
         assert_eq!(detail["data"]["bodyHtml"], "<h2>Body</h2>");
         assert!(detail["data"].get("path").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn detail_projects_reference_links_with_protocol_classification() {
+        let (root, project) = test_project();
+        fs::write(
+            project.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntype: task\ntitle: Validate API\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\nreferences: [decision-1, \"https://example.com/artifacts/42\", \"HTTPS://Example.COM/Upper\", missing-task]\n---\n",
+        )
+        .unwrap();
+        let read = app::queries::load_read(&project).unwrap();
+        let document = read.snapshot.document("task-1").unwrap();
+        let detail = detail_dto(&read, &document).unwrap();
+        let links = detail
+            .reference_links
+            .iter()
+            .map(|link| (link.value.as_str(), link.external))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            links,
+            vec![
+                ("decision-1", false),
+                ("https://example.com/artifacts/42", true),
+                ("HTTPS://Example.COM/Upper", true),
+                ("missing-task", false),
+            ]
+        );
+        assert_eq!(
+            detail.detail.references,
+            vec![
+                "decision-1",
+                "https://example.com/artifacts/42",
+                "HTTPS://Example.COM/Upper",
+                "missing-task",
+            ]
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -7,7 +7,7 @@ use crate::project::write::HierarchyLock;
 use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{state_divergence_warning, status as accord_status};
 use crate::protocol::config::RulesByCategory;
-use crate::protocol::document::parse_field_values;
+use crate::protocol::document::{is_absolute_reference_url, parse_field_values};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{state_matches_filter, workflow_states};
@@ -124,11 +124,21 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> 
         if let Some(warning) = state_divergence_warning(document) {
             warnings.push(warning);
         }
+        // Archived Logs are immutable history: their loose references never
+        // produce missing-target warnings. Board documents (Tasks under
+        // `tasks/` and Decisions under `decisions/`) remain validated, and
+        // absolute URL references are opaque and never warn.
+        if document.location != DocumentLocation::Board {
+            continue;
+        }
         for reference in document
             .field("references")
             .map(parse_field_values)
             .unwrap_or_default()
         {
+            if is_absolute_reference_url(&reference) {
+                continue;
+            }
             let target_exists = hierarchy.document(&reference).is_some();
             if !target_exists {
                 warnings.push(format!(
@@ -404,7 +414,7 @@ mod tests {
         .unwrap();
         fs::write(
             project.tasks_dir.join("task-1.md"),
-            "---\nid: task-1\ntitle: Source\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\nreferences: [task-2, decision-1, task-3, papercut-1, missing-task]\n---\n",
+            "---\nid: task-1\ntitle: Source\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\nreferences: [task-2, decision-1, task-3, papercut-1, missing-task, \"https://example.com/artifacts/42\", \"HTTPS://Example.COM/Upper\"]\n---\n",
         )
         .unwrap();
         fs::write(
@@ -440,6 +450,62 @@ mod tests {
             .any(|warning| warning.contains("task-2")
                 || warning.contains("decision-1")
                 || warning.contains("task-3")));
+        // Absolute http(s) URL references are opaque loose links: never a
+        // missing-target warning, and their exact stored text is preserved.
+        assert!(!read.warnings.iter().any(|warning| warning
+            .contains("https://example.com/artifacts/42")
+            || warning.contains("HTTPS://Example.COM/Upper")));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn load_read_scopes_reference_warnings_to_board_documents() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-query-reference-scope-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        // A Board task referencing an archived record resolves: archived IDs
+        // are valid reference targets even though Logs never emit warnings.
+        fs::write(
+            project.tasks_dir.join("task-1.md"),
+            "---\nid: task-1\ntitle: Board source\nstate: todo\naccord:\n  status: ready\n  acceptance:\n    - criterion\nreferences: [task-9]\n---\n",
+        )
+        .unwrap();
+        // Archived Logs are immutable history and must not warn, even when
+        // their own references are unresolved.
+        fs::write(
+            project.logs_dir.join("task-9.md"),
+            "---\nid: task-9\ntitle: Archived source\nreferences: [gone-task, \"https://example.com/logged\"]\n---\n",
+        )
+        .unwrap();
+        // A Board Decision remains in warning scope.
+        fs::write(
+            project.data_dir().join("decisions/decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Board decision\nstatus: accepted\nreferences: [missing-decision]\n---\n",
+        )
+        .unwrap();
+
+        let read = load_read(&project).unwrap();
+        assert!(!read
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("task-9 references missing target")));
+        assert!(!read
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("task-1 references missing target")));
+        assert!(read
+            .warnings
+            .iter()
+            .any(|warning| warning == "decision-1 references missing target missing-decision."));
         fs::remove_dir_all(root).unwrap();
     }
 }

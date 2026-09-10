@@ -188,6 +188,20 @@ function listValue(values, link = false) {
   return el('span', {}, values.flatMap((value, index) => [index ? ', ' : null, el('a', { href: `#document/${encodeURIComponent(value)}`, text: value })]));
 }
 
+// Reference rows arrive from the web detail projection as `referenceLinks`,
+// where the server (protocol classification) marks absolute HTTP(S) URLs as
+// external. External values keep their exact stored text as the href; every
+// other value stays a percent-encoded internal document fragment.
+function referenceValueList(links) {
+  if (!links?.length) return 'None';
+  return el('span', {}, links.flatMap((link, index) => [
+    index ? ', ' : null,
+    link.external
+      ? el('a', { href: link.value, target: '_blank', rel: 'noopener noreferrer', text: link.value })
+      : el('a', { href: `#document/${encodeURIComponent(link.value)}`, text: link.value }),
+  ]));
+}
+
 function detailLink(item, label) {
   return el('a', { href: itemHref(item), text: `${label ? `${label}: ` : ''}${item.id} · ${item.title}` });
 }
@@ -198,7 +212,7 @@ export function renderDetail(detail, kind = 'document') {
     ['ID', detail.id], ['Type / role', [detail.type, detail.role].filter(Boolean).join(' / ')], ['Location', detail.location],
     ['State', detail.state || 'Not applicable'], ['Priority', detail.priority || 'Not set'], ['Assignee', detail.assignee || 'Not set'],
     ['Due date', detail.dueDate || 'Not set'], ['Created', detail.createdAt || 'Unknown'], ['Updated', detail.updatedAt || 'Unknown'],
-    ['Tags', listValue(detail.tags)], ['Blockers', listValue(detail.blockers, true)], ['References', listValue(detail.references, true)],
+    ['Tags', listValue(detail.tags)], ['Blockers', listValue(detail.blockers, true)], ['References', referenceValueList(detail.referenceLinks)],
     ['Related files', listValue(detail.relatedFiles)],
   ];
   const relationships = [

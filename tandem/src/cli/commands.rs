@@ -127,7 +127,7 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":[]})
+                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
                 );
             } else {
                 println!(

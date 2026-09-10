@@ -248,7 +248,7 @@ tandem add --title <title> [--state <state>] [--kind epic] [--description <text>
   - `--state <state>` defaults to `todo`.
   - `--kind epic`: mark the new root task as an Epic while preserving `type: task` and the task ID namespace. `--kind epic` and `--parent` cannot be combined because Epics cannot have parents.
   - `--parent <id>`: create a normal task linked through canonical `parentId`. A resolved Epic parent creates a global-ID Task with `epic-task`; a resolved Task parent creates a leaf `task-N-M` Subtask with `subtask`; a decision/custom parent creates a global-ID Task with generic `parent`. Attaching beneath a Subtask is an error. Global Epic/Task allocation and per-Task Subtask suffix allocation both scan active board documents and completed logs and reserve without overwriting.
-  - metadata: `--description`, `--priority`, `--effort`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`. `--effort` records the project's effort value without changing workflow state.
+  - metadata: `--description`, `--priority`, `--effort`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`. `--effort` records the project's effort value without changing workflow state. `--reference <ref>` accepts a document ID or an absolute `http(s)` URL; URL references are opaque loose links and are never fetched or warned about, while an unresolved document ID warns. Repository paths belong in `--related-file`, not `--reference`.
   - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
 - Human output shape: labeled created-task summary with ID, state, title, and file path. Epic-parent creation uses Task-of-Epic language, Task-parent creation uses `Created subtask`/`Subtask of`, and non-task parents retain `Created task`/generic `Parent`.
 - JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
@@ -302,7 +302,7 @@ tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--priori
 - Validation:
   - kind, when set, must be `epic`; an Epic must have no `parentId`.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
-  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; references warn when unresolved; related files remain path metadata.
+  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata.
 - Human output shape: warnings first, then changed metadata fields with old/new values; a body replacement reports only `body: changed` and never echoes body content. If every requested value already exists byte-for-byte, the command prints a clear no-op and does not update `updatedAt` or append an event.
 - Mutation notes: raw-source patches preserve unrelated/unknown frontmatter; metadata-only updates preserve the Markdown body, while `--body` replaces it exactly. Real changes update `updatedAt` and append `task.updated`; event summaries name `body` without copying body content.
 
@@ -776,7 +776,7 @@ tandem decision add --title <title> [--body <markdown>] [--status <proposed|acce
   - repeated `--alternative <text>`.
   - repeated `--supersedes <decision-id>`.
   - repeated `--superseded-by <decision-id>`.
-  - repeated `--reference <ref>`: related tasks, logs, or decisions; include superseded/superseding decision IDs here when they should be visible to current CLI/TUI search.
+  - repeated `--reference <ref>`: a related task, log, or decision ID, or an absolute `http(s)` URL. Include superseded/superseding decision IDs here when they should be visible to current CLI/TUI search; repository paths belong in `relatedFiles` metadata, not `references`. The current decision CLI has no `--related-file` option, and adding one is out of scope.
   - repeated `--tag <tag>`: use tags such as `adr`, `architecture`, or product area names for filtering.
 - Human output shape: warnings first, then labeled created-decision summary with ID, status, date, title, and path.
 - Example:
@@ -810,7 +810,7 @@ tandem decision add --title "Use styled-basic Markdown in v0" --status accepted 
 
 - Exit/error notes:
   - fails on missing title, invalid ADR status, empty metadata flag values, invalid references that are structural errors, or failed write.
-  - unresolved `references`, `supersedes`, or `supersededBy` targets are warnings in v0 related-reference semantics.
+  - unresolved document-ID `references` warn in v0 related-reference semantics; absolute `http(s)` URL references are opaque loose links and never warn. Unresolved `supersedes` or `supersededBy` targets also warn because those fields accept decision IDs only.
   - decision documents do not receive a workflow `state`; ADR `status` remains separate from task state filters and board movement.
 
 ### `tandem decision update`

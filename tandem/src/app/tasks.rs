@@ -17,7 +17,9 @@ use crate::project::{
     ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{status as accord_status, AccordRecord};
-use crate::protocol::document::{parse_field_values, validate_task_kind, EFFORTS, PRIORITIES};
+use crate::protocol::document::{
+    is_absolute_reference_url, parse_field_values, validate_task_kind, EFFORTS, PRIORITIES,
+};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
 use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use crate::protocol::workflow::{
@@ -233,6 +235,9 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
 
     let mut warnings = Vec::new();
     for reference in &options.references {
+        if is_absolute_reference_url(reference) {
+            continue;
+        }
         if !workspace.reference_target_exists(reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
@@ -448,6 +453,9 @@ pub(crate) fn update(
 
     let mut warnings = Vec::new();
     for reference in &options.references {
+        if is_absolute_reference_url(reference) {
+            continue;
+        }
         if !workspace.reference_target_exists(reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }

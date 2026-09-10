@@ -95,7 +95,9 @@ All archived outcomes unblock, matching the existing native completion blocker
 policy, which treats only Board blockers or missing IDs as unresolved.
 `dependencyReadiness.issues` repeats every missing or active dependency with its
 owning node ID. `references` are loose related links and are not prerequisites;
-they do not appear in `dependencies` or dependency issues.
+each value is a document ID or an absolute `http(s)` URL. Neither form appears
+in `dependencies` or dependency issues, and URL references are never fetched or
+rewritten.
 
 ## Delivery evidence
 

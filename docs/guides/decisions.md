@@ -6,7 +6,7 @@ Use Tandem `decision` documents for durable project, product, and architecture c
 
 ## Frontmatter pattern
 
-Required v0 fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body.
+Required v0 fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body. `references` accepts document IDs and absolute `http(s)` URLs: a document ID resolves against the workspace and warns when unresolved, while an absolute URL is an opaque loose link that Tandem never fetches, never rewrites, and never warns about. Repository paths belong in `relatedFiles` path metadata, not `references`; the current decision CLI has no `--related-file` option, and adding one is out of scope.
 
 Optional ADR-friendly metadata may be preserved by tools and edited in Markdown when needed:
 
@@ -28,7 +28,7 @@ createdAt: 2026-07-01T18:00:00Z
 updatedAt: 2026-07-01T18:00:00Z
 ```
 
-`status` is ADR record metadata, not workflow `state`. Use `references` for links the current CLI/TUI should find, including superseded or superseding decisions.
+`status` is ADR record metadata, not workflow `state`. Use `references` for links the current CLI/TUI should find, including superseded or superseding decisions and absolute `http(s)` artifact URLs.
 
 ## Body template
 
