@@ -72,3 +72,4 @@
 {"ts":"2026-09-10T18:59:35Z","event":"task.updated","id":"task-31","summary":"Updated task-31 metadata: relatedFiles, constraints","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":72}
 {"ts":"2026-09-10T19:00:04Z","event":"accord.blocked","id":"task-31","summary":"Accord block for task-31","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":73}
 {"ts":"2026-09-10T19:00:12Z","event":"accord.resumed","id":"task-31","summary":"Accord resume for task-31","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":74}
+{"ts":"2026-09-10T19:07:22Z","event":"accord.delivered","id":"task-31","summary":"Accord deliver for task-31","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":75}
