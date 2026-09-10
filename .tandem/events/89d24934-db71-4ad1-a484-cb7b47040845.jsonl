@@ -67,3 +67,5 @@
 {"ts":"2026-09-10T18:14:03Z","event":"task.completed","id":"task-29","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":67}
 {"ts":"2026-09-10T18:15:11Z","event":"accord.delivered","id":"task-30","summary":"Accord deliver for task-30","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":68}
 {"ts":"2026-09-10T18:15:11Z","event":"task.completed","id":"task-30","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":69}
+{"ts":"2026-09-10T18:57:26Z","event":"task.created","id":"task-31","summary":"Publish Tandem 0.13.1 reference-links patch release","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":70}
+{"ts":"2026-09-10T18:57:30Z","event":"accord.claimed","id":"task-31","summary":"Accord claim for task-31","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":71}
