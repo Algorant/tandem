@@ -2,14 +2,13 @@
 id: task-30
 type: task
 title: "TUI Board detail: show a References row"
-state: "in-progress"
 priority: "low"
 effort: "small"
 references: ["task-29"]
 relatedFiles: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/papercuts.rs"]
 tags: ["tui"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["TUI Board task detail renders a References row listing document IDs and URL values", "Rendering handles a record with no references without adding an empty row", "just dev-check passes"]
   claimedAt: "2026-09-10T18:00:26Z"
   deliveredAt: "2026-09-10T18:15:11Z"
@@ -22,6 +21,9 @@ accord:
 createdAt: "2026-09-10T17:54:53Z"
 updatedAt: "2026-09-10T18:15:11Z"
 assignee: "worker-task-30-256b6a3d"
+archivedAt: "2026-09-10T18:15:11Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
