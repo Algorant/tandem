@@ -2,6 +2,17 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.1
+
+Tandem v0.13.1 makes artifact references usable across the CLI, web interface, and TUI.
+
+### Fixed
+
+- References accept absolute HTTP(S) URLs without unresolved-target warnings; missing document IDs still warn. Archived Logs no longer emit reference warnings.
+- Web detail opens URL references as external links while preserving internal navigation for document IDs.
+- Board task detail shows a References row, wraps long values, and omits the row when empty.
+- Decision creation includes unresolved-reference warnings in its JSON response.
+
 ## 0.13.0
 
 Tandem v0.13.0 makes Accord history and assignment validation visible to native clients and the TUI.
