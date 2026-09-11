@@ -76,3 +76,6 @@
 {"ts":"2026-09-10T19:07:26Z","event":"task.completed","id":"task-31","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":76}
 {"ts":"2026-09-11T13:32:41Z","event":"accord.delivered","id":"task-11","summary":"Accord deliver for task-11","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":77}
 {"ts":"2026-09-11T13:32:45Z","event":"task.completed","id":"task-11","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":78}
+{"ts":"2026-09-11T13:35:26Z","event":"task.created","id":"task-32","summary":"Make legacy-rule warnings readable in the TUI Rules view","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":79}
+{"ts":"2026-09-11T13:35:34Z","event":"task.updated","id":"task-12","summary":"Updated task-12 metadata: references","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":80}
+{"ts":"2026-09-11T13:35:52Z","event":"accord.delivered","id":"task-12","summary":"Accord deliver for task-12","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":81}
