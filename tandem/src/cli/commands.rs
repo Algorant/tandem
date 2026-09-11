@@ -53,10 +53,16 @@ fn checkpoint_warning(outcome: &CheckpointOutcome) -> Option<String> {
 pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupRequest, CliError> {
     match command {
         Command::Init(args) => {
-            app::project::initialize(app::project::InitOptions {
+            let outcome = app::project::initialize(app::project::InitOptions {
                 title: args.title,
                 force: false,
             })?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{"title":outcome.title,"root":outcome.project.root().display().to_string()},"warnings":[]})
+                );
+            }
             Ok(super::StartupRequest::Exit)
         }
         Command::Add(args) => add(args, json),
