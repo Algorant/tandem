@@ -2,6 +2,19 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.2
+
+Tandem v0.13.2 fixes Decision editing, Papercuts navigation, and completion diagnostics.
+
+### Fixed
+
+- Common `update` edits Decision metadata, preserves historical decision dates, and avoids writes for unchanged requests. Invalid statuses and conflicting edits fail without modifying records.
+- Successful `init --json` returns a JSON envelope instead of empty output.
+- Review requires an exact current acceptance criterion; invalid requests leave records, events, and Git unchanged.
+- The Board Papercuts view lists every matching task, including nested tasks, with parent context. Papercuts also appear in workflow-state tabs; filtered counts are explicit, and reload preserves the selected view and record.
+- Legacy embedded-rule warnings remain readable in the Rules view instead of disappearing in the transient footer. Compact layouts keep active rules navigable.
+- Epics with a nonempty hierarchy of completed, archived children close without a redundant parent-delivery warning. Active descendants and blockers still prevent closure; child-based closure does not fabricate parent delivery or evidence.
+
 ## 0.13.1
 
 Tandem v0.13.1 makes artifact references usable across the CLI, web interface, and TUI.
