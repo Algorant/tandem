@@ -127,3 +127,4 @@
 {"ts":"2026-09-11T14:58:31Z","event":"accord.delivered","id":"task-28","summary":"Accord deliver for task-28","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":127}
 {"ts":"2026-09-11T14:58:31Z","event":"accord.rework","id":"task-28","summary":"Accord rework for task-28","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":128}
 {"ts":"2026-09-11T15:00:04Z","event":"accord.delivered","id":"task-28","summary":"Accord deliver for task-28","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":129}
+{"ts":"2026-09-11T15:00:04Z","event":"task.completed","id":"task-28","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":130}
