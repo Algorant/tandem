@@ -457,6 +457,13 @@ impl TuiApp {
             };
             return;
         }
+        // The Papercuts lens is flat: a row has no rendered subtree, so Enter
+        // and double-click always open the inline preview for that record
+        // instead of an invisible hierarchy expansion.
+        if self.selected_board_state().as_deref() == Some(PAPERCUTS_SUBVIEW) {
+            self.toggle_board_preview();
+            return;
+        }
         let has_active_descendants = role.is_some()
             && count_task_descendants(
                 &doc_id,
@@ -553,7 +560,7 @@ impl TuiApp {
         board_subview_tabs(&self.states, &self.docs, &self.board_filters).len()
     }
 
-    fn selected_board_state(&self) -> Option<String> {
+    pub(super) fn selected_board_state(&self) -> Option<String> {
         board_subview_tabs(&self.states, &self.docs, &self.board_filters)
             .get(self.selected_state)
             .map(|tab| tab.state.clone())
@@ -1056,8 +1063,14 @@ pub(super) fn document_state_label(doc: &Document) -> String {
         .to_string()
 }
 
+/// Shared Papercut classification: an active Board Task tagged `papercut`.
+/// Every Papercut surface — the global header count, the read-only `i` panel,
+/// and the Board's flat Papercuts lens — uses this predicate so their totals
+/// agree. Tagged Decisions and archived Logs records are not Papercuts.
 pub(super) fn is_papercut_doc(doc: &Document) -> bool {
-    doc.values("tags").iter().any(|tag| tag == "papercut")
+    is_board_visible_doc(doc)
+        && is_task_doc(doc)
+        && doc.values("tags").iter().any(|tag| tag == "papercut")
 }
 
 pub(super) fn is_decision_doc(doc: &Document) -> bool {

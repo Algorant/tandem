@@ -454,6 +454,19 @@ mod tests {
             .collect()
     }
 
+    /// Active Board Task used by the overlapping Papercuts lens tests. The
+    /// `papercut` tag decides lens membership; `parent` sets hierarchy context.
+    fn papercut_doc(id: &str, state: &str, parent: Option<&str>) -> Document {
+        let mut doc = doc_with_state(id, Some(state));
+        doc.fields
+            .insert("tags".to_string(), "[\"papercut\"]".to_string());
+        if let Some(parent) = parent {
+            doc.fields
+                .insert("parentId".to_string(), parent.to_string());
+        }
+        doc
+    }
+
     #[test]
     fn board_row_preserves_right_metadata_when_title_space_is_tight() {
         let theme = TuiTheme::default_dark();
@@ -3069,6 +3082,74 @@ tone = "success"
     }
 
     #[test]
+    fn papercut_lens_survives_manual_and_auto_reload_without_jumping_subviews() {
+        let root = unique_test_dir("tandem-papercut-lens-reload");
+        let workspace = TandemProject::initialize(
+            &root,
+            &crate::protocol::config::default_project_config("Papercut lens reload"),
+        )
+        .unwrap();
+        write_task_doc(&workspace, "task-1", "Ordinary task", "todo");
+        write_papercut(&workspace, "task-10", "First papercut", "Body");
+        write_papercut(&workspace, "task-11", "Second papercut", "Body");
+
+        let mut app = TuiApp::load(workspace.clone()).unwrap();
+        app.selected_state = app.board_section_count() - 1;
+        app.selected_item = 1;
+        app.clamp_selection();
+        assert_eq!(
+            app.selected_board_state().as_deref(),
+            Some(PAPERCUTS_SUBVIEW)
+        );
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
+
+        // Manual reload keeps the flat lens and the same selected id.
+        app.reload();
+        assert_eq!(
+            app.selected_board_state().as_deref(),
+            Some(PAPERCUTS_SUBVIEW)
+        );
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
+
+        // An external edit to a different match must not jump the subview.
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        write_papercut(&workspace, "task-10", "First papercut edited", "Body");
+        assert!(app.reload_if_changed());
+        assert_eq!(
+            app.selected_board_state().as_deref(),
+            Some(PAPERCUTS_SUBVIEW)
+        );
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
+
+        // Untagging the selected record keeps the lens and clamps to a remaining match.
+        app.last_reload_check = Instant::now() - Duration::from_secs(1);
+        write_task_doc(&workspace, "task-11", "Second papercut untagged", "todo");
+        assert!(app.reload_if_changed());
+        assert_eq!(
+            app.selected_board_state().as_deref(),
+            Some(PAPERCUTS_SUBVIEW)
+        );
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+
+        // A filter that excludes the remaining match leaves the lens active and empty.
+        app.board_filters = BoardFilters {
+            priority: Some("high".to_string()),
+            ..BoardFilters::default()
+        };
+        app.clamp_selection();
+        assert_eq!(app.selected_state_count(), 0);
+        app.reload();
+        assert_eq!(
+            app.selected_board_state().as_deref(),
+            Some(PAPERCUTS_SUBVIEW)
+        );
+        assert_eq!(app.selected_state_count(), 0);
+        assert!(app.selected_doc().is_none());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rules_mouse_hits_select_categories_and_dense_rows() {
         let mut app = keyboard_test_app();
         app.view = TuiView::Rules;
@@ -4774,22 +4855,389 @@ tone = "success"
                 BoardSubviewTab {
                     state: "todo".to_string(),
                     count: 2,
+                    total_count: 2,
                 },
                 BoardSubviewTab {
                     state: "in-progress".to_string(),
                     count: 0,
+                    total_count: 0,
                 },
                 BoardSubviewTab {
                     state: "review".to_string(),
                     count: 1,
+                    total_count: 1,
                 },
                 BoardSubviewTab {
-                    state: "__papercuts".to_string(),
+                    state: PAPERCUTS_SUBVIEW.to_string(),
                     count: 0,
+                    total_count: 0,
                 },
             ]
         );
         assert_eq!(state_tab_title("in-progress", 3), " IN PROGRESS 3 ");
+    }
+
+    #[test]
+    fn board_subview_title_distinguishes_filtered_and_total_counts() {
+        assert!(board_subview_title(&BoardSubviewTab {
+            state: PAPERCUTS_SUBVIEW.to_string(),
+            count: 4,
+            total_count: 4,
+        })
+        .contains("PAPERCUTS 4"));
+        assert!(board_subview_title(&BoardSubviewTab {
+            state: PAPERCUTS_SUBVIEW.to_string(),
+            count: 2,
+            total_count: 4,
+        })
+        .contains("PAPERCUTS 2/4"));
+    }
+
+    #[test]
+    fn papercut_lens_lists_every_nested_match_once_and_overlaps_state_tabs() {
+        let docs = vec![
+            doc_with_state("task-1", Some("todo")),
+            papercut_doc("task-1-1", "todo", Some("task-1")),
+            papercut_doc("task-1-2", "todo", Some("task-1")),
+            papercut_doc("task-1-3", "todo", Some("task-1")),
+            papercut_doc("task-2", "todo", None),
+        ];
+        let tabs = board_subview_tabs(&["todo".to_string()], &docs, &BoardFilters::default());
+        assert_eq!(tabs[0].count, 5, "state tabs now include papercut tasks");
+        assert_eq!(tabs[0].total_count, 5);
+        assert_eq!(tabs[1].state, PAPERCUTS_SUBVIEW);
+        assert_eq!(tabs[1].count, 4);
+        assert_eq!(tabs[1].total_count, 4);
+
+        let lens = state_board_entries(
+            &docs,
+            &[],
+            PAPERCUTS_SUBVIEW,
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            lens.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
+            vec!["task-1-1", "task-1-2", "task-1-3", "task-2"],
+            "the reproduced 4-count/1-row case must become four flat rows"
+        );
+        assert!(lens.iter().all(|entry| entry.papercut_lens
+            && entry.depth == 0
+            && matches!(entry.role, StateBoardEntryRole::Root)
+            && !entry.has_active_children));
+
+        // Normal State Board keeps hierarchy: the ordinary parent and the
+        // standalone papercut are roots; nested matches stay collapsed until the
+        // parent is expanded, exactly as for non-papercut children.
+        let collapsed = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            collapsed
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-1", "task-2"]
+        );
+        let expanded = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::from(["task-1".to_string()]),
+        );
+        assert_eq!(
+            expanded
+                .iter()
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-1", "task-1-1", "task-1-2", "task-1-3", "task-2"]
+        );
+    }
+
+    #[test]
+    fn papercut_lens_covers_epic_task_and_subtask_roles() {
+        let mut epic = papercut_doc("task-100", "todo", None);
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut task_under_epic = doc_with_state("task-101", Some("todo"));
+        task_under_epic
+            .fields
+            .insert("parentId".to_string(), "task-100".to_string());
+        let subtask = papercut_doc("task-101-1", "todo", Some("task-101"));
+        let mut other_epic = doc_with_state("task-200", Some("todo"));
+        other_epic
+            .fields
+            .insert("kind".to_string(), "epic".to_string());
+        let task_under_other = papercut_doc("task-201", "todo", Some("task-200"));
+        let docs = vec![epic, task_under_epic, subtask, other_epic, task_under_other];
+
+        let lens = state_board_entries(
+            &docs,
+            &[],
+            PAPERCUTS_SUBVIEW,
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            lens.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
+            vec!["task-100", "task-101-1", "task-201"],
+            "papercut-tagged Epic, Subtask, and Task each appear once"
+        );
+        assert_eq!(
+            lens.iter().map(|entry| entry.task_role).collect::<Vec<_>>(),
+            vec![
+                Some(TaskRole::Epic),
+                Some(TaskRole::Subtask),
+                Some(TaskRole::Task),
+            ]
+        );
+        let tabs = board_subview_tabs(&["todo".to_string()], &docs, &BoardFilters::default());
+        assert_eq!(tabs[0].count, 5);
+        assert_eq!(tabs[1].count, 3);
+    }
+
+    #[test]
+    fn papercut_lens_includes_cross_state_children() {
+        let docs = vec![
+            doc_with_state("task-1", Some("in-progress")),
+            papercut_doc("task-1-1", "todo", Some("task-1")),
+        ];
+        let lens = state_board_entries(
+            &docs,
+            &[],
+            PAPERCUTS_SUBVIEW,
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            lens.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
+            vec!["task-1-1"]
+        );
+        let todo = state_board_entries(
+            &docs,
+            &[],
+            "todo",
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        assert_eq!(
+            todo.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
+            vec!["task-1", "task-1-1"],
+            "a cross-state parent stays visible as context in the child's state tab"
+        );
+    }
+
+    #[test]
+    fn papercut_lens_parent_context_uses_parent_id_not_references() {
+        let mut nested = papercut_doc("task-1-1", "todo", Some("task-1"));
+        nested
+            .fields
+            .insert("references".to_string(), "[\"task-9\"]".to_string());
+        let mut referenced = papercut_doc("task-2", "todo", None);
+        referenced
+            .fields
+            .insert("references".to_string(), "[\"task-1\"]".to_string());
+        let docs = vec![doc_with_state("task-1", Some("todo")), nested, referenced];
+
+        let lens = state_board_entries(
+            &docs,
+            &[],
+            PAPERCUTS_SUBVIEW,
+            &BoardFilters::default(),
+            &BTreeSet::new(),
+        );
+        let child = lens
+            .iter()
+            .find(|entry| entry.doc.id() == "task-1-1")
+            .unwrap();
+        let standalone = lens
+            .iter()
+            .find(|entry| entry.doc.id() == "task-2")
+            .unwrap();
+        let child_context = relationship_context_for_doc(child.doc, &docs, &[]);
+        let context = papercut_parent_context(&child_context).unwrap();
+        assert!(context.contains("task-1"));
+        assert!(
+            !context.contains("task-9"),
+            "references must not leak into the parent chip"
+        );
+        let standalone_context = relationship_context_for_doc(standalone.doc, &docs, &[]);
+        assert!(
+            papercut_parent_context(&standalone_context).is_none(),
+            "a reference is not a hierarchy parent"
+        );
+    }
+
+    #[test]
+    fn papercut_lens_renders_flat_rows_with_parent_context_and_correct_selection() {
+        let mut app = keyboard_test_app();
+        app.docs = vec![
+            doc_with_state("task-1", Some("todo")),
+            papercut_doc("task-1-1", "todo", Some("task-1")),
+            papercut_doc("task-1-2", "todo", Some("task-1")),
+            papercut_doc("task-1-3", "todo", Some("task-1")),
+            papercut_doc("task-2", "todo", None),
+        ];
+        refresh_test_hierarchy(&mut app);
+        app.refresh_papercuts();
+        app.selected_state = app.board_section_count() - 1;
+        app.selected_item = 0;
+        app.clamp_selection();
+
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = terminal_text(&terminal);
+        assert!(text.contains("PAPERCUTS 4"), "flat lens tab count: {text}");
+        for id in ["task-1-1", "task-1-2", "task-1-3", "task-2"] {
+            assert!(text.contains(id), "missing flat row {id}: {text}");
+        }
+        assert!(
+            text.contains("Subtask of: Task task-1"),
+            "nested rows must show resolved hierarchy parent context: {text}"
+        );
+
+        app.handle_key(key(KeyCode::Char('j'))).unwrap();
+        app.handle_key(key(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-1-3"));
+
+        app.handle_key(key(KeyCode::Enter)).unwrap();
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-1-3"));
+        assert!(
+            !app.expanded_board_hierarchy_ids.contains("task-1-3"),
+            "flat lens Enter must preview, not invisibly expand hierarchy"
+        );
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        assert!(terminal_text(&terminal).contains("Enter close preview"));
+    }
+
+    #[test]
+    fn papercut_lens_mouse_selection_targets_the_matching_record() {
+        let mut app = keyboard_test_app();
+        app.docs = vec![
+            papercut_doc("task-10", "todo", None),
+            papercut_doc("task-11", "todo", None),
+            papercut_doc("task-12", "todo", None),
+            papercut_doc("task-13", "todo", None),
+        ];
+        refresh_test_hierarchy(&mut app);
+        app.selected_state = app.board_section_count() - 1;
+        app.clamp_selection();
+
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let row = app
+            .hits
+            .iter()
+            .find(|hit| matches!(hit.action, HitAction::SelectBoardItem(_, 2)))
+            .cloned()
+            .expect("third flat Papercuts row should expose a mouse target");
+        app.handle_mouse(left_click(row.rect.x, row.rect.y));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-12"));
+
+        app.handle_mouse(left_click(row.rect.x, row.rect.y));
+        assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-12"));
+    }
+
+    #[test]
+    fn papercut_header_stays_global_while_tab_count_is_filtered() {
+        let mut app = keyboard_test_app();
+        app.docs = vec![
+            papercut_doc("task-1", "todo", None),
+            papercut_doc("task-2", "todo", None),
+        ];
+        app.docs[0]
+            .fields
+            .insert("priority".to_string(), "high".to_string());
+        app.docs[1]
+            .fields
+            .insert("priority".to_string(), "low".to_string());
+        refresh_test_hierarchy(&mut app);
+        app.refresh_papercuts();
+        app.board_filters = BoardFilters {
+            priority: Some("high".to_string()),
+            ..BoardFilters::default()
+        };
+        app.selected_state = app.board_section_count() - 1;
+        app.clamp_selection();
+
+        assert_eq!(app.papercut_count(), 2, "header count stays global");
+        assert_eq!(app.selected_state_count(), 1, "lens count follows filters");
+        let tabs = board_subview_tabs(&app.states, &app.docs, &app.board_filters);
+        let papercuts = tabs.last().unwrap();
+        assert_eq!(papercuts.count, 1);
+        assert_eq!(papercuts.total_count, 2);
+        assert!(board_subview_title(papercuts).contains("PAPERCUTS 1/2"));
+    }
+
+    #[test]
+    fn papercut_surfaces_share_one_active_board_task_classification() {
+        let root = unique_test_dir("tandem-tui-papercut-classification");
+        let workspace = TandemProject::initialize(
+            &root,
+            &crate::protocol::config::default_project_config("Papercut classification"),
+        )
+        .unwrap();
+        write_task_doc(&workspace, "task-1", "Ordinary task", "todo");
+        write_papercut(&workspace, "task-10", "First papercut", "Body");
+        write_papercut(&workspace, "task-11", "Second papercut", "Body");
+        // A tagged Decision is valid metadata, but a Decision is not a Task.
+        fs::write(
+            workspace.decisions_dir().join("decision-1.md"),
+            "---\nid: decision-1\ntype: decision\ntitle: Tagged decision\nstatus: proposed\ntags: [papercut]\n---\n\nDurable choice with incidental metadata.\n",
+        )
+        .unwrap();
+        // An archived tagged Task lives in Logs and is not an active Papercut.
+        fs::write(
+            workspace.logs_dir.join("task-9.md"),
+            "---\nid: task-9\ntype: task\ntitle: Archived papercut\nstate: todo\ntags: [papercut]\nresolution:\n  outcome: canceled\n  note: archived friction\n---\n\nArchived.\n",
+        )
+        .unwrap();
+
+        let mut app = TuiApp::load(workspace).unwrap();
+        assert_eq!(
+            app.papercut_count(),
+            2,
+            "header and i-panel count active tagged Tasks only"
+        );
+        let tabs = board_subview_tabs(&app.states, &app.docs, &BoardFilters::default());
+        let papercuts = tabs.last().unwrap();
+        assert_eq!(
+            papercuts.count, 2,
+            "lens count matches the shared classification"
+        );
+        assert_eq!(papercuts.total_count, 2);
+
+        let decision = app
+            .docs
+            .iter()
+            .find(|doc| doc.id() == "decision-1")
+            .expect("tagged Decision should still be loaded");
+        assert!(!is_papercut_doc(decision));
+        let archived = app
+            .logs
+            .iter()
+            .find(|doc| doc.id() == "task-9")
+            .expect("archived tagged Task should still be in Logs");
+        assert!(!is_papercut_doc(archived));
+
+        app.selected_state = app.board_section_count() - 1;
+        app.clamp_selection();
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = terminal_text(&terminal);
+        assert!(text.contains("PAPERCUTS 2"));
+        assert!(text.contains("First papercut"));
+        assert!(text.contains("Second papercut"));
+        assert!(!text.contains("Tagged decision"));
+        assert!(!text.contains("Archived papercut"));
+
+        app.toggle_papercuts();
+        assert_eq!(app.papercut_count(), 2);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

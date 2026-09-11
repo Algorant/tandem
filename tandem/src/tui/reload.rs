@@ -54,6 +54,9 @@ impl ReloadFingerprint {
 pub(super) struct ReloadSelection {
     board_doc_id: Option<String>,
     board_state: Option<String>,
+    /// True when the flat Papercuts lens was the selected Board subview. The
+    /// lens is the last subview, so it is not one of `self.states`.
+    board_papercuts: bool,
     log_doc_id: Option<String>,
     rule_anchor: Option<(String, Option<usize>)>,
     decision_doc_id: Option<String>,
@@ -213,6 +216,10 @@ impl TuiApp {
         ReloadSelection {
             board_doc_id: self.selected_doc().map(|doc| doc.id().to_string()),
             board_state: self.states.get(self.selected_state).cloned(),
+            // The Papercuts lens is the subview after the real states. Guard on a
+            // non-empty state list so the first load (no states yet) keeps the
+            // default Todo subview instead of opening the lens.
+            board_papercuts: !self.states.is_empty() && self.selected_state == self.states.len(),
             log_doc_id: self.selected_log().map(|doc| doc.id().to_string()),
             rule_anchor: self.selected_rule_anchor_for_reload(),
             decision_doc_id: self.selected_decision_id_for_reload(),
@@ -221,15 +228,22 @@ impl TuiApp {
     }
 
     pub(super) fn restore_reload_selection(&mut self, selection: ReloadSelection) {
-        let restored_board_doc = selection
-            .board_doc_id
-            .as_deref()
-            .map(|id| self.select_document_by_id_preserving_scroll(id))
-            .unwrap_or(false);
-        if !restored_board_doc {
-            if let Some(state) = selection.board_state.as_deref() {
-                if let Some(index) = self.states.iter().position(|candidate| candidate == state) {
-                    self.selected_state = index;
+        if self.board_arrangement == BoardArrangement::State && selection.board_papercuts {
+            self.restore_papercuts_lens_selection(selection.board_doc_id.as_deref());
+        } else {
+            let restored_board_doc = selection
+                .board_doc_id
+                .as_deref()
+                .map(|id| self.select_document_by_id_preserving_scroll(id))
+                .unwrap_or(false);
+            if !restored_board_doc {
+                if let Some(state) = selection.board_state.as_deref() {
+                    let index = board_subview_tabs(&self.states, &self.docs, &self.board_filters)
+                        .iter()
+                        .position(|tab| tab.state == state);
+                    if let Some(index) = index {
+                        self.selected_state = index;
+                    }
                 }
             }
         }
@@ -240,6 +254,21 @@ impl TuiApp {
         self.restore_rule_selection_after_reload(selection.rule_anchor);
         self.restore_decision_selection_after_reload(selection.decision_doc_id);
         self.restore_papercut_selection_after_reload(selection.papercut_id);
+    }
+
+    /// Reload keeps the flat Papercuts lens active. When the previously selected
+    /// record is still a lens match it stays selected; when it was removed,
+    /// untagged, or filtered out, the lens clamps to a remaining match or an
+    /// empty list instead of jumping to the record's own workflow state.
+    fn restore_papercuts_lens_selection(&mut self, board_doc_id: Option<&str>) {
+        self.selected_state = self.board_section_count().saturating_sub(1);
+        let index = board_doc_id.and_then(|id| {
+            self.state_board_entries(PAPERCUTS_SUBVIEW)
+                .iter()
+                .position(|entry| entry.doc.id() == id)
+        });
+        self.selected_item = index.unwrap_or(0);
+        self.clamp_selection();
     }
 
     pub(super) fn runtime_warnings(&self) -> Vec<String> {

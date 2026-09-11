@@ -86,10 +86,17 @@ impl TuiHierarchySnapshot {
     }
 }
 
+/// Board subview that gathers active Papercut-tagged Tasks into one flat,
+/// overlapping tag lens. It is a display grouping, not a workflow state.
+pub(super) const PAPERCUTS_SUBVIEW: &str = "__papercuts";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct BoardSubviewTab {
     pub(super) state: String,
+    /// Records matching the active Board filters.
     pub(super) count: usize,
+    /// Records before Board filters; differs from `count` only while filtering.
+    pub(super) total_count: usize,
 }
 
 pub(super) fn board_subview_tabs(
@@ -97,31 +104,63 @@ pub(super) fn board_subview_tabs(
     docs: &[Document],
     filters: &BoardFilters,
 ) -> Vec<BoardSubviewTab> {
+    // State tabs overlap with the Papercuts lens: a Papercut-tagged Task still
+    // belongs to its own workflow state. The Papercuts tab is an additional
+    // tag-based projection, not an exclusive partition.
     let mut tabs = states
         .iter()
-        .map(|state| BoardSubviewTab {
-            state: state.clone(),
-            count: docs
+        .map(|state| {
+            let total_count = docs
                 .iter()
-                .filter(|doc| is_board_visible_doc(doc) && !is_papercut_doc(doc))
-                .filter(|doc| document_state_label(doc) == state.as_str())
+                .filter(|doc| {
+                    is_board_visible_doc(doc) && document_state_label(doc) == state.as_str()
+                })
+                .count();
+            let count = docs
+                .iter()
+                .filter(|doc| {
+                    is_board_visible_doc(doc) && document_state_label(doc) == state.as_str()
+                })
                 .filter(|doc| board_filters_match(doc, filters))
-                .count(),
+                .count();
+            BoardSubviewTab {
+                state: state.clone(),
+                count,
+                total_count,
+            }
         })
         .collect::<Vec<_>>();
+    let total_count = docs.iter().filter(|doc| is_papercut_doc(doc)).count();
+    let count = docs
+        .iter()
+        .filter(|doc| is_papercut_doc(doc))
+        .filter(|doc| board_filters_match(doc, filters))
+        .count();
     tabs.push(BoardSubviewTab {
-        state: "__papercuts".to_string(),
-        count: docs
-            .iter()
-            .filter(|doc| is_board_visible_doc(doc) && is_papercut_doc(doc))
-            .filter(|doc| board_filters_match(doc, filters))
-            .count(),
+        state: PAPERCUTS_SUBVIEW.to_string(),
+        count,
+        total_count,
     });
     tabs
 }
 
 pub(super) fn state_tab_title(state: &str, count: usize) -> String {
     format!(" {} {} ", display_state_label(state), count)
+}
+
+/// Tab label for a Board subview. When Board filters narrow a view, show the
+/// filtered count against the unfiltered total so the two are distinguishable.
+pub(super) fn board_subview_title(tab: &BoardSubviewTab) -> String {
+    if tab.count == tab.total_count {
+        state_tab_title(&tab.state, tab.count)
+    } else {
+        format!(
+            " {} {}/{} ",
+            display_state_label(&tab.state),
+            tab.count,
+            tab.total_count
+        )
+    }
 }
 
 pub(super) fn plural_suffix(count: usize) -> &'static str {
@@ -207,6 +246,9 @@ pub(super) struct StateBoardEntry<'a> {
     pub(super) has_active_children: bool,
     pub(super) expanded: bool,
     pub(super) last_sibling: bool,
+    /// True for the flat overlapping Papercuts lens, where a row shows
+    /// `parentId` context instead of tree nesting.
+    pub(super) papercut_lens: bool,
 }
 
 #[cfg(test)]
@@ -231,6 +273,34 @@ pub(super) fn state_board_entries<'a>(
     )
 }
 
+/// Flat overlapping Papercuts lens: one row per active Board Task tagged
+/// `papercut`, in document order, with no ancestor-path requirement. A row
+/// carries `parentId` context but never nests, and references never contribute
+/// membership or hierarchy.
+pub(super) fn papercut_board_entries<'a>(
+    active_docs: &'a [Document],
+    filters: &BoardFilters,
+    hierarchy: &HierarchyIndex,
+) -> Vec<StateBoardEntry<'a>> {
+    active_docs
+        .iter()
+        .filter(|doc| is_papercut_doc(doc))
+        .filter(|doc| board_filters_match(doc, filters))
+        .map(|doc| StateBoardEntry {
+            doc,
+            role: StateBoardEntryRole::Root,
+            task_role: hierarchy.task_role(doc).ok().flatten(),
+            depth: 0,
+            active_descendants: 0,
+            completed_descendants: 0,
+            has_active_children: false,
+            expanded: false,
+            last_sibling: false,
+            papercut_lens: true,
+        })
+        .collect()
+}
+
 pub(super) fn state_board_entries_with_hierarchy<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
@@ -239,22 +309,15 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
     expanded_ids: &BTreeSet<String>,
     hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
+    if state == PAPERCUTS_SUBVIEW {
+        return papercut_board_entries(active_docs, filters, hierarchy);
+    }
     let mut entries = Vec::new();
     for root in active_docs.iter().filter(|doc| {
-        is_board_visible_doc(doc)
-            && if state == "__papercuts" {
-                is_papercut_doc(doc)
-            } else {
-                !is_papercut_doc(doc)
-            }
-            && is_state_board_root(doc, active_docs, completed_logs)
+        is_board_visible_doc(doc) && is_state_board_root(doc, active_docs, completed_logs)
     }) {
         let mut visited = BTreeSet::from([root.id().to_string()]);
-        let root_matches_state = if state == "__papercuts" {
-            is_papercut_doc(root)
-        } else {
-            !is_papercut_doc(root) && document_state_label(root) == state
-        };
+        let root_matches_state = document_state_label(root) == state;
         let descendant_matches_state = is_task_doc(root)
             && task_subtree_matches_filters(
                 root.id(),
@@ -306,6 +369,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
             has_active_children,
             expanded,
             last_sibling: false,
+            papercut_lens: false,
         });
         if is_task_doc(root) {
             collect_visible_state_descendants(
@@ -410,6 +474,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
             has_active_children,
             expanded,
             last_sibling: false,
+            papercut_lens: false,
         });
         collect_visible_state_descendants(
             child.id(),
@@ -1031,6 +1096,11 @@ pub(super) fn state_lines_for_entry(
         chip_text(&format!("{state:<4}"), theme),
         theme.state_chip_style(&document_state_label(doc)),
     ));
+    if entry.papercut_lens {
+        if let Some(parent_context) = papercut_parent_context(relationship_context) {
+            chips.push((truncate(&parent_context, meta_width), theme.muted_style()));
+        }
+    }
     match entry.role {
         StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, entry.task_role, theme)),
         StateBoardEntryRole::Child if entry.depth == 0 => {
@@ -1060,6 +1130,25 @@ pub(super) fn state_lines_for_entry(
         ));
     }
     lines
+}
+
+/// Human-readable `parentId` context for a flat Papercuts row. Reserved for the
+/// overlapping lens; References are loose links and never appear here.
+pub(super) fn papercut_parent_context(
+    relationship_context: &BoardRelationshipContext,
+) -> Option<String> {
+    let parent_id = relationship_context.parent_id.as_deref()?;
+    if relationship_context.parent_missing {
+        return Some(format!("↳ missing parent {parent_id}"));
+    }
+    let role = relationship_context
+        .parent_relationship
+        .map(ParentRelationship::human_label)
+        .unwrap_or("Parent");
+    Some(match relationship_context.parent_title.as_deref() {
+        Some(title) => format!("↳ {role}: {title} ({parent_id})"),
+        None => format!("↳ {role}: {parent_id}"),
+    })
 }
 
 pub(super) fn state_hierarchy_prefix(entry: &StateBoardEntry<'_>) -> String {

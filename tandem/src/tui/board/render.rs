@@ -194,7 +194,7 @@ impl TuiApp {
         let subviews = board_subview_tabs(&self.states, &self.docs, &self.board_filters);
         let titles = subviews
             .iter()
-            .map(|tab| Line::from(state_tab_title(&tab.state, tab.count)))
+            .map(|tab| Line::from(board_subview_title(tab)))
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
             .select(self.selected_state)
@@ -216,8 +216,7 @@ impl TuiApp {
         let mut x = area.x;
         let right = area.x.saturating_add(area.width);
         for (index, tab) in subviews.iter().enumerate() {
-            let width =
-                (state_tab_title(&tab.state, tab.count).chars().count() as u16).saturating_add(1);
+            let width = (board_subview_title(tab).chars().count() as u16).saturating_add(1);
             if x >= right {
                 break;
             }
@@ -257,14 +256,20 @@ impl TuiApp {
         let state_task_count = self
             .docs
             .iter()
-            .filter(|doc| is_board_visible_doc(doc) && !is_papercut_doc(doc))
+            .filter(|doc| is_board_visible_doc(doc))
             .filter(|doc| document_state_label(doc) == state_name)
             .filter(|doc| board_filters_match(doc, &self.board_filters))
             .count();
         let content_width = area.width.saturating_sub(4) as usize;
         let preview_line_limit = inline_preview_line_limit_for_area(area);
         let items = if entries.is_empty() {
-            let empty_text = if self.board_filters.is_active() {
+            let empty_text = if state_name == PAPERCUTS_SUBVIEW {
+                if self.board_filters.is_active() {
+                    "No Papercut-tagged tasks match the active Board filters."
+                } else {
+                    "No active Papercut-tagged tasks on the Board."
+                }
+            } else if self.board_filters.is_active() {
                 "No hierarchy matches the active Board filters. Press f to adjust filters."
             } else if state_task_count > 0 {
                 "Tasks in this state are nested under parents in other state tabs."
