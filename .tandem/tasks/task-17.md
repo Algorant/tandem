@@ -2,19 +2,21 @@
 id: task-17
 type: task
 title: "CLI: review accepts a criterion that is not in the accord"
-state: todo
+state: "in-progress"
 priority: "low"
 tags: ["protocol", "papercut"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Review rejects a criterion absent from the Task's current accord.acceptance, preserving the existing exact-criterion protocol requirement.", "A matching acceptance criterion successfully enters validation with its exact text; invalid requests do not mutate the record, events, or Git checkpoint state.", "Regression coverage exercises exact matching, mismatched text, empty input and the valid request path."]
+  claimedAt: "2026-09-11T14:22:05Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml --check"]
   constraints: ["Validation meaning belongs in protocol, invoked by the shared app review operation before writes. Do not weaken the normative exact-criterion requirement or add CLI-only enforcement.", "Do not modify cli/commands.rs or TUI code; parallel tasks own those paths.", "Submit a plan before editing despite small effort; wait for approval; ask unclear questions through worker_ask."]
-  updatedAt: "2026-09-11T14:21:34Z"
+  updatedAt: "2026-09-11T14:22:05Z"
 createdAt: "2026-09-05T22:07:42Z"
-updatedAt: "2026-09-11T14:21:34Z"
+updatedAt: "2026-09-11T14:22:05Z"
 effort: "small"
 relatedFiles: ["tandem/src/protocol/accord.rs", "tandem/src/app/review.rs", "tandem/tests/review_behavior.rs"]
+assignee: "worker-task-17-3b00555e"
 ---
 
 ## Description

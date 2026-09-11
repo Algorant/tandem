@@ -84,3 +84,4 @@
 {"ts":"2026-09-11T14:21:34Z","event":"task.updated","id":"task-17","summary":"Updated task-17 metadata: effort, relatedFiles, acceptance, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":84}
 {"ts":"2026-09-11T14:21:34Z","event":"task.updated","id":"task-32","summary":"Updated task-32 metadata: effort, references, relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":85}
 {"ts":"2026-09-11T14:21:52Z","event":"accord.claimed","id":"task-16","summary":"Accord claim for task-16","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":86}
+{"ts":"2026-09-11T14:22:05Z","event":"accord.claimed","id":"task-17","summary":"Accord claim for task-17","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":87}
