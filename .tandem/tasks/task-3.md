@@ -2,14 +2,17 @@
 id: task-3
 type: task
 title: "CLI: add decision writes to .tandem/tasks"
-state: todo
+state: "in-progress"
 priority: "low"
 tags: ["papercut"]
 accord:
-  status: ready
+  status: "claimed"
   acceptance: ["decisions/ is the only runtime path for decision documents (D46)"]
+  claimedAt: "2026-09-11T14:22:41Z"
+  updatedAt: "2026-09-11T14:22:41Z"
 createdAt: "2026-08-31T20:53:43Z"
-updatedAt: "2026-08-31T20:53:43Z"
+updatedAt: "2026-09-11T14:22:41Z"
+assignee: "pi-orchestrator"
 ---
 
 ## Description
