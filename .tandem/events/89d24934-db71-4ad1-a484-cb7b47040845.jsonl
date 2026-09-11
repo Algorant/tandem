@@ -94,3 +94,5 @@
 {"ts":"2026-09-11T14:23:03Z","event":"accord.delivered","id":"task-4","summary":"Accord deliver for task-4","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":94}
 {"ts":"2026-09-11T14:23:14Z","event":"task.completed","id":"task-1","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":95}
 {"ts":"2026-09-11T14:23:14Z","event":"task.completed","id":"task-3","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":96}
+{"ts":"2026-09-11T14:23:14Z","event":"task.completed","id":"task-4","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":97}
+{"ts":"2026-09-11T14:23:14Z","event":"task.canceled","id":"task-6","summary":"Canceled: Superseded by completed task-15, which compared contextual picker versus direct-key/CLI-only approaches and shipped the bounded native Actions picker in0.12.4. See plan/task-15-pi-handoff.md. Algorant approved cancellation during papercut cleanup; this does not claim task-6's independent rendered-comparison research was completed.","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":98}
