@@ -103,3 +103,4 @@
 {"ts":"2026-09-11T14:26:36Z","event":"task.updated","id":"task-28","summary":"Updated task-28 metadata: title, effort, tags, relatedFiles, acceptance, constraints, validation, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":103}
 {"ts":"2026-09-11T14:26:36Z","event":"task.updated","id":"task-2","summary":"Updated task-2 metadata: effort, tags, references, relatedFiles, acceptance, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":104}
 {"ts":"2026-09-11T14:27:18Z","event":"accord.delivered","id":"task-16","summary":"Accord deliver for task-16","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":105}
+{"ts":"2026-09-11T14:27:18Z","event":"task.completed","id":"task-16","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":106}
