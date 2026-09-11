@@ -30,6 +30,8 @@ Active Tasks have `state` and a mandatory `accord` with at least one `acceptance
 
 Decision metadata includes `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`), automatic `createdAt`/`updatedAt`, automatic `decidedAt` on acceptance or rejection, `deciders`, `supersedes`, `references`, and `tags`. ADR prose belongs in the Markdown body. There are no manual `date`, `supersededBy`, or prose metadata flags.
 
+`decidedAt` records the latest actual transition into `accepted` or `rejected`, including creation directly in either status. It is retained when the decision later moves to `proposed`, `deprecated`, or `superseded`; repeating an unchanged status is a no-op and never backfills a historical record. Common `update` resolves the document's actual type and edits Decision metadata (`title`, `body`, `status`, `deciders`, `supersedes`, `references`, `relatedFiles`, `tags`) without rewriting unrelated fields or the Markdown body.
+
 `references` accepts document IDs and absolute `http(s)` URLs. Document IDs resolve against the workspace, and an unresolved ID is a warning; absolute URLs are opaque loose links that Tandem never fetches, never rewrites, and never warns about. Repository paths are path metadata for `relatedFiles`, which is not validated. Reference warnings cover active Board records (Tasks and Decisions); archived Logs are immutable history and never emit missing-target warnings.
 
 Rules use composite IDs such as `always-12`, a category (`always`, `never`, `prefer`, or `context`), optional `source`, timestamps, and rule text as the Markdown body. Reclassification is delete-and-add.

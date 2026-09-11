@@ -6,7 +6,7 @@ Use Tandem `decision` documents for durable project, product, and architecture c
 
 ## Frontmatter pattern
 
-Required v0 fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body. `references` accepts document IDs and absolute `http(s)` URLs: a document ID resolves against the workspace and warns when unresolved, while an absolute URL is an opaque loose link that Tandem never fetches, never rewrites, and never warns about. Repository paths belong in `relatedFiles` path metadata, not `references`; the current decision CLI has no `--related-file` option, and adding one is out of scope.
+Required v0 fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body. `references` accepts document IDs and absolute `http(s)` URLs: a document ID resolves against the workspace and warns when unresolved, while an absolute URL is an opaque loose link that Tandem never fetches, never rewrites, and never warns about. Repository paths belong in `relatedFiles` path metadata, not `references`; `tandem update <decision-id> --related-file <path>` stores them, and `relatedFiles` is never validated or treated as a document reference.
 
 Optional ADR-friendly metadata may be preserved by tools and edited in Markdown when needed:
 
@@ -95,6 +95,18 @@ tandem decision add \
 tandem decision list
 tandem decision show decision-12 --json
 ```
+
+## Updating a decision
+
+Common `update` resolves the document's actual type, so Decisions use the same command as Tasks. It edits `title`, `body`, `status`, `deciders`, `supersedes`, `references`, `relatedFiles`, and `tags`, and replaces a present repeated list rather than appending:
+
+```sh
+tandem update decision-12 --status accepted --decider Algorant --tag adr
+tandem update decision-12 --reference task-87 --related-file docs/guides/decisions.md
+tandem update decision-12 --clear supersedes --clear references
+```
+
+Entering `accepted` or `rejected` writes `decidedAt`. Leaving that status keeps the historical `decidedAt`, and repeating an unchanged status is a no-op. Flags that do not apply to a Decision (such as `--priority` or `--parent`) are rejected before any write; a field cannot be set and cleared in the same request.
 
 ## TUI workflow
 

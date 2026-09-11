@@ -278,33 +278,37 @@ tandem move <id> --state <state>
 
 ### `tandem update`
 
-- Purpose: replace the complete Markdown body or edit workflow-orthogonal metadata on an active task without changing state.
+- Purpose: replace the complete Markdown body or edit workflow-orthogonal metadata on an active Task or Decision without changing lifecycle state.
 - Kind: mutation.
 - Syntax:
 
 ```text
-tandem update <id> [--title <title>] [--body <markdown>] [--kind epic] [--priority <critical|high|medium|low>] [--effort <effort>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>]
+tandem update <task-id> [--title <title>] [--body <markdown>] [--kind epic] [--priority <critical|high|medium|low>] [--effort <effort>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--clear <field>]
+tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--decider <name>] [--supersedes <decision-id>] [--tag <tag>] [--reference <ref>] [--related-file <path>] [--clear <field>]
 ```
 
 - Required inputs:
-  - `<id>`: active board task ID.
+  - `<id>`: active Task or Decision ID. The command resolves the document's actual `type` and validates fields against it; type is never inferred from the ID prefix.
 - Optional inputs:
-  - exact body replacement: `--body <markdown>` replaces all text after the closing frontmatter delimiter. Empty, whitespace-only, multiline, Unicode, and leading-dash values are valid; omission means no body edit.
-  - scalar replacements: `--title`, `--kind`, `--priority`, `--effort`, `--assignee`, `--due-date`. `--effort` replaces the effort metadata value.
+  - exact body replacement: `--body <markdown>` replaces all text after the closing frontmatter delimiter. Multiline, Unicode, and leading-dash values are valid; omission means no body edit. A Decision body is removed with `--clear body`, and Decision `--body` values must be non-empty.
+  - scalar replacements: `--title` for both types. Tasks additionally accept `--kind`, `--priority`, `--effort`, and `--due-date`; Decisions additionally accept `--status`.
   - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the prospective role graph. An Epic target requires the document to remain a global-ID Task with `epic-task`; a Task target would require a matching `task-N-M` Subtask with `subtask`; a decision/custom target requires a global-ID Task with generic `parent`. Reject a parented Epic, a Subtask target, every role/ID mismatch, and any role-changing or ID-invalidating reparenting. The immutable ID is never renamed.
-  - append/deduplicated list metadata: repeated `--tag`, `--blocker`, `--reference`, `--related-file`.
+  - repeated list metadata: present repeated `--tag`, `--reference`, and `--related-file` replace the full list for both types; Tasks also accept `--blocker`, and Decisions also accept `--decider` and `--supersedes`. Absent lists are unchanged.
+  - `--clear <field>`: remove a supported list or optional scalar. For Decisions the supported names are `body`, `tags`/`tag`, `references`, `relatedFiles`/`related-file`, `deciders`, and `supersedes`; unknown, immutable (`title`, `id`, `type`, timestamps), and lifecycle (`status`) clears fail. A field may be set or cleared, never both in one request.
 - Unsupported by design:
   - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
   - no update-time `--description`; that flag remains an add-time convenience that creates a Description section. Use `--body` to replace the exact complete Markdown body. Inline `--subtask` authoring is deprecated in favor of a separate task with `--parent`.
-  - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata.
-  - no clear/remove flags in v0, including no way to clear an existing `parentId`.
+  - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata. Decision `status` is ADR record metadata, not Task workflow state or Accord status.
   - completed logs are not updated.
 - Validation:
   - kind, when set, must be `epic`; an Epic must have no `parentId`.
   - priority must be one of `critical`, `high`, `medium`, or `low`.
-  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata.
-- Human output shape: warnings first, then changed metadata fields with old/new values; a body replacement reports only `body: changed` and never echoes body content. If every requested value already exists byte-for-byte, the command prints a clear no-op and does not update `updatedAt` or append an event.
-- Mutation notes: raw-source patches preserve unrelated/unknown frontmatter; metadata-only updates preserve the Markdown body, while `--body` replaces it exactly. Real changes update `updatedAt` and append `task.updated`; event summaries name `body` without copying body content.
+  - decision `status` must be exactly `proposed`, `accepted`, `rejected`, `deprecated`, or `superseded`; padded values with leading or trailing whitespace are rejected rather than normalized.
+  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata and are never treated as document references.
+  - flags that do not apply to the resolved document type are rejected before any write.
+- Decision timestamps: entering `accepted` or `rejected` writes `decidedAt`; leaving a terminal status keeps the historical `decidedAt`; repeating an unchanged status is a no-op. Every real change writes `updatedAt`.
+- Human output shape: warnings first on stderr, then changed metadata fields; a body replacement reports only `body: changed` and never echoes body content. If every requested value already exists byte-for-byte, the command prints a clear no-op and does not update `updatedAt` or append an event.
+- Mutation notes: raw-source patches preserve unrelated/unknown frontmatter; metadata-only updates preserve the Markdown body, while `--body` replaces it exactly. Real changes update `updatedAt` and append `task.updated` or `decision.updated`; event summaries name `body` without copying body content.
 
 ### `tandem complete`
 
@@ -815,17 +819,10 @@ tandem decision add --title "Use styled-basic Markdown in v0" --status accepted 
 
 ### `tandem decision update`
 
-Update selected metadata on an active decision. This mutation has no `--json`
-mode and does not change task workflow state.
-
-```text
-tandem decision update <decision-id> [--title <title>] [--body <markdown>] [--status <status>]
-```
-
-At least one of `--title`, `--body`, or `--status` is required. `--body`
-replaces the complete Markdown body; `--status` must be one of
-`proposed`, `accepted`, `rejected`, `deprecated`, or `superseded`. Example:
-`tandem decision update decision-1 --status accepted`.
+Removed in protocol 0.3.0. Use the common [`tandem update`](#tandem-update)
+command, which resolves the document type and accepts `--status`, `--decider`,
+`--supersedes`, `--reference`, `--related-file`, `--tag`, `--body`, `--title`,
+and `--clear`. Example: `tandem update decision-1 --status accepted`.
 
 ### `tandem decision withdraw`
 

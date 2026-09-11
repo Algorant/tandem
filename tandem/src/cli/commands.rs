@@ -311,48 +311,158 @@ fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliErro
 
 fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let project = app::project::open()?;
-    let outcome = app::tasks::update(
-        &project,
-        app::tasks::UpdateOptions {
-            id: args.id,
-            title: args.title,
-            body: args.body,
-            kind: args.kind,
-            priority: args.priority,
-            effort: args.effort,
-            due_date: args.due_date,
-            parent: args.parent,
-            tags: args.tag,
-            blockers: args.blocker,
-            references: args.reference,
-            related_files: args.related_file,
-            acceptance: args.acceptance,
-            constraints: args.constraint,
-            validations: args.validation,
-            clear: args.clear,
-            ..Default::default()
-        },
-    )?;
+    let resolved_type = project
+        .find_document(&args.id)?
+        .map(|doc| doc.doc_type().to_string());
+    match resolved_type.as_deref() {
+        Some("task") => {
+            reject_decision_only_flags(&args)?;
+            let outcome = app::tasks::update(
+                &project,
+                app::tasks::UpdateOptions {
+                    id: args.id,
+                    title: args.title,
+                    body: args.body,
+                    kind: args.kind,
+                    priority: args.priority,
+                    effort: args.effort,
+                    due_date: args.due_date,
+                    parent: args.parent,
+                    tags: args.tag,
+                    blockers: args.blocker,
+                    references: args.reference,
+                    related_files: args.related_file,
+                    acceptance: args.acceptance,
+                    constraints: args.constraint,
+                    validations: args.validation,
+                    clear: args.clear,
+                    ..Default::default()
+                },
+            )?;
+            print_update_outcome(json, &outcome.id, &outcome.changes, &outcome.warnings);
+        }
+        Some("decision") => {
+            reject_task_only_flags(&args)?;
+            let outcome = app::decisions::update(
+                &project,
+                app::decisions::UpdateOptions {
+                    id: args.id,
+                    title: args.title,
+                    body: args.body,
+                    status: args.status,
+                    deciders: args.decider,
+                    supersedes: args.supersedes,
+                    references: args.reference,
+                    related_files: args.related_file,
+                    tags: args.tag,
+                    clear: args.clear,
+                },
+            )?;
+            print_update_outcome(json, &outcome.id, &outcome.changes, &outcome.warnings);
+        }
+        Some(other) => {
+            return Err(CliError::user(format!(
+                "update does not support document type `{other}` in v0: {}",
+                args.id
+            )));
+        }
+        None => return Err(CliError::user(format!("document not found: {}", args.id))),
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+/// Rejects Decision-only flags on a resolved Task before any application write.
+fn reject_decision_only_flags(args: &UpdateArgs) -> Result<(), CliError> {
+    let mut invalid = Vec::new();
+    if args.status.is_some() {
+        invalid.push("--status");
+    }
+    if !args.decider.is_empty() {
+        invalid.push("--decider");
+    }
+    if !args.supersedes.is_empty() {
+        invalid.push("--supersedes");
+    }
+    reject_update_flags("task", &invalid)
+}
+
+/// Rejects Task-only flags on a resolved Decision before any application write.
+fn reject_task_only_flags(args: &UpdateArgs) -> Result<(), CliError> {
+    let mut invalid = Vec::new();
+    if args.kind.is_some() {
+        invalid.push("--kind");
+    }
+    if args.priority.is_some() {
+        invalid.push("--priority");
+    }
+    if args.effort.is_some() {
+        invalid.push("--effort");
+    }
+    if args.due_date.is_some() {
+        invalid.push("--due-date");
+    }
+    if args.parent.is_some() {
+        invalid.push("--parent");
+    }
+    if !args.blocker.is_empty() {
+        invalid.push("--blocker");
+    }
+    if !args.acceptance.is_empty() {
+        invalid.push("--acceptance");
+    }
+    if !args.constraint.is_empty() {
+        invalid.push("--constraint");
+    }
+    if !args.validation.is_empty() {
+        invalid.push("--validation");
+    }
+    reject_update_flags("decision", &invalid)
+}
+
+fn reject_update_flags(document_type: &str, flags: &[&str]) -> Result<(), CliError> {
+    if flags.is_empty() {
+        Ok(())
+    } else {
+        Err(CliError::usage(format!(
+            "update flags not valid for {document_type} documents: {}",
+            flags.join(", ")
+        )))
+    }
+}
+
+/// Shared success output for the type-aware update command.
+///
+/// Warnings are returned in the JSON envelope and written to stderr in human
+/// mode so they are never silently dropped.
+fn print_update_outcome(
+    json: bool,
+    id: &str,
+    changes: &[app::tasks::UpdateChange],
+    warnings: &[String],
+) {
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"changes":outcome.changes.iter().map(|c| &c.field).collect::<Vec<_>>()},"warnings":outcome.warnings})
+            serde_json::json!({"ok":true,"data":{"id":id,"changes":changes.iter().map(|c| &c.field).collect::<Vec<_>>()},"warnings":warnings})
         );
-    } else if outcome.changes.is_empty() {
-        println!("No changes for {}", outcome.id);
     } else {
-        println!(
-            "Updated {}: {}",
-            outcome.id,
-            outcome
-                .changes
-                .iter()
-                .map(|change| change.field.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+        for warning in warnings {
+            eprintln!("Warning: {warning}");
+        }
+        if changes.is_empty() {
+            println!("No changes for {id}");
+        } else {
+            println!(
+                "Updated {}: {}",
+                id,
+                changes
+                    .iter()
+                    .map(|change| change.field.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
     }
-    Ok(super::StartupRequest::Exit)
 }
 
 fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliError> {

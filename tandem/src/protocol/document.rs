@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use url::Url;
 use yaml_rust2::{Yaml, YamlLoader};
 
+use crate::protocol::config::DECISION_STATUSES;
+
 pub(crate) const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
 pub(crate) const EFFORTS: &[&str] = &["trivial", "small", "medium", "large"];
 pub(crate) const TASK_KINDS: &[&str] = &["epic"];
@@ -110,6 +112,41 @@ fn strip_http_scheme(value: &str) -> Option<&str> {
             .filter(|prefix| prefix.eq_ignore_ascii_case(scheme))
             .map(|_| &value[scheme.len()..])
     })
+}
+
+/// Validates a Decision `status` value against the canonical vocabulary.
+///
+/// Statuses are ADR record metadata, not Task workflow state; the accepted set
+/// is fixed so `update` cannot invent new lifecycle values. Surrounding
+/// whitespace is rejected rather than normalized so a padded value is never
+/// silently stored differing from what the caller wrote.
+pub(crate) fn validate_decision_status(status: &str) -> Result<(), String> {
+    if status.trim().is_empty() {
+        return Err("decision status must not be empty".to_string());
+    }
+    if status != status.trim() {
+        return Err(format!(
+            "decision status `{status}` must not have surrounding whitespace; expected one of: {}",
+            DECISION_STATUSES.join(", ")
+        ));
+    }
+    if DECISION_STATUSES.contains(&status) {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid decision status `{status}`; expected one of: {}",
+            DECISION_STATUSES.join(", ")
+        ))
+    }
+}
+
+/// Whether a Decision status carries the automatic `decidedAt` date.
+///
+/// This is the pure decision-date predicate shared by Decision creation and
+/// `update`: entering `accepted` or `rejected` records the transition, while
+/// `proposed`, `deprecated`, and `superseded` never write it themselves.
+pub(crate) fn decision_status_sets_decided_at(status: &str) -> bool {
+    matches!(status, "accepted" | "rejected")
 }
 
 pub(crate) fn validate_task_kind(kind: &str) -> Result<(), String> {
