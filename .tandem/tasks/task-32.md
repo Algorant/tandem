@@ -2,20 +2,22 @@
 id: task-32
 type: task
 title: "Make legacy-rule warnings readable in the TUI Rules view"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "medium"
 references: ["task-12", "task-20"]
 relatedFiles: ["tandem/src/tui/rules.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs"]
 tags: ["tui", "papercut", "rules"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["At 132-column terminal width, a user in the Rules view can read or explicitly expand the full diagnostic naming tandem.md, saying embedded rules are not active, and identifying .tandem/rules/ as the correct location.", "The warning remains discoverable after ordinary view navigation and transient status expiration while the legacy block exists.", "A rendering regression test verifies visible actionable diagnostic content, not only the internal warning string; no automatic migration or activation of legacy rules is introduced."]
+  claimedAt: "2026-09-11T14:22:25Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml --check"]
   constraints: ["TUI warning presentation only. No automatic migration, legacy rule activation, rule toggles, or app/protocol/CLI changes.", "Use a persistent visible diagnostic or clearly discoverable expanded warning in Rules view; no broad redesign of all notifications.", "Render-test actual diagnostic content and normal no-warning behavior; use valid native 0.3.0 fixture initialization for ordinary workspace tests.", "Submit implementation design and plan before editing. Parent will inspect a release TUI in a safe fixture and own preview routing."]
-  updatedAt: "2026-09-11T14:21:34Z"
+  updatedAt: "2026-09-11T14:22:25Z"
 createdAt: "2026-09-11T13:35:26Z"
-updatedAt: "2026-09-11T14:21:34Z"
+updatedAt: "2026-09-11T14:22:25Z"
+assignee: "worker-task-32-7222a706"
 ---
 
 ## Description
