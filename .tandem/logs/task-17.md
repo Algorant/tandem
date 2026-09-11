@@ -2,11 +2,10 @@
 id: task-17
 type: task
 title: "CLI: review accepts a criterion that is not in the accord"
-state: "in-progress"
 priority: "low"
 tags: ["protocol", "papercut"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Review rejects a criterion absent from the Task's current accord.acceptance, preserving the existing exact-criterion protocol requirement.", "A matching acceptance criterion successfully enters validation with its exact text; invalid requests do not mutate the record, events, or Git checkpoint state.", "Regression coverage exercises exact matching, mismatched text, empty input and the valid request path."]
   claimedAt: "2026-09-11T14:22:05Z"
   deliveredAt: "2026-09-11T14:29:32Z"
@@ -21,6 +20,9 @@ updatedAt: "2026-09-11T14:29:32Z"
 effort: "small"
 relatedFiles: ["tandem/src/protocol/accord.rs", "tandem/src/app/review.rs", "tandem/tests/review_behavior.rs"]
 assignee: "worker-task-17-3b00555e"
+archivedAt: "2026-09-11T14:29:32Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
