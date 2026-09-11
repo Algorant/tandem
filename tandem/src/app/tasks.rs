@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use crate::app::support::{
     active_task_descendant_ids, append_event, checkpoint_boundary, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
-    resolve_parent_relationship, unresolved_blockers_in_hierarchy, validate_state,
-    validate_task_document_against_hierarchy, workspace_deprecation_warnings,
+    resolve_parent_relationship, resolved_task_descendants, unresolved_blockers_in_hierarchy,
+    validate_state, validate_task_document_against_hierarchy, workspace_deprecation_warnings,
 };
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
@@ -889,7 +889,17 @@ pub(crate) fn complete(
             unresolved.join(", ")
         )));
     }
-    let completion_diagnostics = crate::protocol::diagnostic::completion_policy_diagnostics(&doc);
+    let completion_diagnostics = {
+        let role = hierarchy
+            .task_role(&doc)
+            .map_err(|error| Error::user(error.message))?;
+        let resolved_descendants = resolved_task_descendants(&hierarchy, doc.id());
+        crate::protocol::diagnostic::completion_policy_diagnostics(
+            &doc,
+            role,
+            &resolved_descendants,
+        )
+    };
     if let Some(error) = completion_diagnostics
         .iter()
         .find(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Error)

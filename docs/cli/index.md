@@ -327,23 +327,23 @@ tandem complete <id> --summary <text> [--file-changed <path>] [--validation <tex
   - repeated `--file-changed <path>`.
   - `--validation <text>`: human-readable validation result summary.
   - `--reviewer <name>`.
-- Human output shape: warnings first, then completion summary. The current implementation writes `completedAt` plus nested `completion.summary`, `completion.filesChanged`, `completion.validation`, and `completion.reviewer` metadata; read commands still tolerate earlier flat completion fields.
+- Human output shape: policy warnings first on stderr, then the completion result line on stdout. Archived records carry `archivedAt` plus minimal `resolution: { outcome, note, reviewer }`; read commands still tolerate earlier flat completion fields.
+- Behavior:
+  - completes any active Task whose hierarchy, blockers, and structure are valid;
+  - warns when the document's own Accord is neither delivered nor accepted, with the narrow child-based Epic exception below;
+  - child-based Epic exception: a grouping Epic (`kind: epic`) with at least one resolved descendant Task/Subtask closes without the delivery warning when every descendant is archived with an explicit canonical `resolution.outcome: completed`. Eligibility only suppresses that warning: for an otherwise-undelivered eligible Epic, no synthetic delivery or acceptance is added and no child evidence is copied, while normal archive/checkpoint behavior and ordinary delivered-parent acceptance remain. Empty Epics, active descendants, and absent, legacy-only, unknown, canceled, or failed descendant outcomes retain the warning; an explicitly delivered or accepted Epic is already warning-free;
+  - archive outcome (`resolution.outcome`: `completed`, `canceled`, or `failed`) is distinct from Accord delivery status; a `completion.outcome` value without `resolution.outcome` is not positive completion evidence.
 
-Example warning output:
+Example warning output (stderr warnings, then the stdout summary):
 
 ```text
-Warning: task-7 has review.status=pending.
-Warning: task-7 has accord.status=delivered, not accepted.
-Completing anyway in v0.
-
-Completed task-7
-Moved: .tandem/board/task-7.md -> .tandem/logs/task-7.md
-Event: task.completed
+Warning: task-7 has accord.status=ready; complete normally follows a delivered Accord.
+Completed task-7 (record written; Git checkpointed (abc1234))
 ```
 
 - Exit/error notes:
-  - warns but does not fail for missing accepted review or accepted accord in v0.
-  - fails when the ID is missing, the document is not completable, the document is already completed, blockers remain unresolved, structure validation fails, or the move/write fails.
+  - warns but does not fail when the Accord is neither delivered nor accepted, unless the child-based Epic exception applies.
+  - fails when the ID is missing, the document is not completable, the document is already completed, active descendants remain, blockers remain unresolved, structure validation fails, or the move/write fails.
 
 ### `tandem cancel`
 

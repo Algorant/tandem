@@ -11,7 +11,9 @@ use crate::project::{
     self, display_path, parse_frontmatter_fields, split_frontmatter, CheckpointOutcome,
     ProjectHierarchy, StoredDocument as Document, TandemProject,
 };
-use crate::protocol::diagnostic::{metadata_diagnostics, Severity};
+use crate::protocol::diagnostic::{
+    canonical_resolution_outcome, metadata_diagnostics, ResolvedDescendant, Severity,
+};
 use crate::protocol::document::{parse_field_values, validate_task_kind};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::workflow::{display_known_states, is_known_or_legacy_state, workflow_states};
@@ -176,6 +178,34 @@ pub(crate) fn active_task_descendant_ids(
         }
     }
     active.into_iter().collect()
+}
+
+/// Resolved placement and canonical outcome of every descendant beneath
+/// `root_id` in the coherent hierarchy snapshot. Only explicit
+/// `resolution.outcome` values count as canonical; absent or legacy-only
+/// records stay `None` so completion policy never infers completion.
+pub(crate) fn resolved_task_descendants<'a>(
+    hierarchy: &'a ProjectHierarchy,
+    root_id: &str,
+) -> Vec<ResolvedDescendant<'a>> {
+    let mut visited = std::collections::BTreeSet::from([root_id.to_string()]);
+    let mut pending = vec![root_id.to_string()];
+    let mut descendants = Vec::new();
+    while let Some(parent_id) = pending.pop() {
+        for document in hierarchy.documents.values().filter(|doc| {
+            doc.doc_type() == "task" && doc.field("parentId") == Some(parent_id.as_str())
+        }) {
+            if !visited.insert(document.id().to_string()) {
+                continue;
+            }
+            descendants.push(ResolvedDescendant {
+                location: document.location,
+                canonical_outcome: canonical_resolution_outcome(document),
+            });
+            pending.push(document.id().to_string());
+        }
+    }
+    descendants
 }
 
 pub(crate) fn resolve_parent_relationship(

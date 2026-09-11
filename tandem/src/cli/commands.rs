@@ -592,6 +592,9 @@ fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, Cli
             serde_json::json!({"ok":true,"data":{"id":outcome.id,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":outcome.warnings})
         );
     } else {
+        for warning in &outcome.warnings {
+            eprintln!("Warning: {warning}");
+        }
         println!(
             "Completed {} (record written; Git {})",
             outcome.id,
