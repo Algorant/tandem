@@ -1,31 +1,24 @@
 ---
 id: task-22
 type: task
-title: "Review modeling and TUI presentation of research and papercut tasks"
+title: "Review modeling of research and papercut tasks without duplicating Board display work"
 state: todo
 references: ["task-21"]
 tags: ["tui", "taxonomy"]
 accord:
   status: "ready"
-  acceptance: ["Document representative research and papercut workflows and identify which differences require protocol semantics versus presentation/filtering only.", "Compare ordinary Tasks with tags, a task-kind classification, and first-class types, including lifecycle, hierarchy, metadata, interoperability, and migration costs; do not treat classification as workflow state.", "Evaluate TUI presentation options with explicit behavior for counts, nested tasks, parent context, navigation, and tasks tagged both research and papercut, incorporating task-21 findings when available.", "Recommend a model and TUI approach for each category, with rationale and unresolved product questions clearly separated from settled decisions.", "Produce a reviewable proposal and scoped implementation follow-ups once direction is agreed; no protocol taxonomy or TUI implementation changes are made as part of this exploration."]
-  updatedAt: "2026-09-07T13:41:48Z"
+  acceptance: ["Document representative research and papercut workflows and identify differences requiring protocol semantics rather than presentation/filtering.", "Compare ordinary Tasks with tags, task kinds and first-class types, including lifecycle, hierarchy, metadata, interoperability and migration costs.", "Use task-21's agreed overlapping Papercuts view as the display baseline; do not duplicate its counts/navigation implementation or block it on taxonomy choices.", "Recommend a model for each category with rationale and explicitly unresolved product questions, including jointly tagged Tasks where relevant.", "Produce scoped follow-ups only after direction is agreed; make no taxonomy or TUI implementation changes under this exploration."]
+  updatedAt: "2026-09-11T14:24:35Z"
 createdAt: "2026-09-07T13:41:48Z"
-updatedAt: "2026-09-07T13:41:48Z"
+updatedAt: "2026-09-11T14:24:35Z"
 ---
-
-## Description
-
 ## Goal
-Review research-tagged and papercut-tagged tasks as distinct user workflows. Determine whether either now warrants a standalone task type/classification, or whether ordinary Tasks with tags and a dedicated interface/filter remain sufficient.
+Evaluate whether research and papercut workflows need semantics beyond ordinary Tasks with tags. Compare tags, task kinds, and first-class types using concrete lifecycle, hierarchy, metadata, interoperability, and migration needs. Classification must not become workflow state.
 
-## Questions to explore
-- What meaning, lifecycle, required metadata, hierarchy behavior, and actions actually differ from ordinary Tasks for research and papercuts?
-- Are tags sufficient, would a task kind be useful, or is a first-class document/task type justified? Distinguish classification from workflow state rather than assuming a new status column is needed.
-- How should these tasks appear in the TUI: ordinary Board entries, dedicated views/tabs, saved or special filters, or a combination?
-- How should counts, nested matches, parent context, navigation, and tasks carrying both tags behave?
-- What complexity, protocol changes, migration, and CLI/context-consumer consequences would each option introduce?
+## Boundary agreed during papercut cleanup
+Algorant selected an overlapping Papercuts tag view with a flat matching list and parent context. Task-21 owns its membership, counts, discoverability, rendering and navigation implementation. Consume that verified behavior as the baseline; do not repeat task-21's display investigation or delay its concrete defect fix for taxonomy research.
 
-Compare options against concrete workflows and the smallest useful model. Preserve the current tag-based model during exploration; do not introduce new types or implement UI changes under this task. Coordinate with task-21, which investigates the narrower Papercuts count/visibility mismatch, without duplicating that investigation.
+Research-specific presentation and tasks tagged both research and papercut may be discussed only where a modeling difference actually requires it. Preserve current task/tag semantics during exploration. No new types, protocol taxonomy changes, or implementation is authorized here.
 
 ## Deliverable
-An evidence-backed recommendation for both modeling and TUI presentation, identifying whether research and papercuts should share an approach or differ. Surface product choices for review and capture bounded implementation tasks after direction is agreed.
+A reviewable recommendation for each category, distinguishing actual protocol needs from presentation preferences, with unresolved product choices and scoped implementation follow-ups after direction is agreed.

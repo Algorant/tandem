@@ -3,14 +3,15 @@ id: task-20
 type: task
 title: "Explore and implement rule on/off toggles across protocol, context, and TUI"
 state: todo
-references: ["task-4", "task-12"]
+references: ["task-4", "task-12", "task-32"]
 tags: ["rules"]
 accord:
   status: "ready"
   acceptance: ["Exploration records the chosen on/off representation, existing-rule defaults, CLI/JSON contract, TUI interaction, and context refresh behavior before implementation; unresolved product choices are surfaced for review.", "The normative protocol defines enabled/disabled rule semantics, and implementation persists toggles without deleting rules or losing their IDs, text, category, source, or other supported metadata.", "CLI read and mutation paths expose rule on/off state unambiguously; context consumers can obtain enabled rules without treating disabled rules as active instructions.", "The TUI lets users navigate rules, clearly distinguish on from off without relying solely on color, and toggle the selected rule; saved state remains correct after reload.", "Context-window behavior is verified end to end for the supported integration, including turning a rule back on; any necessary adapter implementation is tracked through an explicit authorized handoff/task.", "Project tests cover defaults, persistence round trips, CLI/JSON exposure, enabled-rule context selection, and TUI toggle behavior; documentation explains usage and refresh limitations."]
-  updatedAt: "2026-09-06T12:49:04Z"
+  constraints: ["Rule-storage work task-4 and legacy detection task-12 are completed baseline, not pending implementation dependencies.", "Keep disabled rules distinct from inactive legacy embedded rules. Task-32 owns visibility of the latter; do not duplicate or absorb that focused fix.", "Outside the approved papercut cleanup implementation wave: retain as future exploration/implementation, with adapter changes requiring a separate explicit handoff."]
+  updatedAt: "2026-09-11T14:24:35Z"
 createdAt: "2026-09-06T12:49:04Z"
-updatedAt: "2026-09-06T12:49:04Z"
+updatedAt: "2026-09-11T14:24:35Z"
 ---
 
 ## Description
