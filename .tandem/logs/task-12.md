@@ -2,24 +2,28 @@
 id: task-12
 type: task
 title: "Workspaces with rules embedded in tandem.md lose every rule silently"
-state: "in-progress"
 priority: "high"
 effort: "small"
 relatedFiles: ["tandem/src/project/rules.rs", "tandem/src/tui/reload.rs", "tandem/src/project/mod.rs", "tandem/src/app/rules.rs"]
 tags: ["rules", "migration", "bug", "data-loss"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["A workspace with a non-empty rules block in tandem.md and no .tandem/rules directory produces a visible diagnostic from `tandem rules list` and in the TUI Rules view, rather than reporting zero rules silently.", "The diagnostic names the legacy location and states plainly that those rules are not active.", "If migration is implemented, embedded rules become per-rule files under .tandem/rules with categories and source fields preserved, and the operation is reported rather than silent.", "A test covers a workspace fixture carrying embedded rules and asserts the diagnostic or the migration, so the silent-zero path cannot return."]
   claimedAt: "2026-09-04T02:06:22Z"
   deliveredAt: "2026-09-11T13:35:52Z"
   summary: "Reconciled the legacy embedded-rule detection fix (4260cbd, shipped in 0.12.3). Algorant explicitly approved closing this shipped fix while tracking its remaining TUI warning-readability limitation in task-32."
   evidence: ["cargo test --manifest-path tandem/Cargo.toml --release embedded_rules exited 0: protocol populated/empty-block detection and TUI reload warning regressions pass.", "Disposable 0.3.0 fixture with populated rules block and no .tandem/rules directory: rules list --json returned zero active rules with warning naming the rules block in tandem.md, stating rules are not active, and directing users to .tandem/rules/. Human CLI emitted the same diagnostic. No migration occurred and no rules directory was created.", "Rendered 0.13.1 TUI check at 132x61 found the warning text is generated but clipped behind footer hints; after transient expiration it is no longer discoverable. This is not claimed as full TUI readability validation. Algorant chose 'Close and track follow-up' after this gap was disclosed; task-32 owns the remaining presentation issue.", "git merge-base --is-ancestor 4260cbd tandem-v0.12.3 exited 0; RELEASES.md identifies this warn-only fix. Native history contained claim only, with no delivery/completion. Old worker_integrate explicitly did not accept or complete Tasks; the combined worker_finish was added September 6, after this September 3 integration. Exact historical Worker session records were not found, so the reason the separate closeout was omitted remains uncertain."]
   filesChanged: ["tandem/src/app/project.rs", "tandem/src/cli/commands.rs", "tandem/src/protocol/config.rs", "tandem/src/tui/mod.rs"]
-  updatedAt: "2026-09-11T13:35:52Z"
+  reviewer: "Algorant"
+  updatedAt: "2026-09-11T13:36:02Z"
 createdAt: "2026-09-03T23:26:43Z"
-updatedAt: "2026-09-11T13:35:52Z"
+updatedAt: "2026-09-11T13:36:02Z"
 assignee: "worker-task-12-3ec94bce"
 references: ["task-32"]
+archivedAt: "2026-09-11T13:36:02Z"
+resolution:
+  outcome: "completed"
+  reviewer: "Algorant"
 ---
 
 ## Description
