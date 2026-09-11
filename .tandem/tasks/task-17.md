@@ -7,10 +7,14 @@ priority: "low"
 tags: ["protocol", "papercut"]
 accord:
   status: "ready"
-  acceptance: ["review rejects a criterion string that does not match an existing accord acceptance entry, or the exact-criterion requirement is dropped from protocol/README.md."]
-  updatedAt: "2026-09-05T22:07:42Z"
+  acceptance: ["Review rejects a criterion absent from the Task's current accord.acceptance, preserving the existing exact-criterion protocol requirement.", "A matching acceptance criterion successfully enters validation with its exact text; invalid requests do not mutate the record, events, or Git checkpoint state.", "Regression coverage exercises exact matching, mismatched text, empty input and the valid request path."]
+  validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml --check"]
+  constraints: ["Validation meaning belongs in protocol, invoked by the shared app review operation before writes. Do not weaken the normative exact-criterion requirement or add CLI-only enforcement.", "Do not modify cli/commands.rs or TUI code; parallel tasks own those paths.", "Submit a plan before editing despite small effort; wait for approval; ask unclear questions through worker_ask."]
+  updatedAt: "2026-09-11T14:21:34Z"
 createdAt: "2026-09-05T22:07:42Z"
-updatedAt: "2026-09-05T22:07:42Z"
+updatedAt: "2026-09-11T14:21:34Z"
+effort: "small"
+relatedFiles: ["tandem/src/protocol/accord.rs", "tandem/src/app/review.rs", "tandem/tests/review_behavior.rs"]
 ---
 
 ## Description

@@ -80,3 +80,7 @@
 {"ts":"2026-09-11T13:35:34Z","event":"task.updated","id":"task-12","summary":"Updated task-12 metadata: references","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":80}
 {"ts":"2026-09-11T13:35:52Z","event":"accord.delivered","id":"task-12","summary":"Accord deliver for task-12","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":81}
 {"ts":"2026-09-11T13:36:02Z","event":"task.completed","id":"task-12","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":82}
+{"ts":"2026-09-11T14:21:34Z","event":"task.updated","id":"task-16","summary":"Updated task-16 metadata: effort, tags, relatedFiles, acceptance, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":83}
+{"ts":"2026-09-11T14:21:34Z","event":"task.updated","id":"task-17","summary":"Updated task-17 metadata: effort, relatedFiles, acceptance, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":84}
+{"ts":"2026-09-11T14:21:34Z","event":"task.updated","id":"task-32","summary":"Updated task-32 metadata: effort, references, relatedFiles, constraints, validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":85}
+{"ts":"2026-09-11T14:21:52Z","event":"accord.claimed","id":"task-16","summary":"Accord claim for task-16","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":86}

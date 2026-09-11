@@ -2,15 +2,21 @@
 id: task-16
 type: task
 title: "CLI: init emits no JSON envelope on success"
-state: todo
+state: "in-progress"
 priority: "low"
-tags: ["cli", "papercut"]
+tags: ["protocol", "papercut"]
 accord:
-  status: "ready"
-  acceptance: ["tandem init --title X --json prints one success envelope on stdout when it creates a workspace."]
-  updatedAt: "2026-09-05T22:07:28Z"
+  status: "claimed"
+  acceptance: ["Successful tandem init --title X --json emits exactly one stdout JSON success envelope with ok, data, and warnings; stderr is empty on ordinary success.", "The non-JSON init path retains its current behavior; failure on an existing workspace retains the standard JSON error envelope and exit code.", "Regression tests exercise fresh success and repeated-init failure without altering real project records."]
+  claimedAt: "2026-09-11T14:21:52Z"
+  validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml --check"]
+  constraints: ["Only CLI init output and dedicated init regression tests; no adapter, protocol semantics, or unrelated command changes.", "Use the current native InitOutcome and established envelope conventions; no compatibility fallback for empty success.", "Submit a plan before editing despite small effort; wait for orchestrator approval."]
+  updatedAt: "2026-09-11T14:21:52Z"
 createdAt: "2026-09-05T22:07:28Z"
-updatedAt: "2026-09-05T22:07:28Z"
+updatedAt: "2026-09-11T14:21:52Z"
+effort: "small"
+relatedFiles: ["tandem/src/cli/commands.rs", "tandem/tests/init_behavior.rs"]
+assignee: "worker-task-16-f4a47543"
 ---
 
 ## Description
