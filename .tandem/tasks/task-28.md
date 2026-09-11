@@ -13,9 +13,9 @@ accord:
   constraints: ["Schedule after task-2 (overlapping app/tasks.rs, protocol/README.md and docs/cli/index.md); do not overlap Workers on those files.", "Protocol owns policy meaning; derive Epic roles from resolved documents, never ID shape. App composes existing hierarchy input and performs writes.", "No new Accord status, no derived persisted delivery, no lifecycle bypass, no adapter or TUI implementation changes.", "Submit plan/design before edits and stop for approval; clarify ambiguous hierarchy/outcome cases through worker_ask."]
   updatedAt: "2026-09-11T14:46:57Z"
 createdAt: "2026-09-09T21:16:54Z"
-updatedAt: "2026-09-11T14:46:57Z"
+updatedAt: "2026-09-11T14:50:31Z"
 effort: "medium"
-relatedFiles: ["tandem/src/protocol/diagnostic.rs", "tandem/src/protocol/hierarchy.rs", "tandem/src/app/tasks.rs", "tandem/tests/epic_completion_behavior.rs", "protocol/README.md", "docs/cli/index.md"]
+relatedFiles: ["tandem/src/protocol/diagnostic.rs", "tandem/src/protocol/hierarchy.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/cli/commands.rs", "tandem/tests/epic_completion_behavior.rs", "protocol/README.md", "docs/cli/index.md"]
 assignee: "worker-task-28-797c36dc"
 ---
 ## Reproduced baseline
