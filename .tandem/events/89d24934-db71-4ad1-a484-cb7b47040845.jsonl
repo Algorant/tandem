@@ -111,3 +111,4 @@
 {"ts":"2026-09-11T14:30:37Z","event":"accord.rework","id":"task-32","summary":"Accord rework for task-32","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":111}
 {"ts":"2026-09-11T14:32:17Z","event":"task.updated","id":"task-2","summary":"Updated task-2 metadata: constraints","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":112}
 {"ts":"2026-09-11T14:34:24Z","event":"accord.delivered","id":"task-32","summary":"Accord deliver for task-32","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":113}
+{"ts":"2026-09-11T14:34:24Z","event":"task.completed","id":"task-32","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":114}
