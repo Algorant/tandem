@@ -2,11 +2,10 @@
 id: task-21
 type: task
 title: "Make Papercuts an overlapping, fully discoverable Board tag view"
-state: "in-progress"
 priority: "low"
 tags: ["tui", "papercut"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Papercut-tagged active tasks appear in their normal workflow-state views and the dedicated Papercuts view; no exclusive membership partition remains.", "The dedicated Papercuts view lists every matching active record once, including nested matches beneath non-papercut parents, without requiring expansion; parent context distinguishes hierarchy from references.", "Tab counts correspond to matching records under current filters; global totals and filtered totals are visibly distinguished when different; every counted match is discoverable.", "Existing Board State/Epic hierarchy navigation, selection and keyboard/mouse interactions remain correct; flat Papercuts selection opens the correct record and exposes useful parent context.", "Regression and real rendering evidence cover the reproduced4-count/1-row case, hierarchy roles, workflow states, filters, empty lists and normal Board overlap."]
   claimedAt: "2026-09-11T14:34:44Z"
   deliveredAt: "2026-09-11T15:05:02Z"
@@ -22,6 +21,9 @@ references: ["task-22"]
 effort: "medium"
 relatedFiles: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/state.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "docs/tui/index.md", "tandem/README.md"]
 assignee: "worker-task-21-b150bc53"
+archivedAt: "2026-09-11T15:05:02Z"
+resolution:
+  outcome: "completed"
 ---
 ## Confirmed defect
 The0.13.1 audit reproduced a normal parent with three papercut Subtasks plus one standalone papercut: CLI finds four, the Papercuts header/tab says4, but only the standalone row is visible. Expanding the ordinary parent in TODO reveals the other three. Counting scans all tagged documents, while Papercuts row projection excludes a non-papercut ancestor before traversing children.
