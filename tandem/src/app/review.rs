@@ -8,6 +8,7 @@ use crate::app::support::{
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
 use crate::project::{patch_frontmatter_content, write_atomic, CheckpointOutcome, TandemProject};
+use crate::protocol::accord;
 use crate::protocol::hierarchy::{DocumentLocation, TaskRole};
 
 #[derive(Debug, Default)]
@@ -72,6 +73,8 @@ pub(crate) fn transition(
     }
     validate_task_document_against_hierarchy(workspace, &doc, &hierarchy)?;
     validate_state(workspace, "validation")?;
+    accord::validate_review_criterion(doc.id(), &accord::acceptance(&doc), &criterion)
+        .map_err(Error::user)?;
     let (content, signature) = read_file_snapshot(&doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::from([

@@ -24,10 +24,7 @@ impl AccordRecord {
     pub(crate) fn from_document(doc: &Document, updated_at: &str) -> Self {
         Self {
             status: status(doc).unwrap_or("missing").to_string(),
-            acceptance: doc
-                .field("accord.acceptance")
-                .map(parse_field_values)
-                .unwrap_or_default(),
+            acceptance: acceptance(doc),
             claimed_at: doc.field("accord.claimedAt").map(str::to_string),
             delivered_at: doc.field("accord.deliveredAt").map(str::to_string),
             deliverables: doc
@@ -59,6 +56,15 @@ impl AccordRecord {
     }
 }
 
+/// Canonical parse of a Task's `accord.acceptance` criteria. Protocol owns
+/// this parsing so every caller compares against the same list.
+pub(crate) fn acceptance(document: &Document) -> Vec<String> {
+    document
+        .field("accord.acceptance")
+        .map(parse_field_values)
+        .unwrap_or_default()
+}
+
 pub(crate) const STATUSES: &[&str] = &[
     "ready",
     "claimed",
@@ -81,6 +87,28 @@ pub(crate) fn status(document: &Document) -> Option<&str> {
 
 pub(crate) fn is_known_status(status: &str) -> bool {
     STATUSES.contains(&status) || LEGACY_STATUSES.contains(&status)
+}
+
+/// An exceptional validation escalation must name one of the Task's current
+/// `accord.acceptance` criteria. Comparison is byte-exact: no trimming, case
+/// folding, or fuzzy matching. A non-matching criterion is rejected instead
+/// of being recorded as new validation evidence.
+pub(crate) fn validate_review_criterion(
+    id: &str,
+    acceptance: &[String],
+    criterion: &str,
+) -> Result<(), String> {
+    if acceptance.iter().any(|entry| entry == criterion) {
+        return Ok(());
+    }
+    Err(format!(
+        "Review failed: {id} has no acceptance criterion {criterion:?}; expected one of: {}",
+        acceptance
+            .iter()
+            .map(|entry| format!("{entry:?}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ))
 }
 
 /// Delivery evidence is meaningful only when at least one supplied entry has
@@ -230,6 +258,44 @@ mod tests {
         assert!(validate_transition("release", "claimed").is_ok());
         assert!(validate_transition("fail", "claimed").is_ok());
         assert!(validate_transition("deliver", "accepted").is_err());
+    }
+
+    #[test]
+    fn review_criterion_must_match_acceptance_exactly() {
+        let acceptance = vec![
+            "criterion one".to_string(),
+            "preserve a, b; and c (exact)".to_string(),
+        ];
+        assert!(validate_review_criterion("task-1", &acceptance, "criterion one").is_ok());
+        assert!(
+            validate_review_criterion("task-1", &acceptance, "preserve a, b; and c (exact)")
+                .is_ok()
+        );
+        for criterion in [
+            "totally made up",
+            "Criterion one",
+            "criterion one ",
+            " criterion one",
+            "preserve a, b; and c",
+            "",
+        ] {
+            assert!(
+                validate_review_criterion("task-1", &acceptance, criterion).is_err(),
+                "{criterion:?} must not match"
+            );
+        }
+    }
+
+    #[test]
+    fn acceptance_parses_quoted_entries_with_commas() {
+        let document = Document::new(
+            HashMap::from([(
+                "accord.acceptance".to_string(),
+                "[\"preserve a, b; and c\", \"plain\"]".to_string(),
+            )]),
+            String::new(),
+        );
+        assert_eq!(acceptance(&document), ["preserve a, b; and c", "plain"]);
     }
 
     #[test]
