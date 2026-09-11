@@ -2,11 +2,10 @@
 id: task-2
 type: task
 title: "CLI: update rejects decision documents"
-state: "in-progress"
 priority: "low"
 tags: ["protocol", "papercut", "decisions"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Common update supports active Decision documents alongside existing Tasks; status, deciders, supersedes and common title/body/tags/references/relatedFiles metadata are editable with correct type-specific validation.", "Entering accepted/rejected decision status maintains automatic decidedAt plus updatedAt according to a documented plan-approved rule; invalid statuses or inappropriate type-specific flags fail without writes.", "Repeated list flags replace lists, supported --clear operations work, unknown metadata and body bytes are preserved when unrelated, and no-op updates do not write events or timestamps.", "Decision URL/document-ID references retain task-29 semantics; repo paths can be stored as relatedFiles through decision updates without being treated as document references.", "CLI success reports actual changed fields and failures retain standard envelope/exit behavior. Regression tests exercise real native decision update, timestamp rules, lists/clears, invalid/no-op requests and existing Task update behavior."]
   claimedAt: "2026-09-11T14:27:36Z"
   deliveredAt: "2026-09-11T14:46:38Z"
@@ -22,6 +21,9 @@ effort: "medium"
 references: ["task-3", "task-29"]
 relatedFiles: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/app/decisions.rs", "tandem/src/app/tasks.rs", "tandem/src/protocol/document.rs", "tandem/src/protocol/event.rs", "tandem/tests/decision_update_behavior.rs", "protocol/README.md", "docs/cli/index.md", "docs/guides/decisions.md"]
 assignee: "worker-task-2-a5c95c01"
+archivedAt: "2026-09-11T14:46:38Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
