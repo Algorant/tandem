@@ -132,13 +132,17 @@ impl TuiApp {
             &configured_states,
             &hierarchy,
         ));
-        match app::project::warnings(&self.workspace) {
-            Ok(warnings) => load_errors.extend(warnings),
-            Err(error) => load_errors.push(format!(
-                "Compatibility diagnostics unavailable: {}",
-                error.message
-            )),
-        }
+        let rules_warnings = match app::project::warnings(&self.workspace) {
+            Ok(warnings) => warnings,
+            Err(error) => {
+                load_errors.push(format!(
+                    "Compatibility diagnostics unavailable: {}",
+                    error.message
+                ));
+                Vec::new()
+            }
+        };
+        load_errors.extend(rules_warnings.iter().cloned());
 
         self.title = title;
         self.states = states_with_board_docs(configured_states.clone(), &docs);
@@ -164,6 +168,7 @@ impl TuiApp {
         self.log_events = log_events;
         self.rules = rules;
         self.load_errors = load_errors;
+        self.rules_warnings = rules_warnings;
         self.theme = theme_load.theme;
         self.theme_source = theme_load.source;
         self.theme_warnings = theme_load.warnings;

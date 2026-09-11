@@ -317,12 +317,32 @@ impl TuiApp {
 
     pub(super) fn draw_rules_view(&mut self, frame: &mut Frame<'_>, area: Rect) {
         self.clamp_rules_state();
+        let warning_lines = self.rules_warning_lines(area.width);
+        let mut constraints = vec![Constraint::Length(1)];
+        if warning_lines.is_empty() {
+            constraints.push(Constraint::Min(3));
+        } else {
+            // Length keeps the full wrapped diagnostic visible even at minimum
+            // terminal sizes; the list takes the remaining rows, however few.
+            constraints.push(Constraint::Length(warning_lines.len() as u16));
+            constraints.push(Constraint::Min(0));
+        }
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Min(3)])
+            .constraints(constraints)
             .split(area);
         self.draw_rule_category_tabs(frame, chunks[0]);
-        let content = chunks[1];
+        let content = if warning_lines.is_empty() {
+            chunks[1]
+        } else {
+            frame.render_widget(
+                Paragraph::new(warning_lines)
+                    .style(self.theme.panel_style())
+                    .wrap(Wrap { trim: false }),
+                chunks[1],
+            );
+            chunks[2]
+        };
         let has_selected_rule = self.selected_rule().is_some();
         let visible_rule_rows = self
             .rules
@@ -418,6 +438,26 @@ impl TuiApp {
         self.with_status(controls.to_string())
     }
 
+    fn rules_warning_lines(&self, width: u16) -> Vec<Line<'static>> {
+        if self.rules_warnings.is_empty() {
+            return Vec::new();
+        }
+        let style = self.theme.status_style(StatusTone::Warning);
+        let label_style = style.add_modifier(Modifier::BOLD);
+        let text_width = (width as usize).saturating_sub(2).max(12);
+        let mut lines = Vec::new();
+        for warning in &self.rules_warnings {
+            for (index, segment) in wrap_words(warning, text_width).into_iter().enumerate() {
+                let prefix = if index == 0 { "! " } else { "  " };
+                lines.push(Line::from(vec![
+                    Span::styled(prefix.to_string(), label_style),
+                    Span::styled(segment, style),
+                ]));
+            }
+        }
+        lines
+    }
+
     fn draw_rule_category_tabs(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let tab_widths = RULE_CATEGORIES
             .iter()
@@ -475,7 +515,14 @@ impl TuiApp {
             action: HitAction::FocusRuleList,
         });
         let category = self.selected_rule_category();
-        let list_area = Block::default().borders(Borders::ALL).inner(area);
+        // In the cramped legacy-warning layout there is no room for the list
+        // border; drop it so at least one real rule row stays visible.
+        let compact = area.height < MIN_RULE_LIST_HEIGHT;
+        let list_area = if compact {
+            area
+        } else {
+            Block::default().borders(Borders::ALL).inner(area)
+        };
         let row_width = list_area.width.max(12) as usize;
         let rows = self.rule_display_rows(row_width);
         let selected_row = self.selected_rule_row_index(&rows);
@@ -485,14 +532,16 @@ impl TuiApp {
             .collect::<Vec<_>>();
         let mut state = ListState::default().with_offset(self.rules_view.list_offset);
         state.select(selected_row);
-        let list = List::new(items)
+        let mut list = List::new(items)
             .style(self.theme.panel_style())
-            .highlight_style(self.theme.rule_selected_row_style())
-            .block(rule_list_block(
+            .highlight_style(self.theme.rule_selected_row_style());
+        if !compact {
+            list = list.block(rule_list_block(
                 &self.theme,
                 category,
                 self.rules_view.focus == RuleFocus::List,
             ));
+        }
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
         self.register_rule_row_hits(list_area, &rows);

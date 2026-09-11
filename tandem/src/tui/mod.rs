@@ -234,6 +234,7 @@ struct TuiApp {
     log_events: logs::LogEventsById,
     rules: RulesByCategory,
     load_errors: Vec<String>,
+    rules_warnings: Vec<String>,
     theme: TuiTheme,
     theme_source: String,
     theme_warnings: Vec<String>,
@@ -283,6 +284,7 @@ impl TuiApp {
             log_events: logs::LogEventsById::new(),
             rules: empty_rules(),
             load_errors: Vec::new(),
+            rules_warnings: Vec::new(),
             theme: TuiTheme::default_dark(),
             theme_source: String::new(),
             theme_warnings: Vec::new(),
@@ -2558,6 +2560,57 @@ tone = "success"
         workspace
     }
 
+    const LEGACY_RULES_CONFIG: &str = "---\nprotocolVersion: 0.3.0\ntype: workspace\ntitle: Legacy rules presentation\nstates: [todo, in-progress, validation]\nrules:\n  always:\n    - id: always-1\n      rule: Keep this visible\n---\n";
+
+    fn native_workspace(root: &Path, title: &str) -> TandemProject {
+        TandemProject::initialize(
+            root,
+            &crate::protocol::config::default_project_config(title),
+        )
+        .unwrap()
+    }
+
+    fn legacy_rules_workspace(root: &Path) -> TandemProject {
+        let workspace = native_workspace(root, "Legacy rules presentation");
+        // Explicitly remove the empty native rules directory so this nested
+        // fixture reproduces the pre-0.3 layout with legacy embedded rules only.
+        fs::remove_dir_all(workspace.rules_dir()).unwrap();
+        fs::write(&workspace.config_path, LEGACY_RULES_CONFIG).unwrap();
+        workspace
+    }
+
+    fn mixed_rules_workspace(root: &Path) -> TandemProject {
+        let workspace = native_workspace(root, "Mixed rules presentation");
+        for rule in [
+            "alpha active rule",
+            "bravo active rule",
+            "charlie active rule",
+        ] {
+            crate::app::rules::add(&workspace, "always", rule, None).unwrap();
+        }
+        fs::write(&workspace.config_path, LEGACY_RULES_CONFIG).unwrap();
+        workspace
+    }
+
+    fn terminal_rows(terminal: &Terminal<TestBackend>) -> Vec<String> {
+        let buffer = terminal.backend().buffer();
+        let width = buffer.area.width as usize;
+        let cells = buffer
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<Vec<_>>();
+        cells.chunks(width).map(|chunk| chunk.concat()).collect()
+    }
+
+    fn normalized_terminal_text(terminal: &Terminal<TestBackend>) -> String {
+        terminal_rows(terminal)
+            .join(" ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     fn write_task_doc(workspace: &TandemProject, id: &str, title: &str, state: &str) {
         fs::write(
             workspace.tasks_dir.join(format!("{id}.md")),
@@ -2661,6 +2714,7 @@ tone = "success"
             log_events: logs::LogEventsById::new(),
             rules: empty_rules(),
             load_errors: Vec::new(),
+            rules_warnings: Vec::new(),
             theme: TuiTheme::default_dark(),
             theme_source: "test".to_string(),
             theme_warnings: Vec::new(),
@@ -4101,6 +4155,224 @@ tone = "success"
                 && warning.contains("not active")));
         assert!(app.rules.is_empty() || app.rules.values().all(Vec::is_empty));
         let _ = fs::remove_dir_all(app.workspace.root());
+    }
+
+    #[test]
+    fn rules_view_renders_legacy_rules_diagnostic_at_132_columns() {
+        let root = unique_test_dir("tandem-rules-warning-132");
+        let workspace = legacy_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        let mut terminal = Terminal::new(TestBackend::new(132, 61)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"), "missing tandem.md: {text}");
+        assert!(text.contains("not active"), "missing 'not active': {text}");
+        assert!(
+            text.contains(".tandem/rules/"),
+            "missing .tandem/rules/: {text}"
+        );
+        assert!(!app.workspace.rules_dir().exists());
+        assert!(app.rules.values().all(Vec::is_empty));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_wraps_legacy_rules_diagnostic_at_narrow_width() {
+        let root = unique_test_dir("tandem-rules-warning-narrow");
+        let workspace = legacy_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        let mut terminal = Terminal::new(TestBackend::new(60, 24)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let rows = terminal_rows(&terminal);
+        let first_row = rows
+            .iter()
+            .position(|row| row.contains("Legacy embedded rules"))
+            .expect("warning start not rendered");
+        let location_row = rows
+            .iter()
+            .position(|row| row.contains(".tandem/rules/"))
+            .expect("rules location not rendered");
+        assert_ne!(
+            first_row, location_row,
+            "warning should wrap across rows at 60 columns"
+        );
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"));
+        assert!(text.contains("not active"));
+        assert!(text.contains(".tandem/rules/"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_legacy_rules_diagnostic_renders_at_minimum_terminal_size() {
+        let root = unique_test_dir("tandem-rules-warning-min");
+        let workspace = legacy_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        let mut terminal = Terminal::new(TestBackend::new(45, 12)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        app.switch_view(TuiView::Board);
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        app.switch_view(TuiView::Rules);
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"), "missing tandem.md: {text}");
+        assert!(text.contains("not active"), "missing 'not active': {text}");
+        assert!(
+            text.contains(".tandem/rules/"),
+            "missing .tandem/rules/: {text}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_legacy_rules_diagnostic_persists_after_status_expiry() {
+        let root = unique_test_dir("tandem-rules-warning-persist");
+        let workspace = legacy_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.switch_view(TuiView::Board);
+        app.switch_view(TuiView::Rules);
+        app.status = "Reloaded 0 active documents from .tandem/board · runtime warning".to_string();
+        app.observed_status = app.status.clone();
+        app.status_updated_at = Instant::now() - Duration::from_secs(10);
+        assert!(app.expire_transient_status());
+        assert!(app.status.is_empty());
+
+        let mut terminal = Terminal::new(TestBackend::new(132, 61)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"), "missing tandem.md: {text}");
+        assert!(text.contains("not active"), "missing 'not active': {text}");
+        assert!(
+            text.contains(".tandem/rules/"),
+            "missing .tandem/rules/: {text}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_without_legacy_block_has_no_diagnostic_banner() {
+        let root = unique_test_dir("tandem-rules-clean");
+        let workspace = native_workspace(&root, "Clean rules workspace");
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        assert!(app.rules_warnings.is_empty());
+        let mut terminal = Terminal::new(TestBackend::new(132, 61)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let text = normalized_terminal_text(&terminal);
+        assert!(!text.contains("not active"), "unexpected banner: {text}");
+        assert!(
+            !text.contains(".tandem/rules/"),
+            "unexpected banner: {text}"
+        );
+        assert!(
+            text.contains("No always rules defined"),
+            "expected normal empty-category list: {text}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_legacy_rules_diagnostic_clears_when_block_is_removed() {
+        let root = unique_test_dir("tandem-rules-warning-clear");
+        let workspace = legacy_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        assert!(!app.rules_warnings.is_empty());
+
+        fs::write(
+            &app.workspace.config_path,
+            crate::protocol::config::default_project_config("Legacy rules presentation"),
+        )
+        .unwrap();
+        app.reload();
+        assert!(
+            app.rules_warnings.is_empty(),
+            "stale diagnostic: {:?}",
+            app.rules_warnings
+        );
+        app.status.clear();
+        let mut terminal = Terminal::new(TestBackend::new(132, 61)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = normalized_terminal_text(&terminal);
+        assert!(!text.contains(".tandem/rules/"), "stale banner: {text}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_mixed_rules_keep_selected_rule_at_minimum_size() {
+        let root = unique_test_dir("tandem-rules-mixed-min");
+        let workspace = mixed_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        assert_eq!(app.rules.get("always").map(Vec::len), Some(3));
+        let mut terminal = Terminal::new(TestBackend::new(45, 12)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"), "missing tandem.md: {text}");
+        assert!(
+            text.contains(".tandem/rules/"),
+            "missing .tandem/rules/: {text}"
+        );
+        assert!(
+            text.contains("alpha active rule"),
+            "selected rule not visible at 45x12: {text}"
+        );
+
+        app.handle_rules_key(key(KeyCode::Down));
+        app.handle_rules_key(key(KeyCode::Down));
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let navigated = normalized_terminal_text(&terminal);
+        assert!(
+            navigated.contains("charlie active rule"),
+            "navigated rule not visible at 45x12: {navigated}"
+        );
+        assert!(
+            navigated.contains(".tandem/rules/"),
+            "warning lost after navigation: {navigated}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rules_view_mixed_rules_render_warning_and_rules_at_normal_width() {
+        let root = unique_test_dir("tandem-rules-mixed-normal");
+        let workspace = mixed_rules_workspace(&root);
+        let mut app = TuiApp::load(workspace).unwrap();
+        app.switch_view(TuiView::Rules);
+        app.status.clear();
+        let mut terminal = Terminal::new(TestBackend::new(132, 61)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+
+        let text = normalized_terminal_text(&terminal);
+        assert!(text.contains("tandem.md"), "missing tandem.md: {text}");
+        assert!(text.contains("not active"), "missing 'not active': {text}");
+        assert!(
+            text.contains(".tandem/rules/"),
+            "missing .tandem/rules/: {text}"
+        );
+        assert!(
+            text.contains("Always rules"),
+            "expected bordered rule list: {text}"
+        );
+        assert!(
+            text.contains("alpha active rule"),
+            "active rules not visible: {text}"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
