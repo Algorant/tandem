@@ -77,7 +77,12 @@ fn chore_commit(root: &Path, relative: &str) {
     git(root, &["add", ".tandem"]);
     git(
         root,
-        &["commit", "--quiet", "-m", "chore(tandem): checkpoint metadata"],
+        &[
+            "commit",
+            "--quiet",
+            "-m",
+            "chore(tandem): checkpoint metadata",
+        ],
     );
 }
 
@@ -199,7 +204,10 @@ fn boundaries_roll_up_into_one_amended_checkpoint_without_empty_commits() {
         git(&root, &["log", "-1", "--format=%s"]),
         "chore(tandem): checkpoint metadata"
     );
-    assert_eq!(git(&root, &["show", "--format=%P", "--no-patch", "HEAD"]), baseline);
+    assert_eq!(
+        git(&root, &["show", "--format=%P", "--no-patch", "HEAD"]),
+        baseline
+    );
 
     fs::remove_dir_all(root).unwrap();
 }
@@ -536,7 +544,10 @@ fn rolling_checkpoint_amends_on_a_dirty_unrelated_tree() {
     let root = setup("rolling-dirty");
     fs::write(root.join("unrelated-tracked.txt"), "base\n").unwrap();
     git(&root, &["add", "unrelated-tracked.txt"]);
-    git(&root, &["commit", "--quiet", "-m", "unrelated tracked fixture"]);
+    git(
+        &root,
+        &["commit", "--quiet", "-m", "unrelated tracked fixture"],
+    );
     let baseline = git(&root, &["rev-parse", "HEAD"]);
 
     fs::write(root.join("unrelated-tracked.txt"), "dirty unstaged\n").unwrap();
@@ -620,7 +631,10 @@ fn leftover_adjacent_chore_runs_collapse_on_a_safe_boundary() {
     chore_commit(&root, ".tandem/leftover-b.txt");
     fs::write(root.join("source.txt"), "source\n").unwrap();
     git(&root, &["add", "source.txt"]);
-    git(&root, &["commit", "--quiet", "-m", "ordinary source commit"]);
+    git(
+        &root,
+        &["commit", "--quiet", "-m", "ordinary source commit"],
+    );
     chore_commit(&root, ".tandem/leftover-c.txt");
     chore_commit(&root, ".tandem/leftover-d.txt");
     assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "6");
@@ -645,7 +659,10 @@ fn leftover_adjacent_chore_runs_collapse_on_a_safe_boundary() {
     // meta / source / meta in one reconcile, not one run per checkpoint.
     assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "4");
     assert_eq!(git(&root, &["rev-parse", "HEAD^^^"]), baseline);
-    assert_eq!(git(&root, &["rev-parse", "refs/remotes/origin/main"]), baseline);
+    assert_eq!(
+        git(&root, &["rev-parse", "refs/remotes/origin/main"]),
+        baseline
+    );
     let subjects = git(&root, &["log", "--format=%s"]);
     assert_eq!(
         subjects.lines().collect::<Vec<_>>(),
@@ -706,7 +723,10 @@ fn leftover_chore_run_is_not_collapsed_when_rewrite_is_unsafe() {
     assert_eq!(value["data"]["checkpoint"]["consolidated"], 0);
     assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
     assert_eq!(git(&root, &["rev-parse", "HEAD^^"]), baseline);
-    assert_eq!(git(&root, &["rev-parse", "refs/remotes/origin/main"]), baseline);
+    assert_eq!(
+        git(&root, &["rev-parse", "refs/remotes/origin/main"]),
+        baseline
+    );
 
     fs::remove_dir_all(&root).unwrap();
     fs::remove_dir_all(remote).unwrap();

@@ -11,7 +11,10 @@ fn checkpoint_note(outcome: &CheckpointOutcome) -> String {
             "; milestone/grouping write batched to assignment boundary".to_string()
         }
         CheckpointStatus::Checkpointed => {
-            format!("; record written; Git checkpointed{}", checkpoint_note_suffix(outcome))
+            format!(
+                "; record written; Git checkpointed{}",
+                checkpoint_note_suffix(outcome)
+            )
         }
         CheckpointStatus::Clean => {
             format!("; Git checkpoint clean{}", checkpoint_note_suffix(outcome))

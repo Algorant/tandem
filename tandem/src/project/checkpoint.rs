@@ -356,7 +356,8 @@ fn reconcile_inner(repo_root: &Path, relative_data: &str) -> Result<u32, String>
     // Each collapse removes at least one commit, so this is bounded by the
     // commit count; the guard only protects against an unexpected no-op.
     while consolidated < total {
-        let Some((first, last)) = first_adjacent_own_run(repo_root, &upstream, relative_data)? else {
+        let Some((first, last)) = first_adjacent_own_run(repo_root, &upstream, relative_data)?
+        else {
             break;
         };
         collapse_run(repo_root, &first, &last)?;
@@ -413,14 +414,7 @@ fn collapse_run(repo_root: &Path, first: &str, last: &str) -> Result<(), String>
     }
     let replacement = git_output(
         repo_root,
-        &[
-            "commit-tree",
-            &tree,
-            "-p",
-            &base,
-            "-m",
-            CHECKPOINT_SUBJECT,
-        ],
+        &["commit-tree", &tree, "-p", &base, "-m", CHECKPOINT_SUBJECT],
     )?
     .stdout
     .trim()
@@ -466,7 +460,10 @@ fn is_ancestor(repo_root: &Path, ancestor: &str, descendant: &str) -> Result<boo
 }
 
 fn tree_is_clean(repo_root: &Path) -> Result<bool, String> {
-    let output = git_output(repo_root, &["status", "--porcelain", "--untracked-files=all"])?;
+    let output = git_output(
+        repo_root,
+        &["status", "--porcelain", "--untracked-files=all"],
+    )?;
     Ok(output.stdout.trim().is_empty())
 }
 
@@ -611,7 +608,10 @@ mod tests {
         git(&root, &["commit", "--quiet", "-m", "baseline"]);
         let remote = root.with_extension("bare");
         git(&root, &["init", "--bare", remote.to_str().unwrap()]);
-        git(&root, &["remote", "add", "origin", remote.to_str().unwrap()]);
+        git(
+            &root,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        );
         git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
         for name in ["a", "b"] {
             fs::write(
@@ -620,10 +620,7 @@ mod tests {
             )
             .unwrap();
             git(&root, &["add", ".tandem"]);
-            git(
-                &root,
-                &["commit", "--quiet", "-m", CHECKPOINT_SUBJECT],
-            );
+            git(&root, &["commit", "--quiet", "-m", CHECKPOINT_SUBJECT]);
         }
         assert_eq!(
             git_output(&root, &["rev-list", "--count", "HEAD"])
