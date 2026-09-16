@@ -139,3 +139,4 @@
 {"ts":"2026-09-16T15:22:56Z","event":"task.updated","id":"task-34","summary":"Updated task-34 metadata: body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":139}
 {"ts":"2026-09-16T15:46:25Z","event":"accord.claimed","id":"task-34","summary":"Accord claim for task-34","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":140}
 {"ts":"2026-09-16T16:04:43Z","event":"accord.delivered","id":"task-34","summary":"Accord deliver for task-34","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":141}
+{"ts":"2026-09-16T16:04:43Z","event":"task.completed","id":"task-34","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":142}

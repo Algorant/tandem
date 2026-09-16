@@ -2,14 +2,13 @@
 id: task-34
 type: task
 title: "Collapse unpushed tandem-only checkpoints natively"
-state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["task-14"]
 relatedFiles: ["tandem/src/project/checkpoint.rs", "tandem/src/cli/commands.rs", "tandem/src/app/support.rs", "tandem/tests/checkpoint_behavior.rs", "protocol/README.md", "plan/task-14-pi-handoff.md", "scripts/tidy_history.sh", "justfile"]
 tags: ["protocol", "git"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Protocol states the history invariant: unpushed adjacent `.tandem/`-only commits are not part of the intended shape; Tandem may rewrite its own unpushed tandem-only commits; pushed commits and ordinary/unproven work commits are never amended; a `meta / source / meta` sandwich is allowed.", "Assignment-boundary checkpoint amends HEAD when it is unpushed and tandem-only; otherwise it creates a new ordinary commit. Unrelated dirty index/worktree/untracked bytes are preserved. JSON `amended` is true only when an amend happened.", "When rewrite is safe (clean tree, upstream is an ancestor of HEAD, no in-progress rebase/merge/cherry-pick/revert, lock held), the same checkpoint also collapses any remaining adjacent tandem-only run in `@{upstream}..HEAD`. When unsafe, skip reconcile and do not fail the record write.", "Real-Git tests prove: repeated assignment boundaries on a dirty unrelated tree produce one rolling checkpoint, not N; an ordinary local commit and a pushed HEAD remain `HEAD^`; a leftover adjacent chore run is collapsed only on a safe boundary; the checkpoint lock still serializes.", "Consumer handoff: adapters must not checkpoint or tidy; they must accept `amended: true`. No Pi/adapter implementation in this Task. `just tidy-history` is removed or marked superseded so ordinary Tandem + git push is the supported workflow."]
   claimedAt: "2026-09-16T15:46:25Z"
   deliveredAt: "2026-09-16T16:04:43Z"
@@ -22,6 +21,9 @@ accord:
 createdAt: "2026-09-16T15:22:34Z"
 updatedAt: "2026-09-16T16:04:43Z"
 assignee: "worker-task-34-55be0a8a"
+archivedAt: "2026-09-16T16:04:43Z"
+resolution:
+  outcome: "completed"
 ---
 Native assignment checkpoints always create a new `chore(tandem): checkpoint metadata` commit and never amend, including their own previous unpushed tandem-only HEAD. That last part is stricter than the real safety rule (do not amend pushed or ordinary commits). It floods `main`: a typical Pi session push was 9 commits, 8 of them chores; `~/.pi` last 200 commits were 160 chores. The same shape exists on this repo.
 
