@@ -134,3 +134,7 @@
 {"ts":"2026-09-11T16:56:00Z","event":"accord.claimed","id":"task-33","summary":"Accord claim for task-33","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":134}
 {"ts":"2026-09-11T17:04:41Z","event":"accord.delivered","id":"task-33","summary":"Accord deliver for task-33","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":135}
 {"ts":"2026-09-11T17:04:50Z","event":"task.completed","id":"task-33","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":136}
+{"ts":"2026-09-16T15:22:34Z","event":"task.created","id":"task-34","summary":"Collapse unpushed tandem-only checkpoints natively","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":137}
+{"ts":"2026-09-16T15:22:42Z","event":"task.updated","id":"task-34","summary":"Updated task-34 metadata: acceptance","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":138}
+{"ts":"2026-09-16T15:22:56Z","event":"task.updated","id":"task-34","summary":"Updated task-34 metadata: body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":139}
+{"ts":"2026-09-16T15:46:25Z","event":"accord.claimed","id":"task-34","summary":"Accord claim for task-34","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":140}
