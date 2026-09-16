@@ -72,6 +72,15 @@ fn json(stdout: &str) -> Value {
     })
 }
 
+fn chore_commit(root: &Path, relative: &str) {
+    fs::write(root.join(relative), "leftover checkpoint bytes\n").unwrap();
+    git(root, &["add", ".tandem"]);
+    git(
+        root,
+        &["commit", "--quiet", "-m", "chore(tandem): checkpoint metadata"],
+    );
+}
+
 #[test]
 fn real_git_checkpoint_preserves_unrelated_index_worktree_and_untracked_state() {
     let root = setup("preservation");
@@ -128,25 +137,38 @@ fn real_git_checkpoint_preserves_unrelated_index_worktree_and_untracked_state() 
 }
 
 #[test]
-fn boundaries_batch_progress_and_never_create_empty_or_amending_commits() {
+fn boundaries_roll_up_into_one_amended_checkpoint_without_empty_commits() {
     let root = setup("boundaries");
     let baseline = git(&root, &["rev-parse", "HEAD"]);
-    let (ok, _, stderr) = run(
+    let (ok, stdout, stderr) = run(
         &root,
-        &["accord", "claim", "task-1", "--assignee", "worker"],
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
     );
     assert!(ok, "claim failed: {stderr}");
+    let claim = json(&stdout);
+    assert_eq!(claim["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(claim["data"]["checkpoint"]["amended"], false);
     let claim_head = git(&root, &["rev-parse", "HEAD"]);
     assert_ne!(claim_head, baseline);
+
     let (ok, _, stderr) = run(
         &root,
         &["update", "task-1", "--body", "intermediate progress"],
     );
     assert!(ok, "update failed: {stderr}");
     assert_eq!(git(&root, &["rev-parse", "HEAD"]), claim_head);
-    let (ok, _, stderr) = run(
+
+    let (ok, stdout, stderr) = run(
         &root,
         &[
+            "--json",
             "accord",
             "deliver",
             "task-1",
@@ -157,21 +179,27 @@ fn boundaries_batch_progress_and_never_create_empty_or_amending_commits() {
         ],
     );
     assert!(ok, "deliver failed: {stderr}");
-    let delivery_head = git(&root, &["rev-parse", "HEAD"]);
-    assert_ne!(delivery_head, claim_head);
-    let (ok, _, stderr) = run(&root, &["complete", "task-1"]);
+    let delivery = json(&stdout);
+    assert_eq!(delivery["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(delivery["data"]["checkpoint"]["amended"], true);
+    assert_eq!(
+        git(&root, &["rev-parse", "HEAD^"]),
+        baseline,
+        "delivery must amend the rolling checkpoint, not append a new commit"
+    );
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "complete", "task-1"]);
     assert!(ok, "complete failed: {stderr}");
-    let final_head = git(&root, &["rev-parse", "HEAD"]);
-    assert_ne!(final_head, delivery_head);
-    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "4");
+    let complete = json(&stdout);
+    assert_eq!(complete["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(complete["data"]["checkpoint"]["amended"], true);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
     assert_eq!(
         git(&root, &["log", "-1", "--format=%s"]),
         "chore(tandem): checkpoint metadata"
     );
-    assert_eq!(
-        git(&root, &["show", "--format=%P", "--no-patch", "HEAD"]),
-        delivery_head
-    );
+    assert_eq!(git(&root, &["show", "--format=%P", "--no-patch", "HEAD"]), baseline);
 
     fs::remove_dir_all(root).unwrap();
 }
@@ -429,11 +457,19 @@ fn pushed_and_unproven_ordinary_commits_are_never_amended() {
     git(&root, &["add", "ordinary.txt"]);
     git(&root, &["commit", "--quiet", "-m", "ordinary local commit"]);
     let ordinary_head = git(&root, &["rev-parse", "HEAD"]);
-    let (ok, _, stderr) = run(
+    let (ok, stdout, stderr) = run(
         &root,
-        &["accord", "claim", "task-1", "--assignee", "worker"],
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
     );
     assert!(ok, "claim failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], false);
     assert_eq!(
         git(&root, &["rev-parse", "HEAD^"]),
         ordinary_head,
@@ -450,16 +486,228 @@ fn pushed_and_unproven_ordinary_commits_are_never_amended() {
     );
     git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
     let pushed_head = git(&root, &["rev-parse", "HEAD"]);
-    let (ok, _, stderr) = run(
+    let (ok, stdout, stderr) = run(
         &root,
-        &["accord", "claim", "task-1", "--assignee", "worker"],
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
     );
     assert!(ok, "claim failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], false);
     assert_eq!(git(&root, &["rev-parse", "HEAD^"]), pushed_head);
     assert_eq!(
         git(&root, &["rev-parse", "refs/remotes/origin/main"]),
         pushed_head
     );
+    // The next boundary may amend only the unpushed checkpoint above the
+    // pushed HEAD; the pushed commit stays exactly HEAD^.
+    let (ok, stdout, stderr) = run(
+        &root,
+        &[
+            "--json",
+            "accord",
+            "deliver",
+            "task-1",
+            "--summary",
+            "ready",
+            "--evidence",
+            "observed",
+        ],
+    );
+    assert!(ok, "deliver failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), pushed_head);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_eq!(
+        git(&root, &["rev-parse", "refs/remotes/origin/main"]),
+        pushed_head
+    );
+    fs::remove_dir_all(&root).unwrap();
+    fs::remove_dir_all(remote).unwrap();
+}
+
+#[test]
+fn rolling_checkpoint_amends_on_a_dirty_unrelated_tree() {
+    let root = setup("rolling-dirty");
+    fs::write(root.join("unrelated-tracked.txt"), "base\n").unwrap();
+    git(&root, &["add", "unrelated-tracked.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "unrelated tracked fixture"]);
+    let baseline = git(&root, &["rev-parse", "HEAD"]);
+
+    fs::write(root.join("unrelated-tracked.txt"), "dirty unstaged\n").unwrap();
+    fs::write(root.join("staged-other.txt"), "staged\n").unwrap();
+    git(&root, &["add", "staged-other.txt"]);
+    let staged_before = git(&root, &["diff", "--cached", "--name-status"]);
+    fs::write(root.join("untracked-other.txt"), "untracked\n").unwrap();
+
+    let (ok, stdout, stderr) = run(
+        &root,
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
+    );
+    assert!(ok, "claim failed: {stderr}");
+    let claim = json(&stdout);
+    assert_eq!(claim["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(claim["data"]["checkpoint"]["amended"], false);
+    assert_eq!(claim["data"]["checkpoint"]["consolidated"], 0);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+
+    let (ok, stdout, stderr) = run(
+        &root,
+        &[
+            "--json",
+            "accord",
+            "deliver",
+            "task-1",
+            "--summary",
+            "ready",
+            "--evidence",
+            "observed",
+        ],
+    );
+    assert!(ok, "deliver failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "complete", "task-1"]);
+    assert!(ok, "complete failed: {stderr}");
+    let complete = json(&stdout);
+    assert_eq!(complete["data"]["checkpoint"]["amended"], true);
+    assert_eq!(complete["data"]["checkpoint"]["consolidated"], 0);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
+
+    assert_eq!(
+        git(&root, &["diff", "--cached", "--name-status"]),
+        staged_before
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("unrelated-tracked.txt")).unwrap(),
+        "dirty unstaged\n"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("untracked-other.txt")).unwrap(),
+        "untracked\n"
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn leftover_adjacent_chore_runs_collapse_on_a_safe_boundary() {
+    let root = setup("reconcile-safe");
+    let remote = root.with_extension("bare");
+    git(&root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(
+        &root,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
+    let baseline = git(&root, &["rev-parse", "HEAD"]);
+
+    chore_commit(&root, ".tandem/leftover-a.txt");
+    chore_commit(&root, ".tandem/leftover-b.txt");
+    fs::write(root.join("source.txt"), "source\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "ordinary source commit"]);
+    chore_commit(&root, ".tandem/leftover-c.txt");
+    chore_commit(&root, ".tandem/leftover-d.txt");
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "6");
+
+    let (ok, stdout, stderr) = run(
+        &root,
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
+    );
+    assert!(ok, "claim failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], true);
+    assert_eq!(value["data"]["checkpoint"]["consolidated"], 2);
+
+    // meta / source / meta in one reconcile, not one run per checkpoint.
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "4");
+    assert_eq!(git(&root, &["rev-parse", "HEAD^^^"]), baseline);
+    assert_eq!(git(&root, &["rev-parse", "refs/remotes/origin/main"]), baseline);
+    let subjects = git(&root, &["log", "--format=%s"]);
+    assert_eq!(
+        subjects.lines().collect::<Vec<_>>(),
+        vec![
+            "chore(tandem): checkpoint metadata",
+            "ordinary source commit",
+            "chore(tandem): checkpoint metadata",
+            "fixture baseline",
+        ]
+    );
+    let tree = git(&root, &["ls-tree", "-r", "--name-only", "HEAD"]);
+    for path in [
+        ".tandem/leftover-a.txt",
+        ".tandem/leftover-b.txt",
+        ".tandem/leftover-c.txt",
+        ".tandem/leftover-d.txt",
+    ] {
+        assert!(tree.contains(path), "collapsed history lost {path}");
+    }
+    fs::remove_dir_all(&root).unwrap();
+    fs::remove_dir_all(remote).unwrap();
+}
+
+#[test]
+fn leftover_chore_run_is_not_collapsed_when_rewrite_is_unsafe() {
+    let root = setup("reconcile-unsafe");
+    let remote = root.with_extension("bare");
+    git(&root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(
+        &root,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
+    let baseline = git(&root, &["rev-parse", "HEAD"]);
+
+    chore_commit(&root, ".tandem/leftover-a.txt");
+    chore_commit(&root, ".tandem/leftover-b.txt");
+    // An unrelated dirty byte makes the rewrite unsafe; the run stays. The
+    // live amend still folds the new record into HEAD.
+    fs::write(root.join("dirty-untracked.txt"), "dirty\n").unwrap();
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
+
+    let (ok, stdout, stderr) = run(
+        &root,
+        &[
+            "--json",
+            "accord",
+            "claim",
+            "task-1",
+            "--assignee",
+            "worker",
+        ],
+    );
+    assert!(ok, "claim failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], true);
+    assert_eq!(value["data"]["checkpoint"]["consolidated"], 0);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
+    assert_eq!(git(&root, &["rev-parse", "HEAD^^"]), baseline);
+    assert_eq!(git(&root, &["rev-parse", "refs/remotes/origin/main"]), baseline);
+
     fs::remove_dir_all(&root).unwrap();
     fs::remove_dir_all(remote).unwrap();
 }

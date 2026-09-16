@@ -9,38 +9,56 @@ fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
             "status": "batched",
             "commit": serde_json::Value::Null,
             "amended": false,
+            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Checkpointed => serde_json::json!({
             "status": "checkpointed",
             "commit": outcome.commit.as_deref(),
-            "amended": false,
+            "amended": outcome.amended,
+            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Clean => serde_json::json!({
             "status": "clean",
             "commit": serde_json::Value::Null,
             "amended": false,
+            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Failed { message } => serde_json::json!({
             "status": "failed",
             "commit": serde_json::Value::Null,
             "amended": false,
+            "consolidated": outcome.consolidated,
             "error": message,
         }),
     }
 }
 
+fn checkpoint_details(outcome: &CheckpointOutcome) -> String {
+    let mut details = String::new();
+    if outcome.amended {
+        details.push_str(" amended");
+    }
+    if outcome.consolidated > 0 {
+        details.push_str(&format!(" consolidated {}", outcome.consolidated));
+    }
+    details
+}
+
 fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
+    let details = checkpoint_details(outcome);
     match &outcome.status {
         CheckpointStatus::Batched => "batched (awaiting assignment boundary)".to_string(),
         CheckpointStatus::Checkpointed => format!(
-            "checkpointed{}",
+            "checkpointed{}{details}",
             outcome
                 .commit
                 .as_deref()
                 .map(|commit| format!(" ({commit})"))
                 .unwrap_or_default()
         ),
-        CheckpointStatus::Clean => "clean (no Tandem changes to checkpoint)".to_string(),
+        CheckpointStatus::Clean => {
+            format!("clean (no Tandem changes to checkpoint){details}")
+        }
         CheckpointStatus::Failed { message } => format!("FAILED: {message}"),
     }
 }

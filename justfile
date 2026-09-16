@@ -2,10 +2,6 @@
 
 set positional-arguments
 
-# Squash adjacent unpushed commits that touch only .tandem/.
-tidy-history:
-	@./scripts/tidy_history.sh
-
 # An explicit delegated preview route selects that worktree and fixture instead.
 # Build release and open a fresh, disposable Git-backed TUI sandbox.
 dev:

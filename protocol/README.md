@@ -68,10 +68,31 @@ owning `.tandem/` path. Epics are grouping records and Subtasks are assignment
 milestones: their lifecycle writes return `batched` and remain durable without
 creating a commit until an assignment boundary captures them. Intermediate
 metadata and progress writes do not commit. Checkpoints use the fixed subject
-`chore(tandem): checkpoint metadata`, never amend, and serialize through a
-lock in Git's common directory so linked worktrees share one boundary. Git
-checkpoint failure is returned separately from the successful record result;
-there is no fallback or force path. See
+`chore(tandem): checkpoint metadata` and serialize through a lock in Git's
+common directory so linked worktrees share one boundary.
+
+Unpushed history must not contain adjacent Tandem-only commits. At an
+assignment boundary, when HEAD exists, is unpushed (not contained in any
+remote-tracking ref), and is Tandem's own `.tandem`-only checkpoint commit,
+the boundary amends that HEAD with the `.tandem/` pathspec. Otherwise it
+creates a new ordinary commit. Amending and folding are limited to Tandem's
+own unpushed checkpoint commits: pushed commits and ordinary or unproven work
+commits are never rewritten, and a `meta / source / meta` sandwich is
+preserved because metadata is never folded into a neighboring source commit.
+Unrelated staged, unstaged, and untracked bytes are never touched.
+
+The same boundary then reconciles any remaining adjacent run of Tandem's own
+checkpoint commits inside `@{upstream}..HEAD`, collapsing every such run to
+one commit in a single reconcile. Reconcile runs after both the new/amend
+commit and the clean (no `.tandem` diff) path, but only when the tree is
+clean, `@{upstream}` is an ancestor of HEAD, no
+rebase/merge/cherry-pick/revert is in flight, and the checkpoint lock is held.
+It is best-effort: an unsafe or failed rewrite is skipped, the record write
+and the live commit stay successful, and `consolidated` is reported as `0`.
+Git checkpoint failure is returned separately from the successful record
+result; there is no fallback or force path. The lifecycle JSON reports
+`amended` true only when the boundary amended HEAD and `consolidated` as the
+number of runs collapsed. See
 [`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the consumer
 JSON contract and cutover sequence.
 

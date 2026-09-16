@@ -38,7 +38,7 @@ allowed validation action, return `checkpoint.status=batched`: their record and
 event writes persist immediately, but no Git commit is made. The next actual
 assignment boundary captures them with the owning `.tandem` path. IDs are never
 used to infer this role. There is no daemon, attempt history, per-edit commit,
-or forced/amended commit.
+or forced history rewrite.
 
 The checkpoint stages and commits only the discovered project's `.tandem/`
 path with the fixed subject `chore(tandem): checkpoint metadata`. It never
@@ -50,11 +50,22 @@ Git runs hooks; the coherent native result is retained in memory while the
 checkpoint runs. The lock is outside the worktree and is not tracked.
 `.tandem/actor-id` and other ignored runtime files remain uncommitted.
 
-Native checkpoints always create a new ordinary commit. They do not amend
-pushed, unpushed, ordinary, or previous checkpoint commits. Repeated lifecycle
-actions that have no new `.tandem` diff report `clean` and create no empty
-commit. A real boundary creates one commit, so history is bounded by actual
-boundaries rather than by every progress edit.
+An assignment boundary keeps unpushed history from accumulating adjacent
+Tandem-only commits. When HEAD exists, is unpushed (not contained in any
+remote-tracking ref), and is Tandem's own `.tandem`-only checkpoint commit,
+the boundary amends that HEAD with the `.tandem/` pathspec; otherwise it
+creates a new ordinary commit. Amending and folding are limited to Tandem's
+own unpushed checkpoint commits. Pushed commits and ordinary/unproven work
+commits are never rewritten, and metadata is never folded into a neighboring
+source commit, so a `meta / source / meta` sandwich is preserved. Repeated
+lifecycle actions that have no new `.tandem` diff report `clean` and create no
+empty commit. The same boundary then reconciles every remaining adjacent run
+of Tandem's own checkpoint commits inside `@{upstream}..HEAD`, collapsing each
+run to one commit, but only when the tree is clean, `@{upstream}` is an
+ancestor of HEAD, no rebase/merge/cherry-pick/revert is in flight, and the
+checkpoint lock is held. Reconcile is best-effort: an unsafe or failed rewrite
+is skipped and reported as `consolidated: 0`, and it never turns a successful
+record write into a failure.
 
 Non-Git projects, a workspace outside the Git root, an unsupported Git state,
 Git add failure, and hook/commit failure are explicit `failed` checkpoint
@@ -80,6 +91,7 @@ command in this cutover. The result has:
       "status": "checkpointed|batched|clean|failed",
       "commit": "<HEAD sha>|null",
       "amended": false,
+      "consolidated": 0,
       "error": "<message>"
     }
   },
@@ -87,8 +99,10 @@ command in this cutover. The result has:
 }
 ```
 
-`error` is present only for `failed`. `amended` is always `false` in the
-native implementation and is retained as an explicit safety assertion. A
+`error` is present only for `failed`. `amended` is `true` only when this
+boundary amended its own unpushed tandem-only HEAD, and `consolidated` is the
+number of adjacent own-checkpoint runs collapsed by the best-effort reconcile
+(`0` when nothing was collapsed or the rewrite was unsafe). A
 failed checkpoint leaves the native `.tandem` change staged for inspection or a
 later boundary; it does not roll back the durable record. Human CLI and TUI
 surfaces say `record written` separately from `Git checkpoint FAILED`.
@@ -187,6 +201,14 @@ availability switch, not a retry or replay. Existing adapter reports and
 `expectedHead`/amend logic are not part of the native contract. If native
 availability cannot be verified, leave the adapter in place and do not claim
 that the cutover is complete.
+
+Adapters are consumers, never a second Git writer. They must not commit,
+amend, rebase, or tidy `.tandem/`, and they must accept `checkpoint.amended:
+true` and any consolidate result without replaying the lifecycle mutation that
+produced it. Native Tandem owns the live amend and the reconcile, so adapters
+must not run a pre-push history recipe. The historical `just tidy-history`
+recipe and `scripts/tidy_history.sh` are removed: the supported workflow is
+ordinary Tandem lifecycle calls plus `git push`.
 
 The unresolved consumer choice is scheduling the adapter removal in a later
 Pi-owned task. Native policy, JSON fields, failure semantics, and the exact

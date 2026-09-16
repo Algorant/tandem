@@ -43,6 +43,19 @@ use crate::protocol::workflow::{
 };
 use crate::CliError;
 
+/// Shared suffix describing a checkpoint's amend/consolidate outcome for TUI
+/// status notes. Kept next to the TUI surfaces that render it.
+fn checkpoint_note_suffix(outcome: &CheckpointOutcome) -> String {
+    let mut suffix = String::new();
+    if outcome.amended {
+        suffix.push_str(" (amended)");
+    }
+    if outcome.consolidated > 0 {
+        suffix.push_str(&format!(" (consolidated {})", outcome.consolidated));
+    }
+    suffix
+}
+
 mod bindings;
 mod board;
 mod chrome;
