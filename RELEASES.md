@@ -2,6 +2,17 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.3
+
+Tandem v0.13.3 stops assignment checkpoints from flooding unpushed history with adjacent metadata commits.
+
+### Changed
+
+- Assignment-boundary Git checkpoints amend Tandem's own unpushed `.tandem/`-only HEAD instead of always creating a new `chore(tandem): checkpoint metadata` commit. Unrelated staged, unstaged, and untracked files stay untouched. Pushed commits and ordinary work commits are never rewritten.
+- When a rewrite is safe, the same boundary collapses leftover adjacent Tandem-only checkpoint runs in the unpushed range. A `meta / source / meta` sandwich stays; metadata is never folded into a source commit.
+- Lifecycle JSON reports `amended` only when HEAD was amended and `consolidated` as the number of runs collapsed. Adapters must accept `amended: true` and must not run their own checkpoint or history-tidy path.
+- `just tidy-history` is removed. The supported workflow is ordinary Tandem lifecycle calls plus `git push`.
+
 ## 0.13.2
 
 Tandem v0.13.2 fixes Decision editing, Papercuts navigation, and completion diagnostics.
