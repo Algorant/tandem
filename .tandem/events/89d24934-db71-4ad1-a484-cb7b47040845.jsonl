@@ -143,3 +143,4 @@
 {"ts":"2026-09-16T17:43:03Z","event":"task.created","id":"task-35","summary":"Publish Tandem 0.13.3 native checkpoint-collapse release","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":143}
 {"ts":"2026-09-16T17:43:07Z","event":"accord.claimed","id":"task-35","summary":"Accord claim for task-35","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":144}
 {"ts":"2026-09-16T17:50:30Z","event":"accord.delivered","id":"task-35","summary":"Accord deliver for task-35","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":145}
+{"ts":"2026-09-16T17:50:35Z","event":"task.completed","id":"task-35","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":146}
