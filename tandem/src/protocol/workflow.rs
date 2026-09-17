@@ -253,7 +253,7 @@ mod tests {
         let newest = archived("task-2", &[("archivedAt", "2026-03-01T00:00:00Z")]);
         let legacy = archived("task-10", &[("completedAt", "2026-02-01T00:00:00Z")]);
         let undated = archived("task-3", &[]);
-        let mut docs = vec![oldest, undated, legacy, newest];
+        let mut docs = [oldest, undated, legacy, newest];
         docs.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt", "completedAt"]));
         assert_eq!(
             docs.iter().map(Document::id).collect::<Vec<_>>(),
@@ -262,7 +262,7 @@ mod tests {
 
         let first = archived("task-1", &[("archivedAt", "2026-01-01T00:00:00Z")]);
         let second = archived("task-2", &[("archivedAt", "2026-01-01T00:00:00Z")]);
-        let mut tied = vec![second, first];
+        let mut tied = [second, first];
         tied.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt"]));
         assert_eq!(
             tied.iter().map(Document::id).collect::<Vec<_>>(),
