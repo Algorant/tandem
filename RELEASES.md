@@ -2,6 +2,15 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.4
+
+Tandem v0.13.4 keeps unpushed git history to real commit messages. Board files ride in those commits instead of a stack of `chore(tandem): checkpoint metadata` commits.
+
+### Fixed
+
+- Assignment-boundary checkpoints put `.tandem/` into the last unpushed commit and keep that commit's message. Leftover unpushed Tandem-only chores fold into the neighboring real commit. Pushed commits and merges are not rewritten. Unrelated staged, unstaged, and untracked files stay untouched.
+- Board and Logs list newest work first. Logs sort and display `archivedAt` (with a legacy `completedAt` fallback), so protocol 0.3.0 archives no longer appear in sequential ID order with `completed unknown`.
+
 ## 0.13.3
 
 Tandem v0.13.3 stops assignment checkpoints from flooding unpushed history with adjacent metadata commits.
