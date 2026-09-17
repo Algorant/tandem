@@ -9,9 +9,9 @@ use crate::project::{
 };
 use crate::protocol::accord::status as accord_status;
 use crate::protocol::document::parse_field_values;
-use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
-    resolution_files_changed, resolution_note, resolution_outcome, resolution_reviewer,
+    archive_timestamp, compare_recency_desc, resolution_files_changed, resolution_note,
+    resolution_outcome, resolution_reviewer,
 };
 
 use super::{is_canceled_log, markdownish_lines, StatusTone, TuiTheme};
@@ -47,12 +47,7 @@ pub(super) fn load_logs(project: &TandemProject) -> LogLoad {
 }
 
 pub(super) fn sort_logs_by_recency(docs: &mut [Document]) {
-    docs.sort_by(|a, b| {
-        b.field("completedAt")
-            .unwrap_or("")
-            .cmp(a.field("completedAt").unwrap_or(""))
-            .then_with(|| compare_ids(a.id(), b.id()))
-    });
+    docs.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt", "completedAt"]));
 }
 
 pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<String>) {
@@ -317,7 +312,7 @@ pub(super) fn detail_lines_for_log(
             theme.muted_style(),
         ),
         Span::styled(
-            completed_at_compact(doc.field("completedAt").unwrap_or("unknown")),
+            completed_at_compact(archive_timestamp(doc).unwrap_or("unknown")),
             theme.text_style(),
         ),
     ]));
@@ -612,6 +607,23 @@ mod tests {
         )
     }
 
+    fn archived_log_doc(id: &str, title: &str, fields: &[(&str, &str)]) -> Document {
+        let mut map = HashMap::from([
+            ("id".to_string(), id.to_string()),
+            ("type".to_string(), "task".to_string()),
+            ("title".to_string(), title.to_string()),
+        ]);
+        for (key, value) in fields {
+            map.insert((*key).to_string(), (*value).to_string());
+        }
+        Document::new(
+            PathBuf::from(format!("{id}.md")),
+            DocumentLocation::Logs,
+            map,
+            String::new(),
+        )
+    }
+
     #[test]
     fn filters_logs_by_id_title_summary_and_body() {
         let logs = vec![
@@ -684,6 +696,74 @@ mod tests {
         sort_logs_by_recency(&mut logs);
         assert_eq!(logs[0].id(), "task-2");
         assert_eq!(logs[1].id(), "task-1");
+    }
+
+    #[test]
+    fn sorts_logs_newest_first_by_archived_at_with_completed_at_fallback() {
+        let mut logs = vec![
+            archived_log_doc(
+                "task-1",
+                "Oldest archive",
+                &[("archivedAt", "2026-01-01T00:00:00Z")],
+            ),
+            archived_log_doc(
+                "task-10",
+                "Legacy newest",
+                &[("completedAt", "2026-03-01T00:00:00Z")],
+            ),
+            archived_log_doc(
+                "task-3",
+                "Newer archive",
+                &[("archivedAt", "2026-02-01T00:00:00Z")],
+            ),
+            archived_log_doc("task-2", "Undated", &[]),
+        ];
+        sort_logs_by_recency(&mut logs);
+        assert_eq!(
+            logs.iter().map(|doc| doc.id()).collect::<Vec<_>>(),
+            ["task-10", "task-3", "task-1", "task-2"]
+        );
+    }
+
+    #[test]
+    fn archived_at_takes_priority_over_completed_at_for_recency() {
+        let mut logs = vec![
+            archived_log_doc(
+                "task-1",
+                "Legacy field",
+                &[("completedAt", "2026-05-01T00:00:00Z")],
+            ),
+            archived_log_doc(
+                "task-2",
+                "Archive field",
+                &[
+                    ("archivedAt", "2026-06-01T00:00:00Z"),
+                    ("completedAt", "2026-01-01T00:00:00Z"),
+                ],
+            ),
+        ];
+        sort_logs_by_recency(&mut logs);
+        assert_eq!(
+            logs.iter().map(|doc| doc.id()).collect::<Vec<_>>(),
+            ["task-2", "task-1"]
+        );
+    }
+
+    #[test]
+    fn log_detail_shows_archived_at_when_completed_at_is_missing() {
+        let theme = TuiTheme::default_dark();
+        let doc = archived_log_doc(
+            "task-40",
+            "Archived only",
+            &[("archivedAt", "2026-06-28T17:34:12Z")],
+        );
+        let lines = detail_lines_for_log(&doc, None, &[], &theme)
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>();
+        let reference = lines.join("\n");
+        assert!(reference.contains("06-28 17:34"), "{reference}");
+        assert!(!reference.contains("unknown"), "{reference}");
     }
 
     #[test]

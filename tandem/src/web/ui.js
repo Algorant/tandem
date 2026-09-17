@@ -287,7 +287,7 @@ export function renderLogs(data, query, onSearch) {
   form.addEventListener('submit', (event) => { event.preventDefault(); onSearch(form.querySelector('input').value); });
   const list = data.items.length ? el('div', { class: 'panel' }, el('ul', { class: 'item-list' }, data.items.map((item) => el('li', {}, el('a', { class: 'item-link', href: `#log/${encodeURIComponent(item.id)}` }, [
     el('div', { class: 'item-title' }, [el('span', { text: item.title }), badge('Outcome', item.outcome, statusTone(item.outcome))]),
-    el('p', { class: 'item-summary', text: `${item.id} · ${item.completedAt || 'Completion date unknown'}${item.summary ? ` · ${item.summary}` : ''}` }),
+    el('p', { class: 'item-summary', text: `${item.id} · ${item.archivedAt || 'Archive date unknown'}${item.summary ? ` · ${item.summary}` : ''}` }),
   ]))))) : el('p', { class: 'empty', text: query ? 'No completed work matches this search.' : 'No completed work is available.' });
   return el('div', {}, [heading('Logs', `${data.total} completed or canceled record${data.total === 1 ? '' : 's'} found.`), form, list]);
 }

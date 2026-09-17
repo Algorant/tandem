@@ -36,9 +36,8 @@ use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
-use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
-    self, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
+    self, compare_recency_desc, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
     RESOLUTION_OUTCOME_COMPLETED,
 };
 use crate::CliError;
@@ -107,7 +106,7 @@ fn sort_documents(docs: &mut [Document]) {
         a.field("state")
             .unwrap_or("")
             .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| compare_ids(a.id(), b.id()))
+            .then_with(|| compare_recency_desc(a, b, &["createdAt"]))
     });
 }
 
@@ -478,6 +477,31 @@ mod tests {
                 .insert("parentId".to_string(), parent.to_string());
         }
         doc
+    }
+
+    fn doc_with_created_at(id: &str, state: &str, created_at: Option<&str>) -> Document {
+        let mut doc = doc_with_state(id, Some(state));
+        if let Some(created_at) = created_at {
+            doc.fields
+                .insert("createdAt".to_string(), created_at.to_string());
+        }
+        doc
+    }
+
+    #[test]
+    fn sort_documents_orders_within_state_newest_first_by_created_at() {
+        let mut docs = vec![
+            doc_with_created_at("task-1", "todo", Some("2026-01-01T00:00:00Z")),
+            doc_with_created_at("task-2", "todo", Some("2026-03-01T00:00:00Z")),
+            doc_with_created_at("task-10", "todo", Some("2026-03-01T00:00:00Z")),
+            doc_with_created_at("task-3", "in-progress", Some("2026-02-01T00:00:00Z")),
+            doc_with_created_at("task-4", "todo", None),
+        ];
+        sort_documents(&mut docs);
+        assert_eq!(
+            docs.iter().map(|doc| doc.id()).collect::<Vec<_>>(),
+            ["task-3", "task-2", "task-10", "task-1", "task-4"]
+        );
     }
 
     #[test]

@@ -1,5 +1,7 @@
 //! Shared top-level TUI chrome and frame-local hit geometry.
 
+use crate::protocol::workflow::archive_timestamp;
+
 use super::*;
 
 const TRANSIENT_STATUS_TTL: Duration = Duration::from_secs(4);
@@ -95,7 +97,7 @@ impl TuiApp {
                                     "completed"
                                 },
                                 logs::completed_at_compact(
-                                    doc.field("completedAt").unwrap_or("unknown")
+                                    archive_timestamp(doc).unwrap_or("unknown")
                                 ),
                                 filter
                             )
@@ -312,9 +314,7 @@ impl TuiApp {
                     .add_modifier(Modifier::BOLD),
             )));
             for doc in self.logs.iter().take(10) {
-                let completed = doc
-                    .field("completedAt")
-                    .unwrap_or("unknown completion time");
+                let completed = archive_timestamp(doc).unwrap_or("unknown completion time");
                 lines.push(Line::from(vec![
                     Span::styled(format!("{} ", doc.id()), Style::default().fg(Color::Cyan)),
                     Span::styled(completed.to_string(), Style::default().fg(Color::Gray)),

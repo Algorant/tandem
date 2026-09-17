@@ -144,3 +144,7 @@
 {"ts":"2026-09-16T17:43:07Z","event":"accord.claimed","id":"task-35","summary":"Accord claim for task-35","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":144}
 {"ts":"2026-09-16T17:50:30Z","event":"accord.delivered","id":"task-35","summary":"Accord deliver for task-35","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":145}
 {"ts":"2026-09-16T17:50:35Z","event":"task.completed","id":"task-35","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":146}
+{"ts":"2026-09-17T02:08:57Z","event":"task.created","id":"task-36","summary":"Review TUI Board task ordering and default sort","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":147}
+{"ts":"2026-09-17T02:11:58Z","event":"task.updated","id":"task-36","summary":"Updated task-36 metadata: title, acceptance, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":148}
+{"ts":"2026-09-17T02:15:58Z","event":"task.updated","id":"task-36","summary":"Updated task-36 metadata: title, effort, relatedFiles, acceptance, constraints, validation, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":149}
+{"ts":"2026-09-17T02:16:08Z","event":"accord.claimed","id":"task-36","summary":"Accord claim for task-36","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":150}

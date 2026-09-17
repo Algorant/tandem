@@ -24,7 +24,8 @@ use crate::protocol::document::{is_absolute_reference_url, parse_field_values};
 use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::ids::compare_ids;
 use crate::protocol::workflow::{
-    resolution_note, resolution_outcome, resolution_reviewer, state_matches_filter,
+    compare_recency_desc, resolution_note, resolution_outcome, resolution_reviewer,
+    state_matches_filter,
 };
 use crate::CliError;
 
@@ -373,12 +374,7 @@ async fn logs_api(State(state): State<WebState>, uri: Uri) -> Response {
                         .any(|value| value.to_lowercase().contains(query))
             })
         });
-        documents.sort_by(|a, b| {
-            b.field("completedAt")
-                .unwrap_or("")
-                .cmp(a.field("completedAt").unwrap_or(""))
-                .then_with(|| compare_ids(a.id(), b.id()))
-        });
+        documents.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt", "completedAt"]));
         let total = documents.len();
         documents.truncate(limit);
         Ok(LogsDto {
@@ -647,7 +643,7 @@ fn sort_documents(documents: &mut [Document]) {
         a.field("state")
             .unwrap_or("")
             .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| compare_ids(a.id(), b.id()))
+            .then_with(|| compare_recency_desc(a, b, &["createdAt"]))
     });
 }
 
@@ -1041,6 +1037,32 @@ mod tests {
         assert_eq!(detail["data"]["body"], "\n## Body\n");
         assert_eq!(detail["data"]["bodyHtml"], "<h2>Body</h2>");
         assert!(detail["data"].get("path").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn logs_api_orders_archived_records_newest_first_with_completed_at_fallback() {
+        let (root, project) = test_project();
+        fs::write(
+            project.logs_dir.join("task-3.md"),
+            "---\nid: task-3\ntype: task\ntitle: Newest\narchivedAt: 2026-08-06T00:00:00Z\nresolution:\n  outcome: completed\n  note: Newest\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            project.logs_dir.join("task-10.md"),
+            "---\nid: task-10\ntype: task\ntitle: Legacy\ncompletedAt: 2026-08-04T00:00:00Z\ncompletion:\n  outcome: completed\n  summary: Legacy\n---\n",
+        )
+        .unwrap();
+        let app = router(project, TEST_HOST);
+        let (status, value) = json_request(app, "/api/v1/logs?limit=10").await;
+        assert_eq!(status, StatusCode::OK, "{value}");
+        let ids = value["data"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, ["task-3", "task-2", "task-10"]);
         fs::remove_dir_all(root).unwrap();
     }
 

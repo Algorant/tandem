@@ -3,9 +3,12 @@
 //! Workflow `state` is configurable project data. Completion archives a task
 //! into Logs; it is not another workflow state.
 
+use std::cmp::Ordering;
+
 use yaml_rust2::Yaml;
 
 use super::document::{parse_field_values, Document};
+use super::ids::compare_ids;
 
 pub(crate) const DEFAULT_STATES: &[&str] = &["todo", "in-progress", "validation"];
 pub(crate) const LEGACY_REVIEW_STATE: &str = "review";
@@ -114,6 +117,36 @@ pub(crate) fn resolution_files_changed(document: &Document) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Recency timestamp for a document: `archivedAt` on protocol 0.3.0 archives,
+/// falling back to the legacy `completedAt` retained by historical logs.
+/// Blank values are treated as absent.
+pub(crate) fn archive_timestamp(document: &Document) -> Option<&str> {
+    ["archivedAt", "completedAt"]
+        .into_iter()
+        .find_map(|field| non_empty_field(document, field))
+}
+
+/// Orders documents newest-first by the first non-empty field in `fields`, then
+/// by canonical numeric ID. Missing timestamps sort after dated records; when
+/// both keys are equal or absent, ascending ID order is the tie-break.
+pub(crate) fn compare_recency_desc(a: &Document, b: &Document, fields: &[&str]) -> Ordering {
+    let a_key = fields
+        .iter()
+        .find_map(|field| non_empty_field(a, field))
+        .unwrap_or("");
+    let b_key = fields
+        .iter()
+        .find_map(|field| non_empty_field(b, field))
+        .unwrap_or("");
+    b_key.cmp(a_key).then_with(|| compare_ids(a.id(), b.id()))
+}
+
+fn non_empty_field<'a>(document: &'a Document, field: &str) -> Option<&'a str> {
+    document
+        .field(field)
+        .filter(|value| !value.trim().is_empty())
+}
+
 fn yaml_scalar_to_string(value: &Yaml) -> Option<String> {
     match value {
         Yaml::String(value) | Yaml::Real(value) => Some(value.clone()),
@@ -174,5 +207,66 @@ mod tests {
         );
         assert_eq!(resolution_note(&legacy), Some("Done"));
         assert_eq!(resolution_outcome(&legacy), "canceled");
+    }
+
+    fn archived(id: &str, fields: &[(&str, &str)]) -> Document {
+        let mut map = HashMap::from([("id".to_string(), id.to_string())]);
+        for (key, value) in fields {
+            map.insert((*key).to_string(), (*value).to_string());
+        }
+        Document::new(map, String::new())
+    }
+
+    #[test]
+    fn archive_timestamp_prefers_archived_at_and_skips_blank_values() {
+        let current = archived(
+            "task-2",
+            &[
+                ("archivedAt", "2026-08-05T00:00:00Z"),
+                ("completedAt", "2026-01-01T00:00:00Z"),
+            ],
+        );
+        assert_eq!(archive_timestamp(&current), Some("2026-08-05T00:00:00Z"));
+
+        let historical = archived("task-1", &[("completedAt", "2026-01-01T00:00:00Z")]);
+        assert_eq!(archive_timestamp(&historical), Some("2026-01-01T00:00:00Z"));
+
+        let blank_archive = archived(
+            "task-3",
+            &[
+                ("archivedAt", "  "),
+                ("completedAt", "2026-02-02T00:00:00Z"),
+            ],
+        );
+        assert_eq!(
+            archive_timestamp(&blank_archive),
+            Some("2026-02-02T00:00:00Z")
+        );
+
+        let undated = archived("task-4", &[]);
+        assert_eq!(archive_timestamp(&undated), None);
+    }
+
+    #[test]
+    fn compare_recency_desc_orders_newest_first_and_keeps_missing_timestamps_last() {
+        let oldest = archived("task-1", &[("archivedAt", "2026-01-01T00:00:00Z")]);
+        let newest = archived("task-2", &[("archivedAt", "2026-03-01T00:00:00Z")]);
+        let legacy = archived("task-10", &[("completedAt", "2026-02-01T00:00:00Z")]);
+        let undated = archived("task-3", &[]);
+        let mut docs = vec![oldest, undated, legacy, newest];
+        docs.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt", "completedAt"]));
+        assert_eq!(
+            docs.iter().map(Document::id).collect::<Vec<_>>(),
+            ["task-2", "task-10", "task-1", "task-3"]
+        );
+
+        let first = archived("task-1", &[("archivedAt", "2026-01-01T00:00:00Z")]);
+        let second = archived("task-2", &[("archivedAt", "2026-01-01T00:00:00Z")]);
+        let mut tied = vec![second, first];
+        tied.sort_by(|a, b| compare_recency_desc(a, b, &["archivedAt"]));
+        assert_eq!(
+            tied.iter().map(Document::id).collect::<Vec<_>>(),
+            ["task-1", "task-2"]
+        );
     }
 }
