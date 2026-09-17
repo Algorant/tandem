@@ -6,12 +6,11 @@
 //! A lock in the repository's common Git directory serializes linked
 //! worktrees as well as ordinary processes.
 //!
-//! Tandem is the only Git writer. Unpushed history must not accumulate
-//! adjacent Tandem-only commits, so an assignment boundary amends its own
-//! unpushed checkpoint HEAD, and the same boundary reconciles any remaining
-//! adjacent own-checkpoint run when a rewrite is provably safe. Pushed commits
-//! and ordinary/unproven work commits are never rewritten, and Tandem never
-//! folds metadata into a neighboring source commit.
+//! Tandem is the only Git writer. An assignment boundary amends any unpushed
+//! HEAD with the `.tandem/` pathspec, keeping a non-chore commit message, so
+//! board files ride in the last real commit instead of a stack of chores.
+//! Leftover unpushed tandem-only commits next to a real commit are folded into
+//! it when a rewrite is safe. Pushed commits and merges are never rewritten.
 
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -25,7 +24,7 @@ const CHECKPOINT_SUBJECT: &str = "chore(tandem): checkpoint metadata";
 pub(crate) struct CheckpointOutcome {
     pub(crate) status: CheckpointStatus,
     pub(crate) commit: Option<String>,
-    /// True only when this boundary amended its own unpushed tandem-only HEAD.
+    /// True when this boundary amended HEAD.
     pub(crate) amended: bool,
     /// Number of adjacent own-checkpoint runs collapsed by this boundary's
     /// best-effort reconcile. Always `0` on the batched and failed paths.
@@ -167,22 +166,29 @@ fn checkpoint_inner(project: &TandemProject) -> Result<CheckpointOutcome, String
     git_output(&repo_root, &["add", "-A", "--", relative_data])?;
     let has_staged = staged_tandem_changes(&repo_root, relative_data)?;
 
-    // Live maintenance is primary: fold this boundary's `.tandem` write into
-    // Tandem's own unpushed checkpoint HEAD, or append an ordinary commit.
+    // Live maintenance: put this boundary's `.tandem` write into the last
+    // unpushed commit. Keep that commit's message unless it is already a chore.
     let mut amended = false;
     if has_staged {
-        if should_amend_head(&repo_root, relative_data)? {
-            git_output(
-                &repo_root,
-                &[
-                    "commit",
-                    "--amend",
-                    "-m",
-                    CHECKPOINT_SUBJECT,
-                    "--",
-                    relative_data,
-                ],
-            )?;
+        if should_amend_head(&repo_root)? {
+            if is_own_checkpoint(&repo_root, "HEAD", relative_data)? {
+                git_output(
+                    &repo_root,
+                    &[
+                        "commit",
+                        "--amend",
+                        "-m",
+                        CHECKPOINT_SUBJECT,
+                        "--",
+                        relative_data,
+                    ],
+                )?;
+            } else {
+                git_output(
+                    &repo_root,
+                    &["commit", "--amend", "--no-edit", "--", relative_data],
+                )?;
+            }
             amended = true;
         } else {
             git_output(
@@ -192,9 +198,8 @@ fn checkpoint_inner(project: &TandemProject) -> Result<CheckpointOutcome, String
         }
     }
 
-    // Reconcile is a best-effort backup for leftover runs from old binaries,
-    // failed amends, or pre-change history. It never changes the primary
-    // result: unsafe or failed rewrites are skipped and reported as zero.
+    // Reconcile leftover chore runs: collapse adjacent chores, then fold a
+    // chore sitting next to an unpushed real commit into that commit.
     let consolidated = reconcile(&repo_root, relative_data);
 
     if !has_staged {
@@ -230,14 +235,26 @@ fn staged_tandem_changes(repo_root: &Path, relative_data: &str) -> Result<bool, 
     }
 }
 
-fn should_amend_head(repo_root: &Path, relative_data: &str) -> Result<bool, String> {
+fn should_amend_head(repo_root: &Path) -> Result<bool, String> {
     if !rev_exists(repo_root, "HEAD")? {
         return Ok(false);
     }
     if head_is_pushed(repo_root)? {
         return Ok(false);
     }
-    is_own_checkpoint(repo_root, "HEAD", relative_data)
+    if head_is_merge(repo_root)? {
+        return Ok(false);
+    }
+    Ok(true)
+}
+
+fn head_is_merge(repo_root: &Path) -> Result<bool, String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", "HEAD^2"])
+        .current_dir(repo_root)
+        .output()
+        .map_err(|error| format!("could not inspect merge parents: {error}"))?;
+    Ok(output.status.success())
 }
 
 /// A commit is pushed when any remote-tracking ref already contains it. A
@@ -363,7 +380,20 @@ fn reconcile_inner(repo_root: &Path, relative_data: &str) -> Result<u32, String>
         collapse_run(repo_root, &first, &last)?;
         consolidated += 1;
     }
+    while consolidated < total {
+        let Some(fold) = first_foldable_chore_run(repo_root, &upstream, relative_data)? else {
+            break;
+        };
+        fold_chore_run_into_real(repo_root, &fold)?;
+        consolidated += 1;
+    }
     Ok(consolidated)
+}
+
+struct FoldableChoreRun {
+    first_chore: String,
+    last_chore: String,
+    real: String,
 }
 
 fn first_adjacent_own_run(
@@ -398,6 +428,112 @@ fn first_adjacent_own_run(
         first_run = Some((run[0].clone(), run[run.len() - 1].clone()));
     }
     Ok(first_run)
+}
+
+fn first_foldable_chore_run(
+    repo_root: &Path,
+    upstream: &str,
+    relative_data: &str,
+) -> Result<Option<FoldableChoreRun>, String> {
+    let output = git_output(
+        repo_root,
+        &[
+            "log",
+            "--reverse",
+            "--format=%H%x09%s",
+            &format!("{upstream}..HEAD"),
+        ],
+    )?;
+    struct Item {
+        sha: String,
+        own: bool,
+    }
+    let mut items = Vec::new();
+    for line in output.stdout.lines() {
+        let (sha, subject) = line.split_once('\t').unwrap_or((line, ""));
+        let own = subject == CHECKPOINT_SUBJECT && is_tandem_only(repo_root, sha, relative_data)?;
+        items.push(Item {
+            sha: sha.to_string(),
+            own,
+        });
+    }
+    let mut i = 0;
+    while i < items.len() {
+        if !items[i].own {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < items.len() && items[i].own {
+            i += 1;
+        }
+        let end = i - 1;
+        let real = if i < items.len() && !items[i].own {
+            Some(items[i].sha.clone())
+        } else if start > 0 && !items[start - 1].own {
+            Some(items[start - 1].sha.clone())
+        } else {
+            None
+        };
+        if let Some(real) = real {
+            if rev_exists(repo_root, &format!("{}^", items[start].sha))? || start > 0 {
+                return Ok(Some(FoldableChoreRun {
+                    first_chore: items[start].sha.clone(),
+                    last_chore: items[end].sha.clone(),
+                    real,
+                }));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn fold_chore_run_into_real(repo_root: &Path, fold: &FoldableChoreRun) -> Result<(), String> {
+    let real_after_chores = is_ancestor(repo_root, &fold.last_chore, &fold.real)?;
+    let base_spec = if real_after_chores {
+        format!("{}^", fold.first_chore)
+    } else {
+        format!("{}^", fold.real)
+    };
+    let tree_spec = if real_after_chores {
+        format!("{}^{{tree}}", fold.real)
+    } else {
+        format!("{}^{{tree}}", fold.last_chore)
+    };
+    let onto = if real_after_chores {
+        fold.real.as_str()
+    } else {
+        fold.last_chore.as_str()
+    };
+    let base = git_output(repo_root, &["rev-parse", &base_spec])?
+        .stdout
+        .trim()
+        .to_string();
+    let tree = git_output(repo_root, &["rev-parse", &tree_spec])?
+        .stdout
+        .trim()
+        .to_string();
+    let message = commit_subject(repo_root, &fold.real)?;
+    if base.is_empty() || tree.is_empty() || message.is_empty() {
+        return Err("could not resolve fold range".to_string());
+    }
+    let replacement = git_output(
+        repo_root,
+        &["commit-tree", &tree, "-p", &base, "-m", &message],
+    )?
+    .stdout
+    .trim()
+    .to_string();
+    if replacement.is_empty() {
+        return Err("git commit-tree returned no commit".to_string());
+    }
+    match git_output(repo_root, &["rebase", "--onto", &replacement, onto]) {
+        Ok(_) => Ok(()),
+        Err(error) => {
+            abort_rebase(repo_root);
+            Err(error)
+        }
+    }
 }
 
 fn collapse_run(repo_root: &Path, first: &str, last: &str) -> Result<(), String> {

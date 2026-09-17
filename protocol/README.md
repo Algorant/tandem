@@ -71,28 +71,26 @@ metadata and progress writes do not commit. Checkpoints use the fixed subject
 `chore(tandem): checkpoint metadata` and serialize through a lock in Git's
 common directory so linked worktrees share one boundary.
 
-Unpushed history must not contain adjacent Tandem-only commits. At an
-assignment boundary, when HEAD exists, is unpushed (not contained in any
-remote-tracking ref), and is Tandem's own `.tandem`-only checkpoint commit,
-the boundary amends that HEAD with the `.tandem/` pathspec. Otherwise it
-creates a new ordinary commit. Amending and folding are limited to Tandem's
-own unpushed checkpoint commits: pushed commits and ordinary or unproven work
-commits are never rewritten, and a `meta / source / meta` sandwich is
-preserved because metadata is never folded into a neighboring source commit.
-Unrelated staged, unstaged, and untracked bytes are never touched.
+At an assignment boundary, when HEAD exists, is unpushed (not contained in any
+remote-tracking ref), and is not a merge, the boundary amends that HEAD with
+the `.tandem/` pathspec. A chore commit keeps the fixed checkpoint subject; any
+other unpushed commit keeps its message so board files ride in the last real
+commit. If HEAD is pushed, it creates a new checkpoint commit. Pushed commits
+and merges are never rewritten. Unrelated staged, unstaged, and untracked
+bytes are never touched.
 
-The same boundary then reconciles any remaining adjacent run of Tandem's own
-checkpoint commits inside `@{upstream}..HEAD`, collapsing every such run to
-one commit in a single reconcile. Reconcile runs after both the new/amend
-commit and the clean (no `.tandem` diff) path, but only when the tree is
-clean, `@{upstream}` is an ancestor of HEAD, no
+The same boundary then reconciles `@{upstream}..HEAD`: adjacent Tandem-only
+checkpoint runs collapse to one commit, then a remaining Tandem-only commit
+next to an unpushed real commit is folded into that real commit. Reconcile
+runs after both the new/amend commit and the clean (no `.tandem` diff) path,
+but only when the tree is clean, `@{upstream}` is an ancestor of HEAD, no
 rebase/merge/cherry-pick/revert is in flight, and the checkpoint lock is held.
 It is best-effort: an unsafe or failed rewrite is skipped, the record write
 and the live commit stay successful, and `consolidated` is reported as `0`.
 Git checkpoint failure is returned separately from the successful record
 result; there is no fallback or force path. The lifecycle JSON reports
 `amended` true only when the boundary amended HEAD and `consolidated` as the
-number of runs collapsed. See
+number of runs collapsed or folded. See
 [`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the consumer
 JSON contract and cutover sequence.
 

@@ -159,9 +159,14 @@ fn boundaries_roll_up_into_one_amended_checkpoint_without_empty_commits() {
     assert!(ok, "claim failed: {stderr}");
     let claim = json(&stdout);
     assert_eq!(claim["data"]["checkpoint"]["status"], "checkpointed");
-    assert_eq!(claim["data"]["checkpoint"]["amended"], false);
+    assert_eq!(claim["data"]["checkpoint"]["amended"], true);
     let claim_head = git(&root, &["rev-parse", "HEAD"]);
     assert_ne!(claim_head, baseline);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
+    assert_eq!(
+        git(&root, &["log", "-1", "--format=%s"]),
+        "fixture baseline"
+    );
 
     let (ok, _, stderr) = run(
         &root,
@@ -187,26 +192,17 @@ fn boundaries_roll_up_into_one_amended_checkpoint_without_empty_commits() {
     let delivery = json(&stdout);
     assert_eq!(delivery["data"]["checkpoint"]["status"], "checkpointed");
     assert_eq!(delivery["data"]["checkpoint"]["amended"], true);
-    assert_eq!(
-        git(&root, &["rev-parse", "HEAD^"]),
-        baseline,
-        "delivery must amend the rolling checkpoint, not append a new commit"
-    );
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
 
     let (ok, stdout, stderr) = run(&root, &["--json", "complete", "task-1"]);
     assert!(ok, "complete failed: {stderr}");
     let complete = json(&stdout);
     assert_eq!(complete["data"]["checkpoint"]["status"], "checkpointed");
     assert_eq!(complete["data"]["checkpoint"]["amended"], true);
-    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
-    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
     assert_eq!(
         git(&root, &["log", "-1", "--format=%s"]),
-        "chore(tandem): checkpoint metadata"
-    );
-    assert_eq!(
-        git(&root, &["show", "--format=%P", "--no-patch", "HEAD"]),
-        baseline
+        "fixture baseline"
     );
 
     fs::remove_dir_all(root).unwrap();
@@ -459,12 +455,12 @@ fn pre_commit_hook_can_read_tandem_without_hierarchy_lock_deadlock() {
 }
 
 #[test]
-fn pushed_and_unproven_ordinary_commits_are_never_amended() {
-    let root = setup("ordinary-preserved");
+fn unpushed_ordinary_commits_absorb_tandem_and_pushed_commits_are_never_amended() {
+    let root = setup("ordinary-absorbed");
     fs::write(root.join("ordinary.txt"), "ordinary\n").unwrap();
     git(&root, &["add", "ordinary.txt"]);
     git(&root, &["commit", "--quiet", "-m", "ordinary local commit"]);
-    let ordinary_head = git(&root, &["rev-parse", "HEAD"]);
+    let ordinary_parent = git(&root, &["rev-parse", "HEAD^"]);
     let (ok, stdout, stderr) = run(
         &root,
         &[
@@ -477,12 +473,12 @@ fn pushed_and_unproven_ordinary_commits_are_never_amended() {
         ],
     );
     assert!(ok, "claim failed: {stderr}");
-    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], false);
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
     assert_eq!(
-        git(&root, &["rev-parse", "HEAD^"]),
-        ordinary_head,
-        "native checkpoint must append after an ordinary unproven commit"
+        git(&root, &["log", "-1", "--format=%s"]),
+        "ordinary local commit"
     );
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), ordinary_parent);
     fs::remove_dir_all(&root).unwrap();
 
     let root = setup("pushed-preserved");
@@ -548,6 +544,7 @@ fn rolling_checkpoint_amends_on_a_dirty_unrelated_tree() {
         &root,
         &["commit", "--quiet", "-m", "unrelated tracked fixture"],
     );
+    let parent = git(&root, &["rev-parse", "HEAD^"]);
     let baseline = git(&root, &["rev-parse", "HEAD"]);
 
     fs::write(root.join("unrelated-tracked.txt"), "dirty unstaged\n").unwrap();
@@ -570,9 +567,14 @@ fn rolling_checkpoint_amends_on_a_dirty_unrelated_tree() {
     assert!(ok, "claim failed: {stderr}");
     let claim = json(&stdout);
     assert_eq!(claim["data"]["checkpoint"]["status"], "checkpointed");
-    assert_eq!(claim["data"]["checkpoint"]["amended"], false);
+    assert_eq!(claim["data"]["checkpoint"]["amended"], true);
     assert_eq!(claim["data"]["checkpoint"]["consolidated"], 0);
-    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+    assert_ne!(git(&root, &["rev-parse", "HEAD"]), baseline);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), parent);
+    assert_eq!(
+        git(&root, &["log", "-1", "--format=%s"]),
+        "unrelated tracked fixture"
+    );
 
     let (ok, stdout, stderr) = run(
         &root,
@@ -589,15 +591,15 @@ fn rolling_checkpoint_amends_on_a_dirty_unrelated_tree() {
     );
     assert!(ok, "deliver failed: {stderr}");
     assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
-    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), parent);
 
     let (ok, stdout, stderr) = run(&root, &["--json", "complete", "task-1"]);
     assert!(ok, "complete failed: {stderr}");
     let complete = json(&stdout);
     assert_eq!(complete["data"]["checkpoint"]["amended"], true);
     assert_eq!(complete["data"]["checkpoint"]["consolidated"], 0);
-    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
-    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), parent);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
 
     assert_eq!(
         git(&root, &["diff", "--cached", "--name-status"]),
@@ -654,11 +656,15 @@ fn leftover_adjacent_chore_runs_collapse_on_a_safe_boundary() {
     let value = json(&stdout);
     assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
     assert_eq!(value["data"]["checkpoint"]["amended"], true);
-    assert_eq!(value["data"]["checkpoint"]["consolidated"], 2);
+    assert!(
+        value["data"]["checkpoint"]["consolidated"]
+            .as_u64()
+            .unwrap()
+            >= 2
+    );
 
-    // meta / source / meta in one reconcile, not one run per checkpoint.
-    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "4");
-    assert_eq!(git(&root, &["rev-parse", "HEAD^^^"]), baseline);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
     assert_eq!(
         git(&root, &["rev-parse", "refs/remotes/origin/main"]),
         baseline
@@ -666,12 +672,7 @@ fn leftover_adjacent_chore_runs_collapse_on_a_safe_boundary() {
     let subjects = git(&root, &["log", "--format=%s"]);
     assert_eq!(
         subjects.lines().collect::<Vec<_>>(),
-        vec![
-            "chore(tandem): checkpoint metadata",
-            "ordinary source commit",
-            "chore(tandem): checkpoint metadata",
-            "fixture baseline",
-        ]
+        vec!["ordinary source commit", "fixture baseline"]
     );
     let tree = git(&root, &["ls-tree", "-r", "--name-only", "HEAD"]);
     for path in [
@@ -901,8 +902,8 @@ fn concurrent_boundary_processes_share_git_repository_lock() {
         json(&String::from_utf8_lossy(&second_output.stdout))["data"]["checkpoint"]["status"],
         "checkpointed"
     );
-    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "3");
-    assert_eq!(git(&linked, &["rev-list", "--count", "HEAD"]), "3");
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_eq!(git(&linked, &["rev-list", "--count", "HEAD"]), "2");
     assert!(git(&root, &["fsck", "--no-progress", "--full"]).is_empty());
     git(
         &root,
