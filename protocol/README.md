@@ -60,52 +60,41 @@ Required fields are `ts`, `seq`, `actor`, `event`, `id`, and structured event-sp
 
 ## Native Git checkpoints
 
-The native Rust application writes records and events immediately. Root Tasks
-and direct Tasks beneath an Epic are assignments: their claim/start,
-delivery, block/pause, resume/rework/release, terminal failure or cancel,
-completion, and exceptional review/validation actions stage and commit the
-owning `.tandem/` path. Epics are grouping records and Subtasks are assignment
-milestones: their lifecycle writes return `batched` and remain durable without
-creating a commit until an assignment boundary captures them. Intermediate
-metadata and progress writes do not commit. Checkpoints use the fixed subject
-`chore(tandem): checkpoint metadata` and serialize through a lock in Git's
-common directory so linked worktrees share one boundary.
+The native Rust application writes records and events immediately and never
+runs Git during a Task, record, or event mutation. Lifecycle outcomes report a
+constant `checkpoint.status` of `batched`: the metadata is durable in the
+worktree but pending for the next explicit flush. No mutation stages, commits,
+or rewrites anything, and no lifecycle action can produce or absorb a commit.
 
-At an assignment boundary, when HEAD exists, is unpushed (not contained in any
-remote-tracking ref), and is not a merge, the boundary amends that HEAD with
-the `.tandem/` pathspec. A chore commit keeps the fixed checkpoint subject; any
-other unpushed commit keeps its message so board files ride in the last real
-commit. If HEAD is pushed, it creates a new checkpoint commit. Pushed commits
-and merges are never rewritten. Unrelated staged, unstaged, and untracked
-bytes are never touched.
+Metadata is expected repository state. A host workflow collects it at a
+deliberate commit/push boundary by running `tandem checkpoint`; this batching
+is a host responsibility, not a command the user must remember per mutation.
 
-The same boundary then reconciles `@{upstream}..HEAD`: adjacent Tandem-only
-checkpoint runs collapse to one commit, then a remaining Tandem-only commit
-next to an unpushed real commit is folded into that real commit. Reconcile
-runs after both the new/amend commit and the clean (no `.tandem` diff) path,
-but only when the tree is clean, `@{upstream}` is an ancestor of HEAD, no
-rebase/merge/cherry-pick/revert is in flight, and the checkpoint lock is held.
-It is best-effort: an unsafe or failed rewrite is skipped, the record write
-and the live commit stay successful, and `consolidated` is reported as `0`.
-Git checkpoint failure is returned separately from the successful record
-result; there is no fallback or force path. The lifecycle JSON reports
-`amended` true only when the boundary amended HEAD and `consolidated` as the
-number of runs collapsed or folded.
+`tandem checkpoint` is the single forward-only native flush. It stages only
+the owning `.tandem/` path (`git add -A -- .tandem`), and when that path has
+staged changes records them in one ordinary commit with the fixed subject
+`chore(tandem): checkpoint metadata`. It never amends, rebases, folds, or
+otherwise rewrites an existing commit, so pre-existing source commit
+identities are stable across a flush. It creates at most one commit per
+invocation and appends it as a new child of the current HEAD. A clean
+`.tandem/` is an idempotent no-op: it reports `clean` and creates no commit.
+Unrelated staged entries, unstaged bytes, and untracked files are never
+touched. A lock in Git's common directory serializes linked worktrees as well
+as ordinary processes.
 
-`tandem checkpoint` is the explicit native flush for adapters and commit/push
-workflows. It calls the same checkpointer directly with no Accord or record
-transition and no role gating, so Task, Rule, Decision, Subtask, and Epic
-metadata left dirty by intermediate writes is captured. The operation is
-idempotent: a clean `.tandem/` reports `clean`, creates no commit, and still
-runs the leftover-chore reconcile. The documented adapter handoff is: create
-the real source commit, run `tandem checkpoint`, require a clean `.tandem/`,
-then push. A checkpoint failure exits `1` with a `checkpoint` error envelope,
-so `tandem checkpoint && git push` cannot proceed.
+Because a flush is a new commit rather than a history rewrite, a source-only
+branch integrates over pending target metadata without stale-base replay, and
+genuine overlapping metadata edits still surface as ordinary conflicts. The
+explicit command fails closed: a failure exits `1` with a `checkpoint` error
+envelope and leaves the pending `.tandem/` change staged for inspection, so
+`tandem checkpoint && git push` cannot proceed on failure.
 
-See [`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the
-lifecycle consumer JSON contract and
-[`plan/task-39-pi-handoff.md`](../plan/task-39-pi-handoff.md) for the explicit
-native flush handoff.
+See [`plan/task-40-pi-handoff.md`](../plan/task-40-pi-handoff.md) for the
+current lifecycle/flush consumer contract and the required host commit/push
+boundary wiring. The earlier
+[`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) and
+[`plan/task-39-pi-handoff.md`](../plan/task-39-pi-handoff.md) contracts are
+superseded by it.
 
 ## CLI contract
 

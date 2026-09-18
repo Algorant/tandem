@@ -1,5 +1,12 @@
 # Task 39 explicit native flush handoff
 
+> **Superseded (Task 40).** This document records the historical Task 39
+> explicit-flush contract, including its amend/reconcile behavior and the
+> `amended`/`consolidated` JSON fields. Those were removed. The forward-only
+> flush and its host boundary wiring are documented in
+> [`task-40-pi-handoff.md`](task-40-pi-handoff.md); this file is retained as
+> history only.
+
 ## Purpose
 
 Tandem 0.13.4 folds pending `.tandem/` state into an unpushed non-merge real

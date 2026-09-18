@@ -331,14 +331,14 @@ tandem complete <id> --summary <text> [--file-changed <path>] [--validation <tex
 - Behavior:
   - completes any active Task whose hierarchy, blockers, and structure are valid;
   - warns when the document's own Accord is neither delivered nor accepted, with the narrow child-based Epic exception below;
-  - child-based Epic exception: a grouping Epic (`kind: epic`) with at least one resolved descendant Task/Subtask closes without the delivery warning when every descendant is archived with an explicit canonical `resolution.outcome: completed`. Eligibility only suppresses that warning: for an otherwise-undelivered eligible Epic, no synthetic delivery or acceptance is added and no child evidence is copied, while normal archive/checkpoint behavior and ordinary delivered-parent acceptance remain. Empty Epics, active descendants, and absent, legacy-only, unknown, canceled, or failed descendant outcomes retain the warning; an explicitly delivered or accepted Epic is already warning-free;
+  - child-based Epic exception: a grouping Epic (`kind: epic`) with at least one resolved descendant Task/Subtask closes without the delivery warning when every descendant is archived with an explicit canonical `resolution.outcome: completed`. Eligibility only suppresses that warning: for an otherwise-undelivered eligible Epic, no synthetic delivery or acceptance is added and no child evidence is copied, while normal archive behavior and ordinary delivered-parent acceptance remain. Empty Epics, active descendants, and absent, legacy-only, unknown, canceled, or failed descendant outcomes retain the warning; an explicitly delivered or accepted Epic is already warning-free;
   - archive outcome (`resolution.outcome`: `completed`, `canceled`, or `failed`) is distinct from Accord delivery status; a `completion.outcome` value without `resolution.outcome` is not positive completion evidence.
 
 Example warning output (stderr warnings, then the stdout summary):
 
 ```text
 Warning: task-7 has accord.status=ready; complete normally follows a delivered Accord.
-Completed task-7 (record written; Git checkpointed (abc1234))
+Completed task-7 (record written; metadata persisted (batched for host boundary))
 ```
 
 - Exit/error notes:
@@ -370,7 +370,7 @@ tandem cancel <id> --reason <text>
 
 ### `tandem checkpoint`
 
-- Purpose: explicitly flush pending owning `.tandem/` changes into Git for adapter and commit/push workflows without creating or changing a Task, Accord, Rule, Decision, or event.
+- Purpose: explicitly flush pending owning `.tandem/` changes into Git for host commit/push workflows without creating or changing a Task, Accord, Rule, Decision, or event.
 - Kind: mutation (Git only).
 - Syntax:
 
@@ -380,19 +380,20 @@ tandem checkpoint
 
 - Accepted options: none beyond the global `-j/--json`. Passing an argument is a usage error.
 - Behavior:
-  - calls the same native checkpointer used at assignment boundaries, with no role gating, so Task, Epic, Subtask, Rule, and Decision metadata written by intermediate commands is captured;
-  - amends an unpushed non-merge HEAD with the `.tandem/` pathspec and preserves the real commit subject, or creates at most one rolling `chore(tandem): checkpoint metadata` commit when no real commit is absorbable;
-  - never rewrites pushed or merge commits and never touches unrelated staged, unstaged, or untracked files;
-  - is idempotent on a clean `.tandem/` and still folds eligible leftover own-chore runs;
+  - stages only the owning `.tandem/` path (`git add -A -- .tandem`) and, when that path has staged changes, records them in one ordinary commit with the fixed subject `chore(tandem): checkpoint metadata`;
+  - is strictly forward-only: it never amends, rebases, folds, or otherwise rewrites an existing commit, so pre-existing source commit identities are stable across a flush;
+  - creates at most one commit per invocation and appends it as a new child of the current HEAD regardless of whether HEAD is pushed or a merge;
+  - never touches unrelated staged, unstaged, or untracked files, and preserves unrelated index entries;
+  - is an idempotent no-op on a clean `.tandem/` (reports `clean` and creates no commit);
   - writes no records or events.
-- Adapter handoff: create the real source commit, run `tandem checkpoint`, require a clean `.tandem/`, then push. `tandem checkpoint && git push` is fail-closed.
+- Host boundary handoff: create the real source commit, run `tandem checkpoint` automatically at the commit/push boundary, require a clean `.tandem/`, then push. `tandem checkpoint && git push` is fail-closed. Automatic wiring is a Pi adapter prerequisite; see `plan/task-40-pi-handoff.md`.
 - Success JSON envelope (`--json`):
 
 ```json
-{"ok":true,"data":{"checkpoint":{"status":"checkpointed|clean","commit":"<sha>|null","amended":true,"consolidated":0}},"warnings":[]}
+{"ok":true,"data":{"checkpoint":{"status":"checkpointed|clean","commit":"<sha>|null"}},"warnings":[]}
 ```
 
-- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"amended":false,"consolidated":0,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed flush leaves the pending change staged for inspection.
+- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed flush leaves the pending change staged for inspection.
 
 ### `tandem log`
 

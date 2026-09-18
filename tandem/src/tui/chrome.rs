@@ -770,17 +770,10 @@ impl TuiApp {
 }
 
 fn durable_outcome_footer_status(status: &str) -> Option<String> {
-    let lower = status.to_ascii_lowercase();
-    if !lower.contains("record written") || !lower.contains("checkpoint") {
-        return None;
-    }
-    if let Some(index) = status.find("checkpoint FAILED:") {
-        return Some(status[..index + "checkpoint FAILED".len()].to_string());
-    }
-    if let Some(index) = status.find("Git checkpointed") {
-        return Some(status[..index + "Git checkpointed".len()].to_string());
-    }
-    Some(status.to_string())
+    status
+        .to_ascii_lowercase()
+        .contains("record written")
+        .then(|| status.to_string())
 }
 
 pub(super) fn status_tone_for_message(message: &str) -> StatusTone {

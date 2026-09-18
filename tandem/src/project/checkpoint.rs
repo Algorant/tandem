@@ -1,16 +1,16 @@
 //! Native Git checkpoints for durable `.tandem` state.
 //!
-//! Checkpoints are deliberately narrow: only the owning `.tandem` path is
-//! staged and committed. Git's index therefore retains unrelated staged
-//! entries, while unrelated worktree and untracked bytes are never touched.
-//! A lock in the repository's common Git directory serializes linked
+//! A checkpoint is a single forward-only flush. It stages only the owning
+//! `.tandem` path and, when that path has staged changes, records them in one
+//! ordinary commit. It never amends, rebases, folds, or otherwise rewrites an
+//! existing commit, so source commit identities are stable across a flush.
+//! Unrelated index entries, worktree bytes, and untracked files are never
+//! touched. A lock in the repository's common Git directory serializes linked
 //! worktrees as well as ordinary processes.
 //!
-//! Tandem is the only Git writer. An assignment boundary amends any unpushed
-//! HEAD with the `.tandem/` pathspec, keeping a non-chore commit message, so
-//! board files ride in the last real commit instead of a stack of chores.
-//! Leftover unpushed tandem-only commits next to a real commit are folded into
-//! it when a rewrite is safe. Pushed commits and merges are never rewritten.
+//! Native record and event writes persist immediately and never call this
+//! module; a flush happens only when a host workflow explicitly runs
+//! `tandem checkpoint` at a commit/push boundary.
 
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -24,24 +24,18 @@ const CHECKPOINT_SUBJECT: &str = "chore(tandem): checkpoint metadata";
 pub(crate) struct CheckpointOutcome {
     pub(crate) status: CheckpointStatus,
     pub(crate) commit: Option<String>,
-    /// True when this boundary amended HEAD.
-    pub(crate) amended: bool,
-    /// Number of adjacent own-checkpoint runs collapsed by this boundary's
-    /// best-effort reconcile. Always `0` on the batched and failed paths.
-    pub(crate) consolidated: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum CheckpointStatus {
-    /// The mutation belongs to a Subtask milestone or Epic grouping. Its
-    /// tracked write is durable, but the next assignment boundary owns the
-    /// checkpoint.
+    /// The lifecycle write is durable in the worktree but no flush has run.
+    /// Its metadata is pending for the next explicit checkpoint.
     Batched,
     /// No `.tandem` changes were present after staging, so no commit was made.
     Clean,
-    /// A checkpoint commit was created or amended.
+    /// One checkpoint commit was created.
     Checkpointed,
-    /// The record/event write already succeeded, but Git checkpointing failed.
+    /// The flush failed; the pending `.tandem` change stays staged.
     Failed { message: String },
 }
 
@@ -50,17 +44,13 @@ impl CheckpointOutcome {
         Self {
             status: CheckpointStatus::Batched,
             commit: None,
-            amended: false,
-            consolidated: 0,
         }
     }
 
-    pub(crate) fn clean(consolidated: u32) -> Self {
+    pub(crate) fn clean() -> Self {
         Self {
             status: CheckpointStatus::Clean,
             commit: None,
-            amended: false,
-            consolidated,
         }
     }
 
@@ -70,8 +60,6 @@ impl CheckpointOutcome {
                 message: message.into(),
             },
             commit: None,
-            amended: false,
-            consolidated: 0,
         }
     }
 }
@@ -109,12 +97,12 @@ struct GitOutput {
     _stderr: String,
 }
 
-/// Commit changed tracked Tandem state at one explicit work boundary.
+/// Flush pending tracked `.tandem` state into one forward-only commit.
 ///
-/// This method is intentionally best-effort after the native record write:
-/// failure is returned as a data-bearing outcome instead of an application
-/// error, so callers can show that the lifecycle mutation succeeded and only
-/// its Git checkpoint needs attention. There is no fallback or force path.
+/// Failure is returned as a data-bearing outcome instead of an application
+/// error so lifecycle callers can report it without replaying a successful
+/// record write. The explicit `tandem checkpoint` command converts a failure
+/// into a fail-closed process exit.
 pub(crate) fn checkpoint(project: &TandemProject) -> CheckpointOutcome {
     match checkpoint_inner(project) {
         Ok(outcome) => outcome,
@@ -164,47 +152,17 @@ fn checkpoint_inner(project: &TandemProject) -> Result<CheckpointOutcome, String
     // `-A -- .tandem` is the only mutating Git preparation operation. It does
     // not reset, stash, clean, or otherwise rewrite unrelated index entries.
     git_output(&repo_root, &["add", "-A", "--", relative_data])?;
-    let has_staged = staged_tandem_changes(&repo_root, relative_data)?;
-
-    // Live maintenance: put this boundary's `.tandem` write into the last
-    // unpushed commit. Keep that commit's message unless it is already a chore.
-    let mut amended = false;
-    if has_staged {
-        if should_amend_head(&repo_root)? {
-            if is_own_checkpoint(&repo_root, "HEAD", relative_data)? {
-                git_output(
-                    &repo_root,
-                    &[
-                        "commit",
-                        "--amend",
-                        "-m",
-                        CHECKPOINT_SUBJECT,
-                        "--",
-                        relative_data,
-                    ],
-                )?;
-            } else {
-                git_output(
-                    &repo_root,
-                    &["commit", "--amend", "--no-edit", "--", relative_data],
-                )?;
-            }
-            amended = true;
-        } else {
-            git_output(
-                &repo_root,
-                &["commit", "-m", CHECKPOINT_SUBJECT, "--", relative_data],
-            )?;
-        }
+    if !staged_tandem_changes(&repo_root, relative_data)? {
+        return Ok(CheckpointOutcome::clean());
     }
 
-    // Reconcile leftover chore runs: collapse adjacent chores, then fold a
-    // chore sitting next to an unpushed real commit into that commit.
-    let consolidated = reconcile(&repo_root, relative_data);
+    // A new commit limited to the owning path: existing history is never
+    // rewritten and unrelated staged entries stay in the index.
+    git_output(
+        &repo_root,
+        &["commit", "-m", CHECKPOINT_SUBJECT, "--", relative_data],
+    )?;
 
-    if !has_staged {
-        return Ok(CheckpointOutcome::clean(consolidated));
-    }
     let sha = git_output(&repo_root, &["rev-parse", "HEAD"])?
         .stdout
         .trim()
@@ -215,8 +173,6 @@ fn checkpoint_inner(project: &TandemProject) -> Result<CheckpointOutcome, String
     Ok(CheckpointOutcome {
         status: CheckpointStatus::Checkpointed,
         commit: Some(sha),
-        amended,
-        consolidated,
     })
 }
 
@@ -233,401 +189,6 @@ fn staged_tandem_changes(repo_root: &Path, relative_data: &str) -> Result<bool, 
             "Git diff --cached could not inspect Tandem state (status {staged})"
         )),
     }
-}
-
-fn should_amend_head(repo_root: &Path) -> Result<bool, String> {
-    if !rev_exists(repo_root, "HEAD")? {
-        return Ok(false);
-    }
-    if head_is_pushed(repo_root)? {
-        return Ok(false);
-    }
-    if head_is_merge(repo_root)? {
-        return Ok(false);
-    }
-    Ok(true)
-}
-
-fn head_is_merge(repo_root: &Path) -> Result<bool, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", "HEAD^2"])
-        .current_dir(repo_root)
-        .output()
-        .map_err(|error| format!("could not inspect merge parents: {error}"))?;
-    Ok(output.status.success())
-}
-
-/// A commit is pushed when any remote-tracking ref already contains it. A
-/// repository with no remote-tracking refs has nothing pushed, so its own
-/// checkpoint HEAD is amendable.
-fn head_is_pushed(repo_root: &Path) -> Result<bool, String> {
-    let output = git_output(
-        repo_root,
-        &[
-            "for-each-ref",
-            "--contains=HEAD",
-            "--format=%(refname)",
-            "refs/remotes",
-        ],
-    )?;
-    Ok(!output.stdout.trim().is_empty())
-}
-
-/// Tandem's own commit is identifiable by the fixed checkpoint subject; a
-/// user-authored `.tandem`-only commit is unproven work and is never rewritten.
-fn is_own_checkpoint(repo_root: &Path, rev: &str, relative_data: &str) -> Result<bool, String> {
-    if commit_subject(repo_root, rev)? != CHECKPOINT_SUBJECT {
-        return Ok(false);
-    }
-    is_tandem_only(repo_root, rev, relative_data)
-}
-
-fn commit_subject(repo_root: &Path, rev: &str) -> Result<String, String> {
-    Ok(git_output(repo_root, &["log", "-1", "--format=%s", rev])?
-        .stdout
-        .trim()
-        .to_string())
-}
-
-/// True when the commit changed at least one path and every changed path is
-/// under the owning Tandem directory. Merge commits report no changed paths and
-/// are therefore never treated as Tandem-only.
-fn is_tandem_only(repo_root: &Path, rev: &str, relative_data: &str) -> Result<bool, String> {
-    let output = git_output(
-        repo_root,
-        &[
-            "diff-tree",
-            "--no-commit-id",
-            "--name-only",
-            "-r",
-            "--root",
-            rev,
-        ],
-    )?;
-    let mut changed = false;
-    for path in output
-        .stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-    {
-        changed = true;
-        if !is_within(path, relative_data) {
-            return Ok(false);
-        }
-    }
-    Ok(changed)
-}
-
-fn is_within(path: &str, directory: &str) -> bool {
-    path == directory
-        || path
-            .strip_prefix(directory)
-            .is_some_and(|rest| rest.starts_with('/'))
-}
-
-fn rev_exists(repo_root: &Path, rev: &str) -> Result<bool, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", rev])
-        .current_dir(repo_root)
-        .output()
-        .map_err(|error| format!("could not resolve {rev}: {error}"))?;
-    Ok(output.status.success() && !String::from_utf8_lossy(&output.stdout).trim().is_empty())
-}
-
-/// Collapse every remaining adjacent own-checkpoint run in the unpushed range.
-///
-/// The result is a count of collapsed runs. Any unsafe condition or failed
-/// rewrite is skipped, so this never fails the already-successful record write
-/// or live commit.
-fn reconcile(repo_root: &Path, relative_data: &str) -> u32 {
-    match reconcile_inner(repo_root, relative_data) {
-        Ok(consolidated) => consolidated,
-        Err(_) => {
-            abort_rebase(repo_root);
-            0
-        }
-    }
-}
-
-fn reconcile_inner(repo_root: &Path, relative_data: &str) -> Result<u32, String> {
-    let Some(upstream) = upstream_commit(repo_root)? else {
-        return Ok(0);
-    };
-    if !is_ancestor(repo_root, &upstream, "HEAD")? {
-        return Ok(0);
-    }
-    if !tree_is_clean(repo_root)? {
-        return Ok(0);
-    }
-    if operation_in_progress(repo_root)? {
-        return Ok(0);
-    }
-
-    let total = git_output(repo_root, &["rev-list", "--count", "HEAD"])?
-        .stdout
-        .trim()
-        .parse::<u32>()
-        .unwrap_or(0);
-    let mut consolidated = 0u32;
-    // Each collapse removes at least one commit, so this is bounded by the
-    // commit count; the guard only protects against an unexpected no-op.
-    while consolidated < total {
-        let Some((first, last)) = first_adjacent_own_run(repo_root, &upstream, relative_data)?
-        else {
-            break;
-        };
-        collapse_run(repo_root, &first, &last)?;
-        consolidated += 1;
-    }
-    while consolidated < total {
-        let Some(fold) = first_foldable_chore_run(repo_root, &upstream, relative_data)? else {
-            break;
-        };
-        fold_chore_run_into_real(repo_root, &fold)?;
-        consolidated += 1;
-    }
-    Ok(consolidated)
-}
-
-struct FoldableChoreRun {
-    first_chore: String,
-    last_chore: String,
-    real: String,
-}
-
-fn first_adjacent_own_run(
-    repo_root: &Path,
-    upstream: &str,
-    relative_data: &str,
-) -> Result<Option<(String, String)>, String> {
-    let output = git_output(
-        repo_root,
-        &[
-            "log",
-            "--reverse",
-            "--format=%H%x09%s",
-            &format!("{upstream}..HEAD"),
-        ],
-    )?;
-    let mut run: Vec<String> = Vec::new();
-    let mut first_run: Option<(String, String)> = None;
-    for line in output.stdout.lines() {
-        let (sha, subject) = line.split_once('\t').unwrap_or((line, ""));
-        let own = subject == CHECKPOINT_SUBJECT && is_tandem_only(repo_root, sha, relative_data)?;
-        if own {
-            run.push(sha.to_string());
-            continue;
-        }
-        if run.len() >= 2 && first_run.is_none() {
-            first_run = Some((run[0].clone(), run[run.len() - 1].clone()));
-        }
-        run.clear();
-    }
-    if run.len() >= 2 && first_run.is_none() {
-        first_run = Some((run[0].clone(), run[run.len() - 1].clone()));
-    }
-    Ok(first_run)
-}
-
-fn first_foldable_chore_run(
-    repo_root: &Path,
-    upstream: &str,
-    relative_data: &str,
-) -> Result<Option<FoldableChoreRun>, String> {
-    let output = git_output(
-        repo_root,
-        &[
-            "log",
-            "--reverse",
-            "--format=%H%x09%s",
-            &format!("{upstream}..HEAD"),
-        ],
-    )?;
-    struct Item {
-        sha: String,
-        own: bool,
-    }
-    let mut items = Vec::new();
-    for line in output.stdout.lines() {
-        let (sha, subject) = line.split_once('\t').unwrap_or((line, ""));
-        let own = subject == CHECKPOINT_SUBJECT && is_tandem_only(repo_root, sha, relative_data)?;
-        items.push(Item {
-            sha: sha.to_string(),
-            own,
-        });
-    }
-    let mut i = 0;
-    while i < items.len() {
-        if !items[i].own {
-            i += 1;
-            continue;
-        }
-        let start = i;
-        while i < items.len() && items[i].own {
-            i += 1;
-        }
-        let end = i - 1;
-        let real = if i < items.len() && !items[i].own {
-            Some(items[i].sha.clone())
-        } else if start > 0 && !items[start - 1].own {
-            Some(items[start - 1].sha.clone())
-        } else {
-            None
-        };
-        if let Some(real) = real {
-            if rev_exists(repo_root, &format!("{}^", items[start].sha))? || start > 0 {
-                return Ok(Some(FoldableChoreRun {
-                    first_chore: items[start].sha.clone(),
-                    last_chore: items[end].sha.clone(),
-                    real,
-                }));
-            }
-        }
-    }
-    Ok(None)
-}
-
-fn fold_chore_run_into_real(repo_root: &Path, fold: &FoldableChoreRun) -> Result<(), String> {
-    let real_after_chores = is_ancestor(repo_root, &fold.last_chore, &fold.real)?;
-    let base_spec = if real_after_chores {
-        format!("{}^", fold.first_chore)
-    } else {
-        format!("{}^", fold.real)
-    };
-    let tree_spec = if real_after_chores {
-        format!("{}^{{tree}}", fold.real)
-    } else {
-        format!("{}^{{tree}}", fold.last_chore)
-    };
-    let onto = if real_after_chores {
-        fold.real.as_str()
-    } else {
-        fold.last_chore.as_str()
-    };
-    let base = git_output(repo_root, &["rev-parse", &base_spec])?
-        .stdout
-        .trim()
-        .to_string();
-    let tree = git_output(repo_root, &["rev-parse", &tree_spec])?
-        .stdout
-        .trim()
-        .to_string();
-    let message = commit_subject(repo_root, &fold.real)?;
-    if base.is_empty() || tree.is_empty() || message.is_empty() {
-        return Err("could not resolve fold range".to_string());
-    }
-    let replacement = git_output(
-        repo_root,
-        &["commit-tree", &tree, "-p", &base, "-m", &message],
-    )?
-    .stdout
-    .trim()
-    .to_string();
-    if replacement.is_empty() {
-        return Err("git commit-tree returned no commit".to_string());
-    }
-    match git_output(repo_root, &["rebase", "--onto", &replacement, onto]) {
-        Ok(_) => Ok(()),
-        Err(error) => {
-            abort_rebase(repo_root);
-            Err(error)
-        }
-    }
-}
-
-fn collapse_run(repo_root: &Path, first: &str, last: &str) -> Result<(), String> {
-    let base = git_output(repo_root, &["rev-parse", &format!("{first}^")])?
-        .stdout
-        .trim()
-        .to_string();
-    let tree = git_output(repo_root, &["rev-parse", &format!("{last}^{{tree}}")])?
-        .stdout
-        .trim()
-        .to_string();
-    if base.is_empty() || tree.is_empty() {
-        return Err("could not resolve collapse range".to_string());
-    }
-    let replacement = git_output(
-        repo_root,
-        &["commit-tree", &tree, "-p", &base, "-m", CHECKPOINT_SUBJECT],
-    )?
-    .stdout
-    .trim()
-    .to_string();
-    if replacement.is_empty() {
-        return Err("git commit-tree returned no commit".to_string());
-    }
-    match git_output(repo_root, &["rebase", "--onto", &replacement, last]) {
-        Ok(_) => Ok(()),
-        Err(error) => {
-            abort_rebase(repo_root);
-            Err(error)
-        }
-    }
-}
-
-fn upstream_commit(repo_root: &Path) -> Result<Option<String>, String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--verify", "--quiet", "@{upstream}"])
-        .current_dir(repo_root)
-        .output()
-        .map_err(|error| format!("could not resolve @{{upstream}}: {error}"))?;
-    if !output.status.success() {
-        return Ok(None);
-    }
-    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    Ok((!sha.is_empty()).then_some(sha))
-}
-
-fn is_ancestor(repo_root: &Path, ancestor: &str, descendant: &str) -> Result<bool, String> {
-    let status = Command::new("git")
-        .args(["merge-base", "--is-ancestor", ancestor, descendant])
-        .current_dir(repo_root)
-        .status()
-        .map_err(|error| format!("could not inspect ancestry: {error}"))?;
-    match status.code() {
-        Some(0) => Ok(true),
-        Some(1) => Ok(false),
-        _ => Err(format!(
-            "Git merge-base --is-ancestor failed with status {status}"
-        )),
-    }
-}
-
-fn tree_is_clean(repo_root: &Path) -> Result<bool, String> {
-    let output = git_output(
-        repo_root,
-        &["status", "--porcelain", "--untracked-files=all"],
-    )?;
-    Ok(output.stdout.trim().is_empty())
-}
-
-fn operation_in_progress(repo_root: &Path) -> Result<bool, String> {
-    for name in [
-        "MERGE_HEAD",
-        "CHERRY_PICK_HEAD",
-        "REVERT_HEAD",
-        "rebase-merge",
-        "rebase-apply",
-    ] {
-        let output = git_output(
-            repo_root,
-            &["rev-parse", "--path-format=absolute", "--git-path", name],
-        )?;
-        let path = output.stdout.trim();
-        if !path.is_empty() && Path::new(path).exists() {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-fn abort_rebase(repo_root: &Path) {
-    let _ = Command::new("git")
-        .args(["rebase", "--abort"])
-        .current_dir(repo_root)
-        .output();
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Result<GitOutput, String> {
@@ -687,17 +248,8 @@ mod tests {
     }
 
     #[test]
-    fn checkpoint_outcome_defaults_are_explicitly_non_amending() {
-        assert_eq!(CHECKPOINT_SUBJECT, "chore(tandem): checkpoint metadata");
-        let clean = CheckpointOutcome::clean(0);
-        assert_eq!(clean.status, CheckpointStatus::Clean);
-        assert!(!clean.amended);
-        assert_eq!(clean.consolidated, 0);
-    }
-
-    #[test]
-    fn clean_boundary_does_not_create_an_empty_commit() {
-        let root = temp_root("clean");
+    fn forward_only_flush_creates_one_commit_and_is_idempotent() {
+        let root = temp_root("forward-only");
         fs::create_dir_all(&root).unwrap();
         let project = TandemProject::initialize(
             &root,
@@ -709,75 +261,54 @@ mod tests {
         git(&root, &["config", "user.email", "tests@example.invalid"]);
         git(&root, &["add", ".tandem"]);
         git(&root, &["commit", "--quiet", "-m", "baseline"]);
-        let before = git_output(&root, &["rev-list", "--count", "HEAD"])
+        let baseline = git_output(&root, &["rev-parse", "HEAD"])
             .unwrap()
             .stdout
             .trim()
             .to_string();
+
+        // A clean flush is a no-op.
         let outcome = checkpoint(&project);
         assert_eq!(outcome.status, CheckpointStatus::Clean);
-        assert!(!outcome.amended);
-        assert_eq!(outcome.consolidated, 0);
+        assert_eq!(outcome.commit, None);
+
+        fs::write(root.join(".tandem/leftover.txt"), "pending\n").unwrap();
+        let outcome = checkpoint(&project);
+        assert_eq!(outcome.status, CheckpointStatus::Checkpointed);
+        let commit = outcome.commit.clone().unwrap();
         assert_eq!(
-            git_output(&root, &["rev-list", "--count", "HEAD"])
+            git_output(&root, &["rev-parse", "HEAD"])
                 .unwrap()
                 .stdout
                 .trim(),
-            before
+            commit
         );
+        assert_eq!(
+            git_output(&root, &["rev-parse", "HEAD^"])
+                .unwrap()
+                .stdout
+                .trim(),
+            baseline
+        );
+        assert_eq!(
+            git_output(&root, &["log", "-1", "--format=%s"])
+                .unwrap()
+                .stdout
+                .trim(),
+            CHECKPOINT_SUBJECT
+        );
+
+        // A repeated flush on a clean `.tandem` adds nothing.
+        let outcome = checkpoint(&project);
+        assert_eq!(outcome.status, CheckpointStatus::Clean);
+        assert_eq!(
+            git_output(&root, &["rev-parse", "HEAD"])
+                .unwrap()
+                .stdout
+                .trim(),
+            commit
+        );
+
         fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn clean_boundary_reconciles_leftover_runs_without_a_new_diff() {
-        let root = temp_root("clean-reconcile");
-        fs::create_dir_all(&root).unwrap();
-        let project = TandemProject::initialize(
-            &root,
-            "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
-        )
-        .unwrap();
-        git(&root, &["init", "--quiet"]);
-        git(&root, &["config", "user.name", "Tandem Tests"]);
-        git(&root, &["config", "user.email", "tests@example.invalid"]);
-        git(&root, &["add", ".tandem"]);
-        git(&root, &["commit", "--quiet", "-m", "baseline"]);
-        let remote = root.with_extension("bare");
-        git(&root, &["init", "--bare", remote.to_str().unwrap()]);
-        git(
-            &root,
-            &["remote", "add", "origin", remote.to_str().unwrap()],
-        );
-        git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
-        for name in ["a", "b"] {
-            fs::write(
-                root.join(format!(".tandem/leftover-{name}.txt")),
-                "leftover\n",
-            )
-            .unwrap();
-            git(&root, &["add", ".tandem"]);
-            git(&root, &["commit", "--quiet", "-m", CHECKPOINT_SUBJECT]);
-        }
-        assert_eq!(
-            git_output(&root, &["rev-list", "--count", "HEAD"])
-                .unwrap()
-                .stdout
-                .trim(),
-            "3"
-        );
-
-        let outcome = checkpoint(&project);
-        assert_eq!(outcome.status, CheckpointStatus::Clean);
-        assert!(!outcome.amended);
-        assert_eq!(outcome.consolidated, 1);
-        assert_eq!(
-            git_output(&root, &["rev-list", "--count", "HEAD"])
-                .unwrap()
-                .stdout
-                .trim(),
-            "2"
-        );
-        fs::remove_dir_all(&root).unwrap();
-        fs::remove_dir_all(remote).unwrap();
     }
 }

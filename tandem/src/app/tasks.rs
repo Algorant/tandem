@@ -958,7 +958,7 @@ pub(crate) fn complete(
     )?;
     append_event(workspace, "task.completed", doc.id(), &summary)?;
     drop(_hierarchy_lock);
-    let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
+    let checkpoint = checkpoint_boundary();
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
         board_path: doc.path,
@@ -1032,7 +1032,7 @@ pub(crate) fn cancel(
     )?;
     append_event(workspace, "task.canceled", doc.id(), &summary)?;
     drop(_hierarchy_lock);
-    let checkpoint = checkpoint_boundary(workspace, &hierarchy, &doc);
+    let checkpoint = checkpoint_boundary();
 
     Ok(CancelOutcome {
         id: doc.id().to_string(),

@@ -166,3 +166,16 @@
 {"ts":"2026-09-18T12:53:18Z","event":"accord.rework","id":"task-39","summary":"Accord rework for task-39","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":166}
 {"ts":"2026-09-18T13:05:51Z","event":"accord.delivered","id":"task-39","summary":"Accord deliver for task-39","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":167}
 {"ts":"2026-09-18T13:05:55Z","event":"task.completed","id":"task-39","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":168}
+{"ts":"2026-09-18T21:23:10Z","event":"task.created","id":"task-40","summary":"Preserve shared Git ancestry during checkpoint compaction without restoring metadata commit spam","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":169}
+{"ts":"2026-09-18T21:23:17Z","event":"task.updated","id":"task-40","summary":"Updated task-40 metadata: references","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":170}
+{"ts":"2026-09-18T21:23:53Z","event":"accord.claimed","id":"task-40","summary":"Accord claim for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":171}
+{"ts":"2026-09-18T21:28:58Z","event":"accord.blocked","id":"task-40","summary":"Accord block for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":172}
+{"ts":"2026-09-18T21:29:34Z","event":"task.updated","id":"task-40","summary":"Updated task-40 metadata: title, acceptance, constraints, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":173}
+{"ts":"2026-09-18T21:29:56Z","event":"accord.released","id":"task-40","summary":"Accord release for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":174,"data":{"disposition":"discarded"}}
+{"ts":"2026-09-18T21:30:05Z","event":"accord.claimed","id":"task-40","summary":"Accord claim for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":175}
+{"ts":"2026-09-18T21:43:41Z","event":"accord.delivered","id":"task-40","summary":"Accord deliver for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":176}
+{"ts":"2026-09-18T21:43:41Z","event":"accord.rework","id":"task-40","summary":"Accord rework for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":177}
+{"ts":"2026-09-18T21:45:29Z","event":"accord.delivered","id":"task-40","summary":"Accord deliver for task-40","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":178}
+{"ts":"2026-09-18T21:45:29Z","event":"task.completed","id":"task-40","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":179}
+{"ts":"2026-09-18T21:50:00Z","event":"task.created","id":"task-41","summary":"Release Tandem 0.13.6","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":180}
+{"ts":"2026-09-18T21:50:03Z","event":"accord.claimed","id":"task-41","summary":"Accord claim for task-41","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":181}

@@ -1,5 +1,12 @@
 # Task 14 native checkpoint handoff
 
+> **Superseded (Task 40).** This document records the historical Task 14
+> lifecycle-boundary checkpoint contract. Automatic per-boundary Git activity
+> and the amend/reconcile machinery it describes were removed. Current
+> lifecycle persistence and host commit/push boundary wiring are documented in
+> [`task-40-pi-handoff.md`](task-40-pi-handoff.md); this file is retained as
+> history only.
+
 ## Verified availability
 
 Integrated on local `main` at `937a6207202a710dea4aed884e53e8633ff5e381`.

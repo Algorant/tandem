@@ -8,64 +8,43 @@ fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
         CheckpointStatus::Batched => serde_json::json!({
             "status": "batched",
             "commit": serde_json::Value::Null,
-            "amended": false,
-            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Checkpointed => serde_json::json!({
             "status": "checkpointed",
             "commit": outcome.commit.as_deref(),
-            "amended": outcome.amended,
-            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Clean => serde_json::json!({
             "status": "clean",
             "commit": serde_json::Value::Null,
-            "amended": false,
-            "consolidated": outcome.consolidated,
         }),
         CheckpointStatus::Failed { message } => serde_json::json!({
             "status": "failed",
             "commit": serde_json::Value::Null,
-            "amended": false,
-            "consolidated": outcome.consolidated,
             "error": message,
         }),
     }
 }
 
-fn checkpoint_details(outcome: &CheckpointOutcome) -> String {
-    let mut details = String::new();
-    if outcome.amended {
-        details.push_str(" amended");
-    }
-    if outcome.consolidated > 0 {
-        details.push_str(&format!(" consolidated {}", outcome.consolidated));
-    }
-    details
+/// Human note for a lifecycle mutation. Lifecycle writes never touch Git, so
+/// they always report pending batched metadata rather than a checkpoint result.
+fn metadata_batched_text() -> &'static str {
+    "metadata persisted (batched for host boundary)"
 }
 
 fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
-    let details = checkpoint_details(outcome);
     match &outcome.status {
-        CheckpointStatus::Batched => "batched (awaiting assignment boundary)".to_string(),
+        CheckpointStatus::Batched => metadata_batched_text().to_string(),
         CheckpointStatus::Checkpointed => format!(
-            "checkpointed{}{details}",
+            "checkpointed{}",
             outcome
                 .commit
                 .as_deref()
                 .map(|commit| format!(" ({commit})"))
                 .unwrap_or_default()
         ),
-        CheckpointStatus::Clean => {
-            format!("clean (no Tandem changes to checkpoint){details}")
-        }
+        CheckpointStatus::Clean => "clean (no Tandem changes to checkpoint)".to_string(),
         CheckpointStatus::Failed { message } => format!("FAILED: {message}"),
     }
-}
-
-fn checkpoint_warning(outcome: &CheckpointOutcome) -> Option<String> {
-    matches!(outcome.status, CheckpointStatus::Failed { .. })
-        .then(|| format!("; Git checkpoint {}", checkpoint_text(outcome)))
 }
 
 pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupRequest, CliError> {
@@ -552,14 +531,11 @@ fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliErro
         );
     } else {
         println!(
-            "Accord {}: {} (record written; Git {})",
+            "Accord {}: {} (record written; {})",
             outcome.id,
             outcome.status,
-            checkpoint_text(&outcome.checkpoint)
+            metadata_batched_text()
         );
-        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
-            eprintln!("Warning: {warning}");
-        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -584,13 +560,10 @@ fn review(args: ReviewArgs, json: bool) -> Result<super::StartupRequest, CliErro
         );
     } else {
         println!(
-            "Validation requested for {} (record written; Git {})",
+            "Validation requested for {} (record written; {})",
             outcome.id,
-            checkpoint_text(&outcome.checkpoint)
+            metadata_batched_text()
         );
-        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
-            eprintln!("Warning: {warning}");
-        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -615,13 +588,10 @@ fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, Cli
             eprintln!("Warning: {warning}");
         }
         println!(
-            "Completed {} (record written; Git {})",
+            "Completed {} (record written; {})",
             outcome.id,
-            checkpoint_text(&outcome.checkpoint)
+            metadata_batched_text()
         );
-        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
-            eprintln!("Warning: {warning}");
-        }
     }
     Ok(super::StartupRequest::Exit)
 }
@@ -636,13 +606,10 @@ fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliErro
         );
     } else {
         println!(
-            "Canceled {} (record written; Git {})",
+            "Canceled {} (record written; {})",
             outcome.id,
-            checkpoint_text(&outcome.checkpoint)
+            metadata_batched_text()
         );
-        if let Some(warning) = checkpoint_warning(&outcome.checkpoint) {
-            eprintln!("Warning: {warning}");
-        }
     }
     Ok(super::StartupRequest::Exit)
 }

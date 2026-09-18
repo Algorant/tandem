@@ -5,24 +5,10 @@
 
 use super::*;
 
-fn checkpoint_note(outcome: &CheckpointOutcome) -> String {
-    match &outcome.status {
-        CheckpointStatus::Batched => {
-            "; milestone/grouping write batched to assignment boundary".to_string()
-        }
-        CheckpointStatus::Checkpointed => {
-            format!(
-                "; record written; Git checkpointed{}",
-                checkpoint_note_suffix(outcome)
-            )
-        }
-        CheckpointStatus::Clean => {
-            format!("; Git checkpoint clean{}", checkpoint_note_suffix(outcome))
-        }
-        CheckpointStatus::Failed { message } => {
-            format!("; RECORD WRITTEN but Git checkpoint FAILED: {message}")
-        }
-    }
+/// Lifecycle writes persist immediately and never touch Git, so every TUI
+/// mutation reports the same pending batched metadata.
+fn checkpoint_note() -> &'static str {
+    "; record written; metadata persisted (batched for host boundary)"
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -279,7 +265,7 @@ impl TuiApp {
                     "Accord {}: {}{}{}",
                     outcome.id,
                     outcome.status,
-                    checkpoint_note(&outcome.checkpoint),
+                    checkpoint_note(),
                     reload_note
                 );
             }
@@ -307,13 +293,13 @@ impl TuiApp {
                         "Completed {} with warning: {}{}{}",
                         outcome.id,
                         warning,
-                        checkpoint_note(&outcome.checkpoint),
+                        checkpoint_note(),
                         reload_note
                     ),
                     None => format!(
                         "Completed {}{}{}",
                         outcome.id,
-                        checkpoint_note(&outcome.checkpoint),
+                        checkpoint_note(),
                         reload_note
                     ),
                 };

@@ -50,19 +50,11 @@ pub(crate) fn current_timestamp() -> String {
     format_unix_timestamp(seconds)
 }
 
-/// Checkpoint only at an explicit lifecycle boundary. The native record and
-/// event writes happen before this call; a Git failure is therefore data in the
-/// outcome, never a request to replay the lifecycle mutation.
-pub(crate) fn checkpoint_boundary(
-    project: &TandemProject,
-    hierarchy: &ProjectHierarchy,
-    document: &Document,
-) -> CheckpointOutcome {
-    match hierarchy.task_role(document) {
-        Ok(Some(TaskRole::Task)) => project::checkpoint(project),
-        Ok(Some(TaskRole::Epic | TaskRole::Subtask)) | Ok(None) => CheckpointOutcome::batched(),
-        Err(error) => CheckpointOutcome::failed(error.message),
-    }
+/// Lifecycle writes persist immediately and never touch Git. Every lifecycle
+/// outcome therefore reports `batched`: the metadata is durable in the worktree
+/// but pending for the next explicit checkpoint at a host commit/push boundary.
+pub(crate) fn checkpoint_boundary() -> CheckpointOutcome {
+    CheckpointOutcome::batched()
 }
 
 pub(crate) fn append_event(

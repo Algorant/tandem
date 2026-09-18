@@ -91,7 +91,7 @@ fn setup(label: &str) -> PathBuf {
 }
 
 #[test]
-fn exact_acceptance_criterion_enters_validation_and_checkpoints() {
+fn exact_acceptance_criterion_enters_validation_and_batches_metadata() {
     let root = setup("exact");
     let before_head = git(&root, &["rev-parse", "HEAD"]);
     let review = run(
@@ -114,7 +114,7 @@ fn exact_acceptance_criterion_enters_validation_and_checkpoints() {
     let envelope = json(&review);
     assert_eq!(envelope["ok"], true);
     assert_eq!(envelope["data"]["state"], "validation");
-    assert_eq!(envelope["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(envelope["data"]["checkpoint"]["status"], "batched");
 
     let shown = json(&run(&root, &["show", "task-1", "--json"]));
     assert_eq!(shown["data"]["state"], "validation");
@@ -123,13 +123,16 @@ fn exact_acceptance_criterion_enters_validation_and_checkpoints() {
         serde_json::json!([ACCEPTANCE])
     );
     assert_eq!(shown["data"]["validation"]["criterion"], ACCEPTANCE);
-    assert_ne!(
+    assert_eq!(
         git(&root, &["rev-parse", "HEAD"]),
         before_head,
-        "root Task review must create a checkpoint commit"
+        "root Task review must persist metadata without a checkpoint commit"
     );
     assert!(String::from_utf8_lossy(&event_bytes(&root)).contains("review.requested"));
-    assert_eq!(git(&root, &["status", "--porcelain"]), "");
+    assert!(
+        !git(&root, &["status", "--porcelain"]).is_empty(),
+        "review must leave pending metadata for the next explicit checkpoint"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 

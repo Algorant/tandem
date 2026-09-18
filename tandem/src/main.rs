@@ -52,8 +52,6 @@ impl CliError {
         let checkpoint = serde_json::json!({
             "status": "failed",
             "commit": serde_json::Value::Null,
-            "amended": false,
-            "consolidated": 0,
             "error": message.as_str(),
         });
         Self {

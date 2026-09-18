@@ -2,24 +2,10 @@
 
 use super::*;
 
-fn validation_checkpoint_note(outcome: &CheckpointOutcome) -> String {
-    match &outcome.status {
-        CheckpointStatus::Batched => {
-            "; milestone/grouping write batched to assignment boundary".to_string()
-        }
-        CheckpointStatus::Checkpointed => {
-            format!(
-                "; record written; Git checkpointed{}",
-                checkpoint_note_suffix(outcome)
-            )
-        }
-        CheckpointStatus::Clean => {
-            format!("; Git checkpoint clean{}", checkpoint_note_suffix(outcome))
-        }
-        CheckpointStatus::Failed { message } => {
-            format!("; RECORD WRITTEN but Git checkpoint FAILED: {message}")
-        }
-    }
+/// Lifecycle writes persist immediately and never touch Git, so validation
+/// actions report the same pending batched metadata as other mutations.
+fn validation_checkpoint_note() -> &'static str {
+    "; record written; metadata persisted (batched for host boundary)"
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -233,7 +219,7 @@ impl TuiApp {
                 self.status = format!(
                     "Accepted sign-off for {}{}{}",
                     outcome.id,
-                    validation_checkpoint_note(&outcome.checkpoint),
+                    validation_checkpoint_note(),
                     reload_note
                 );
             }
@@ -265,7 +251,7 @@ impl TuiApp {
                     "Requested rework for {}; moved to {}{}{}",
                     outcome.id,
                     outcome.state,
-                    validation_checkpoint_note(&outcome.checkpoint),
+                    validation_checkpoint_note(),
                     reload_note
                 );
             }

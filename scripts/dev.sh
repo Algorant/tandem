@@ -62,6 +62,9 @@ sandbox() {
         "$binary" accord claim task-6 --assignee dev-example >/dev/null
         "$binary" accord deliver task-6 --summary 'Example outcome' --evidence 'Native delivery and archive from the dev build' >/dev/null
         "$binary" complete task-6 >/dev/null
+        # Lifecycle writes persist without Git; one explicit forward flush makes
+        # the sandbox clean for inspection.
+        "$binary" checkpoint >/dev/null
     )
     printf '%s\n' "$dir"
 }
@@ -83,12 +86,15 @@ smoke() {
         fi
         jq -e '.ok == false' <<< "$invalid" >/dev/null
         "$binary" show task-5 --json | jq -e '.data.accordStatus == "ready"' >/dev/null
-        "$binary" accord claim task-2 --assignee dev-smoke --json | jq -e '.ok and .data.recordWritten and .data.checkpoint.status == "checkpointed"' >/dev/null
+        "$binary" accord claim task-2 --assignee dev-smoke --json | jq -e '.ok and .data.recordWritten and .data.checkpoint.status == "batched"' >/dev/null
+        [[ "$(git rev-parse HEAD)" == "$before" ]]
+        "$binary" checkpoint --json | jq -e '.ok and .data.checkpoint.status == "checkpointed"' >/dev/null
         [[ "$(git rev-parse HEAD)" != "$before" ]]
+        [[ -z "$(git status --porcelain -- .tandem)" ]]
         [[ "$("$binary" assignment task-2 --json | jq -er '.data.definitionToken')" == "$token" ]]
         [[ -z "$(git ls-files -- .tandem/actor-id)" ]]
     )
-    echo 'PASS: assignment freshness, evidence rejection, milestone batching, and Git boundary checkpoint.'
+    echo 'PASS: assignment freshness, evidence rejection, milestone batching, and explicit forward checkpoint flush.'
 }
 
 if [[ "$mode" == check ]]; then

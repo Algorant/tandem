@@ -29,8 +29,8 @@ use crate::app;
 use crate::project::rules::empty_rules;
 use crate::project::write::{file_signature, FileSignature, HierarchyLock};
 use crate::project::{
-    display_path, yaml_mapping_value, yaml_scalar_to_string, CheckpointOutcome, CheckpointStatus,
-    ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
+    display_path, yaml_mapping_value, yaml_scalar_to_string, ProjectHierarchy as HierarchyIndex,
+    StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{self, status as accord_status};
 use crate::protocol::config::RulesByCategory;
@@ -41,19 +41,6 @@ use crate::protocol::workflow::{
     RESOLUTION_OUTCOME_COMPLETED,
 };
 use crate::CliError;
-
-/// Shared suffix describing a checkpoint's amend/consolidate outcome for TUI
-/// status notes. Kept next to the TUI surfaces that render it.
-fn checkpoint_note_suffix(outcome: &CheckpointOutcome) -> String {
-    let mut suffix = String::new();
-    if outcome.amended {
-        suffix.push_str(" (amended)");
-    }
-    if outcome.consolidated > 0 {
-        suffix.push_str(&format!(" (consolidated {})", outcome.consolidated));
-    }
-    suffix
-}
 
 mod bindings;
 mod board;
@@ -3738,8 +3725,8 @@ tone = "success"
     // The former bulk-apply flow was removed by the 0.3.0 validation model.
 
     #[test]
-    fn workflow_render_reports_native_checkpoint_success_and_failure() {
-        let root = unique_test_dir("tandem-tui-checkpoint-outcome");
+    fn workflow_render_reports_pending_metadata_without_committing() {
+        let root = unique_test_dir("tandem-tui-pending-metadata");
         fs::create_dir_all(&root).unwrap();
         let git = |args: &[&str]| {
             let output = Command::new("git")
@@ -3748,6 +3735,17 @@ tone = "success"
                 .output()
                 .unwrap();
             assert!(output.status.success(), "git {args:?}: {:?}", output.stderr);
+        };
+        let head = || {
+            String::from_utf8(
+                Command::new("git")
+                    .args(["rev-parse", "HEAD"])
+                    .current_dir(&root)
+                    .output()
+                    .unwrap()
+                    .stdout,
+            )
+            .unwrap()
         };
         git(&["init", "--quiet"]);
         git(&["config", "user.name", "Tandem TUI Tests"]);
@@ -3760,14 +3758,15 @@ tone = "success"
         app::tasks::add(
             &workspace,
             crate::app::tasks::AddOptions {
-                title: Some("TUI checkpoint success".to_string()),
-                acceptance: vec!["render success".to_string()],
+                title: Some("TUI pending metadata".to_string()),
+                acceptance: vec!["render pending metadata".to_string()],
                 ..Default::default()
             },
         )
         .unwrap();
         git(&["add", ".tandem"]);
         git(&["commit", "--quiet", "-m", "baseline"]);
+        let head_before = head();
         let mut app = TuiApp::load(workspace.clone()).unwrap();
         assert!(app.select_document_by_id("task-1"));
         app.start_workflow_action("claim");
@@ -3775,67 +3774,26 @@ tone = "success"
         type_text(&mut app, "tui-worker");
         app.handle_workflow_prompt_key(key(KeyCode::Enter));
         assert!(
-            app.status.contains("Git checkpointed"),
+            app.status.contains("metadata persisted"),
             "status: {}",
             app.status
         );
+        assert_eq!(head_before, head(), "lifecycle mutation must not commit");
         for width in [80, 120] {
             let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
             terminal.draw(|frame| app.draw(frame)).unwrap();
             let rendered = terminal_text(&terminal);
             assert!(
-                rendered.contains("record written; Git checkpointed"),
-                "width {width} rendered success: {rendered}"
-            );
-        }
-
-        app::tasks::add(
-            &workspace,
-            crate::app::tasks::AddOptions {
-                title: Some("TUI checkpoint failure".to_string()),
-                acceptance: vec!["render failure".to_string()],
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        git(&["add", ".tandem"]);
-        git(&["commit", "--quiet", "-m", "second baseline"]);
-        let hook = root.join(".git/hooks/pre-commit");
-        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(&hook).unwrap().permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&hook, permissions).unwrap();
-        }
-        app.reload();
-        assert!(app.select_document_by_id("task-2"));
-        app.start_workflow_action("claim");
-        app.handle_workflow_prompt_key(key(KeyCode::Enter));
-        type_text(&mut app, "tui-worker");
-        app.handle_workflow_prompt_key(key(KeyCode::Enter));
-        assert!(
-            app.status
-                .contains("RECORD WRITTEN but Git checkpoint FAILED"),
-            "status: {}",
-            app.status
-        );
-        for width in [80, 120] {
-            let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
-            terminal.draw(|frame| app.draw(frame)).unwrap();
-            let rendered = terminal_text(&terminal);
-            assert!(
-                rendered.contains("RECORD WRITTEN but Git checkpoint FAILED"),
-                "width {width} rendered failure: {rendered}"
+                rendered.contains("record written; metadata persisted"),
+                "width {width} rendered status: {rendered}"
             );
         }
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn validation_render_prioritizes_checkpoint_failure_at_bounded_widths() {
-        let root = unique_test_dir("tandem-tui-validation-checkpoint");
+    fn validation_render_reports_pending_metadata_at_bounded_widths() {
+        let root = unique_test_dir("tandem-tui-validation-pending");
         fs::create_dir_all(&root).unwrap();
         let git = |args: &[&str]| {
             let output = Command::new("git")
@@ -3844,6 +3802,17 @@ tone = "success"
                 .output()
                 .unwrap();
             assert!(output.status.success(), "git {args:?}: {:?}", output.stderr);
+        };
+        let head = || {
+            String::from_utf8(
+                Command::new("git")
+                    .args(["rev-parse", "HEAD"])
+                    .current_dir(&root)
+                    .output()
+                    .unwrap()
+                    .stdout,
+            )
+            .unwrap()
         };
         git(&["init", "--quiet"]);
         git(&["config", "user.name", "Tandem Validation Tests"]);
@@ -3855,37 +3824,29 @@ tone = "success"
         .unwrap();
         fs::write(
             workspace.tasks_dir.join("task-1.md"),
-            "---\nid: task-1\ntype: task\ntitle: Validation checkpoint\nstate: validation\naccord:\n  status: delivered\n  acceptance: [\"validate outcome\"]\n  summary: delivered\n---\n",
+            "---\nid: task-1\ntype: task\ntitle: Validation pending\nstate: validation\naccord:\n  status: delivered\n  acceptance: [\"validate outcome\"]\n  summary: delivered\n---\n",
         )
         .unwrap();
         git(&["add", ".tandem"]);
         git(&["commit", "--quiet", "-m", "validation baseline"]);
-        let hook = root.join(".git/hooks/pre-commit");
-        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(&hook).unwrap().permissions();
-            permissions.set_mode(0o755);
-            fs::set_permissions(&hook, permissions).unwrap();
-        }
+        let head_before = head();
         let mut app = TuiApp::load(workspace).unwrap();
         assert!(app.select_document_by_id("task-1"));
         app.start_validation_accept();
         app.handle_validation_prompt_key(key(KeyCode::Enter));
         assert!(
-            app.status
-                .contains("RECORD WRITTEN but Git checkpoint FAILED"),
+            app.status.contains("metadata persisted"),
             "status: {}",
             app.status
         );
+        assert_eq!(head_before, head(), "validation accept must not commit");
         for width in [80, 120] {
             let mut terminal = Terminal::new(TestBackend::new(width, 30)).unwrap();
             terminal.draw(|frame| app.draw(frame)).unwrap();
             let rendered = terminal_text(&terminal);
             assert!(
-                rendered.contains("RECORD WRITTEN but Git checkpoint FAILED"),
-                "width {width} rendered validation failure: {rendered}"
+                rendered.contains("record written; metadata persisted"),
+                "width {width} rendered validation status: {rendered}"
             );
         }
         fs::remove_dir_all(root).unwrap();
