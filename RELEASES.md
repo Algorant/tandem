@@ -2,6 +2,20 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.6
+
+Tandem v0.13.6 restores quiet metadata batching without rewriting existing Git history.
+
+### Fixed
+
+- Task, Accord, review, and completion activity persists records and events immediately without automatically staging, committing, amending, rebasing, folding, or reconciling Git history.
+- `tandem checkpoint` is now a forward-only flush: it batches pending `.tandem/` additions, modifications, and deletions into one ordinary metadata commit, leaves existing commits and unrelated Git state untouched, and creates nothing when metadata is clean.
+- Source-only Worker integration was verified with installed Worktrunk over pending target metadata. Genuine overlapping metadata edits still surface as conflicts instead of being silently resolved.
+
+### Known limitation
+
+- Automatic checkpoint invocation at host commit/push boundaries requires the separate Pi adapter handoff documented in `plan/task-40-pi-handoff.md`; this release provides the native contract but does not claim that adapter wiring is complete.
+
 ## 0.13.5
 
 Tandem v0.13.5 adds an explicit native checkpoint for commit and push workflows.
