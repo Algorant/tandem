@@ -169,9 +169,9 @@ tests prove:
 
 A source build containing Task 39 is for development verification only: check
 that `tandem --help` lists `checkpoint`, or run the JSON probe above in a
-disposable Git repository. Pi readiness requires the first published Tandem
-release after 0.13.4 to be available through the normal mise source; Pi must
-not implement against unreleased main or a locally copied binary. Version
+disposable Git repository. Pi readiness requires published Tandem 0.13.5 to be
+available through the normal mise source; Pi must not implement against
+unreleased main or a locally copied binary. Version
 metadata, release notes, annotated tags, pushed tags, GitHub Release
 publication, and release automation are owned by the Tandem orchestrator, not
 this Task. No Pi adapter file, external Pi configuration, Git hook, or push

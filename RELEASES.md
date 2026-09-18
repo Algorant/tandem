@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.5
+
+Tandem v0.13.5 adds an explicit native checkpoint for commit and push workflows.
+
+### Added
+
+- `tandem checkpoint` flushes pending owning `.tandem/` changes through Tandem's existing locked checkpointer without fabricating a lifecycle transition. The supported adapter order is: create the real source commit, checkpoint, require clean `.tandem`, then push.
+- JSON callers receive the lifecycle-compatible checkpoint object under `data.checkpoint`. Standalone checkpoint failures exit 1 with a structured `checkpoint` error so shell and adapter workflows fail closed.
+- The flush preserves the existing safety contract: unpushed non-merge source commits keep their subject, pushed and merge commits are never amended, unrelated Git state is untouched, clean runs are idempotent, and metadata-only work keeps at most one rolling checkpoint.
+
 ## 0.13.4
 
 Tandem v0.13.4 keeps unpushed git history to real commit messages. Board files ride in those commits instead of a stack of `chore(tandem): checkpoint metadata` commits.
