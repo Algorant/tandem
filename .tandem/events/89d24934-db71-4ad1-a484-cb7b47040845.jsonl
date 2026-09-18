@@ -179,3 +179,6 @@
 {"ts":"2026-09-18T21:45:29Z","event":"task.completed","id":"task-40","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":179}
 {"ts":"2026-09-18T21:50:00Z","event":"task.created","id":"task-41","summary":"Release Tandem 0.13.6","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":180}
 {"ts":"2026-09-18T21:50:03Z","event":"accord.claimed","id":"task-41","summary":"Accord claim for task-41","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":181}
+{"ts":"2026-09-18T21:55:40Z","event":"task.updated","id":"task-41","summary":"Updated task-41 metadata: validation","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":182}
+{"ts":"2026-09-18T21:55:46Z","event":"accord.delivered","id":"task-41","summary":"Accord deliver for task-41","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":183}
+{"ts":"2026-09-18T21:55:48Z","event":"task.completed","id":"task-41","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":184}
