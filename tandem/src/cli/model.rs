@@ -26,6 +26,8 @@ pub(crate) enum Command {
     Review(ReviewArgs),
     Complete(CompleteArgs),
     Cancel(CancelArgs),
+    /// Flush pending owning `.tandem` changes into Git without a lifecycle transition
+    Checkpoint,
     Rules(RulesArgs),
     Tui,
     Web(WebArgs),

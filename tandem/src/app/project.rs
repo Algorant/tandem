@@ -3,7 +3,9 @@
 use std::env;
 
 use crate::app::Error;
-use crate::project::{display_path, parse_frontmatter_fields, split_frontmatter, TandemProject};
+use crate::project::{
+    display_path, parse_frontmatter_fields, split_frontmatter, CheckpointOutcome, TandemProject,
+};
 use crate::protocol::config::{default_project_config, PROTOCOL_VERSION};
 use crate::protocol::document::normalize_fields;
 
@@ -92,6 +94,15 @@ pub(crate) fn warnings(project: &TandemProject) -> Result<Vec<String>, Error> {
             .into_iter()
             .collect(),
     )
+}
+
+/// Explicit native Git flush for commit/push workflows and adapters.
+///
+/// This is the authoritative integration point for the existing checkpointer:
+/// it stages and commits only the owning `.tandem` path without role gating and
+/// without writing or transitioning any Task, Accord, Rule, Decision, or event.
+pub(crate) fn checkpoint(project: &TandemProject) -> CheckpointOutcome {
+    crate::project::checkpoint(project)
 }
 
 pub(crate) fn default_title(root: &std::path::Path) -> String {

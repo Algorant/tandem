@@ -24,6 +24,7 @@ pub(crate) fn print() {
     println!("  cancel               Cancel and archive a task");
     println!();
     println!("Workspace");
+    println!("  checkpoint           Flush pending .tandem changes into Git");
     println!("  rules list|add|edit|delete  Manage project rules");
     println!("  tui                  Open the terminal interface");
     println!("  web                  Open the web interface");

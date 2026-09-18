@@ -35,7 +35,7 @@ From a local checkout, use `cargo install --path tandem --locked`.
 
 ## Command index
 
-- Workspace: [`init`](#tandem-init), [`upgrade`](#tandem-upgrade)
+- Workspace: [`init`](#tandem-init), [`upgrade`](#tandem-upgrade), [`checkpoint`](#tandem-checkpoint)
 - Board documents: [`list`](#tandem-list), [`show`](#tandem-show), [`add`](#tandem-add), [`move`](#tandem-move), [`update`](#tandem-update), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel), [`search`](#tandem-search)
 - Friction inbox: [`papercut`](#tandem-papercut)
 - History: [`log`](#tandem-log)
@@ -367,6 +367,32 @@ tandem cancel <id> --reason <text>
 - Human output shape: canceled ID, reason, Board-to-Logs path, and event name.
 - JSON/Log/TUI reads expose `canceled`; legacy Logs without `completion.outcome` default to `completed`.
 - Out of scope: permanent deletion, cascades, same-ID recreation, a dedicated recreate command, and a TUI cancellation action. TUI read/render compatibility is required.
+
+### `tandem checkpoint`
+
+- Purpose: explicitly flush pending owning `.tandem/` changes into Git for adapter and commit/push workflows without creating or changing a Task, Accord, Rule, Decision, or event.
+- Kind: mutation (Git only).
+- Syntax:
+
+```text
+tandem checkpoint
+```
+
+- Accepted options: none beyond the global `-j/--json`. Passing an argument is a usage error.
+- Behavior:
+  - calls the same native checkpointer used at assignment boundaries, with no role gating, so Task, Epic, Subtask, Rule, and Decision metadata written by intermediate commands is captured;
+  - amends an unpushed non-merge HEAD with the `.tandem/` pathspec and preserves the real commit subject, or creates at most one rolling `chore(tandem): checkpoint metadata` commit when no real commit is absorbable;
+  - never rewrites pushed or merge commits and never touches unrelated staged, unstaged, or untracked files;
+  - is idempotent on a clean `.tandem/` and still folds eligible leftover own-chore runs;
+  - writes no records or events.
+- Adapter handoff: create the real source commit, run `tandem checkpoint`, require a clean `.tandem/`, then push. `tandem checkpoint && git push` is fail-closed.
+- Success JSON envelope (`--json`):
+
+```json
+{"ok":true,"data":{"checkpoint":{"status":"checkpointed|clean","commit":"<sha>|null","amended":true,"consolidated":0}},"warnings":[]}
+```
+
+- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"amended":false,"consolidated":0,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed flush leaves the pending change staged for inspection.
 
 ### `tandem log`
 

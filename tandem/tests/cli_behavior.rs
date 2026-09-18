@@ -15,6 +15,7 @@ fn landing_and_help_need_no_workspace() {
     assert!(landing_text.contains("accord claim         Claim a task"));
     assert!(landing_text.contains("review               Request exceptional human validation"));
     assert!(landing_text.contains("rules list|add|edit|delete  Manage project rules"));
+    assert!(landing_text.contains("checkpoint           Flush pending .tandem changes into Git"));
     assert!(landing_text.contains("Run 'tandem <command> --help' for detailed usage."));
     let help = bin().arg("--help").output().unwrap();
     assert!(help.status.success());
@@ -53,6 +54,7 @@ fn generated_help_covers_exact_target_surfaces_without_workspace() {
         vec!["review", "--help"],
         vec!["complete", "--help"],
         vec!["cancel", "--help"],
+        vec!["checkpoint", "--help"],
         vec!["rules", "--help"],
         vec!["rules", "list", "--help"],
         vec!["rules", "add", "--help"],
@@ -61,7 +63,7 @@ fn generated_help_covers_exact_target_surfaces_without_workspace() {
         vec!["tui", "--help"],
         vec!["web", "--help"],
     ];
-    assert_eq!(surfaces.len(), 27);
+    assert_eq!(surfaces.len(), 28);
     for argv in surfaces {
         let output = bin().args(argv.iter()).output().unwrap();
         assert!(output.status.success(), "{argv:?}: {:?}", output.stderr);

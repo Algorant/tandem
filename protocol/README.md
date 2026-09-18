@@ -90,13 +90,26 @@ and the live commit stay successful, and `consolidated` is reported as `0`.
 Git checkpoint failure is returned separately from the successful record
 result; there is no fallback or force path. The lifecycle JSON reports
 `amended` true only when the boundary amended HEAD and `consolidated` as the
-number of runs collapsed or folded. See
-[`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the consumer
-JSON contract and cutover sequence.
+number of runs collapsed or folded.
+
+`tandem checkpoint` is the explicit native flush for adapters and commit/push
+workflows. It calls the same checkpointer directly with no Accord or record
+transition and no role gating, so Task, Rule, Decision, Subtask, and Epic
+metadata left dirty by intermediate writes is captured. The operation is
+idempotent: a clean `.tandem/` reports `clean`, creates no commit, and still
+runs the leftover-chore reconcile. The documented adapter handoff is: create
+the real source commit, run `tandem checkpoint`, require a clean `.tandem/`,
+then push. A checkpoint failure exits `1` with a `checkpoint` error envelope,
+so `tandem checkpoint && git push` cannot proceed.
+
+See [`plan/task-14-pi-handoff.md`](../plan/task-14-pi-handoff.md) for the
+lifecycle consumer JSON contract and
+[`plan/task-39-pi-handoff.md`](../plan/task-39-pi-handoff.md) for the explicit
+native flush handoff.
 
 ## CLI contract
 
-The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 24 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure.
+The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 25 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `checkpoint`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure. `checkpoint` reports success as `data.checkpoint` and a checkpoint failure as `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed",...}}}}` with exit code 1.
 
 `assignment <task-id> --json` returns the complete current Task and direct milestone definition with an opaque freshness token and derived blocker readiness; assignment nodes also include derived `attemptCount`, `reworkCount`, and `discardedCount`; see [`assignment.md`](assignment.md). A planned validation beginning with `$ ` is a runnable command: after removing the prefix and leading whitespace, the command runs from the Task repository root and exit 0 passes. Other planned validations are manual checks. Assignment JSON classifies each item as `{ "kind": "command" | "manual", "text": "..." }` and strips `$ ` from command text; `show --json` preserves the raw validation strings. Adapters should require captured command output for command entries and may refuse integration on a non-zero exit. Tandem does not execute these commands, and Tasks with no command entries are unaffected. `list` and `search` support `--scope active|archived|all`, defaulting to active. `update` never mutates state, assignee, or Accord status. Repeated list values replace the complete list; absent values remain unchanged; `--clear` removes lists and optional scalars. Human prose accepts leading hyphens while typed IDs, enums, and numbers remain strict.
 

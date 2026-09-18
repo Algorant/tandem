@@ -33,6 +33,21 @@ fn git(cwd: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
+/// Exact Git stdout without trimming, for byte-for-byte blob comparisons.
+fn git_raw(cwd: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
 fn run(root: &Path, args: &[&str]) -> (bool, String, String) {
     let output = bin().args(args).current_dir(root).output().unwrap();
     (
@@ -84,6 +99,35 @@ fn chore_commit(root: &Path, relative: &str) {
             "chore(tandem): checkpoint metadata",
         ],
     );
+}
+
+/// Every file under `dir` as a sorted `(relative path, contents)` snapshot.
+/// Used to prove the explicit flush authors no document, rule, or event bytes.
+fn snapshot_tree(dir: &Path) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    if !dir.exists() {
+        return entries;
+    }
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let mut children = fs::read_dir(&current)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        children.sort();
+        for path in children {
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                entries.push((
+                    path.strip_prefix(dir).unwrap().display().to_string(),
+                    fs::read_to_string(&path).unwrap(),
+                ));
+            }
+        }
+    }
+    entries.sort();
+    entries
 }
 
 #[test]
@@ -913,4 +957,411 @@ fn concurrent_boundary_processes_share_git_repository_lock() {
     if linked.exists() {
         fs::remove_dir_all(linked).unwrap();
     }
+}
+
+#[test]
+fn explicit_checkpoint_flushes_pending_metadata_into_unpushed_source_commit() {
+    let root = setup("explicit-absorb");
+
+    // An ordinary unpushed source commit that does not include `.tandem`.
+    fs::write(root.join("tracked-partial.txt"), "base partial\n").unwrap();
+    fs::write(root.join("source.txt"), "source\n").unwrap();
+    git(&root, &["add", "tracked-partial.txt", "source.txt"]);
+    git(
+        &root,
+        &["commit", "--quiet", "-m", "ordinary source commit"],
+    );
+    let source_parent = git(&root, &["rev-parse", "HEAD^"]);
+
+    // Pending owning `.tandem` metadata from ordinary intermediate commands.
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "pending metadata"]);
+    assert!(ok, "update failed: {stderr}");
+    let (ok, _, stderr) = run(
+        &root,
+        &["add", "task", "Pending task", "--acceptance", "captured"],
+    );
+    assert!(ok, "add failed: {stderr}");
+    let (ok, _, stderr) = run(
+        &root,
+        &[
+            "add",
+            "task",
+            "Pending milestone",
+            "--parent",
+            "task-1",
+            "--acceptance",
+            "milestone captured",
+        ],
+    );
+    assert!(ok, "milestone add failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["rules", "add", "prefer", "Pending rule text"]);
+    assert!(ok, "rule add failed: {stderr}");
+    let rule_id = stdout
+        .trim()
+        .strip_prefix("Created rule ")
+        .expect("rule add prints its composite id")
+        .to_string();
+    let rule_path = format!(".tandem/rules/{rule_id}.md");
+
+    // Unrelated staged, unstaged, and untracked state must survive untouched.
+    fs::write(root.join("tracked-partial.txt"), "staged partial\n").unwrap();
+    git(&root, &["add", "tracked-partial.txt"]);
+    fs::write(root.join("tracked-partial.txt"), "unstaged partial\n").unwrap();
+    fs::write(root.join("untracked.txt"), "untracked\n").unwrap();
+
+    let tasks_before = snapshot_tree(&root.join(".tandem/tasks"));
+    let rules_before = snapshot_tree(&root.join(".tandem/rules"));
+    let events_before = snapshot_tree(&root.join(".tandem/events"));
+    let decisions_before = snapshot_tree(&root.join(".tandem/decisions"));
+    let index_before = git(&root, &["ls-files", "--stage", "--", "tracked-partial.txt"]);
+    let staged_before = git(&root, &["diff", "--cached", "--name-status", "--", "."]);
+    let head_before = git(&root, &["rev-parse", "HEAD"]);
+    assert!(!git(&root, &["status", "--porcelain", "--", ".tandem"]).is_empty());
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], true);
+
+    let head_after = git(&root, &["rev-parse", "HEAD"]);
+    assert_ne!(head_after, head_before);
+    assert_eq!(value["data"]["checkpoint"]["commit"], head_after.as_str());
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), source_parent);
+    assert_eq!(
+        git(&root, &["log", "-1", "--format=%s"]),
+        "ordinary source commit"
+    );
+    assert!(git(&root, &["status", "--porcelain", "--", ".tandem"]).is_empty());
+
+    let committed = git(&root, &["show", "--format=", "--name-only", "HEAD"]);
+    for path in [
+        ".tandem/tasks/task-1.md",
+        ".tandem/tasks/task-2.md",
+        ".tandem/tasks/task-1-1.md",
+        rule_path.as_str(),
+        ".tandem/events",
+    ] {
+        assert!(committed.contains(path), "checkpoint commit missing {path}");
+    }
+
+    // The pending Rule and Subtask bytes are committed exactly as written.
+    for path in [rule_path.as_str(), ".tandem/tasks/task-1-1.md"] {
+        let committed_bytes = git_raw(&root, &["show", &format!("HEAD:{path}")]);
+        let worktree_bytes = fs::read_to_string(root.join(path)).unwrap();
+        assert_eq!(
+            committed_bytes, worktree_bytes,
+            "flush did not commit the pending bytes for {path}"
+        );
+    }
+    let committed_subtask = git_raw(&root, &["show", "HEAD:.tandem/tasks/task-1-1.md"]);
+    assert!(committed_subtask.contains("Pending milestone"));
+    let committed_rule = git_raw(&root, &["show", &format!("HEAD:{rule_path}")]);
+    assert!(committed_rule.contains("Pending rule text"));
+
+    // The flush itself authors no Task, Rule, Decision, or event bytes.
+    assert_eq!(snapshot_tree(&root.join(".tandem/tasks")), tasks_before);
+    assert_eq!(snapshot_tree(&root.join(".tandem/rules")), rules_before);
+    assert_eq!(snapshot_tree(&root.join(".tandem/events")), events_before);
+    assert_eq!(
+        snapshot_tree(&root.join(".tandem/decisions")),
+        decisions_before
+    );
+
+    // Unrelated index, staged paths, and worktree bytes are unchanged.
+    assert_eq!(
+        git(&root, &["ls-files", "--stage", "--", "tracked-partial.txt"]),
+        index_before
+    );
+    assert_eq!(
+        git(&root, &["diff", "--cached", "--name-status", "--", "."]),
+        staged_before
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("tracked-partial.txt")).unwrap(),
+        "unstaged partial\n"
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("untracked.txt")).unwrap(),
+        "untracked\n"
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn explicit_checkpoint_is_idempotent_and_keeps_one_rolling_commit() {
+    // Local unpushed history: repeated flushes keep exactly one commit.
+    let root = setup("explicit-idempotent");
+    let baseline = git(&root, &["rev-parse", "HEAD"]);
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "first"]);
+    assert!(ok, "update failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], true);
+    let first = git(&root, &["rev-parse", "HEAD"]);
+    assert_ne!(first, baseline);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
+    assert_eq!(
+        git(&root, &["log", "-1", "--format=%s"]),
+        "fixture baseline"
+    );
+
+    // Idempotent on a clean `.tandem`.
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "clean checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["ok"], true);
+    assert_eq!(value["data"]["checkpoint"]["status"], "clean");
+    assert_eq!(value["data"]["checkpoint"]["commit"], Value::Null);
+    assert_eq!(git(&root, &["rev-parse", "HEAD"]), first);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
+
+    // A second metadata mutation folds into the same rolling commit.
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "second"]);
+    assert!(ok, "second update failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "second checkpoint failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "1");
+    fs::remove_dir_all(root).unwrap();
+
+    // Pushed history: the flush adds at most one rolling checkpoint commit.
+    let root = setup("explicit-rolling");
+    let remote = root.with_extension("bare");
+    git(&root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(
+        &root,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
+    let pushed = git(&root, &["rev-parse", "HEAD"]);
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "pushed-first"]);
+    assert!(ok, "update failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], false);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    let rolling = git(&root, &["rev-parse", "HEAD"]);
+
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "pushed-second"]);
+    assert!(ok, "second update failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "second checkpoint failed: {stderr}");
+    assert_eq!(json(&stdout)["data"]["checkpoint"]["amended"], true);
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_ne!(git(&root, &["rev-parse", "HEAD"]), rolling);
+    assert_eq!(
+        git(&root, &["rev-parse", "refs/remotes/origin/main"]),
+        pushed
+    );
+    fs::remove_dir_all(&root).unwrap();
+    fs::remove_dir_all(remote).unwrap();
+}
+
+#[test]
+fn explicit_checkpoint_never_amends_a_merge_head() {
+    let root = setup("explicit-merge");
+    let base_branch = git(&root, &["rev-parse", "--abbrev-ref", "HEAD"]);
+    git(&root, &["checkout", "--quiet", "-b", "side"]);
+    fs::write(root.join("side.txt"), "side\n").unwrap();
+    git(&root, &["add", "side.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "side commit"]);
+    git(&root, &["checkout", "--quiet", &base_branch]);
+    fs::write(root.join("mainline.txt"), "main\n").unwrap();
+    git(&root, &["add", "mainline.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "mainline commit"]);
+    git(
+        &root,
+        &["merge", "--quiet", "--no-ff", "side", "-m", "merge side"],
+    );
+    let merge = git(&root, &["rev-parse", "HEAD"]);
+    assert_eq!(
+        git(&root, &["rev-list", "--parents", "-1", "HEAD"])
+            .split_whitespace()
+            .count(),
+        3
+    );
+    let count_before: u32 = git(&root, &["rev-list", "--count", "HEAD"])
+        .parse()
+        .unwrap();
+
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "dirty after merge"]);
+    assert!(ok, "update failed: {stderr}");
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], false);
+    assert_ne!(git(&root, &["rev-parse", "HEAD"]), merge);
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), merge);
+    let count_after: u32 = git(&root, &["rev-list", "--count", "HEAD"])
+        .parse()
+        .unwrap();
+    assert_eq!(count_after, count_before + 1);
+
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn explicit_checkpoint_fails_closed_with_structured_envelopes() {
+    let non_git = root("explicit-non-git");
+    fs::create_dir_all(&non_git).unwrap();
+    let (ok, _, stderr) = run(&non_git, &["init", "--title", "No Git"]);
+    assert!(ok, "init failed: {stderr}");
+    let (ok, _, stderr) = run(
+        &non_git,
+        &["add", "task", "No Git task", "--acceptance", "durable"],
+    );
+    assert!(ok, "add failed: {stderr}");
+
+    let output = bin()
+        .args(["--json", "checkpoint"])
+        .current_dir(&non_git)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty(), "JSON failure must be stdout-only");
+    let value = json(&String::from_utf8_lossy(&output.stdout));
+    assert_eq!(value["ok"], false);
+    assert_eq!(value["error"]["code"], "checkpoint");
+    assert_eq!(value["error"]["details"]["checkpoint"]["status"], "failed");
+    assert_eq!(
+        value["error"]["details"]["checkpoint"]["commit"],
+        Value::Null
+    );
+    assert_eq!(value["error"]["details"]["checkpoint"]["amended"], false);
+    assert_eq!(value["error"]["details"]["checkpoint"]["consolidated"], 0);
+    let message = value["error"]["message"].as_str().unwrap();
+    assert!(
+        message.contains("Git"),
+        "message lost Git detail: {message}"
+    );
+    assert_eq!(value["error"]["details"]["checkpoint"]["error"], message);
+
+    let output = bin()
+        .arg("checkpoint")
+        .current_dir(&non_git)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        output.stdout.is_empty(),
+        "human failure must not write stdout"
+    );
+    assert!(String::from_utf8_lossy(&output.stderr).starts_with("Error:"));
+    fs::remove_dir_all(&non_git).unwrap();
+
+    // A failing pre-commit hook keeps the pending change staged for inspection.
+    let root = setup("explicit-hook-failure");
+    let hook = root.join(".git/hooks/pre-commit");
+    fs::write(
+        &hook,
+        "#!/bin/sh\necho intentional checkpoint hook failure >&2\nexit 1\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&hook).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&hook, permissions).unwrap();
+    }
+    let (ok, _, stderr) = run(
+        &root,
+        &["update", "task-1", "--body", "pending hook failure"],
+    );
+    assert!(ok, "update failed: {stderr}");
+    let output = bin()
+        .args(["--json", "checkpoint"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stderr.is_empty());
+    let value = json(&String::from_utf8_lossy(&output.stdout));
+    assert_eq!(value["error"]["code"], "checkpoint");
+    assert!(value["error"]["details"]["checkpoint"]["error"]
+        .as_str()
+        .unwrap()
+        .contains("intentional checkpoint hook failure"));
+    assert!(
+        !Command::new("git")
+            .args(["diff", "--cached", "--quiet", "--", ".tandem"])
+            .current_dir(&root)
+            .status()
+            .unwrap()
+            .success(),
+        "failed checkpoint must leave .tandem staged for inspection"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn explicit_checkpoint_folds_leftover_own_chore_runs() {
+    let root = setup("explicit-reconcile");
+    let remote = root.with_extension("bare");
+    git(&root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(
+        &root,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&root, &["push", "--quiet", "-u", "origin", "HEAD:main"]);
+    let baseline = git(&root, &["rev-parse", "HEAD"]);
+
+    chore_commit(&root, ".tandem/leftover-a.txt");
+    chore_commit(&root, ".tandem/leftover-b.txt");
+    fs::write(root.join("source.txt"), "source\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(
+        &root,
+        &["commit", "--quiet", "-m", "ordinary source commit"],
+    );
+    chore_commit(&root, ".tandem/leftover-c.txt");
+    chore_commit(&root, ".tandem/leftover-d.txt");
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "6");
+
+    let (ok, _, stderr) = run(&root, &["update", "task-1", "--body", "pending reconcile"]);
+    assert!(ok, "update failed: {stderr}");
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "checkpoint failed: {stderr}");
+    let value = json(&stdout);
+    assert_eq!(value["data"]["checkpoint"]["status"], "checkpointed");
+    assert_eq!(value["data"]["checkpoint"]["amended"], true);
+    assert!(
+        value["data"]["checkpoint"]["consolidated"]
+            .as_u64()
+            .unwrap()
+            >= 2,
+        "expected leftover chore runs to fold: {value}"
+    );
+
+    assert_eq!(git(&root, &["rev-list", "--count", "HEAD"]), "2");
+    assert_eq!(git(&root, &["rev-parse", "HEAD^"]), baseline);
+    assert_eq!(
+        git(&root, &["rev-parse", "refs/remotes/origin/main"]),
+        baseline
+    );
+    let subjects = git(&root, &["log", "--format=%s"]);
+    assert_eq!(
+        subjects.lines().collect::<Vec<_>>(),
+        vec!["ordinary source commit", "fixture baseline"]
+    );
+    let tree = git(&root, &["ls-tree", "-r", "--name-only", "HEAD"]);
+    for path in [
+        ".tandem/leftover-a.txt",
+        ".tandem/leftover-b.txt",
+        ".tandem/leftover-c.txt",
+        ".tandem/leftover-d.txt",
+    ] {
+        assert!(tree.contains(path), "collapsed history lost {path}");
+    }
+    fs::remove_dir_all(&root).unwrap();
+    fs::remove_dir_all(remote).unwrap();
 }
