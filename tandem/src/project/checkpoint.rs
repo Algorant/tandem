@@ -142,7 +142,7 @@ fn checkpoint_inner_locked(
 ) -> Result<CheckpointOutcome, String> {
     let data_dir = project.data_dir();
     let relative_data = data_dir
-        .strip_prefix(&repo_root)
+        .strip_prefix(repo_root)
         .map_err(|_| {
             format!(
                 "Tandem workspace {} is outside Git repository {}; refusing checkpoint",
@@ -158,19 +158,19 @@ fn checkpoint_inner_locked(
 
     // `-A -- .tandem` is the only mutating Git preparation operation. It does
     // not reset, stash, clean, or otherwise rewrite unrelated index entries.
-    git_output(&repo_root, &["add", "-A", "--", relative_data])?;
-    if !staged_tandem_changes(&repo_root, relative_data)? {
+    git_output(repo_root, &["add", "-A", "--", relative_data])?;
+    if !staged_tandem_changes(repo_root, relative_data)? {
         return Ok(CheckpointOutcome::clean());
     }
 
     // A new commit limited to the owning path: existing history is never
     // rewritten and unrelated staged entries stay in the index.
     git_output(
-        &repo_root,
+        repo_root,
         &["commit", "-m", CHECKPOINT_SUBJECT, "--", relative_data],
     )?;
 
-    let sha = git_output(&repo_root, &["rev-parse", "HEAD"])?
+    let sha = git_output(repo_root, &["rev-parse", "HEAD"])?
         .stdout
         .trim()
         .to_string();
