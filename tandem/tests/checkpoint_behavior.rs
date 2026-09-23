@@ -181,6 +181,157 @@ fn remove_worktree(root: &Path, worktree: &Path) {
     let _ = fs::remove_dir_all(worktree);
 }
 
+fn upstream(root: &Path) {
+    let bare = root.with_extension("upstream.git");
+    git(root, &["init", "--bare", bare.to_str().unwrap()]);
+    git(root, &["remote", "add", "origin", bare.to_str().unwrap()]);
+    git(root, &["push", "--quiet", "-u", "origin", "HEAD"]);
+}
+
+#[test]
+fn consolidate_interleaved_checkpoints_preserves_tree_and_real_commit_order() {
+    let root = setup("consolidate-interleaved");
+    upstream(&root);
+    let base = head(&root);
+    fs::write(root.join(".tandem/one.txt"), "first\n").unwrap();
+    assert!(run(&root, &["checkpoint"]).0);
+    fs::write(root.join("source.txt"), "source one\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "feat: first"]);
+    let real_one = head(&root);
+    fs::write(root.join(".tandem/two.txt"), "second\n").unwrap();
+    assert!(run(&root, &["checkpoint"]).0);
+    fs::write(root.join("source.txt"), "source two\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "fix: second"]);
+    let real_two = head(&root);
+    fs::write(root.join(".tandem/three.txt"), "third\n").unwrap();
+    let original_tree = git(&root, &["rev-parse", "HEAD^{tree}"]);
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint", "--consolidate"]);
+    assert!(ok, "{stdout} {stderr}");
+    let result = json(&stdout);
+    assert_eq!(result["data"]["checkpoint"]["collapsed"], 3);
+    let old = result["data"]["checkpoint"]["oldHead"].as_str().unwrap();
+    let new = result["data"]["checkpoint"]["newHead"].as_str().unwrap();
+    assert_eq!(head(&root), new);
+    assert_ne!(old, new);
+    assert_eq!(git(&root, &["rev-parse", "@{upstream}"]), base);
+    assert_eq!(git(&root, &["merge-base", "HEAD", &base]), base);
+    assert_eq!(
+        git(&root, &["rev-list", "--count", "@{upstream}..HEAD"]),
+        "3"
+    );
+    assert_eq!(
+        git(
+            &root,
+            &["log", "--reverse", "--format=%s", "@{upstream}..HEAD"]
+        ),
+        format!("feat: first\nfix: second\n{CHECKPOINT_SUBJECT}")
+    );
+    assert_ne!(git(&root, &["rev-parse", "HEAD~2"]), real_one);
+    assert_ne!(git(&root, &["rev-parse", "HEAD~1"]), real_two);
+    assert_eq!(
+        git(&root, &["rev-parse", "HEAD^{tree}"]),
+        git(&root, &["rev-parse", &format!("{old}^{{tree}}")])
+    );
+    assert_ne!(original_tree, git(&root, &["rev-parse", "HEAD^{tree}"]));
+    assert!(git(&root, &["status", "--porcelain"]).is_empty());
+    fs::remove_dir_all(root.with_extension("upstream.git")).unwrap();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn consolidate_refuses_live_worktree_without_rewriting() {
+    let root = setup("consolidate-live-worktree");
+    upstream(&root);
+    fs::write(root.join(".tandem/pending.txt"), "first\n").unwrap();
+    assert!(run(&root, &["checkpoint"]).0);
+    let branch_point = head(&root);
+    let linked = root.with_extension("linked");
+    git(
+        &root,
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "worker",
+            linked.to_str().unwrap(),
+        ],
+    );
+    fs::write(root.join("source.txt"), "source\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "real"]);
+    let before = head(&root);
+    let (ok, stdout, _) = run(&root, &["--json", "checkpoint", "--consolidate"]);
+    assert!(!ok);
+    assert_eq!(json(&stdout)["error"]["code"], "checkpoint");
+    assert!(json(&stdout)["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("branch or linked worktree"));
+    assert_eq!(head(&root), before);
+    assert_eq!(head(&linked), branch_point);
+    git(
+        &root,
+        &["worktree", "remove", "--force", linked.to_str().unwrap()],
+    );
+    fs::remove_dir_all(root.with_extension("upstream.git")).unwrap();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn consolidate_refuses_unsafe_ranges_and_git_operations() {
+    // No upstream: a previous forward checkpoint may still be present but the
+    // explicit rewrite must fail in the checkpoint envelope.
+    let root = setup("consolidate-no-upstream");
+    let before = head(&root);
+    let (ok, stdout, _) = run(&root, &["--json", "checkpoint", "--consolidate"]);
+    assert!(!ok);
+    assert_eq!(json(&stdout)["error"]["code"], "checkpoint");
+    assert_eq!(head(&root), before);
+    fs::remove_dir_all(root).unwrap();
+
+    for kind in ["real-metadata", "merge", "operation"] {
+        let root = setup(&format!("consolidate-{kind}"));
+        upstream(&root);
+        fs::write(root.join(".tandem/pending.txt"), "pending\n").unwrap();
+        assert!(run(&root, &["checkpoint"]).0);
+        match kind {
+            "real-metadata" => {
+                fs::write(root.join(".tandem/pending.txt"), "manual change\n").unwrap();
+                git(&root, &["add", ".tandem/pending.txt"]);
+                git(&root, &["commit", "--quiet", "-m", "manual metadata"]);
+            }
+            "merge" => {
+                git(&root, &["checkout", "--quiet", "-b", "side"]);
+                fs::write(root.join("side.txt"), "side\n").unwrap();
+                git(&root, &["add", "side.txt"]);
+                git(&root, &["commit", "--quiet", "-m", "side"]);
+                git(&root, &["checkout", "--quiet", "-"]);
+                fs::write(root.join("main.txt"), "main\n").unwrap();
+                git(&root, &["add", "main.txt"]);
+                git(&root, &["commit", "--quiet", "-m", "main"]);
+                git(
+                    &root,
+                    &["merge", "--quiet", "--no-ff", "side", "-m", "merge"],
+                );
+            }
+            "operation" => {
+                fs::write(root.join(".git/MERGE_HEAD"), head(&root)).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let before = head(&root);
+        let (ok, stdout, _) = run(&root, &["--json", "checkpoint", "--consolidate"]);
+        assert!(!ok, "{kind}: {stdout}");
+        assert_eq!(json(&stdout)["error"]["code"], "checkpoint");
+        assert_eq!(head(&root), before, "{kind}");
+        fs::remove_dir_all(root.with_extension("upstream.git")).unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
 #[test]
 fn lifecycle_mutations_persist_without_per_event_commits_or_history_rewrites() {
     let root = setup("lifecycle-persist");

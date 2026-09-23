@@ -1,20 +1,21 @@
 //! Native Git checkpoints for durable `.tandem` state.
 //!
-//! A checkpoint is a single forward-only flush. It stages only the owning
+//! Plain checkpoint is a single forward-only flush. It stages only the owning
 //! `.tandem` path and, when that path has staged changes, records them in one
-//! ordinary commit. It never amends, rebases, folds, or otherwise rewrites an
-//! existing commit, so source commit identities are stable across a flush.
+//! ordinary commit. Only the explicit push-boundary consolidation mode rewrites
+//! eligible unpushed history; plain flush leaves source commit IDs stable.
 //! Unrelated index entries, worktree bytes, and untracked files are never
 //! touched. A lock in the repository's common Git directory serializes linked
 //! worktrees as well as ordinary processes.
 //!
 //! Native record and event writes persist immediately and never call this
 //! module; a flush happens only when a host workflow explicitly runs
-//! `tandem checkpoint` at a commit/push boundary.
+//! `tandem checkpoint` at a commit boundary or `--consolidate` before push.
 
-use std::fs::{File, OpenOptions};
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::project::{display_path, TandemProject};
 
@@ -132,7 +133,13 @@ fn checkpoint_inner(project: &TandemProject) -> Result<CheckpointOutcome, String
     let common_dir = PathBuf::from(common_dir);
     let lock_path = common_dir.join("tandem-checkpoint.lock");
     let _lock = RepositoryLock::acquire(&lock_path)?;
+    checkpoint_inner_locked(project, &repo_root)
+}
 
+fn checkpoint_inner_locked(
+    project: &TandemProject,
+    repo_root: &Path,
+) -> Result<CheckpointOutcome, String> {
     let data_dir = project.data_dir();
     let relative_data = data_dir
         .strip_prefix(&repo_root)
@@ -219,6 +226,459 @@ fn format_git_error(args: &[&str], output: &std::process::Output) -> String {
     } else {
         format!("Git {} failed: {detail}", args.join(" "))
     }
+}
+
+/// The explicit push-boundary rewrite result. Ordinary checkpoints never use this path.
+pub(crate) struct Consolidation {
+    pub(crate) old_head: String,
+    pub(crate) new_head: String,
+    pub(crate) collapsed: usize,
+}
+
+/// Collapse only unpushed fixed-subject metadata commits. The ref is moved
+/// only after all preconditions and the final tree have been verified.
+pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolidation, String> {
+    let repo = PathBuf::from(
+        git_output(project.root(), &["rev-parse", "--show-toplevel"])?
+            .stdout
+            .trim(),
+    );
+    let common = PathBuf::from(
+        git_output(
+            &repo,
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        )?
+        .stdout
+        .trim(),
+    );
+    let _lock = RepositoryLock::acquire(&common.join("tandem-checkpoint.lock"))?;
+    no_git_operation(&repo)?;
+    // This flush is still forward-only. A later refusal never rewrites it.
+    if let CheckpointStatus::Failed { message } = checkpoint_inner_locked(project, &repo)?.status {
+        return Err(message);
+    }
+    let relative = project
+        .data_dir()
+        .strip_prefix(&repo)
+        .map_err(|_| "Tandem workspace is outside the Git repository".to_string())?
+        .to_str()
+        .ok_or("Tandem workspace path is not UTF-8")?;
+    let old = git_output(&repo, &["rev-parse", "HEAD"])?
+        .stdout
+        .trim()
+        .to_string();
+    let upstream = git_output(&repo, &["rev-parse", "@{upstream}"])
+        .map_err(|_| "checkpoint consolidation requires an upstream".to_string())?
+        .stdout
+        .trim()
+        .to_string();
+    let branch = git_output(&repo, &["symbolic-ref", "-q", "HEAD"])
+        .map_err(|_| "checkpoint consolidation requires a checked-out branch".to_string())?
+        .stdout
+        .trim()
+        .to_string();
+    if !git_success(&repo, &["merge-base", "--is-ancestor", &upstream, &old])? {
+        return Err("upstream is not an ancestor of HEAD; refusing consolidation".into());
+    }
+    no_git_operation(&repo)?;
+    if !git_output(&repo, &["status", "--porcelain"])?
+        .stdout
+        .is_empty()
+    {
+        return Err(
+            "consolidation requires a clean index and worktree after flushing metadata".into(),
+        );
+    }
+    let range = git_output(
+        &repo,
+        &["rev-list", "--reverse", &format!("{upstream}..{old}")],
+    )?
+    .stdout;
+    let commits: Vec<&str> = range.lines().collect();
+    let mut checkpoints = 0;
+    for sha in &commits {
+        let parents = git_output(&repo, &["rev-list", "--parents", "-n", "1", sha])?.stdout;
+        let parts: Vec<&str> = parents.split_whitespace().collect();
+        if parts.len() != 2 {
+            return Err(format!(
+                "merge or root commit {sha} in unpushed range; refusing consolidation"
+            ));
+        }
+        let changes = git_output(
+            &repo,
+            &[
+                "diff-tree",
+                "--no-commit-id",
+                "--name-only",
+                "-r",
+                "-z",
+                parts[1],
+                sha,
+            ],
+        )?
+        .stdout;
+        let paths: Vec<&str> = changes.split('\0').filter(|p| !p.is_empty()).collect();
+        let only_metadata = !paths.is_empty()
+            && paths
+                .iter()
+                .all(|p| *p == relative || p.starts_with(&format!("{relative}/")));
+        let touches_metadata = paths
+            .iter()
+            .any(|p| *p == relative || p.starts_with(&format!("{relative}/")));
+        let subject = git_output(&repo, &["log", "-1", "--format=%s", sha])?.stdout;
+        if subject.trim_end() == CHECKPOINT_SUBJECT && only_metadata {
+            checkpoints += 1;
+        } else if touches_metadata || subject.trim_end() == CHECKPOINT_SUBJECT {
+            return Err(format!("commit {sha} touches metadata outside an eligible checkpoint; refusing consolidation"));
+        }
+        let raw = git_output(&repo, &["cat-file", "-p", sha])?.stdout;
+        let headers = raw.split_once("\n\n").ok_or("invalid Git commit")?.0;
+        if headers.lines().any(|line| {
+            !["tree ", "parent ", "author ", "committer "]
+                .iter()
+                .any(|prefix| line.starts_with(prefix))
+        }) {
+            return Err(format!(
+                "commit {sha} has extra headers that cannot be replayed safely"
+            ));
+        }
+    }
+    let rewritten: std::collections::HashSet<&str> = commits.iter().copied().collect();
+    let refs = git_output(
+        &repo,
+        &[
+            "for-each-ref",
+            "--format=%(refname) %(objectname)",
+            "refs/heads",
+        ],
+    )?
+    .stdout;
+    for line in refs.lines() {
+        let Some((name, tip)) = line.split_once(' ') else {
+            continue;
+        };
+        if name != branch {
+            refuse_shared_base(&repo, &old, tip, &rewritten)?;
+        }
+    }
+    // An upstream need not be the only published ref. Reject any other remote
+    // ref pointing into the range rather than rewriting a published commit.
+    let remotes = git_output(
+        &repo,
+        &[
+            "for-each-ref",
+            "--format=%(refname) %(objectname)",
+            "refs/remotes",
+        ],
+    )?
+    .stdout;
+    for line in remotes.lines() {
+        if let Some((_, tip)) = line.split_once(' ') {
+            refuse_shared_base(&repo, &old, tip, &rewritten)?;
+        }
+    }
+    let tags = git_output(
+        &repo,
+        &[
+            "for-each-ref",
+            "--format=%(*objectname) %(objectname)",
+            "refs/tags",
+        ],
+    )?
+    .stdout;
+    for line in tags.lines() {
+        let Some((peeled, direct)) = line.split_once(' ') else {
+            continue;
+        };
+        let tip = if peeled.is_empty() { direct } else { peeled };
+        // Tags on non-commit objects have no merge-base; only commit tags
+        // participate in ancestry. Never rewrite a tagged commit.
+        if git_output(&repo, &["cat-file", "-t", tip])?.stdout.trim() == "commit" {
+            refuse_shared_base(&repo, &old, tip, &rewritten)?;
+        }
+    }
+    let worktrees = git_output(&repo, &["worktree", "list", "--porcelain"])?.stdout;
+    let current = fs::canonicalize(&repo).map_err(|e| e.to_string())?;
+    let mut path = None;
+    for line in worktrees.lines().chain(std::iter::once("")) {
+        if let Some(value) = line.strip_prefix("worktree ") {
+            path = Some(value.to_string());
+        }
+        if let Some(tip) = line.strip_prefix("HEAD ") {
+            if path
+                .as_ref()
+                .is_some_and(|p| fs::canonicalize(p).ok().as_ref() != Some(&current))
+            {
+                refuse_shared_base(&repo, &old, tip, &rewritten)?;
+            }
+        }
+        if line.is_empty() {
+            path = None;
+        }
+    }
+    if checkpoints == 0 {
+        return Ok(Consolidation {
+            old_head: old.clone(),
+            new_head: old,
+            collapsed: 0,
+        });
+    }
+
+    let index = common.join(format!(
+        "tandem-consolidate-{}-{}.index",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| e.to_string())?
+            .as_nanos()
+    ));
+    let _temporary = TemporaryIndex(index.clone());
+    let mut parent = upstream.clone();
+    for sha in &commits {
+        let subject = git_output(&repo, &["log", "-1", "--format=%s", sha])?.stdout;
+        if subject.trim_end() == CHECKPOINT_SUBJECT {
+            continue;
+        }
+        // Construct each real tree from its original snapshot with the
+        // upstream metadata subtree, using a private index only.
+        git_index(&repo, &index, &["read-tree", sha])?;
+        git_index(
+            &repo,
+            &index,
+            &[
+                "restore",
+                "--staged",
+                &format!("--source={upstream}"),
+                "--",
+                relative,
+            ],
+        )?;
+        let tree = git_index(&repo, &index, &["write-tree"])?
+            .stdout
+            .trim()
+            .to_string();
+        parent = replay_commit(&repo, sha, &tree, &parent)?;
+    }
+    let original_tree = git_output(&repo, &["rev-parse", &format!("{old}^{{tree}}")])?
+        .stdout
+        .trim()
+        .to_string();
+    let identity = git_output(&repo, &["var", "GIT_COMMITTER_IDENT"])?.stdout;
+    let (name, email, date) = parse_identity(identity.trim())?;
+    let new_head = commit_tree(
+        &repo,
+        &original_tree,
+        &parent,
+        &format!("{CHECKPOINT_SUBJECT}\n"),
+        (&name, &email, &date),
+        (&name, &email, &date),
+    )?;
+    let new_tree = git_output(&repo, &["rev-parse", &format!("{new_head}^{{tree}}")])?
+        .stdout
+        .trim()
+        .to_string();
+    if new_tree != original_tree {
+        return Err("consolidation tree mismatch; branch was not moved".into());
+    }
+    // Revalidate mutable safety inputs immediately before the atomic ref move.
+    if !git_output(&repo, &["status", "--porcelain"])?
+        .stdout
+        .is_empty()
+    {
+        return Err("worktree changed during consolidation".into());
+    }
+    if git_output(&repo, &["rev-parse", "@{upstream}"])?
+        .stdout
+        .trim()
+        != upstream
+    {
+        return Err("upstream moved during consolidation".into());
+    }
+    no_git_operation(&repo)?;
+    git_output(
+        &repo,
+        &[
+            "update-ref",
+            "-m",
+            "tandem checkpoint --consolidate",
+            &branch,
+            &new_head,
+            &old,
+        ],
+    )?;
+    Ok(Consolidation {
+        old_head: old,
+        new_head,
+        collapsed: checkpoints,
+    })
+}
+
+struct TemporaryIndex(PathBuf);
+impl Drop for TemporaryIndex {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+fn git_index(cwd: &Path, index: &Path, args: &[&str]) -> Result<GitOutput, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .env("GIT_INDEX_FILE", index)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format_git_error(args, &output));
+    }
+    Ok(GitOutput {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        _stderr: String::new(),
+    })
+}
+
+fn git_success(cwd: &Path, args: &[&str]) -> Result<bool, String> {
+    let status = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .status()
+        .map_err(|e| e.to_string())?;
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(format!("git {} failed: {status}", args.join(" "))),
+    }
+}
+
+fn refuse_shared_base(
+    repo: &Path,
+    head: &str,
+    tip: &str,
+    range: &std::collections::HashSet<&str>,
+) -> Result<(), String> {
+    let result = Command::new("git")
+        .args(["merge-base", head, tip])
+        .current_dir(repo)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if result.status.code() == Some(1) {
+        return Ok(());
+    }
+    if !result.status.success() {
+        return Err(format_git_error(&["merge-base", head, tip], &result));
+    }
+    if range.contains(String::from_utf8_lossy(&result.stdout).trim()) {
+        return Err(format!(
+            "another branch or linked worktree is based inside the rewrite range ({tip})"
+        ));
+    }
+    Ok(())
+}
+
+fn no_git_operation(repo: &Path) -> Result<(), String> {
+    for marker in [
+        "MERGE_HEAD",
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+        "REBASE_HEAD",
+        "rebase-merge",
+        "rebase-apply",
+        "sequencer",
+        "BISECT_LOG",
+    ] {
+        let path = git_output(
+            repo,
+            &["rev-parse", "--path-format=absolute", "--git-path", marker],
+        )?
+        .stdout;
+        if Path::new(path.trim()).exists() {
+            return Err(format!(
+                "Git operation in progress ({marker}); refusing consolidation"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn parse_identity(value: &str) -> Result<(String, String, String), String> {
+    let start = value.rfind(" <").ok_or("invalid Git identity")?;
+    let end = value[start + 2..]
+        .find("> ")
+        .ok_or("invalid Git identity")?
+        + start
+        + 2;
+    Ok((
+        value[..start].to_string(),
+        value[start + 2..end].to_string(),
+        value[end + 2..].to_string(),
+    ))
+}
+
+fn replay_commit(repo: &Path, sha: &str, tree: &str, parent: &str) -> Result<String, String> {
+    let output = Command::new("git")
+        .args(["cat-file", "-p", sha])
+        .current_dir(repo)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format_git_error(&["cat-file", "-p", sha], &output));
+    }
+    let raw = String::from_utf8(output.stdout).map_err(|_| {
+        format!("commit {sha} contains non-UTF-8 bytes and cannot be replayed safely")
+    })?;
+    let (headers, message) = raw.split_once("\n\n").ok_or("invalid Git commit")?;
+    let author = headers
+        .lines()
+        .find_map(|l| l.strip_prefix("author "))
+        .ok_or("missing author")?;
+    let committer = headers
+        .lines()
+        .find_map(|l| l.strip_prefix("committer "))
+        .ok_or("missing committer")?;
+    let author = parse_identity(author)?;
+    let committer = parse_identity(committer)?;
+    commit_tree(
+        repo,
+        tree,
+        parent,
+        message,
+        (&author.0, &author.1, &author.2),
+        (&committer.0, &committer.1, &committer.2),
+    )
+}
+
+fn commit_tree(
+    repo: &Path,
+    tree: &str,
+    parent: &str,
+    message: &str,
+    author: (&str, &str, &str),
+    committer: (&str, &str, &str),
+) -> Result<String, String> {
+    let mut child = Command::new("git")
+        .args(["commit-tree", tree, "-p", parent, "-F", "-"])
+        .current_dir(repo)
+        .env("GIT_AUTHOR_NAME", author.0)
+        .env("GIT_AUTHOR_EMAIL", author.1)
+        .env("GIT_AUTHOR_DATE", author.2)
+        .env("GIT_COMMITTER_NAME", committer.0)
+        .env("GIT_COMMITTER_EMAIL", committer.1)
+        .env("GIT_COMMITTER_DATE", committer.2)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    child
+        .stdin
+        .take()
+        .ok_or("missing commit-tree stdin")?
+        .write_all(message.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format_git_error(&["commit-tree"], &output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 #[cfg(test)]

@@ -27,10 +27,17 @@ pub(crate) enum Command {
     Complete(CompleteArgs),
     Cancel(CancelArgs),
     /// Flush pending owning `.tandem` changes into Git without a lifecycle transition
-    Checkpoint,
+    Checkpoint(CheckpointArgs),
     Rules(RulesArgs),
     Tui,
     Web(WebArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CheckpointArgs {
+    /// Collapse eligible unpushed metadata-only commits at the push boundary
+    #[arg(long)]
+    pub(crate) consolidate: bool,
 }
 
 #[derive(Debug, Args)]

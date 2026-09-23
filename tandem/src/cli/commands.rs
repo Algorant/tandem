@@ -72,7 +72,7 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
         Command::Review(args) => review(args, json),
         Command::Complete(args) => complete(args, json),
         Command::Cancel(args) => cancel(args, json),
-        Command::Checkpoint => checkpoint(json),
+        Command::Checkpoint(args) => checkpoint(args, json),
         Command::Rules(args) => rules(args, json),
         Command::Tui => Ok(super::StartupRequest::Tui),
         Command::Web(args) => Ok(super::StartupRequest::Web(crate::web::Options {
@@ -619,19 +619,39 @@ fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliErro
 /// Unlike a lifecycle mutation, this command exists only to checkpoint, so a
 /// failed checkpoint fails closed with exit code 1 instead of being reported as
 /// data next to a successful record write.
-fn checkpoint(json: bool) -> Result<super::StartupRequest, CliError> {
+fn checkpoint(args: CheckpointArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let project = app::project::open()?;
-    let outcome = app::project::checkpoint(&project);
-    if let CheckpointStatus::Failed { message } = &outcome.status {
-        return Err(CliError::checkpoint_failure(message.clone()));
-    }
-    if json {
-        println!(
-            "{}",
-            serde_json::json!({"ok":true,"data":{"checkpoint":checkpoint_json(&outcome)},"warnings":[]})
-        );
+    if args.consolidate {
+        let outcome =
+            app::project::consolidate_checkpoint(&project).map_err(CliError::checkpoint_failure)?;
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{"checkpoint":{
+                "status":"consolidated", "commit":outcome.new_head,
+                "oldHead":outcome.old_head, "newHead":outcome.new_head,
+                "collapsed":outcome.collapsed
+            }},"warnings":[]})
+            );
+        } else {
+            println!(
+                "Checkpoint: consolidated {} commit(s) ({} -> {})",
+                outcome.collapsed, outcome.old_head, outcome.new_head
+            );
+        }
     } else {
-        println!("Checkpoint: {}", checkpoint_text(&outcome));
+        let outcome = app::project::checkpoint(&project);
+        if let CheckpointStatus::Failed { message } = &outcome.status {
+            return Err(CliError::checkpoint_failure(message.clone()));
+        }
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{"checkpoint":checkpoint_json(&outcome)},"warnings":[]})
+            );
+        } else {
+            println!("Checkpoint: {}", checkpoint_text(&outcome));
+        }
     }
     Ok(super::StartupRequest::Exit)
 }

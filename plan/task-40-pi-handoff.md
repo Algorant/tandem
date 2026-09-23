@@ -4,7 +4,7 @@
 
 Task 40 removed automatic Git activity from native Tandem. Task, record, and
 event mutations now persist immediately and never stage, commit, amend, rebase,
-or reconcile anything. `tandem checkpoint` is the single forward-only native
+or reconcile anything. Plain `tandem checkpoint` is the forward-only native
 flush that collects pending owning `.tandem/` changes into one ordinary commit.
 
 Making that flush automatic at a commit/push boundary is **host adapter work**,
@@ -28,7 +28,7 @@ to a manual command the user is expected to remember.
 ## Exact adapter ownership and discovery
 
 No file in `extensions/pi-tandem/`, no external Pi configuration, and no Git
-hook is changed by Task 40. An adapter Task owns:
+hook is changed by Tasks 40 or 43. An adapter Task owns:
 
 - `extensions/pi-tandem/index.ts` — the Pi tool/command layer and its
   `execFile` wrapper. Any new `tandem_checkpoint` tool, commit/push command
@@ -64,8 +64,8 @@ review, complete, cancel) returns JSON with:
 
 `checkpoint.status: "batched"` is a truthful pending-metadata signal. It means
 the record is durable in the worktree and no commit was made. It is never a
-request to commit immediately and never carries amend/consolidate fields:
-`amended` and `consolidated` no longer exist in any envelope.
+request to commit immediately and never carries a rewrite outcome; only the
+explicit push-boundary command can report `status: "consolidated"`.
 
 The flush command:
 
@@ -85,7 +85,7 @@ or, when nothing is pending,
 {"ok":true,"data":{"checkpoint":{"status":"clean","commit":null}},"warnings":[]}
 ```
 
-The flush stages only the owning `.tandem/` path, appends at most one ordinary
+The plain flush stages only the owning `.tandem/` path, appends at most one ordinary
 `chore(tandem): checkpoint metadata` commit, never rewrites an existing commit,
 and preserves unrelated staged entries, unstaged bytes, and untracked files.
 It writes no Task, Accord, Rule, Decision, or event bytes.
@@ -104,23 +104,35 @@ It writes no Task, Accord, Rule, Decision, or event bytes.
 
 ## Push boundary call sequence
 
-1. Run `tandem --json checkpoint` before pushing.
-2. Continue only on `checkpointed` or `clean`, and only when
-   `git status --porcelain -- .tandem` is empty.
-3. Push.
+1. Run `tandem --json checkpoint --consolidate` **only** at the push boundary.
+   This first runs the forward-only flush (including metadata-only work), then
+   consolidates eligible unpushed checkpoints. It rewrites the IDs of unpushed
+   real commits while preserving their order, messages and final tree. Never
+   use this option at commit boundaries or on lifecycle mutations.
+2. Continue only on a successful `status: "consolidated"` response, and only
+   when `git status --porcelain -- .tandem` is empty.
+3. Push. Do not replay a failed push-boundary operation with an alternate Git
+   writer or force-push.
 
 The fail-closed composition is:
 
 ```sh
-tandem checkpoint && git push
+tandem checkpoint --consolidate && git push
 ```
 
-An adapter that owns both boundaries may run the flush once at the push
-boundary; running it at both is safe because a clean flush is a no-op.
+The response includes `oldHead`, `newHead`, `commit` (the new HEAD), and
+`collapsed` (the number of eligible metadata-only commits). Zero is a clean
+no-op. Consolidation requires an upstream ancestor and a clean index/worktree
+after the flush. It refuses with a checkpoint error envelope without rewriting
+for an in-progress Git operation, merge commit, real commit touching
+`.tandem/`, signed commit, or any other local branch/linked worktree based
+inside the rewritten range. If refusal occurs after a pending flush, that
+forward-only commit remains; the adapter must stop before pushing. The default
+`checkpoint` command remains the forward-only commit-boundary operation.
 
 ## Clean/no-op handling
 
-`clean` is success, not an error. It creates no commit, does not amend, and
+For the plain flush, `clean` is success, not an error. It creates no commit, does not amend, and
 does not rewrite history. It also does not touch unrelated dirt: a dirty
 working tree outside `.tandem/` is left exactly as it was. Adapters must not
 turn a clean flush into an empty commit or a retry.
@@ -147,8 +159,8 @@ Human mode writes the message to stderr and exits `1`. On failure the pending
 - A genuine overlapping `.tandem` edit conflict is reported as a conflict and
   left for a human; there is no merge driver, ours/theirs winner, or automatic
   repair.
-- Existing published/shared history is never rewritten by the flush or the
-  adapter.
+- Published/shared history is never rewritten; the explicit push-boundary
+  mode may rewrite only eligible unpushed commits after its safety checks.
 - The adapter never commits, amends, rebases, or tidies `.tandem/`
   itself; Tandem remains the sole metadata Git writer.
 

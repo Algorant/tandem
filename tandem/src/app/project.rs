@@ -105,6 +105,12 @@ pub(crate) fn checkpoint(project: &TandemProject) -> CheckpointOutcome {
     crate::project::checkpoint(project)
 }
 
+pub(crate) fn consolidate_checkpoint(
+    project: &TandemProject,
+) -> Result<crate::project::Consolidation, String> {
+    crate::project::consolidate_checkpoint(project)
+}
+
 pub(crate) fn default_title(root: &std::path::Path) -> String {
     root.file_name()
         .and_then(|name| name.to_str())

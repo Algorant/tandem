@@ -70,7 +70,7 @@ Metadata is expected repository state. A host workflow collects it at a
 deliberate commit/push boundary by running `tandem checkpoint`; this batching
 is a host responsibility, not a command the user must remember per mutation.
 
-`tandem checkpoint` is the single forward-only native flush. It stages only
+Plain `tandem checkpoint` is the forward-only native flush. It stages only
 the owning `.tandem/` path (`git add -A -- .tandem`), and when that path has
 staged changes records them in one ordinary commit with the fixed subject
 `chore(tandem): checkpoint metadata`. It never amends, rebases, folds, or
@@ -89,6 +89,24 @@ explicit command fails closed: a failure exits `1` with a `checkpoint` error
 envelope and leaves the pending `.tandem/` change staged for inspection, so
 `tandem checkpoint && git push` cannot proceed on failure.
 
+At the push boundary only, a host may explicitly run `tandem checkpoint
+--consolidate`. It first performs the ordinary forward-only flush, then
+inspects `@{upstream}..HEAD`. Fixed-subject commits changing exclusively the
+owning `.tandem/` path are collapsed into one final checkpoint commit after
+replaying real commits in order. Its resulting HEAD tree equals the flushed
+HEAD tree; eligible unpushed real commits acquire new IDs. The JSON success
+checkpoint includes `status: "consolidated"`, `oldHead`, `newHead`, `commit`
+(the new HEAD), and `collapsed` (eligible commits); with none eligible it
+reports zero and leaves HEAD unchanged. The command refuses with a checkpoint
+error envelope and no history rewrite if there is no upstream, the upstream
+is not an ancestor, the worktree/index is dirty after the flush, Git has an
+operation in progress, the range has a merge or a real commit touching
+`.tandem/`, or another local branch or linked worktree is based inside the
+range. Signed commits are also refused rather than silently losing signatures.
+Its branch update is atomic and conditioned on the original HEAD. Never run
+this mode on lifecycle writes, ordinary commit boundaries, or published
+history; the default checkpoint remains forward-only.
+
 See [`plan/task-40-pi-handoff.md`](../plan/task-40-pi-handoff.md) for the
 current lifecycle/flush consumer contract and the required host commit/push
 boundary wiring. The earlier
@@ -98,7 +116,7 @@ superseded by it.
 
 ## CLI contract
 
-The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 25 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `checkpoint`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure. `checkpoint` reports success as `data.checkpoint` and a checkpoint failure as `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed",...}}}}` with exit code 1.
+The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 25 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `checkpoint`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure. `checkpoint` accepts the explicit `--consolidate` push-boundary flag and reports success as `data.checkpoint` and a checkpoint failure as `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed",...}}}}` with exit code 1.
 
 `assignment <task-id> --json` returns the complete current Task and direct milestone definition with an opaque freshness token and derived blocker readiness; assignment nodes also include derived `attemptCount`, `reworkCount`, and `discardedCount`; see [`assignment.md`](assignment.md). A planned validation beginning with `$ ` is a runnable command: after removing the prefix and leading whitespace, the command runs from the Task repository root and exit 0 passes. Other planned validations are manual checks. Assignment JSON classifies each item as `{ "kind": "command" | "manual", "text": "..." }` and strips `$ ` from command text; `show --json` preserves the raw validation strings. Adapters should require captured command output for command entries and may refuse integration on a non-zero exit. Tandem does not execute these commands, and Tasks with no command entries are unaffected. `list` and `search` support `--scope active|archived|all`, defaulting to active. `update` never mutates state, assignee, or Accord status. Repeated list values replace the complete list; absent values remain unchanged; `--clear` removes lists and optional scalars. Human prose accepts leading hyphens while typed IDs, enums, and numbers remain strict.
 
