@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.13.7
+
+Tandem v0.13.7 adds an explicit push-boundary consolidation for unpushed metadata checkpoints.
+
+### Added
+
+- `tandem checkpoint --consolidate` first flushes pending `.tandem/` changes, then combines eligible fixed-subject, metadata-only commits in `@{upstream}..HEAD` into one final checkpoint after replaying real commits in order. The resulting HEAD tree matches the flushed tree; JSON reports the old and new HEAD and the number collapsed.
+- Consolidation refuses rather than rewriting when an upstream is missing or diverged, a merge or real metadata edit is in range, a Git operation is active, or another local branch or linked worktree is based in the range. A pending flush can still append one ordinary checkpoint before a refusal.
+- Unrelated staged changes, unstaged edits, and untracked files survive consolidation unchanged, including on dirty Worktrunk targets. Plain `tandem checkpoint` and lifecycle writes remain forward-only; the new option is for the host's push boundary only, not automatic per mutation. Host adapter wiring remains a separate concern.
+
 ## 0.13.6
 
 Tandem v0.13.6 restores quiet metadata batching without rewriting existing Git history.
