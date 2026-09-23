@@ -2,19 +2,27 @@
 id: task-43
 type: task
 title: "Add an explicit push-boundary consolidation for unpushed checkpoint commits"
-state: todo
 priority: "medium"
 effort: "medium"
 references: ["task-40", "task-42"]
 relatedFiles: ["protocol/README.md", "plan/task-40-pi-handoff.md"]
 tags: ["checkpoint", "git", "workflow"]
 accord:
-  status: "ready"
+  status: "accepted"
   acceptance: ["`tandem checkpoint --consolidate` (or equivalent) collapses all fixed-subject .tandem-only checkpoint commits in @{upstream}..HEAD into one final checkpoint commit, replaying real commits in order; resulting HEAD tree equals the prior HEAD tree", "It refuses without rewriting when a linked worktree or other local branch is based inside the range, when a real commit in range touches .tandem/, when a merge commit is in range, when no upstream exists, or when a Git operation is in progress, with a checkpoint error envelope", "Default `tandem checkpoint` remains forward-only and unchanged; lifecycle mutations never consolidate", "Protocol README and host handoff document the push-boundary contract", "Demonstrated on a disposable repo reproducing an interleaved chore/real history plus a refusal case with a linked worktree"]
+  claimedAt: "2026-09-23T01:57:38Z"
+  deliveredAt: "2026-09-23T02:06:01Z"
   validation: ["$ cd tandem && cargo test"]
-  updatedAt: "2026-09-23T01:57:21Z"
+  summary: "Added explicit push-boundary checkpoint consolidation that flushes pending metadata, preflights unpushed ancestry/commit contents/Git state/other refs and worktrees, replays real commits using a private index, verifies tree equality, and atomically moves the local branch. Plain checkpoint and lifecycle writes stay forward-only. Updated protocol and host handoff."
+  evidence: ["`cd tandem && cargo test`: 306 unit tests and every integration test passed, including 12 checkpoint behavior tests; `cargo fmt --check` and `git diff --check` passed.", "Disposable repo `consolidate_interleaved_checkpoints_preserves_tree_and_real_commit_order`: 3 metadata checkpoints interleaved with 2 real commits became 2 replayed real commits and 1 final checkpoint; `HEAD^{tree}` equals old flushed HEAD tree; upstream unchanged; index/worktree clean.", "Disposable repo `consolidate_refuses_live_worktree_without_rewriting`: linked worktree based on an eligible checkpoint produced exit 1 / `error.code=checkpoint`, main HEAD unchanged and linked worktree HEAD unchanged.", "Disposable repo refusal coverage also verifies no upstream, manual real metadata edit, merge commit, and Git operation in progress all fail with checkpoint error and do not rewrite HEAD."]
+  filesChanged: ["tandem/src/project/checkpoint.rs", "tandem/src/project/mod.rs", "tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/tests/checkpoint_behavior.rs", "protocol/README.md", "plan/task-40-pi-handoff.md"]
+  updatedAt: "2026-09-23T02:06:09Z"
 createdAt: "2026-09-23T01:57:02Z"
-updatedAt: "2026-09-23T01:57:21Z"
+updatedAt: "2026-09-23T02:06:09Z"
+assignee: "pi"
+archivedAt: "2026-09-23T02:06:09Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
