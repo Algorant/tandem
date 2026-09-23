@@ -122,13 +122,16 @@ tandem checkpoint --consolidate && git push
 
 The response includes `oldHead`, `newHead`, `commit` (the new HEAD), and
 `collapsed` (the number of eligible metadata-only commits). Zero is a clean
-no-op. Consolidation requires an upstream ancestor and a clean index/worktree
-after the flush. It refuses with a checkpoint error envelope without rewriting
-for an in-progress Git operation, merge commit, real commit touching
-`.tandem/`, signed commit, or any other local branch/linked worktree based
-inside the rewritten range. If refusal occurs after a pending flush, that
-forward-only commit remains; the adapter must stop before pushing. The default
-`checkpoint` command remains the forward-only commit-boundary operation.
+no-op. Consolidation requires an upstream ancestor and a clean owning
+`.tandem/` path after the flush. It preserves unrelated staged entries,
+unstaged edits, and untracked files, even on a dirty Worktrunk target: replay
+uses a private index and never checks out the rewritten commits. It refuses
+with a checkpoint error envelope without rewriting for an in-progress Git
+operation, merge commit, real commit touching `.tandem/`, signed commit, or
+any other local branch/linked worktree based inside the rewritten range. If
+refusal occurs after a pending flush, that forward-only commit remains; the
+adapter must stop before pushing. The default `checkpoint` command remains
+the forward-only commit-boundary operation.
 
 ## Clean/no-op handling
 

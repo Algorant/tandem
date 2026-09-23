@@ -99,11 +99,14 @@ checkpoint includes `status: "consolidated"`, `oldHead`, `newHead`, `commit`
 (the new HEAD), and `collapsed` (eligible commits); with none eligible it
 reports zero and leaves HEAD unchanged. The command refuses with a checkpoint
 error envelope and no history rewrite if there is no upstream, the upstream
-is not an ancestor, the worktree/index is dirty after the flush, Git has an
-operation in progress, the range has a merge or a real commit touching
-`.tandem/`, or another local branch or linked worktree is based inside the
-range. Signed commits are also refused rather than silently losing signatures.
-Its branch update is atomic and conditioned on the original HEAD. Never run
+is not an ancestor, the owning `.tandem/` path is still dirty after the
+flush, Git has an operation in progress, the range has a merge or a real
+commit touching `.tandem/`, or another local branch or linked worktree is
+based inside the range. Unrelated staged entries, unstaged edits, and
+untracked files are preserved: replay uses a private index and the new HEAD
+has exactly the flushed HEAD tree. Signed commits are also refused rather
+than silently losing signatures. Its branch update is atomic and conditioned
+on the original HEAD. Never run
 this mode on lifecycle writes, ordinary commit boundaries, or published
 history; the default checkpoint remains forward-only.
 

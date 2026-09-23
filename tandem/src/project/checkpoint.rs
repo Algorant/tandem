@@ -281,14 +281,7 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
         return Err("upstream is not an ancestor of HEAD; refusing consolidation".into());
     }
     no_git_operation(&repo)?;
-    if !git_output(&repo, &["status", "--porcelain"])?
-        .stdout
-        .is_empty()
-    {
-        return Err(
-            "consolidation requires a clean index and worktree after flushing metadata".into(),
-        );
-    }
+    clean_owning_metadata(&repo, relative)?;
     let range = git_output(
         &repo,
         &["rev-list", "--reverse", &format!("{upstream}..{old}")],
@@ -480,13 +473,10 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
     if new_tree != original_tree {
         return Err("consolidation tree mismatch; branch was not moved".into());
     }
-    // Revalidate mutable safety inputs immediately before the atomic ref move.
-    if !git_output(&repo, &["status", "--porcelain"])?
-        .stdout
-        .is_empty()
-    {
-        return Err("worktree changed during consolidation".into());
-    }
+    // The new HEAD has exactly the old tree. Replay touches only a private
+    // index, so unrelated staged, unstaged and untracked state survives the
+    // ref move. Recheck only owning metadata before moving the branch.
+    clean_owning_metadata(&repo, relative)?;
     if git_output(&repo, &["rev-parse", "@{upstream}"])?
         .stdout
         .trim()
@@ -511,6 +501,25 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
         new_head,
         collapsed: checkpoints,
     })
+}
+
+fn clean_owning_metadata(repo: &Path, relative: &str) -> Result<(), String> {
+    if !git_output(
+        repo,
+        &[
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--",
+            relative,
+        ],
+    )?
+    .stdout
+    .is_empty()
+    {
+        return Err("owning Tandem metadata changed after flush; refusing consolidation".into());
+    }
+    Ok(())
 }
 
 struct TemporaryIndex(PathBuf);
