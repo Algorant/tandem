@@ -144,6 +144,11 @@ pub(super) const BINDINGS: &[Binding] = &[
     },
     Binding {
         scope: BindingScope::Board,
+        keys: "s",
+        description: "cycle Board sort order",
+    },
+    Binding {
+        scope: BindingScope::Board,
         keys: "f",
         description: "open Board filter controls",
     },

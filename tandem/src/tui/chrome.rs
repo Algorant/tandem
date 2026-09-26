@@ -388,9 +388,12 @@ impl TuiApp {
             "d Detail"
         };
         let commands = if self.focus == FocusPane::Detail {
-            format!("{detail_hint} · e Edit · {arrangement_hint} · ? Help")
+            format!(
+                "sort {} · s Cycle · {detail_hint} · e Edit · {arrangement_hint} · ? Help",
+                self.board_sort.label()
+            )
         } else {
-            format!("a Actions · {detail_hint} · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help")
+            format!("sort {} · s Cycle · a Actions · {detail_hint} · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help", self.board_sort.label())
         };
         self.with_status(commands)
     }

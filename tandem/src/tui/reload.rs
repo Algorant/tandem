@@ -87,7 +87,7 @@ impl TuiApp {
             self.workspace
                 .read_decision_documents_tolerant(&mut load_errors),
         );
-        sort_documents(&mut docs);
+        sort_documents(&mut docs, self.board_sort);
 
         // Rules are one file per rule under .tandem/rules/ (protocol 0.3.0).
         let file_rules = match crate::project::rules::rules_by_category(&self.workspace.rules_dir())

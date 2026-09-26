@@ -27,6 +27,67 @@ impl BoardArrangement {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum BoardSort {
+    #[default]
+    IdAsc,
+    IdDesc,
+    CreatedDesc,
+    UpdatedDesc,
+    PriorityDesc,
+}
+
+impl BoardSort {
+    pub(super) fn next(self) -> Self {
+        match self {
+            Self::IdAsc => Self::IdDesc,
+            Self::IdDesc => Self::CreatedDesc,
+            Self::CreatedDesc => Self::UpdatedDesc,
+            Self::UpdatedDesc => Self::PriorityDesc,
+            Self::PriorityDesc => Self::IdAsc,
+        }
+    }
+
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::IdAsc => "ID ascending",
+            Self::IdDesc => "ID descending",
+            Self::CreatedDesc => "Newest created",
+            Self::UpdatedDesc => "Recently updated",
+            Self::PriorityDesc => "Priority",
+        }
+    }
+
+    pub(super) fn compare(self, a: &Document, b: &Document) -> std::cmp::Ordering {
+        let id = || crate::protocol::ids::compare_ids(a.id(), b.id());
+        match self {
+            Self::IdAsc => id(),
+            Self::IdDesc => id().reverse(),
+            Self::CreatedDesc | Self::UpdatedDesc => {
+                let field = if self == Self::CreatedDesc {
+                    "createdAt"
+                } else {
+                    "updatedAt"
+                };
+                match (a.field(field), b.field(field)) {
+                    (Some(a), Some(b)) if !a.is_empty() && !b.is_empty() => b.cmp(a).then_with(id),
+                    _ => id(),
+                }
+            }
+            Self::PriorityDesc => {
+                let rank = |doc: &Document| match doc.field("priority").unwrap_or("") {
+                    "critical" => 0,
+                    "high" => 1,
+                    "medium" => 2,
+                    "low" => 3,
+                    _ => 4,
+                };
+                rank(a).cmp(&rank(b)).then_with(id)
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct BoardFilters {
     pub(super) tag: Option<String>,
@@ -243,6 +304,7 @@ pub(super) struct StateBoardEntry<'a> {
     pub(super) depth: usize,
     pub(super) active_descendants: usize,
     pub(super) completed_descendants: usize,
+    pub(super) hidden_matches: usize,
     pub(super) has_active_children: bool,
     pub(super) expanded: bool,
     pub(super) last_sibling: bool,
@@ -293,6 +355,7 @@ pub(super) fn papercut_board_entries<'a>(
             depth: 0,
             active_descendants: 0,
             completed_descendants: 0,
+            hidden_matches: 0,
             has_active_children: false,
             expanded: false,
             last_sibling: false,
@@ -327,9 +390,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
                 filters,
                 &mut visited,
             );
-        // A state pane must expose every task counted by its tab, even when that task
-        // sits below an ancestor in another workflow state. Keep the ancestor path as
-        // context and automatically open the matching branch.
+        // Cross-state ancestors remain as context, collapsed until explicitly opened.
         let subtree_matches =
             (root_matches_state && board_filters_match(root, filters)) || descendant_matches_state;
         if !subtree_matches {
@@ -346,10 +407,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
             (0, 0)
         };
         let has_active_children = active_descendants > 0;
-        // Auto-expand only an ancestor whose own state differs from this pane. A
-        // same-state hierarchy remains collapsed by default and user-controlled.
-        let expanded =
-            expanded_ids.contains(root.id()) || (descendant_matches_state && !root_matches_state);
+        let expanded = expanded_ids.contains(root.id());
         let role = if normalized_parent_id(root).is_some_and(|parent_id| {
             completed_logs
                 .iter()
@@ -366,6 +424,13 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
             depth: 0,
             active_descendants,
             completed_descendants,
+            hidden_matches: count_matching_descendants(
+                root.id(),
+                active_docs,
+                completed_logs,
+                state,
+                filters,
+            ),
             has_active_children,
             expanded,
             last_sibling: false,
@@ -381,7 +446,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
                     state,
                     filters,
                     expanded_ids,
-                    expanded || filters.is_active(),
+                    expanded,
                     hierarchy,
                 ),
                 &mut BTreeSet::from([root.id().to_string()]),
@@ -452,17 +517,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
             &mut BTreeSet::from([child.id().to_string()]),
         );
         let has_active_children = active_descendants > 0;
-        let descendant_matches_state = task_subtree_matches_filters(
-            child.id(),
-            active_docs,
-            completed_logs,
-            target_state,
-            filters,
-            &mut BTreeSet::from([child.id().to_string()]),
-        );
-        let child_matches_state = document_state_label(child) == target_state;
-        let expanded =
-            expanded_ids.contains(child.id()) || (descendant_matches_state && !child_matches_state);
+        let expanded = expanded_ids.contains(child.id());
         let task_role = hierarchy.task_role(child).ok().flatten();
         entries.push(StateBoardEntry {
             doc: child,
@@ -471,6 +526,13 @@ pub(super) fn collect_visible_state_descendants<'a>(
             depth,
             active_descendants,
             completed_descendants,
+            hidden_matches: count_matching_descendants(
+                child.id(),
+                active_docs,
+                completed_logs,
+                target_state,
+                filters,
+            ),
             has_active_children,
             expanded,
             last_sibling: false,
@@ -485,7 +547,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
                 target_state,
                 filters,
                 expanded_ids,
-                expanded || filters.is_active(),
+                expanded,
                 hierarchy,
             ),
             visited,
@@ -562,6 +624,49 @@ pub(super) fn is_state_board_root(
         }
         return !saw_active_ancestor;
     }
+}
+
+fn count_matching_descendants(
+    parent_id: &str,
+    active_docs: &[Document],
+    completed_logs: &[Document],
+    target_state: &str,
+    filters: &BoardFilters,
+) -> usize {
+    fn walk(
+        parent_id: &str,
+        active: &[Document],
+        logs: &[Document],
+        state: &str,
+        filters: &BoardFilters,
+        visited: &mut BTreeSet<String>,
+    ) -> usize {
+        let mut count = 0;
+        for child in active.iter().chain(logs).filter(|doc| {
+            is_task_doc(doc) && normalized_parent_id(doc).as_deref() == Some(parent_id)
+        }) {
+            if !visited.insert(child.id().to_string()) {
+                continue;
+            }
+            if child.location == DocumentLocation::Board
+                && is_board_visible_doc(child)
+                && document_state_label(child) == state
+                && board_filters_match(child, filters)
+            {
+                count += 1;
+            }
+            count += walk(child.id(), active, logs, state, filters, visited);
+        }
+        count
+    }
+    walk(
+        parent_id,
+        active_docs,
+        completed_logs,
+        target_state,
+        filters,
+        &mut BTreeSet::from([parent_id.to_string()]),
+    )
 }
 
 pub(super) fn task_subtree_matches_filters(
@@ -1081,7 +1186,17 @@ pub(super) fn state_lines_for_entry(
     let doc = entry.doc;
     debug_assert!(entry.task_role.is_none() || is_task_doc(doc));
     let meta_width = content_width.saturating_div(2).min(32);
-    let right_meta = if entry.active_descendants + entry.completed_descendants > 0 {
+    let right_meta = if !entry.expanded && entry.hidden_matches > 0 {
+        format!(
+            "{} {} hidden",
+            entry.hidden_matches,
+            if entry.hidden_matches == 1 {
+                "match"
+            } else {
+                "matches"
+            }
+        )
+    } else if entry.active_descendants + entry.completed_descendants > 0 {
         truncate(
             &descendant_rollup(entry.active_descendants, entry.completed_descendants),
             meta_width,

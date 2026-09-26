@@ -37,7 +37,7 @@ use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::parse_field_values;
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::workflow::{
-    self, compare_recency_desc, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
+    self, resolution_outcome, workflow_states, RESOLUTION_OUTCOME_CANCELED,
     RESOLUTION_OUTCOME_COMPLETED,
 };
 use crate::CliError;
@@ -88,13 +88,8 @@ pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
     app.run(&mut session)
 }
 
-fn sort_documents(docs: &mut [Document]) {
-    docs.sort_by(|a, b| {
-        a.field("state")
-            .unwrap_or("")
-            .cmp(b.field("state").unwrap_or(""))
-            .then_with(|| compare_recency_desc(a, b, &["createdAt"]))
-    });
+fn sort_documents(docs: &mut [Document], sort: BoardSort) {
+    docs.sort_by(|a, b| sort.compare(a, b));
 }
 
 fn is_canceled_log(doc: &Document) -> bool {
@@ -241,6 +236,7 @@ struct TuiApp {
     selected_item: usize,
     board_filters: BoardFilters,
     board_arrangement: BoardArrangement,
+    board_sort: BoardSort,
     selected_log: usize,
     focus: FocusPane,
     show_board_detail: bool,
@@ -291,6 +287,7 @@ impl TuiApp {
             selected_item: 0,
             board_filters: BoardFilters::default(),
             board_arrangement: BoardArrangement::State,
+            board_sort: BoardSort::default(),
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -476,7 +473,7 @@ mod tests {
     }
 
     #[test]
-    fn sort_documents_orders_within_state_newest_first_by_created_at() {
+    fn sort_documents_orders_by_created_at_with_numeric_id_ties() {
         let mut docs = vec![
             doc_with_created_at("task-1", "todo", Some("2026-01-01T00:00:00Z")),
             doc_with_created_at("task-2", "todo", Some("2026-03-01T00:00:00Z")),
@@ -484,11 +481,170 @@ mod tests {
             doc_with_created_at("task-3", "in-progress", Some("2026-02-01T00:00:00Z")),
             doc_with_created_at("task-4", "todo", None),
         ];
-        sort_documents(&mut docs);
+        sort_documents(&mut docs, BoardSort::CreatedDesc);
         assert_eq!(
             docs.iter().map(|doc| doc.id()).collect::<Vec<_>>(),
-            ["task-3", "task-2", "task-10", "task-1", "task-4"]
+            ["task-2", "task-10", "task-3", "task-1", "task-4"]
         );
+    }
+
+    #[test]
+    fn board_sort_modes_order_children_and_epics_numerically() {
+        let mut epic = doc_with_state("task-1", Some("in-progress"));
+        epic.fields.insert("kind".into(), "epic".into());
+        let mut older = doc_with_created_at("task-2", "todo", Some("2025-01-01T00:00:00Z"));
+        older.fields.insert("parentId".into(), "task-1".into());
+        older
+            .fields
+            .insert("updatedAt".into(), "2026-03-01T00:00:00Z".into());
+        older.fields.insert("priority".into(), "low".into());
+        let mut newer = doc_with_created_at("task-10", "todo", Some("2026-01-01T00:00:00Z"));
+        newer.fields.insert("parentId".into(), "task-1".into());
+        newer
+            .fields
+            .insert("updatedAt".into(), "2025-03-01T00:00:00Z".into());
+        newer.fields.insert("priority".into(), "high".into());
+        for (mode, order) in [
+            (BoardSort::IdAsc, ["task-2", "task-10"]),
+            (BoardSort::IdDesc, ["task-10", "task-2"]),
+            (BoardSort::CreatedDesc, ["task-10", "task-2"]),
+            (BoardSort::UpdatedDesc, ["task-2", "task-10"]),
+            (BoardSort::PriorityDesc, ["task-10", "task-2"]),
+        ] {
+            let mut docs = vec![newer.clone(), epic.clone(), older.clone()];
+            sort_documents(&mut docs, mode);
+            let state = state_board_entries(
+                &docs,
+                &[],
+                "todo",
+                &BoardFilters::default(),
+                &BTreeSet::from(["task-1".to_string()]),
+            );
+            let epic = epic_board_entries(&docs, &[], &BoardFilters::default());
+            assert_eq!(
+                state
+                    .iter()
+                    .skip(1)
+                    .map(|entry| entry.doc.id())
+                    .collect::<Vec<_>>(),
+                order,
+                "state {mode:?}"
+            );
+            assert_eq!(
+                epic.iter()
+                    .skip(1)
+                    .map(|entry| entry.doc.id())
+                    .collect::<Vec<_>>(),
+                order,
+                "epic {mode:?}"
+            );
+        }
+        let mut mode = BoardSort::default();
+        for expected in [
+            BoardSort::IdDesc,
+            BoardSort::CreatedDesc,
+            BoardSort::UpdatedDesc,
+            BoardSort::PriorityDesc,
+            BoardSort::IdAsc,
+        ] {
+            mode = mode.next();
+            assert_eq!(mode, expected);
+        }
+    }
+
+    #[test]
+    fn board_sort_modes_order_subtasks_in_both_arrangements() {
+        let mut epic = doc_with_state("task-1", Some("todo"));
+        epic.fields.insert("kind".into(), "epic".into());
+        let mut task = doc_with_state("task-2", Some("todo"));
+        task.fields.insert("parentId".into(), "task-1".into());
+        let mut first = doc_with_created_at("task-2-1", "todo", Some("2025-01-01T00:00:00Z"));
+        first.fields.insert("parentId".into(), "task-2".into());
+        first
+            .fields
+            .insert("updatedAt".into(), "2026-01-01T00:00:00Z".into());
+        first.fields.insert("priority".into(), "low".into());
+        let mut second = doc_with_created_at("task-2-10", "todo", Some("2026-01-01T00:00:00Z"));
+        second.fields.insert("parentId".into(), "task-2".into());
+        second
+            .fields
+            .insert("updatedAt".into(), "2025-01-01T00:00:00Z".into());
+        second.fields.insert("priority".into(), "high".into());
+        for (mode, expected) in [
+            (BoardSort::IdAsc, ["task-2-1", "task-2-10"]),
+            (BoardSort::IdDesc, ["task-2-10", "task-2-1"]),
+            (BoardSort::CreatedDesc, ["task-2-10", "task-2-1"]),
+            (BoardSort::UpdatedDesc, ["task-2-1", "task-2-10"]),
+            (BoardSort::PriorityDesc, ["task-2-10", "task-2-1"]),
+        ] {
+            let mut docs = vec![second.clone(), task.clone(), first.clone(), epic.clone()];
+            sort_documents(&mut docs, mode);
+            let expanded = BTreeSet::from(["task-1".into(), "task-2".into()]);
+            let state =
+                state_board_entries(&docs, &[], "todo", &BoardFilters::default(), &expanded);
+            let epic = epic_board_entries(&docs, &[], &BoardFilters::default());
+            for ids in [
+                state
+                    .iter()
+                    .filter(|entry| entry.depth == 2)
+                    .map(|entry| entry.doc.id())
+                    .collect::<Vec<_>>(),
+                epic.iter()
+                    .filter(|entry| entry.depth == 2)
+                    .map(|entry| entry.doc.id())
+                    .collect::<Vec<_>>(),
+            ] {
+                assert_eq!(ids, expected, "{mode:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn cross_state_parent_stays_collapsed_with_and_without_filters() {
+        let mut epic = doc_with_state("task-1", Some("in-progress"));
+        epic.fields.insert("kind".into(), "epic".into());
+        let mut task = doc_with_state("task-2", Some("todo"));
+        task.fields.insert("parentId".into(), "task-1".into());
+        task.fields.insert("tags".into(), "[\"target\"]".into());
+        let docs = vec![epic, task];
+        for filters in [
+            BoardFilters::default(),
+            BoardFilters {
+                tag: Some("target".into()),
+                ..BoardFilters::default()
+            },
+        ] {
+            let collapsed = state_board_entries(&docs, &[], "todo", &filters, &BTreeSet::new());
+            assert_eq!(collapsed.len(), 1);
+            assert!(!collapsed[0].expanded);
+            assert_eq!(collapsed[0].hidden_matches, 1);
+            let text = state_lines_for_entry(
+                &collapsed[0],
+                &relationship_context_for_doc(collapsed[0].doc, &docs, &[]),
+                &TuiTheme::default_dark(),
+                (100, false, 0, false, false),
+            )
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+            assert!(text.contains("1 match hidden"), "{text}");
+            let opened = state_board_entries(
+                &docs,
+                &[],
+                "todo",
+                &filters,
+                &BTreeSet::from(["task-1".to_string()]),
+            );
+            assert_eq!(
+                opened
+                    .iter()
+                    .map(|entry| entry.doc.id())
+                    .collect::<Vec<_>>(),
+                ["task-1", "task-2"]
+            );
+            assert!(opened[0].expanded);
+        }
     }
 
     #[test]
@@ -869,7 +1025,7 @@ mod tests {
     }
 
     #[test]
-    fn in_progress_subtask_is_visible_with_its_ancestor_path() {
+    fn explicitly_expanded_in_progress_subtask_is_visible_with_its_ancestor_path() {
         let mut epic = doc_with_state("task-1", Some("todo"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
         let mut task = doc_with_state("task-2", Some("todo"));
@@ -886,7 +1042,7 @@ mod tests {
             &[],
             "in-progress",
             &BoardFilters::default(),
-            &BTreeSet::new(),
+            &BTreeSet::from(["task-1".to_string(), "task-2".to_string()]),
         );
 
         assert_eq!(
@@ -925,7 +1081,7 @@ mod tests {
             &[],
             "in-progress",
             &BoardFilters::default(),
-            &BTreeSet::new(),
+            &BTreeSet::from(["task-1".to_string()]),
         );
         let task_entry = entries
             .iter()
@@ -1341,7 +1497,7 @@ in-progress = "active"
     }
 
     #[test]
-    fn state_board_filters_reveal_matching_descendant_ancestor_path() {
+    fn explicitly_expanded_state_board_filters_reveal_matching_descendant_ancestor_path() {
         let mut parent = doc_with_state("task-1", Some("todo"));
         parent.fields.insert("kind".to_string(), "epic".to_string());
         parent
@@ -1367,8 +1523,13 @@ in-progress = "active"
 
         let todo_entries = state_board_entries(&docs, &[], "todo", &filters, &BTreeSet::new());
         assert!(todo_entries.is_empty());
-        let validation_entries =
-            state_board_entries(&docs, &[], "validation", &filters, &BTreeSet::new());
+        let validation_entries = state_board_entries(
+            &docs,
+            &[],
+            "validation",
+            &filters,
+            &BTreeSet::from(["task-1".to_string(), "task-2".to_string()]),
+        );
         assert_eq!(
             validation_entries
                 .iter()
@@ -2759,6 +2920,7 @@ tone = "success"
             selected_item: 0,
             board_filters: BoardFilters::default(),
             board_arrangement: BoardArrangement::State,
+            board_sort: BoardSort::default(),
             selected_log: 0,
             focus: FocusPane::Board,
             show_board_detail: false,
@@ -2871,7 +3033,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "sort ID ascending · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
         assert!(!app.board_footer_text().contains("TODO"));
         assert!(!app.board_footer_text().contains("row"));
@@ -2881,7 +3043,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "d List · e Edit · b Epic Board · ? Help"
+            "sort ID ascending · s Cycle · d List · e Edit · b Epic Board · ? Help"
         );
 
         app.switch_view(TuiView::Logs);
@@ -3331,7 +3493,7 @@ tone = "success"
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
-            "a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "sort ID ascending · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
         );
     }
 
@@ -5024,7 +5186,7 @@ tone = "success"
         );
         assert_eq!(
             todo.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
-            vec!["task-1", "task-1-1"],
+            vec!["task-1"],
             "a cross-state parent stays visible as context in the child's state tab"
         );
     }

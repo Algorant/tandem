@@ -419,6 +419,18 @@ impl TuiApp {
         };
     }
 
+    pub(super) fn cycle_board_sort(&mut self) {
+        let selected_id = self.selected_doc().map(|doc| doc.id().to_string());
+        self.board_sort = self.board_sort.next();
+        sort_documents(&mut self.docs, self.board_sort);
+        if let Some(id) = selected_id.as_deref() {
+            self.select_document_by_id_preserving_scroll(id);
+        } else {
+            self.clamp_selection();
+        }
+        self.status = format!("Board sort: {}. Press s to cycle.", self.board_sort.label());
+    }
+
     pub(super) fn toggle_board_arrangement(&mut self) {
         let selected_id = self.selected_doc().map(|doc| doc.id().to_string());
         self.board_arrangement = self.board_arrangement.toggled();
