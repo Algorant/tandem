@@ -2,6 +2,23 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.14.0
+
+Tandem v0.14.0 gives the TUI Board user-controlled ordering and collapsed-by-default hierarchy.
+
+### Added
+
+- `s` on the Board cycles session-only sort modes: ID ascending (default), ID descending, newest created, recently updated, and priority (then ID). The active mode applies at every hierarchy level in both State and Epic Board, keeps state grouping, and is shown in the Board command line.
+
+### Changed
+
+- The Board no longer defaults to newest-first; it opens in numeric ID ascending order.
+- State Board rows with children start collapsed and open only by explicit Enter or click, including when filters are active. Cross-state parents are no longer forced open, and a collapsed row shows how many pane- or filter-matching descendants it hides.
+
+### Fixed
+
+- Enter now reliably collapses a parent that was previously auto-expanded, and the status message reports the actual resulting state.
+
 ## 0.13.7
 
 Tandem v0.13.7 adds an explicit push-boundary consolidation for unpushed metadata checkpoints.
