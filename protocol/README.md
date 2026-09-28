@@ -78,9 +78,15 @@ otherwise rewrites an existing commit, so pre-existing source commit
 identities are stable across a flush. It creates at most one commit per
 invocation and appends it as a new child of the current HEAD. A clean
 `.tandem/` is an idempotent no-op: it reports `clean` and creates no commit.
-Unrelated staged entries, unstaged bytes, and untracked files are never
-touched. A lock in Git's common directory serializes linked worktrees as well
-as ordinary processes.
+If the owning `.tandem/` directory is intentionally ignored and has no index
+entries, no entries in `HEAD`, and no non-ignored untracked files, Tandem treats
+it as local-only: it skips staging and committing and reports
+`{"status":"clean","commit":null,"localOnly":true}`. Detection uses Git's
+index, `HEAD` tree, ignore, and untracked-file queries; unexpected Git errors
+fail closed. Ignored bytes are preserved. Any tracked `.tandem/` content,
+including a staged deletion, follows the normal flush path. Unrelated staged
+entries, unstaged bytes, and untracked files are never touched. A lock in Git's
+common directory serializes linked worktrees as well as ordinary processes.
 
 Because a flush is a new commit rather than a history rewrite, a source-only
 branch integrates over pending target metadata without stale-base replay, and
@@ -94,11 +100,15 @@ At the push boundary only, a host may explicitly run `tandem checkpoint
 inspects `@{upstream}..HEAD`. Fixed-subject commits changing exclusively the
 owning `.tandem/` path are collapsed into one final checkpoint commit after
 replaying real commits in order. Its resulting HEAD tree equals the flushed
-HEAD tree; eligible unpushed real commits acquire new IDs. The JSON success
-checkpoint includes `status: "consolidated"`, `oldHead`, `newHead`, `commit`
-(the new HEAD), and `collapsed` (eligible commits); with none eligible it
-reports zero and leaves HEAD unchanged. The command refuses with a checkpoint
-error envelope and no history rewrite if there is no upstream, the upstream
+HEAD tree; eligible unpushed real commits acquire new IDs. For local-only
+metadata, the flush is skipped but every consolidation safety guard still
+runs. Its JSON success checkpoint includes `status: "consolidated"`,
+`oldHead`, `newHead`, `commit` (the new HEAD), and `collapsed` (eligible
+commits); with none eligible it reports zero and leaves HEAD unchanged. A
+local-only success also includes `localOnly: true`. Local-only mode refuses
+rather than rewriting if any eligible checkpoint commit is already in the
+unpushed range. The command refuses with a checkpoint error envelope and no
+history rewrite if there is no upstream, the upstream
 is not an ancestor, the owning `.tandem/` path is still dirty after the
 flush, Git has an operation in progress, the range has a merge or a real
 commit touching `.tandem/`, or another local branch or linked worktree is

@@ -375,25 +375,31 @@ tandem cancel <id> --reason <text>
 - Syntax:
 
 ```text
-tandem checkpoint
+tandem checkpoint [--consolidate]
 ```
 
-- Accepted options: none beyond the global `-j/--json`. Passing an argument is a usage error.
+- Accepted options: `--consolidate` and the global `-j/--json`. Any other argument is a usage error.
 - Behavior:
-  - stages only the owning `.tandem/` path (`git add -A -- .tandem`) and, when that path has staged changes, records them in one ordinary commit with the fixed subject `chore(tandem): checkpoint metadata`;
+  - normally stages only the owning `.tandem/` path (`git add -A -- .tandem`) and, when that path has staged changes, records them in one ordinary commit with the fixed subject `chore(tandem): checkpoint metadata`;
   - is strictly forward-only: it never amends, rebases, folds, or otherwise rewrites an existing commit, so pre-existing source commit identities are stable across a flush;
   - creates at most one commit per invocation and appends it as a new child of the current HEAD regardless of whether HEAD is pushed or a merge;
   - never touches unrelated staged, unstaged, or untracked files, and preserves unrelated index entries;
   - is an idempotent no-op on a clean `.tandem/` (reports `clean` and creates no commit);
+  - treats an owning `.tandem/` as local-only only when it has no Git index entries, no `HEAD` tree entries, Git reports the directory ignored (`git check-ignore`), and there are no non-ignored untracked files beneath it. Git errors fail closed. Local-only mode skips staging and committing and preserves ignored bytes; tracked content, including staged deletions, stays on the normal path;
+  - with `--consolidate`, skips only the flush for local-only metadata and still runs every push-boundary safety guard. It refuses without rewriting if an eligible checkpoint commit is already in the unpushed range;
   - writes no records or events.
-- Host boundary handoff: create the real source commit, run `tandem checkpoint` automatically at the commit/push boundary, require a clean `.tandem/`, then push. `tandem checkpoint && git push` is fail-closed. Automatic wiring is a Pi adapter prerequisite; see `plan/task-40-pi-handoff.md`.
-- Success JSON envelope (`--json`):
+- Host boundary handoff: create the real source commit, run `tandem checkpoint` automatically at the commit/push boundary, require a clean `.tandem/`, then push. A successful local-only result is also consolidated push-boundary success. `tandem checkpoint && git push` is fail-closed. Automatic wiring is a Pi adapter prerequisite; see `plan/task-40-pi-handoff.md`.
+- Success JSON envelopes (`--json`):
 
 ```json
 {"ok":true,"data":{"checkpoint":{"status":"checkpointed|clean","commit":"<sha>|null"}},"warnings":[]}
+{"ok":true,"data":{"checkpoint":{"status":"clean","commit":null,"localOnly":true}},"warnings":[]}
+{"ok":true,"data":{"checkpoint":{"status":"consolidated","oldHead":"<sha>","newHead":"<sha>","commit":"<sha>","collapsed":0}},"warnings":[]}
+{"ok":true,"data":{"checkpoint":{"status":"consolidated","oldHead":"<sha>","newHead":"<sha>","commit":"<sha>","collapsed":0,"localOnly":true}},"warnings":[]}
 ```
 
-- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed flush leaves the pending change staged for inspection.
+`localOnly` is omitted for tracked repositories. In local-only consolidation, `oldHead` and `newHead` are the unchanged HEAD and `collapsed` is zero.
+- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed tracked flush leaves the pending change staged for inspection.
 
 ### `tandem log`
 

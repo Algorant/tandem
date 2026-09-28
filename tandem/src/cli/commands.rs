@@ -17,6 +17,11 @@ fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
             "status": "clean",
             "commit": serde_json::Value::Null,
         }),
+        CheckpointStatus::LocalOnly => serde_json::json!({
+            "status": "clean",
+            "commit": serde_json::Value::Null,
+            "localOnly": true,
+        }),
         CheckpointStatus::Failed { message } => serde_json::json!({
             "status": "failed",
             "commit": serde_json::Value::Null,
@@ -43,6 +48,9 @@ fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
                 .unwrap_or_default()
         ),
         CheckpointStatus::Clean => "clean (no Tandem changes to checkpoint)".to_string(),
+        CheckpointStatus::LocalOnly => {
+            "clean (local-only: owning .tandem is Git-ignored)".to_string()
+        }
         CheckpointStatus::Failed { message } => format!("FAILED: {message}"),
     }
 }
@@ -625,13 +633,22 @@ fn checkpoint(args: CheckpointArgs, json: bool) -> Result<super::StartupRequest,
         let outcome =
             app::project::consolidate_checkpoint(&project).map_err(CliError::checkpoint_failure)?;
         if json {
-            println!(
-                "{}",
-                serde_json::json!({"ok":true,"data":{"checkpoint":{
+            let mut checkpoint = serde_json::json!({
                 "status":"consolidated", "commit":outcome.new_head,
                 "oldHead":outcome.old_head, "newHead":outcome.new_head,
                 "collapsed":outcome.collapsed
-            }},"warnings":[]})
+            });
+            if outcome.local_only {
+                checkpoint["localOnly"] = serde_json::Value::Bool(true);
+            }
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{"checkpoint":checkpoint},"warnings":[]})
+            );
+        } else if outcome.local_only {
+            println!(
+                "Checkpoint: consolidated local-only (Git-ignored) .tandem; {} commit(s) ({} -> {})",
+                outcome.collapsed, outcome.old_head, outcome.new_head
             );
         } else {
             println!(

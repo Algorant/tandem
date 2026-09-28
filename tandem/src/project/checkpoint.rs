@@ -34,6 +34,8 @@ pub(crate) enum CheckpointStatus {
     Batched,
     /// No `.tandem` changes were present after staging, so no commit was made.
     Clean,
+    /// The owning `.tandem` directory is intentionally ignored and is local-only.
+    LocalOnly,
     /// One checkpoint commit was created.
     Checkpointed,
     /// The flush failed; the pending `.tandem` change stays staged.
@@ -155,6 +157,12 @@ fn checkpoint_inner_locked(
     if relative_data.is_empty() || relative_data == "." {
         return Err("refusing to checkpoint an empty Git pathspec".to_string());
     }
+    if local_only_ignored_metadata(repo_root, relative_data)? {
+        return Ok(CheckpointOutcome {
+            status: CheckpointStatus::LocalOnly,
+            commit: None,
+        });
+    }
 
     // `-A -- .tandem` is the only mutating Git preparation operation. It does
     // not reset, stash, clean, or otherwise rewrite unrelated index entries.
@@ -181,6 +189,38 @@ fn checkpoint_inner_locked(
         status: CheckpointStatus::Checkpointed,
         commit: Some(sha),
     })
+}
+
+/// Whether the owning path is intentionally ignored and contains no tracked
+/// or non-ignored untracked files. All Git probes run before any staging.
+fn local_only_ignored_metadata(repo: &Path, relative: &str) -> Result<bool, String> {
+    let indexed = git_output(repo, &["ls-files", "-z", "--", relative])?.stdout;
+    let has_head = git_quiet_success(repo, &["rev-parse", "--verify", "-q", "HEAD"])?;
+    let in_head = if has_head {
+        git_output(
+            repo,
+            &["ls-tree", "-r", "--name-only", "HEAD", "--", relative],
+        )?
+        .stdout
+    } else {
+        String::new()
+    };
+    let ignored_path = format!("{relative}/");
+    let ignored = git_quiet_success(repo, &["check-ignore", "-q", "--", &ignored_path])?;
+    let untracked = git_output(
+        repo,
+        &[
+            "ls-files",
+            "--others",
+            "--exclude-standard",
+            "-z",
+            "--",
+            relative,
+        ],
+    )?
+    .stdout;
+
+    Ok(indexed.is_empty() && in_head.is_empty() && ignored && untracked.is_empty())
 }
 
 fn staged_tandem_changes(repo_root: &Path, relative_data: &str) -> Result<bool, String> {
@@ -233,6 +273,7 @@ pub(crate) struct Consolidation {
     pub(crate) old_head: String,
     pub(crate) new_head: String,
     pub(crate) collapsed: usize,
+    pub(crate) local_only: bool,
 }
 
 /// Collapse only unpushed fixed-subject metadata commits. The ref is moved
@@ -254,9 +295,13 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
     let _lock = RepositoryLock::acquire(&common.join("tandem-checkpoint.lock"))?;
     no_git_operation(&repo)?;
     // This flush is still forward-only. A later refusal never rewrites it.
-    if let CheckpointStatus::Failed { message } = checkpoint_inner_locked(project, &repo)?.status {
-        return Err(message);
-    }
+    // An intentionally ignored, untracked owning directory skips only this
+    // flush; all consolidation guards below still apply.
+    let local_only = match checkpoint_inner_locked(project, &repo)?.status {
+        CheckpointStatus::Failed { message } => return Err(message),
+        CheckpointStatus::LocalOnly => true,
+        _ => false,
+    };
     let relative = project
         .data_dir()
         .strip_prefix(&repo)
@@ -409,11 +454,17 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
             path = None;
         }
     }
+    if local_only && checkpoints > 0 {
+        return Err(format!(
+            "Git-ignored local-only .tandem cannot consolidate {checkpoints} eligible checkpoint commit(s); refusing consolidation"
+        ));
+    }
     if checkpoints == 0 {
         return Ok(Consolidation {
             old_head: old.clone(),
             new_head: old,
             collapsed: 0,
+            local_only,
         });
     }
 
@@ -500,6 +551,7 @@ pub(crate) fn consolidate_checkpoint(project: &TandemProject) -> Result<Consolid
         old_head: old,
         new_head,
         collapsed: checkpoints,
+        local_only,
     })
 }
 
@@ -543,6 +595,19 @@ fn git_index(cwd: &Path, index: &Path, args: &[&str]) -> Result<GitOutput, Strin
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         _stderr: String::new(),
     })
+}
+
+fn git_quiet_success(cwd: &Path, args: &[&str]) -> Result<bool, String> {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .map_err(|error| format!("could not execute Git {}: {error}", args.join(" ")))?;
+    match output.status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(format_git_error(args, &output)),
+    }
 }
 
 fn git_success(cwd: &Path, args: &[&str]) -> Result<bool, String> {

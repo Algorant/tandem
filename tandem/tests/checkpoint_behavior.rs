@@ -188,6 +188,324 @@ fn upstream(root: &Path) {
     git(root, &["push", "--quiet", "-u", "origin", "HEAD"]);
 }
 
+/// A Git-backed Tandem workspace whose metadata remains on disk but has no
+/// index or HEAD entries and is ignored through either .gitignore or info/exclude.
+fn setup_local_only(label: &str, info_exclude: bool) -> PathBuf {
+    let root = setup(label);
+    fs::write(root.join("source.txt"), "baseline\n").unwrap();
+    git(&root, &["add", "source.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "source baseline"]);
+    git(&root, &["rm", "--cached", "-r", ".tandem"]);
+    if info_exclude {
+        fs::write(root.join(".git/info/exclude"), "/.tandem/\n").unwrap();
+    } else {
+        fs::write(root.join(".gitignore"), "/.tandem/\n").unwrap();
+        git(&root, &["add", ".gitignore"]);
+    }
+    git(
+        &root,
+        &["commit", "--quiet", "-m", "make metadata local-only"],
+    );
+    assert!(git_status(&root, &["check-ignore", "-q", "--", ".tandem/"]));
+    assert!(git(&root, &["ls-files", "-z", "--", ".tandem"]).is_empty());
+    assert!(git(
+        &root,
+        &["ls-tree", "-r", "--name-only", "HEAD", "--", ".tandem"]
+    )
+    .is_empty());
+    root
+}
+
+fn snapshot_tree_bytes(dir: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut entries = Vec::new();
+    if !dir.exists() {
+        return entries;
+    }
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let mut children = fs::read_dir(&current)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect::<Vec<_>>();
+        children.sort();
+        for path in children {
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                entries.push((
+                    path.strip_prefix(dir).unwrap().display().to_string(),
+                    fs::read(&path).unwrap(),
+                ));
+            }
+        }
+    }
+    entries.sort_by(|left, right| left.0.cmp(&right.0));
+    entries
+}
+
+#[test]
+fn intentionally_ignored_metadata_is_local_only_and_preserves_all_local_state() {
+    for consolidate in [false, true] {
+        let root = setup_local_only(
+            if consolidate {
+                "local-only-consolidate"
+            } else {
+                "local-only-plain"
+            },
+            false,
+        );
+        if consolidate {
+            upstream(&root);
+        }
+
+        fs::write(root.join("source.txt"), "staged\n").unwrap();
+        git(&root, &["add", "source.txt"]);
+        fs::write(root.join("source.txt"), "unstaged\n").unwrap();
+        fs::write(root.join("untracked.txt"), "untracked\n").unwrap();
+
+        let before_head = head(&root);
+        let before_index = git(&root, &["ls-files", "-s"]);
+        let before_status = git(&root, &["status", "--porcelain", "--ignored"]);
+        let before_metadata = snapshot_tree_bytes(&root.join(".tandem"));
+        let args = if consolidate {
+            vec!["--json", "checkpoint", "--consolidate"]
+        } else {
+            vec!["--json", "checkpoint"]
+        };
+        let (ok, stdout, stderr) = run(&root, &args);
+        assert!(ok, "{stdout} {stderr}");
+        let checkpoint = json(&stdout)["data"]["checkpoint"].clone();
+        if consolidate {
+            assert_eq!(checkpoint["status"], "consolidated");
+            assert_eq!(checkpoint["localOnly"], true);
+            assert_eq!(checkpoint["collapsed"], 0);
+            assert_eq!(checkpoint["commit"], before_head);
+            assert_eq!(checkpoint["oldHead"], before_head);
+            assert_eq!(checkpoint["newHead"], before_head);
+        } else {
+            assert_eq!(
+                checkpoint,
+                serde_json::json!({
+                    "status": "clean",
+                    "commit": null,
+                    "localOnly": true
+                })
+            );
+        }
+        assert_eq!(head(&root), before_head);
+        assert_eq!(git(&root, &["ls-files", "-s"]), before_index);
+        assert_eq!(
+            git(&root, &["status", "--porcelain", "--ignored"]),
+            before_status
+        );
+        assert_eq!(snapshot_tree_bytes(&root.join(".tandem")), before_metadata);
+
+        if consolidate {
+            fs::remove_dir_all(root.with_extension("upstream.git")).unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[test]
+fn intentionally_ignored_metadata_from_git_info_exclude_is_local_only() {
+    let root = setup_local_only("local-only-info-exclude", true);
+    let metadata = snapshot_tree_bytes(&root.join(".tandem"));
+    let before = head(&root);
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "{stdout} {stderr}");
+    let checkpoint = json(&stdout)["data"]["checkpoint"].clone();
+    assert_eq!(checkpoint["status"], "clean");
+    assert_eq!(checkpoint["localOnly"], true);
+    assert_eq!(head(&root), before);
+    assert_eq!(snapshot_tree_bytes(&root.join(".tandem")), metadata);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn intentionally_ignored_metadata_is_detected_in_an_unborn_repository() {
+    let root = root("local-only-unborn");
+    fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "--quiet"]);
+    git(&root, &["config", "user.email", "tests@example.invalid"]);
+    git(&root, &["config", "user.name", "Tandem Tests"]);
+    fs::write(root.join(".git/info/exclude"), "/.tandem/\n").unwrap();
+    let (ok, _, stderr) = run(&root, &["init", "--title", "Unborn local-only"]);
+    assert!(ok, "init failed: {stderr}");
+    assert!(!git_status(&root, &["rev-parse", "--verify", "-q", "HEAD"]));
+    let metadata = snapshot_tree_bytes(&root.join(".tandem"));
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(ok, "{stdout} {stderr}");
+    let checkpoint = json(&stdout)["data"]["checkpoint"].clone();
+    assert_eq!(checkpoint["status"], "clean");
+    assert_eq!(checkpoint["commit"], Value::Null);
+    assert_eq!(checkpoint["localOnly"], true);
+    assert!(!git_status(&root, &["rev-parse", "--verify", "-q", "HEAD"]));
+    assert_eq!(snapshot_tree_bytes(&root.join(".tandem")), metadata);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn ignored_directory_with_force_added_tracked_file_uses_normal_git_add_path() {
+    let root = setup("force-added-ignored-metadata");
+    fs::write(root.join(".git/info/exclude"), "/.tandem/\n").unwrap();
+    fs::write(root.join(".tandem/force-tracked.txt"), "baseline\n").unwrap();
+    git(&root, &["add", "-f", ".tandem/force-tracked.txt"]);
+    git(&root, &["commit", "--quiet", "-m", "force-add metadata"]);
+    let before_head = head(&root);
+    fs::write(root.join(".tandem/force-tracked.txt"), "modified\n").unwrap();
+
+    // Empirically, Git stages the tracked modification but exits 1 because the
+    // owning ignored directory is also named by the pathspec.
+    let empirical = Command::new("git")
+        .args(["add", "-A", "--", ".tandem"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert_eq!(empirical.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&empirical.stderr).contains("paths are ignored"));
+    assert_eq!(
+        git(
+            &root,
+            &["diff", "--cached", "--name-status", "--", ".tandem"]
+        ),
+        "M\t.tandem/force-tracked.txt"
+    );
+    git(
+        &root,
+        &["reset", "--quiet", "--", ".tandem/force-tracked.txt"],
+    );
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(!ok, "unexpected success: {stdout}");
+    let result = json(&stdout);
+    let checkpoint = &result["error"]["details"]["checkpoint"];
+    assert_eq!(result["error"]["code"], "checkpoint");
+    assert!(!checkpoint.as_object().unwrap().contains_key("localOnly"));
+    assert!(result["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("ignored"));
+    assert_eq!(head(&root), before_head);
+    assert_eq!(
+        git(
+            &root,
+            &["diff", "--cached", "--name-status", "--", ".tandem"]
+        ),
+        "M\t.tandem/force-tracked.txt"
+    );
+    assert!(stderr.is_empty());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn staged_deletion_of_tracked_metadata_is_not_misclassified_as_local_only() {
+    let root = setup("staged-metadata-deletion");
+    fs::write(root.join(".git/info/exclude"), "/.tandem/\n").unwrap();
+    git(&root, &["rm", "--cached", "-r", ".tandem"]);
+    assert!(git(&root, &["ls-files", "-z", "--", ".tandem"]).is_empty());
+    assert!(!git(
+        &root,
+        &["ls-tree", "-r", "--name-only", "HEAD", "--", ".tandem"]
+    )
+    .is_empty());
+    let before_head = head(&root);
+
+    let (ok, stdout, stderr) = run(&root, &["--json", "checkpoint"]);
+    assert!(!ok, "unexpected success: {stdout}");
+    let result = json(&stdout);
+    let checkpoint = &result["error"]["details"]["checkpoint"];
+    assert_eq!(result["error"]["code"], "checkpoint");
+    assert!(!checkpoint.as_object().unwrap().contains_key("localOnly"));
+    assert!(result["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains("ignored"));
+    assert_eq!(head(&root), before_head);
+    assert!(git(&root, &["ls-files", "-z", "--", ".tandem"]).is_empty());
+    assert!(git(
+        &root,
+        &["diff", "--cached", "--name-status", "--", ".tandem"]
+    )
+    .lines()
+    .all(|line| line.starts_with("D\t")));
+    assert!(stderr.is_empty());
+    fs::remove_dir_all(root).unwrap();
+}
+
+fn assert_local_only_consolidation_refused(root: &Path, expected: &str) {
+    let before_head = head(root);
+    let (ok, stdout, stderr) = run(root, &["--json", "checkpoint", "--consolidate"]);
+    assert!(!ok, "unexpected success: {stdout} {stderr}");
+    let result = json(&stdout);
+    assert_eq!(result["error"]["code"], "checkpoint");
+    assert!(result["error"]["message"]
+        .as_str()
+        .unwrap()
+        .contains(expected));
+    assert_eq!(head(root), before_head);
+}
+
+#[test]
+fn local_only_consolidation_preserves_all_safety_refusals_without_rewriting() {
+    let no_upstream = setup_local_only("local-only-no-upstream", false);
+    assert_local_only_consolidation_refused(&no_upstream, "requires an upstream");
+    fs::remove_dir_all(no_upstream).unwrap();
+
+    let diverged = setup_local_only("local-only-diverged", false);
+    upstream(&diverged);
+    let tree = git(&diverged, &["write-tree"]);
+    let unrelated = git(
+        &diverged,
+        &["commit-tree", &tree, "-m", "diverged upstream"],
+    );
+    let branch = git(&diverged, &["branch", "--show-current"]);
+    let tracking_ref = format!("refs/remotes/origin/{branch}");
+    git(&diverged, &["update-ref", &tracking_ref, &unrelated]);
+    assert!(!git_status(
+        &diverged,
+        &["merge-base", "--is-ancestor", "@{upstream}", "HEAD"]
+    ));
+    assert_local_only_consolidation_refused(&diverged, "upstream is not an ancestor");
+    fs::remove_dir_all(diverged.with_extension("upstream.git")).unwrap();
+    fs::remove_dir_all(diverged).unwrap();
+
+    let operation = setup_local_only("local-only-operation", false);
+    fs::write(operation.join(".git/MERGE_HEAD"), head(&operation)).unwrap();
+    assert_local_only_consolidation_refused(&operation, "operation in progress");
+    fs::remove_dir_all(operation).unwrap();
+
+    let checkpoint_in_range = setup("local-only-checkpoint-in-range");
+    fs::write(checkpoint_in_range.join(".gitignore"), "/.tandem/\n").unwrap();
+    git(&checkpoint_in_range, &["add", ".gitignore"]);
+    git(
+        &checkpoint_in_range,
+        &["commit", "--quiet", "-m", "ignore local metadata path"],
+    );
+    upstream(&checkpoint_in_range);
+    git(&checkpoint_in_range, &["rm", "--cached", "-r", ".tandem"]);
+    git(
+        &checkpoint_in_range,
+        &["commit", "--quiet", "-m", CHECKPOINT_SUBJECT],
+    );
+    assert!(git_status(
+        &checkpoint_in_range,
+        &["check-ignore", "-q", "--", ".tandem/"]
+    ));
+    assert!(git(&checkpoint_in_range, &["ls-files", "-z", "--", ".tandem"]).is_empty());
+    assert!(git(
+        &checkpoint_in_range,
+        &["ls-tree", "-r", "--name-only", "HEAD", "--", ".tandem"]
+    )
+    .is_empty());
+    assert_local_only_consolidation_refused(
+        &checkpoint_in_range,
+        "local-only .tandem cannot consolidate",
+    );
+    fs::remove_dir_all(checkpoint_in_range.with_extension("upstream.git")).unwrap();
+    fs::remove_dir_all(checkpoint_in_range).unwrap();
+}
+
 #[test]
 fn consolidate_interleaved_checkpoints_preserves_tree_and_real_commit_order() {
     let root = setup("consolidate-interleaved");
@@ -211,6 +529,10 @@ fn consolidate_interleaved_checkpoints_preserves_tree_and_real_commit_order() {
     assert!(ok, "{stdout} {stderr}");
     let result = json(&stdout);
     assert_eq!(result["data"]["checkpoint"]["collapsed"], 3);
+    assert!(!result["data"]["checkpoint"]
+        .as_object()
+        .unwrap()
+        .contains_key("localOnly"));
     let old = result["data"]["checkpoint"]["oldHead"].as_str().unwrap();
     let new = result["data"]["checkpoint"]["newHead"].as_str().unwrap();
     assert_eq!(head(&root), new);
@@ -739,6 +1061,10 @@ fn clean_flush_is_a_noop_and_ignores_unrelated_dirt() {
     let value = json(&stdout);
     assert_eq!(value["data"]["checkpoint"]["status"], "clean");
     assert_eq!(value["data"]["checkpoint"]["commit"], Value::Null);
+    assert!(!value["data"]["checkpoint"]
+        .as_object()
+        .unwrap()
+        .contains_key("localOnly"));
     assert_eq!(head(&root), baseline);
     assert!(root.join("dirty-untracked.txt").exists());
     assert!(root.join(".tandem-adjacent.txt").exists());
