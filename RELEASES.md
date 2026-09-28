@@ -2,6 +2,15 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.14.1
+
+Tandem v0.14.1 lets checkpoints work in repositories that intentionally keep `.tandem/` out of Git.
+
+### Fixed
+
+- `tandem checkpoint` and `tandem checkpoint --consolidate` no longer fail at `git add` when the owning `.tandem/` directory is Git-ignored (via `.gitignore` or `.git/info/exclude`) and has no tracked, indexed, or un-ignored files. Plain checkpoint reports `status: "clean"` with `localOnly: true`; consolidation skips only the flush, still enforces every upstream, ancestry, range, ref, worktree, and in-progress-operation guard, refuses if eligible checkpoint commits are in the unpushed range, and reports `status: "consolidated"` with `localOnly: true` and HEAD unchanged. Ignored files are never force-added, and HEAD, the index, and ignored bytes are left untouched.
+- Repositories that track any `.tandem/` file keep the existing staging, checkpoint, and consolidation behavior and JSON output unchanged.
+
 ## 0.14.0
 
 Tandem v0.14.0 gives the TUI Board user-controlled ordering and collapsed-by-default hierarchy.
