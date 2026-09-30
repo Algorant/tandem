@@ -1,58 +1,112 @@
 //! Typed CLI-to-application conversion and dispatch.
 use super::model::*;
-use crate::project::{CheckpointOutcome, CheckpointStatus};
+use crate::project::sync::{self, Mode, Outcome, Report};
+use crate::project::TandemProject;
 use crate::{app, CliError};
 
-fn checkpoint_json(outcome: &CheckpointOutcome) -> serde_json::Value {
-    match &outcome.status {
-        CheckpointStatus::Batched => serde_json::json!({
-            "status": "batched",
-            "commit": serde_json::Value::Null,
-        }),
-        CheckpointStatus::Checkpointed => serde_json::json!({
-            "status": "checkpointed",
-            "commit": outcome.commit.as_deref(),
-        }),
-        CheckpointStatus::Clean => serde_json::json!({
-            "status": "clean",
-            "commit": serde_json::Value::Null,
-        }),
-        CheckpointStatus::LocalOnly => serde_json::json!({
-            "status": "clean",
-            "commit": serde_json::Value::Null,
-            "localOnly": true,
-        }),
-        CheckpointStatus::Failed { message } => serde_json::json!({
-            "status": "failed",
-            "commit": serde_json::Value::Null,
-            "error": message,
-        }),
+/// How long a read trusts the local board before refreshing from the remote.
+const READ_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(60);
+
+fn sync_json(report: &Report) -> serde_json::Value {
+    let (status, message) = match &report.outcome {
+        Outcome::Synced => ("synced", None),
+        Outcome::Pending(reason) => ("pending", Some(reason.clone())),
+        Outcome::LocalOnly => ("local-only", None),
+        Outcome::NotGit => ("not-git", None),
+    };
+    let renamed: serde_json::Map<String, serde_json::Value> = report
+        .renames
+        .iter()
+        .map(|(old, new)| (old.clone(), serde_json::Value::String(new.clone())))
+        .collect();
+    serde_json::json!({
+        "status": status,
+        "message": message,
+        "renamed": renamed,
+        "conflicts": report.conflicts.iter().map(|c| serde_json::json!({"id": c.id, "reason": c.reason})).collect::<Vec<_>>(),
+        "held": report.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason})).collect::<Vec<_>>(),
+    })
+}
+
+fn sync_text(report: &Report) -> String {
+    let mut text = match &report.outcome {
+        Outcome::Synced => "synced".to_string(),
+        Outcome::Pending(reason) => format!("saved locally; pending sync ({reason})"),
+        Outcome::LocalOnly => "saved locally (no Git remote to sync with)".to_string(),
+        Outcome::NotGit => "saved (board is not in a Git repository)".to_string(),
+    };
+    for (old, new) in &report.renames {
+        text.push_str(&format!("\n  {old} is now {new}"));
+    }
+    for conflict in &report.conflicts {
+        text.push_str(&format!(
+            "\n  conflict: {}: {}",
+            conflict.id, conflict.reason
+        ));
+    }
+    for held in &report.held {
+        text.push_str(&format!("\n  held: {}: {}", held.path, held.reason));
+    }
+    text
+}
+
+/// Publishes a mutation. A sync failure never undoes the saved change.
+fn publish(project: &TandemProject) -> Report {
+    sync::sync(project, Mode::Publish).unwrap_or_else(|error| Report::pending(error.message))
+}
+
+/// Refreshes the board before a read when it may be stale. Returns warnings.
+fn refresh_for_read(project: &TandemProject) -> Vec<String> {
+    if let Some(message) = app::project::historical(project) {
+        return vec![message];
+    }
+    if !sync::is_stale(project, READ_FRESHNESS) {
+        return Vec::new();
+    }
+    match sync::sync(project, Mode::Refresh) {
+        Ok(report) => match report.outcome {
+            Outcome::Pending(reason) => {
+                vec![format!("the board may be out of date: {reason}")]
+            }
+            _ => Vec::new(),
+        },
+        Err(error) => vec![format!("the board may be out of date: {}", error.message)],
     }
 }
 
-/// Human note for a lifecycle mutation. Lifecycle writes never touch Git, so
-/// they always report pending batched metadata rather than a checkpoint result.
-fn metadata_batched_text() -> &'static str {
-    "metadata persisted (batched for host boundary)"
+fn open_read() -> Result<(TandemProject, Vec<String>), CliError> {
+    let project = app::project::open()?;
+    let warnings = refresh_for_read(&project);
+    Ok((project, warnings))
 }
 
-fn checkpoint_text(outcome: &CheckpointOutcome) -> String {
-    match &outcome.status {
-        CheckpointStatus::Batched => metadata_batched_text().to_string(),
-        CheckpointStatus::Checkpointed => format!(
-            "checkpointed{}",
-            outcome
-                .commit
-                .as_deref()
-                .map(|commit| format!(" ({commit})"))
-                .unwrap_or_default()
-        ),
-        CheckpointStatus::Clean => "clean (no Tandem changes to checkpoint)".to_string(),
-        CheckpointStatus::LocalOnly => {
-            "clean (local-only: owning .tandem is Git-ignored)".to_string()
-        }
-        CheckpointStatus::Failed { message } => format!("FAILED: {message}"),
+fn print_warnings(warnings: &[String]) {
+    for warning in warnings {
+        eprintln!("Warning: {warning}");
     }
+}
+
+/// Opens the board for a change to `id`, mapping an outdated provisional ID
+/// and refusing a record with an unresolved sync conflict.
+fn open_write_for(id: &str) -> Result<(TandemProject, String), CliError> {
+    let project = app::project::open_for_write()?;
+    let id = project.current_id(id)?;
+    refuse_conflicted(&project, &id)?;
+    Ok((project, id))
+}
+
+fn refuse_conflicted(project: &TandemProject, id: &str) -> Result<(), CliError> {
+    if let Some(conflict) = sync::conflict_for(project, id) {
+        return Err(CliError::user(format!(
+            "{id} has an unresolved sync conflict ({}). Resolve it with `tandem sync resolve {id} --keep local|remote|edited`.",
+            conflict.reason
+        )));
+    }
+    Ok(())
+}
+
+fn map_ids(project: &TandemProject, ids: Vec<String>) -> Result<Vec<String>, CliError> {
+    ids.into_iter().map(|id| project.current_id(&id)).collect()
 }
 
 pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupRequest, CliError> {
@@ -62,11 +116,14 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
                 title: args.title,
                 force: false,
             })?;
+            let report = publish(&outcome.project);
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"title":outcome.title,"root":outcome.project.root().display().to_string()},"warnings":[]})
+                    serde_json::json!({"ok":true,"data":{"title":outcome.title,"root":outcome.project.root().display().to_string(),"sync":sync_json(&report)},"warnings":[]})
                 );
+            } else if let Outcome::Pending(reason) = &report.outcome {
+                eprintln!("Warning: the new board is not synced yet: {reason}");
             }
             Ok(super::StartupRequest::Exit)
         }
@@ -80,7 +137,8 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
         Command::Review(args) => review(args, json),
         Command::Complete(args) => complete(args, json),
         Command::Cancel(args) => cancel(args, json),
-        Command::Checkpoint(args) => checkpoint(args, json),
+        Command::Sync(args) => sync_command(args, json),
+        Command::Migrate(args) => migrate(args, json),
         Command::Rules(args) => rules(args, json),
         Command::Tui => Ok(super::StartupRequest::Tui),
         Command::Web(args) => Ok(super::StartupRequest::Web(crate::web::Options {
@@ -91,7 +149,7 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
 }
 
 fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let project = app::project::open_for_write()?;
     match args.command {
         AddCommand::Task(task) => {
             let outcome = app::tasks::add(
@@ -105,8 +163,11 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                     effort: task.effort,
                     tags: task.tag,
                     due_date: task.due_date,
-                    parent: task.parent,
-                    blockers: task.blocker,
+                    parent: task
+                        .parent
+                        .map(|parent| project.current_id(&parent))
+                        .transpose()?,
+                    blockers: map_ids(&project, task.blocker)?,
                     references: task.reference,
                     related_files: task.related_file,
                     constraints: task.constraint,
@@ -114,13 +175,19 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                     ..Default::default()
                 },
             )?;
+            let report = publish(&project);
+            let id = report.renamed(&outcome.id);
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
+                    serde_json::json!({"ok":true,"data":{"id":id,"sync":sync_json(&report)},"warnings":outcome.warnings})
                 );
             } else {
-                println!("Created task\nID: {}\nTitle: {}", outcome.id, outcome.title);
+                println!(
+                    "Created task\nID: {id}\nTitle: {}\nSync: {}",
+                    outcome.title,
+                    sync_text(&report)
+                );
             }
         }
         AddCommand::Decision(decision) => {
@@ -136,15 +203,18 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                     ..Default::default()
                 },
             )?;
+            let report = publish(&project);
+            let id = report.renamed(&outcome.id);
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"id":outcome.id},"warnings":outcome.warnings})
+                    serde_json::json!({"ok":true,"data":{"id":id,"sync":sync_json(&report)},"warnings":outcome.warnings})
                 );
             } else {
                 println!(
-                    "Created decision\nID: {}\nTitle: {}",
-                    outcome.id, outcome.title
+                    "Created decision\nID: {id}\nTitle: {}\nSync: {}",
+                    outcome.title,
+                    sync_text(&report)
                 );
             }
         }
@@ -153,15 +223,17 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
 }
 
 fn assignment(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
-    let outcome = app::assignment::read(&project, &args.id)?;
+    let (project, mut warnings) = open_read()?;
+    let id = project.current_id(&args.id)?;
+    let outcome = app::assignment::read(&project, &id)?;
+    warnings.extend(outcome.warnings.iter().cloned());
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":outcome.data,"warnings":outcome.warnings})
+            serde_json::json!({"ok":true,"data":outcome.data,"warnings":warnings})
         );
     } else {
-        for warning in &outcome.warnings {
+        for warning in &warnings {
             eprintln!("Warning: {warning}");
         }
         println!(
@@ -182,7 +254,7 @@ fn assignment(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliErro
 }
 
 fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let (project, warnings) = open_read()?;
     let docs = app::queries::documents_for_scope(
         &project,
         match args.scope {
@@ -210,9 +282,10 @@ fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":documents.iter().map(|d| serde_json::json!({"id":d.id(),"title":d.title()})).collect::<Vec<_>>(),"warnings":[]})
+            serde_json::json!({"ok":true,"data":documents.iter().map(|d| serde_json::json!({"id":d.id(),"title":d.title()})).collect::<Vec<_>>(),"warnings":warnings})
         );
     } else {
+        print_warnings(&warnings);
         for doc in documents {
             println!("{}\t{}", doc.id(), doc.title());
         }
@@ -221,16 +294,19 @@ fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
 }
 
 fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let (project, sync_warnings) = open_read()?;
     if let Some(doc) = project.find_document(&args.id)? {
         if json {
             let read = app::queries::load_read(&project)?;
             let detail = app::dto::detail(&read, &doc)?;
+            let mut warnings = sync_warnings;
+            warnings.extend(read.warnings.iter().cloned());
             println!(
                 "{}",
-                serde_json::json!({"ok":true,"data":detail,"warnings":read.warnings})
+                serde_json::json!({"ok":true,"data":detail,"warnings":warnings})
             );
         } else {
+            print_warnings(&sync_warnings);
             print!("{}", show_text(&doc));
         }
         return Ok(super::StartupRequest::Exit);
@@ -277,7 +353,7 @@ fn show_text(doc: &crate::project::StoredDocument) -> String {
 }
 
 fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let (project, warnings) = open_read()?;
     let docs = app::queries::documents_for_scope(
         &project,
         match args.scope {
@@ -300,9 +376,10 @@ fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliErro
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":results.iter().map(|r| serde_json::json!({"id":r.doc.id(),"title":r.doc.title(),"snippet":r.snippet})).collect::<Vec<_>>(),"warnings":[]})
+            serde_json::json!({"ok":true,"data":results.iter().map(|r| serde_json::json!({"id":r.doc.id(),"title":r.doc.title(),"snippet":r.snippet})).collect::<Vec<_>>(),"warnings":warnings})
         );
     } else {
+        print_warnings(&warnings);
         for result in results {
             println!(
                 "{}\t{}\t{}",
@@ -315,8 +392,14 @@ fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliErro
     Ok(super::StartupRequest::Exit)
 }
 
-fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+fn update(mut args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let (project, id) = open_write_for(&args.id)?;
+    args.id = id;
+    args.parent = args
+        .parent
+        .map(|parent| project.current_id(&parent))
+        .transpose()?;
+    args.blocker = map_ids(&project, args.blocker)?;
     let resolved_type = project
         .find_document(&args.id)?
         .map(|doc| doc.doc_type().to_string());
@@ -345,7 +428,14 @@ fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliErro
                     ..Default::default()
                 },
             )?;
-            print_update_outcome(json, &outcome.id, &outcome.changes, &outcome.warnings);
+            let report = publish(&project);
+            print_update_outcome(
+                json,
+                &report.renamed(&outcome.id),
+                &outcome.changes,
+                &outcome.warnings,
+                &report,
+            );
         }
         Some("decision") => {
             reject_task_only_flags(&args)?;
@@ -364,7 +454,14 @@ fn update(args: UpdateArgs, json: bool) -> Result<super::StartupRequest, CliErro
                     clear: args.clear,
                 },
             )?;
-            print_update_outcome(json, &outcome.id, &outcome.changes, &outcome.warnings);
+            let report = publish(&project);
+            print_update_outcome(
+                json,
+                &report.renamed(&outcome.id),
+                &outcome.changes,
+                &outcome.warnings,
+                &report,
+            );
         }
         Some(other) => {
             return Err(CliError::user(format!(
@@ -445,11 +542,12 @@ fn print_update_outcome(
     id: &str,
     changes: &[app::tasks::UpdateChange],
     warnings: &[String],
+    report: &Report,
 ) {
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":id,"changes":changes.iter().map(|c| &c.field).collect::<Vec<_>>()},"warnings":warnings})
+            serde_json::json!({"ok":true,"data":{"id":id,"changes":changes.iter().map(|c| &c.field).collect::<Vec<_>>(),"sync":sync_json(report)},"warnings":warnings})
         );
     } else {
         for warning in warnings {
@@ -468,6 +566,7 @@ fn print_update_outcome(
                     .join(", ")
             );
         }
+        println!("Sync: {}", sync_text(report));
     }
 }
 
@@ -526,190 +625,133 @@ fn accord(args: AccordArgs, json: bool) -> Result<super::StartupRequest, CliErro
             },
         ),
     };
-    let project = app::project::open()?;
+    let (project, id) = open_write_for(&id)?;
     let outcome = app::accord::transition(
         &project,
         action,
         app::accord::AccordOptions { id, ..options },
     )?;
+    let report = publish(&project);
+    let id = report.renamed(&outcome.id);
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"status":outcome.status,"event":outcome.event_name,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":id,"status":outcome.status,"event":outcome.event_name,"recordWritten":true,"sync":sync_json(&report)},"warnings":[]})
         );
     } else {
         println!(
-            "Accord {}: {} (record written; {})",
-            outcome.id,
+            "Accord {id}: {} (record written; {})",
             outcome.status,
-            metadata_batched_text()
+            sync_text(&report)
         );
     }
     Ok(super::StartupRequest::Exit)
 }
 
 fn review(args: ReviewArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let (project, id) = open_write_for(&args.id)?;
     let outcome = app::review::transition(
         &project,
         "request",
         app::review::ReviewOptions {
-            id: args.id,
+            id,
             criterion: Some(args.criterion),
             note: Some(args.note),
             reviewer: args.reviewer,
             ..Default::default()
         },
     )?;
+    let report = publish(&project);
+    let id = report.renamed(&outcome.id);
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"state":outcome.state,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":id,"state":outcome.state,"recordWritten":true,"sync":sync_json(&report)},"warnings":[]})
         );
     } else {
         println!(
-            "Validation requested for {} (record written; {})",
-            outcome.id,
-            metadata_batched_text()
+            "Validation requested for {id} (record written; {})",
+            sync_text(&report)
         );
     }
     Ok(super::StartupRequest::Exit)
 }
 
 fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
+    let (project, id) = open_write_for(&args.id)?;
     let outcome = app::tasks::complete(
         &project,
         app::tasks::CompleteOptions {
-            id: args.id,
+            id,
             reviewer: args.reviewer,
             ..Default::default()
         },
     )?;
+    let report = publish(&project);
+    let id = report.renamed(&outcome.id);
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":outcome.warnings})
+            serde_json::json!({"ok":true,"data":{"id":id,"recordWritten":true,"sync":sync_json(&report)},"warnings":outcome.warnings})
         );
     } else {
         for warning in &outcome.warnings {
             eprintln!("Warning: {warning}");
         }
-        println!(
-            "Completed {} (record written; {})",
-            outcome.id,
-            metadata_batched_text()
-        );
+        println!("Completed {id} (record written; {})", sync_text(&report));
     }
     Ok(super::StartupRequest::Exit)
 }
 
 fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
-    let outcome = app::tasks::cancel(&project, &args.id, &args.note)?;
+    let (project, id) = open_write_for(&args.id)?;
+    let outcome = app::tasks::cancel(&project, &id, &args.note)?;
+    let report = publish(&project);
+    let id = report.renamed(&outcome.id);
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":outcome.id,"recordWritten":true,"checkpoint":checkpoint_json(&outcome.checkpoint)},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":id,"recordWritten":true,"sync":sync_json(&report)},"warnings":[]})
         );
     } else {
-        println!(
-            "Canceled {} (record written; {})",
-            outcome.id,
-            metadata_batched_text()
-        );
-    }
-    Ok(super::StartupRequest::Exit)
-}
-
-/// Explicit native Git flush for commit/push workflows and adapters.
-///
-/// Unlike a lifecycle mutation, this command exists only to checkpoint, so a
-/// failed checkpoint fails closed with exit code 1 instead of being reported as
-/// data next to a successful record write.
-fn checkpoint(args: CheckpointArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
-    if args.consolidate {
-        let outcome =
-            app::project::consolidate_checkpoint(&project).map_err(CliError::checkpoint_failure)?;
-        if json {
-            let mut checkpoint = serde_json::json!({
-                "status":"consolidated", "commit":outcome.new_head,
-                "oldHead":outcome.old_head, "newHead":outcome.new_head,
-                "collapsed":outcome.collapsed
-            });
-            if outcome.local_only {
-                checkpoint["localOnly"] = serde_json::Value::Bool(true);
-            }
-            println!(
-                "{}",
-                serde_json::json!({"ok":true,"data":{"checkpoint":checkpoint},"warnings":[]})
-            );
-        } else if outcome.local_only {
-            println!(
-                "Checkpoint: consolidated local-only (Git-ignored) .tandem; {} commit(s) ({} -> {})",
-                outcome.collapsed, outcome.old_head, outcome.new_head
-            );
-        } else {
-            println!(
-                "Checkpoint: consolidated {} commit(s) ({} -> {})",
-                outcome.collapsed, outcome.old_head, outcome.new_head
-            );
-        }
-    } else {
-        let outcome = app::project::checkpoint(&project);
-        if let CheckpointStatus::Failed { message } = &outcome.status {
-            return Err(CliError::checkpoint_failure(message.clone()));
-        }
-        if json {
-            println!(
-                "{}",
-                serde_json::json!({"ok":true,"data":{"checkpoint":checkpoint_json(&outcome)},"warnings":[]})
-            );
-        } else {
-            println!("Checkpoint: {}", checkpoint_text(&outcome));
-        }
+        println!("Canceled {id} (record written; {})", sync_text(&report));
     }
     Ok(super::StartupRequest::Exit)
 }
 
 fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let project = app::project::open()?;
-    match args.command {
-        RulesCommand::List { category } => {
-            let mut values = crate::project::rules::read_rule_files(&project.rules_dir())?;
-            if let Some(category) = category.as_deref() {
-                values.retain(|rule| rule.category == category);
+    if let RulesCommand::List { category } = args.command {
+        let (project, mut warnings) = open_read()?;
+        let mut values = crate::project::rules::read_rule_files(&project.rules_dir())?;
+        if let Some(category) = category.as_deref() {
+            values.retain(|rule| rule.category == category);
+        }
+        warnings.extend(app::project::warnings(&project)?);
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":warnings})
+            );
+        } else {
+            for warning in &warnings {
+                println!("Warning: {warning}");
             }
-            let warnings = app::project::warnings(&project)?;
-            if json {
-                println!(
-                    "{}",
-                    serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":warnings})
-                );
-            } else {
-                for warning in &warnings {
-                    println!("Warning: {warning}");
-                }
-                for r in values {
-                    println!("{}\t{}", r.id, r.text);
-                }
+            for r in values {
+                println!("{}\t{}", r.id, r.text);
             }
         }
+        return Ok(super::StartupRequest::Exit);
+    }
+    let (project, rule_id, verb) = match args.command {
+        RulesCommand::List { .. } => unreachable!("handled above"),
         RulesCommand::Add {
             category,
             text,
             source,
         } => {
+            let project = app::project::open_for_write()?;
             let o = app::rules::add(&project, &category, &text, source)?;
-            println!(
-                "{}",
-                if json {
-                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
-                } else {
-                    format!("Created rule {}-{}", o.category, o.id)
-                }
-            );
+            (project, o.rule_id, "Created")
         }
         RulesCommand::Edit {
             id,
@@ -717,26 +759,216 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             source,
             clear,
         } => {
+            let (project, id) = open_write_for(&id)?;
+            let id = current_rule_id(&project, &id);
             let clear_source = clear.iter().any(|field| field == "source");
             let o = app::rules::edit(&project, &id, &text, source, clear_source)?;
-            println!(
-                "{}",
-                if json {
-                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
-                } else {
-                    format!("Updated rule {}-{}", o.category, o.id)
-                }
-            );
+            (project, o.rule_id, "Updated")
         }
         RulesCommand::Delete { id } => {
+            let (project, id) = open_write_for(&id)?;
+            let id = current_rule_id(&project, &id);
             let o = app::rules::delete(&project, &id)?;
+            (project, o.rule_id, "Deleted")
+        }
+    };
+    let report = publish(&project);
+    let rule_id = report.renamed(&rule_id);
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":rule_id,"sync":sync_json(&report)},"warnings":[]})
+        );
+    } else {
+        println!("{verb} rule {rule_id} ({})", sync_text(&report));
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+/// Maps an outdated provisional rule ID to the rule's current ID.
+fn current_rule_id(project: &TandemProject, id: &str) -> String {
+    let Some((_, hex)) = crate::protocol::ids::provisional_parts(id) else {
+        return id.to_string();
+    };
+    crate::project::rules::read_rule_files(&project.rules_dir())
+        .ok()
+        .and_then(|rules| {
+            let matches: Vec<_> = rules
+                .into_iter()
+                .filter(|rule| {
+                    rule.uid
+                        .as_deref()
+                        .is_some_and(|uid| uid.replace('-', "").starts_with(hex))
+                })
+                .collect();
+            (matches.len() == 1).then(|| matches[0].id.clone())
+        })
+        .unwrap_or_else(|| id.to_string())
+}
+
+fn sync_command(args: SyncArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let project = app::project::open()?;
+    if let Some(message) = app::project::historical(&project) {
+        return Err(CliError::user(message));
+    }
+    match args.command {
+        None => {
+            let report = sync::sync(&project, Mode::Refresh)?;
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{"sync":sync_json(&report)},"warnings":[]})
+                );
+            } else {
+                println!("Sync: {}", sync_text(&report));
+            }
+        }
+        Some(SyncCommand::Status) => {
+            let status = sync::status(&project)?;
+            let last_fetch = status.last_fetch.map(crate::app::support::format_timestamp);
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{
+                        "git": status.git,
+                        "remote": status.remote,
+                        "published": status.published,
+                        "pending": status.pending,
+                        "lastFetch": last_fetch,
+                        "lastError": status.last_error,
+                        "conflicts": status.conflicts.iter().map(|c| serde_json::json!({"id": c.id, "reason": c.reason})).collect::<Vec<_>>(),
+                        "held": status.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason})).collect::<Vec<_>>(),
+                    },"warnings":[]})
+                );
+            } else if !status.git {
+                println!("The board is not in a Git repository; it does not sync.");
+            } else {
+                match &status.remote {
+                    Some(remote) => println!("Remote: {remote} (branch {})", sync::BRANCH),
+                    None => println!("Remote: none (local-only board)"),
+                }
+                println!(
+                    "Local changes: {}",
+                    if status.pending {
+                        "waiting to sync"
+                    } else {
+                        "none"
+                    }
+                );
+                println!("Last fetch: {}", last_fetch.as_deref().unwrap_or("never"));
+                if let Some(error) = &status.last_error {
+                    println!("Last problem: {error}");
+                }
+                if status.conflicts.is_empty() && status.held.is_empty() {
+                    println!("Conflicts: none");
+                }
+                for conflict in &status.conflicts {
+                    println!(
+                        "Conflict: {}: {}\n  resolve: tandem sync resolve {} --keep local|remote|edited",
+                        conflict.id, conflict.reason, conflict.id
+                    );
+                }
+                for held in &status.held {
+                    println!("Held edit: {}: {}", held.path, held.reason);
+                }
+            }
+        }
+        Some(SyncCommand::Resolve(resolve)) => {
+            let id = project.current_id(&resolve.id)?;
+            let keep = match resolve.keep {
+                KeepChoice::Local => sync::Keep::Local,
+                KeepChoice::Remote => sync::Keep::Remote,
+                KeepChoice::Edited => sync::Keep::Edited,
+            };
+            sync::resolve(&project, &id, keep)?;
+            let report = sync::sync(&project, Mode::Refresh)
+                .unwrap_or_else(|error| Report::pending(error.message));
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({"ok":true,"data":{"id":report.renamed(&id),"sync":sync_json(&report)},"warnings":[]})
+                );
+            } else {
+                println!("Resolved {id} ({})", sync_text(&report));
+            }
+        }
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn migrate(args: MigrateArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let cwd = std::env::current_dir()?;
+    if args.adopt {
+        let report = crate::project::migrate::adopt(&cwd, args.dry_run)?;
+        if json {
             println!(
                 "{}",
-                if json {
-                    serde_json::json!({"ok":true,"data":{"id":format!("{}-{}",o.category,o.id)},"warnings":[]}).to_string()
-                } else {
-                    format!("Deleted rule {}-{}", o.category, o.id)
+                serde_json::json!({"ok":true,"data":{
+                    "dryRun": report.dry_run,
+                    "remote": report.remote,
+                    "newRecords": report.new_records,
+                    "changedRecords": report.changed_records,
+                    "renumbered": report.renumbered.iter().map(|(old, new)| serde_json::json!({"old": old, "new": new})).collect::<Vec<_>>(),
+                    "unpushedCommits": report.unpushed_commits,
+                    "needsPull": report.needs_pull,
+                    "sync": report.sync.as_ref().map(sync_json),
+                },"warnings":[]})
+            );
+        } else {
+            let prefix = if report.dry_run {
+                "Would adopt"
+            } else {
+                "Adopted"
+            };
+            println!(
+                "{prefix} {} new and {} changed record(s) from this machine into the shared board on {}.",
+                report.new_records.len(),
+                report.changed_records.len(),
+                report.remote
+            );
+            for (old, new) in &report.renumbered {
+                println!("  {old} is now {new}");
+            }
+            if let Some(sync_report) = &report.sync {
+                println!("Sync: {}", sync_text(sync_report));
+            }
+            if !report.unpushed_commits.is_empty() {
+                println!(
+                    "These unpushed commits also changed .tandem/. Their board changes are adopted; when `git pull` reports conflicts in .tandem/, resolve them with `git rm -r --cached .tandem` and continue:"
+                );
+                for commit in &report.unpushed_commits {
+                    println!("  {commit}");
                 }
+            }
+            if report.needs_pull {
+                println!("Next: run `git pull`. The board returns automatically afterwards.");
+            }
+        }
+    } else {
+        let report = crate::project::migrate::migrate(&cwd, args.dry_run)?;
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{
+                    "dryRun": report.dry_run,
+                    "remote": report.remote,
+                    "records": report.records,
+                    "files": report.files,
+                    "migratedFrom": report.migrated_from,
+                    "sourceCommit": report.source_commit,
+                },"warnings":[]})
+            );
+        } else if report.dry_run {
+            println!(
+                "Would move {} file(s) ({} record(s)) to the `tandem` branch on {}, then create one source commit that stops tracking .tandem/.",
+                report.files, report.records, report.remote
+            );
+        } else {
+            println!(
+                "Moved {} record(s) to the `tandem` branch on {}.\nCreated source commit {} that stops tracking .tandem/.\nNext: push it with `git push`, then run `git pull` (or `tandem migrate --adopt` if they have unpushed board changes) on your other machines.",
+                report.records,
+                report.remote,
+                report.source_commit.as_deref().unwrap_or("?")
             );
         }
     }

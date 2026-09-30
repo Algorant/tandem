@@ -1,6 +1,6 @@
-//! Workspace-free landing surface for Tandem 0.3.0.
+//! Workspace-free landing surface for Tandem 0.4.0.
 pub(crate) fn print() {
-    println!("tandem - Tandem CLI 0.3.0");
+    println!("tandem - Tandem CLI 0.4.0");
     println!();
     println!("Work");
     println!("  init                 Create a Tandem workspace");
@@ -24,7 +24,9 @@ pub(crate) fn print() {
     println!("  cancel               Cancel and archive a task");
     println!();
     println!("Workspace");
-    println!("  checkpoint           Flush pending .tandem changes into Git");
+    println!("  sync                 Sync the board with the tandem branch");
+    println!("  sync status|resolve  Inspect or resolve sync conflicts");
+    println!("  migrate              Move a 0.3.0 board to the tandem branch");
     println!("  rules list|add|edit|delete  Manage project rules");
     println!("  tui                  Open the terminal interface");
     println!("  web                  Open the web interface");

@@ -10,6 +10,7 @@ mod tests {
             std::env::temp_dir().join(format!("tandem-review-contract-{}", std::process::id()));
         let data = root.join(".tandem");
         let project = TandemProject {
+            git: None,
             root: root.clone(),
             data_dir: data.clone(),
             tasks_dir: data.join("tasks"),

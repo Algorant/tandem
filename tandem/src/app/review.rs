@@ -2,12 +2,12 @@
 use std::collections::BTreeMap;
 
 use crate::app::support::{
-    append_event, checkpoint_boundary, current_timestamp, hierarchy_from_project, validate_state,
+    append_event, current_timestamp, hierarchy_from_project, validate_state,
     validate_task_document_against_hierarchy,
 };
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
-use crate::project::{patch_frontmatter_content, write_atomic, CheckpointOutcome, TandemProject};
+use crate::project::{patch_frontmatter_content, write_atomic, TandemProject};
 use crate::protocol::accord;
 use crate::protocol::hierarchy::{DocumentLocation, TaskRole};
 
@@ -25,7 +25,6 @@ pub(crate) struct ReviewOutcome {
     pub(crate) id: String,
     pub(crate) state: String,
     pub(crate) event_name: String,
-    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 pub(crate) fn transition(
@@ -97,11 +96,9 @@ pub(crate) fn transition(
         &format!("Requested validation for {}", doc.id()),
     )?;
     drop(_lock);
-    let checkpoint = checkpoint_boundary();
     Ok(ReviewOutcome {
         id: doc.id().to_string(),
         state: "validation".to_string(),
         event_name: "review.requested".to_string(),
-        checkpoint,
     })
 }

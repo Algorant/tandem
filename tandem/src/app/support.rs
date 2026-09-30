@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::app::Error;
 use crate::project::{
-    self, display_path, parse_frontmatter_fields, split_frontmatter, CheckpointOutcome,
-    ProjectHierarchy, StoredDocument as Document, TandemProject,
+    self, display_path, parse_frontmatter_fields, split_frontmatter, ProjectHierarchy,
+    StoredDocument as Document, TandemProject,
 };
 use crate::protocol::diagnostic::{
     canonical_resolution_outcome, metadata_diagnostics, ResolvedDescendant, Severity,
@@ -50,13 +50,6 @@ pub(crate) fn current_timestamp() -> String {
     format_unix_timestamp(seconds)
 }
 
-/// Lifecycle writes persist immediately and never touch Git. Every lifecycle
-/// outcome therefore reports `batched`: the metadata is durable in the worktree
-/// but pending for the next explicit checkpoint at a host commit/push boundary.
-pub(crate) fn checkpoint_boundary() -> CheckpointOutcome {
-    CheckpointOutcome::batched()
-}
-
 pub(crate) fn append_event(
     project: &TandemProject,
     event_name: &str,
@@ -83,6 +76,11 @@ pub(crate) fn append_event_with_data(
     )?)
 }
 
+/// Formats Unix seconds as an RFC 3339 UTC timestamp.
+pub(crate) fn format_timestamp(seconds: u64) -> String {
+    format_unix_timestamp(seconds)
+}
+
 fn format_unix_timestamp(seconds: u64) -> String {
     let seconds = seconds as i64;
     let days = seconds.div_euclid(86_400);
@@ -107,40 +105,44 @@ fn civil_from_days(days_since_epoch: i64) -> (i64, i64, i64) {
     (year + i64::from(month <= 2), month, day)
 }
 
-pub(crate) fn create_new_sequential_document<F>(
-    project: &TandemProject,
-    prefix: &str,
-    content_for_id: F,
-) -> Result<project::write::CreatedDocument, Error>
-where
-    F: FnMut(&str) -> String,
-{
-    create_new_sequential_document_in(project, &project.tasks_dir, prefix, content_for_id)
-}
-
-/// Creates a new sequential document in an explicit directory (used for the
-/// durable `.tandem/decisions/` store). ID allocation scans all active
-/// documents for the prefix so the sequence stays global per type.
-pub(crate) fn create_new_sequential_document_in<F>(
+/// Creates a new Task or Decision record with a permanent `uid`.
+///
+/// A board that syncs through a remote gives the record a provisional
+/// `<prefix>-new-<hex>` ID; publication assigns its sequential number. A
+/// board without a remote allocates the next local sequential ID directly.
+pub(crate) fn create_record<F>(
     project: &TandemProject,
     dir: &Path,
-    prefix: &str,
-    content_for_id: F,
+    provisional_prefix: &str,
+    sequential_prefix: &str,
+    last_allocated: usize,
+    mut content_for: F,
 ) -> Result<project::write::CreatedDocument, Error>
 where
-    F: FnMut(&str) -> String,
+    F: FnMut(&str, &str) -> String,
 {
-    let hierarchy = hierarchy_from_project(project)?;
-    let last_allocated = crate::protocol::ids::next_sequential_number(
-        hierarchy.documents.values().map(|document| document.id()),
-        prefix,
-    );
-    Ok(project::write::create_new_sequential_document_in_dir_after(
+    let uid = new_uid();
+    if project::sync::has_remote(project) {
+        let id = crate::protocol::ids::provisional_id(provisional_prefix, &uid);
+        let path = dir.join(format!("{id}.md"));
+        if !project::write::write_new_atomic(&path, &content_for(&id, &uid))? {
+            return Err(Error::user(format!(
+                "ID allocation failure: {id} already exists; rerun the command"
+            )));
+        }
+        return Ok(project::write::CreatedDocument { id, path });
+    }
+    Ok(project::write::create_new_sequential_file_after(
         dir,
-        prefix,
+        sequential_prefix,
         last_allocated,
-        content_for_id,
+        |id| content_for(id, &uid),
     )?)
+}
+
+/// A new permanent record identity.
+pub(crate) fn new_uid() -> String {
+    uuid::Uuid::new_v4().hyphenated().to_string()
 }
 
 pub(crate) fn hierarchy_from_project(project: &TandemProject) -> Result<ProjectHierarchy, Error> {

@@ -1,4 +1,4 @@
-//! Clap derive model for the protocol 0.3.0 command surface.
+//! Clap derive model for the protocol 0.4.0 command surface.
 //!
 //! This module contains grammar only. Semantic validation remains in protocol
 //! and app modules.
@@ -26,18 +26,52 @@ pub(crate) enum Command {
     Review(ReviewArgs),
     Complete(CompleteArgs),
     Cancel(CancelArgs),
-    /// Flush pending owning `.tandem` changes into Git without a lifecycle transition
-    Checkpoint(CheckpointArgs),
+    /// Synchronize the board with the repository's `tandem` branch
+    Sync(SyncArgs),
+    /// Move a protocol 0.3.0 board to the repository's `tandem` branch
+    Migrate(MigrateArgs),
     Rules(RulesArgs),
     Tui,
     Web(WebArgs),
 }
 
 #[derive(Debug, Args)]
-pub(crate) struct CheckpointArgs {
-    /// Collapse eligible unpushed metadata-only commits at the push boundary
+pub(crate) struct SyncArgs {
+    #[command(subcommand)]
+    pub(crate) command: Option<SyncCommand>,
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum SyncCommand {
+    /// Show pending changes, held edits, and conflicts without network access
+    Status,
+    /// Resolve a sync conflict by keeping one version
+    Resolve(ResolveArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct ResolveArgs {
+    pub(crate) id: String,
+    /// local: this machine's version; remote: the shared version; edited: the file as you edited it
+    #[arg(long, value_enum)]
+    pub(crate) keep: KeepChoice,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub(crate) enum KeepChoice {
+    Local,
+    Remote,
+    Edited,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct MigrateArgs {
+    /// Report what would change without changing anything
     #[arg(long)]
-    pub(crate) consolidate: bool,
+    pub(crate) dry_run: bool,
+    /// Bring this machine's unpushed 0.3.0 board changes into an already migrated board
+    #[arg(long)]
+    pub(crate) adopt: bool,
 }
 
 #[derive(Debug, Args)]

@@ -2741,6 +2741,7 @@ tone = "success"
     fn temp_workspace(root: &Path) -> TandemProject {
         let tandem_dir = root.join(".tandem");
         let workspace = TandemProject {
+            git: None,
             root: PathBuf::new(),
             data_dir: PathBuf::new(),
             tasks_dir: tandem_dir.join("board"),
@@ -2763,7 +2764,7 @@ tone = "success"
     fn native_workspace(root: &Path, title: &str) -> TandemProject {
         TandemProject::initialize(
             root,
-            &crate::protocol::config::default_project_config(title),
+            &crate::protocol::config::default_project_config(title, "test-workspace"),
         )
         .unwrap()
     }
@@ -2895,6 +2896,7 @@ tone = "success"
         ];
         TuiApp {
             workspace: TandemProject {
+                git: None,
                 root: PathBuf::new(),
                 data_dir: PathBuf::new(),
                 tasks_dir: PathBuf::from(".tandem/tasks"),
@@ -3272,7 +3274,10 @@ tone = "success"
         let root = unique_test_dir("tandem-papercut-lens-reload");
         let workspace = TandemProject::initialize(
             &root,
-            &crate::protocol::config::default_project_config("Papercut lens reload"),
+            &crate::protocol::config::default_project_config(
+                "Papercut lens reload",
+                "test-workspace",
+            ),
         )
         .unwrap();
         write_task_doc(&workspace, "task-1", "Ordinary task", "todo");
@@ -4379,6 +4384,7 @@ tone = "success"
         )
         .unwrap();
         let workspace = TandemProject {
+            git: None,
             root,
             data_dir: data_dir.clone(),
             tasks_dir: data_dir.join("board"),
@@ -4534,7 +4540,10 @@ tone = "success"
 
         fs::write(
             &app.workspace.config_path,
-            crate::protocol::config::default_project_config("Legacy rules presentation"),
+            crate::protocol::config::default_project_config(
+                "Legacy rules presentation",
+                "test-workspace",
+            ),
         )
         .unwrap();
         app.reload();
@@ -5338,7 +5347,10 @@ tone = "success"
         let root = unique_test_dir("tandem-tui-papercut-classification");
         let workspace = TandemProject::initialize(
             &root,
-            &crate::protocol::config::default_project_config("Papercut classification"),
+            &crate::protocol::config::default_project_config(
+                "Papercut classification",
+                "test-workspace",
+            ),
         )
         .unwrap();
         write_task_doc(&workspace, "task-1", "Ordinary task", "todo");

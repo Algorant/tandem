@@ -20,8 +20,14 @@ pub(crate) fn empty_rules() -> RulesByCategory {
     rules
 }
 
-/// Parses a composite rule id like `always-12` into (category, number).
+/// Parses a composite rule id like `always-12` into (category, number). A
+/// provisional `always-new-<hex>` rule parses with number 0.
 pub(crate) fn parse_rule_id(id: &str) -> Option<(String, usize)> {
+    if let Some((category, _)) = crate::protocol::ids::provisional_parts(id) {
+        if RULE_CATEGORIES.contains(&category) {
+            return Some((category.to_string(), 0));
+        }
+    }
     for category in RULE_CATEGORIES {
         if let Some(number) = id
             .strip_prefix(&format!("{category}-"))
@@ -78,6 +84,7 @@ pub(crate) fn delete_rule_file(dir: &Path, id: &str) -> Result<(), CliError> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RuleRecord {
     pub(crate) id: String,
+    pub(crate) uid: Option<String>,
     pub(crate) category: String,
     pub(crate) source: Option<String>,
     pub(crate) created_at: Option<String>,
@@ -125,6 +132,7 @@ pub(crate) fn read_rule_file(path: &Path) -> Result<RuleRecord, CliError> {
         return Err(CliError::user(format!("Rule {id} has empty text")));
     }
     Ok(RuleRecord {
+        uid: fields.get("uid").cloned(),
         id,
         category,
         source: fields.get("source").cloned(),
@@ -164,7 +172,11 @@ pub(crate) fn write_rule_file(dir: &Path, rule: &RuleRecord) -> Result<(), CliEr
     }
     fs::create_dir_all(dir)?;
     let path = dir.join(format!("{}.md", rule.id));
-    let mut frontmatter = format!("id: {}\ncategory: {}\n", rule.id, rule.category);
+    let mut frontmatter = format!("id: {}\n", rule.id);
+    if let Some(uid) = &rule.uid {
+        frontmatter.push_str(&format!("uid: {uid}\n"));
+    }
+    frontmatter.push_str(&format!("category: {}\n", rule.category));
     if let Some(source) = &rule.source {
         frontmatter.push_str(&format!("source: {}\n", yaml_double_quote(source)));
     }
@@ -187,6 +199,9 @@ fn validate_rule_category(category: &str) -> Result<(), CliError> {
     }
 }
 fn rule_id_matches(id: &str, category: &str) -> bool {
+    if let Some((prefix, _)) = crate::protocol::ids::provisional_parts(id) {
+        return prefix == category;
+    }
     id.strip_prefix(&format!("{category}-"))
         .is_some_and(|n| n.parse::<usize>().is_ok_and(|n| n > 0))
 }

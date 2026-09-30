@@ -14,4 +14,5 @@ pub(crate) mod document;
 pub(crate) mod event;
 pub(crate) mod hierarchy;
 pub(crate) mod ids;
+pub(crate) mod merge;
 pub(crate) mod workflow;

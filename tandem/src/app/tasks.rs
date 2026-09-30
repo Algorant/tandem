@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    active_task_descendant_ids, append_event, checkpoint_boundary, current_timestamp,
+    active_task_descendant_ids, append_event, create_record, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
     resolve_parent_relationship, resolved_task_descendants, unresolved_blockers_in_hierarchy,
     validate_state, validate_task_document_against_hierarchy, workspace_deprecation_warnings,
@@ -13,7 +13,7 @@ use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
 use crate::project::{
     self, patch_accord_content, patch_frontmatter_content, patch_resolution_content,
-    render_accord_block, replace_markdown_body, write_atomic, yaml_double_quote, CheckpointOutcome,
+    render_accord_block, replace_markdown_body, write_atomic, yaml_double_quote,
     ProjectHierarchy as HierarchyIndex, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{status as accord_status, AccordRecord};
@@ -158,7 +158,6 @@ pub(crate) struct CompleteOutcome {
     pub(crate) log_path: PathBuf,
     pub(crate) warnings: Vec<String>,
     pub(crate) has_completion_warnings: bool,
-    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 #[derive(Debug, Default)]
@@ -173,7 +172,6 @@ pub(crate) struct CancelOutcome {
     pub(crate) reason: String,
     pub(crate) board_path: PathBuf,
     pub(crate) log_path: PathBuf,
-    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 /// Create a Task, Epic, or Subtask after canonical hierarchy validation.
@@ -252,14 +250,17 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         hierarchy.documents.values().map(|doc| doc.id()),
         allocation_prefix,
     );
-    let created = project::write::create_new_sequential_document_after(
+    let created = create_record(
         workspace,
+        &workspace.tasks_dir,
+        "task",
         allocation_prefix,
         last_allocated,
-        |task_id| {
+        |task_id, uid| {
             let mut lines = vec![
                 "---".to_string(),
                 format!("id: {task_id}"),
+                format!("uid: {uid}"),
                 "type: task".to_string(),
             ];
             push_optional_line(&mut lines, "kind", kind.as_deref());
@@ -958,14 +959,12 @@ pub(crate) fn complete(
     )?;
     append_event(workspace, "task.completed", doc.id(), &summary)?;
     drop(_hierarchy_lock);
-    let checkpoint = checkpoint_boundary();
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
         board_path: doc.path,
         log_path,
         warnings,
         has_completion_warnings,
-        checkpoint,
     })
 }
 
@@ -1032,14 +1031,12 @@ pub(crate) fn cancel(
     )?;
     append_event(workspace, "task.canceled", doc.id(), &summary)?;
     drop(_hierarchy_lock);
-    let checkpoint = checkpoint_boundary();
 
     Ok(CancelOutcome {
         id: doc.id().to_string(),
         reason,
         board_path: doc.path,
         log_path,
-        checkpoint,
     })
 }
 

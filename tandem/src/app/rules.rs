@@ -15,7 +15,10 @@ use crate::protocol::config::RULE_CATEGORIES;
 #[derive(Debug)]
 pub(crate) struct MutationOutcome {
     pub(crate) category: String,
+    /// Rule number; 0 for a provisional rule that is not yet published.
     pub(crate) id: usize,
+    /// Complete rule ID such as `always-12` or `always-new-3f9a2c1d`.
+    pub(crate) rule_id: String,
     pub(crate) rule: String,
     pub(crate) warning: Option<String>,
 }
@@ -24,6 +27,7 @@ pub(crate) struct MutationOutcome {
 pub(crate) struct DeleteOutcome {
     pub(crate) category: String,
     pub(crate) id: usize,
+    pub(crate) rule_id: String,
 }
 
 pub(crate) fn add(
@@ -36,10 +40,16 @@ pub(crate) fn add(
     let rule = require_rule_text(rule, "rules add requires rule text")?;
     let source = normalized_source(source);
     let warning = missing_source_warning(project, source.as_deref())?;
-    let id = next_rule_id(&project.rules_dir(), category).map_err(|e| Error::user(e.message))?;
+    let uid = crate::app::support::new_uid();
+    let id = if crate::project::sync::has_remote(project) {
+        crate::protocol::ids::provisional_id(category, &uid)
+    } else {
+        next_rule_id(&project.rules_dir(), category).map_err(|e| Error::user(e.message))?
+    };
     let now = now_timestamp();
     let record = RuleRecord {
         id: id.clone(),
+        uid: Some(uid),
         category: category.to_string(),
         source,
         created_at: Some(now.clone()),
@@ -56,7 +66,8 @@ pub(crate) fn add(
     )?;
     Ok(MutationOutcome {
         category: category.to_string(),
-        id: record.id.rsplit_once('-').unwrap().1.parse().unwrap(),
+        id: parse_rule_id(&record.id).map(|(_, n)| n).unwrap_or(0),
+        rule_id: record.id.clone(),
         rule: rule.to_string(),
         warning,
     })
@@ -100,6 +111,7 @@ pub(crate) fn edit(
     Ok(MutationOutcome {
         category,
         id: number,
+        rule_id: id.to_string(),
         rule: rule.to_string(),
         warning,
     })
@@ -112,6 +124,7 @@ pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome,
         ))
     })?;
     delete_rule_file(&project.rules_dir(), id).map_err(|e| Error::user(e.message))?;
+    crate::project::sync::note_removed(project, &project.rules_dir().join(format!("{id}.md")))?;
     append_event(
         project,
         "rules.updated",
@@ -121,6 +134,7 @@ pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome,
     Ok(DeleteOutcome {
         category,
         id: number,
+        rule_id: id.to_string(),
     })
 }
 pub(crate) fn validate_rule_category(category: &str) -> Result<(), Error> {

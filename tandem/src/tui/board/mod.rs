@@ -2813,7 +2813,10 @@ mod tests {
     fn initialized_workspace(root: &Path) -> TandemProject {
         TandemProject::initialize(
             root,
-            &crate::protocol::config::default_project_config("Reference wrap test"),
+            &crate::protocol::config::default_project_config(
+                "Reference wrap test",
+                "test-workspace",
+            ),
         )
         .unwrap()
     }

@@ -258,12 +258,17 @@ impl HierarchyIndex {
                 doc.id()
             )));
         }
-        let valid_id = match role {
-            TaskRole::Epic | TaskRole::Task => global_task_number(doc.id()).is_some(),
-            TaskRole::Subtask => doc
-                .field("parentId")
-                .is_some_and(|parent_id| subtask_suffix(doc.id(), parent_id).is_some()),
-        };
+        // An unpublished record carries a provisional ID in every role until
+        // publication assigns its role-specific sequential ID.
+        let provisional = crate::protocol::ids::provisional_parts(doc.id())
+            .is_some_and(|(prefix, _)| prefix == "task");
+        let valid_id = provisional
+            || match role {
+                TaskRole::Epic | TaskRole::Task => global_task_number(doc.id()).is_some(),
+                TaskRole::Subtask => doc
+                    .field("parentId")
+                    .is_some_and(|parent_id| subtask_suffix(doc.id(), parent_id).is_some()),
+            };
         if !valid_id {
             let expected = match role {
                 TaskRole::Epic | TaskRole::Task => "global `task-N`".to_string(),

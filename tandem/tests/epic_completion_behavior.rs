@@ -39,7 +39,7 @@ fn git(cwd: &Path, args: &[&str]) {
     );
 }
 
-/// A disposable Git-backed workspace with a clean checkpoint baseline.
+/// A disposable Git-backed workspace with a clean source baseline.
 fn setup(label: &str) -> PathBuf {
     let root = root(label);
     fs::create_dir_all(&root).unwrap();
@@ -52,7 +52,8 @@ fn setup(label: &str) -> PathBuf {
         "init failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    git(&root, &["add", ".tandem"]);
+    fs::write(root.join("README.md"), "fixture\n").unwrap();
+    git(&root, &["add", "README.md"]);
     git(&root, &["commit", "--quiet", "-m", "fixture baseline"]);
     root
 }

@@ -12,20 +12,37 @@ use crate::CliError;
 const MAX_SEQUENTIAL_ID_ALLOCATION_ATTEMPTS: usize = 1000;
 static TEMP_FILE_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// Serializes cooperative hierarchy snapshots and mutations on config inode.
+/// Serializes board snapshots, mutations, and sync.
+///
+/// A Git-backed board locks a file in the Git directory, which sync can hold
+/// while it rewrites board files (including `tandem.md`). A board outside Git
+/// locks the config inode.
 pub(crate) struct HierarchyLock {
     file: File,
 }
 
 impl HierarchyLock {
     pub(crate) fn acquire(project: &TandemProject) -> Result<Self, CliError> {
-        let path = project.config_path.clone();
-        let file = OpenOptions::new().read(true).open(&path).map_err(|error| {
-            CliError::user(format!(
-                "Write failure: could not open hierarchy lock {}: {error}",
-                display_path(&path)
-            ))
-        })?;
+        let path = match project.git() {
+            Some(git) => {
+                let dir = git.state_dir();
+                fs::create_dir_all(&dir)?;
+                dir.join("lock")
+            }
+            None => project.config_path.clone(),
+        };
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(project.git().is_some())
+            .truncate(false)
+            .open(&path)
+            .map_err(|error| {
+                CliError::user(format!(
+                    "Write failure: could not open hierarchy lock {}: {error}",
+                    display_path(&path)
+                ))
+            })?;
         file.lock().map_err(|error| {
             CliError::user(format!(
                 "Write failure: could not lock hierarchy snapshot {}: {error}",

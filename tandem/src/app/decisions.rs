@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    append_event, create_new_sequential_document_in, current_timestamp, reference_target_exists,
+    append_event, create_record, current_timestamp, reference_target_exists,
 };
 use crate::app::tasks::UpdateChange;
 use crate::app::Error;
@@ -86,14 +86,24 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
     // Protocol 0.3.0 (D41): no manual decision date. decidedAt is written by
     // the lifecycle layer when a Decision reaches accepted/rejected; new
     // decisions start proposed without a date field.
-    let created = create_new_sequential_document_in(
+    let last_allocated = crate::protocol::ids::next_sequential_number(
+        crate::app::support::hierarchy_from_project(project)?
+            .documents
+            .values()
+            .map(|document| document.id()),
+        "decision",
+    );
+    let created = create_record(
         project,
         &project.decisions_dir(),
         "decision",
-        |decision_id| {
+        "decision",
+        last_allocated,
+        |decision_id, uid| {
             let mut lines = vec![
                 "---".to_string(),
                 format!("id: {decision_id}"),
+                format!("uid: {uid}"),
                 "type: decision".to_string(),
                 format!("title: {}", yaml_double_quote(&title)),
                 format!("status: {}", yaml_double_quote(status)),

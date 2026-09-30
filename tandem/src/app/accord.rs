@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::app::support::{
-    append_event, append_event_with_data, checkpoint_boundary, current_timestamp,
+    append_event, append_event_with_data, current_timestamp,
     hierarchy_from_project as hierarchy_from_workspace, require_nonempty, validate_state,
     validate_task_document_against_hierarchy,
 };
@@ -14,7 +14,7 @@ use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
 use crate::project::{
     self, patch_accord_content, patch_frontmatter_content, patch_resolution_content,
-    split_frontmatter, write_atomic, CheckpointOutcome, StoredDocument as Document, TandemProject,
+    split_frontmatter, write_atomic, StoredDocument as Document, TandemProject,
 };
 use crate::protocol::accord::{self, status as accord_status, AccordRecord};
 use crate::protocol::hierarchy::DocumentLocation;
@@ -182,7 +182,6 @@ fn apply_accord_action(
 pub(crate) struct ValidationActionOutcome {
     pub(crate) id: String,
     pub(crate) state: String,
-    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 pub(crate) fn accept_validation(
@@ -321,11 +320,9 @@ fn apply_validation_action(
                 &format!("Accepted sign-off for {}", doc.id()),
             )?;
             drop(_hierarchy_lock);
-            let checkpoint = checkpoint_boundary();
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
                 state: "archived".to_string(),
-                checkpoint,
             })
         }
         ValidationAction::Rework { feedback } => {
@@ -363,11 +360,9 @@ fn apply_validation_action(
                 &format!("Requested rework for {}", doc.id()),
             )?;
             drop(_hierarchy_lock);
-            let checkpoint = checkpoint_boundary();
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
                 state: "in-progress".to_string(),
-                checkpoint,
             })
         }
     }
@@ -419,7 +414,6 @@ pub(crate) struct AccordTransitionOutcome {
     pub(crate) synced_state: Option<String>,
     pub(crate) event_name: String,
     pub(crate) path: PathBuf,
-    pub(crate) checkpoint: CheckpointOutcome,
 }
 
 pub(crate) fn transition(
@@ -523,7 +517,6 @@ pub(crate) fn transition(
             &format!("Accord {action} for {}", doc.id()),
         )?;
         drop(_hierarchy_lock);
-        let checkpoint = checkpoint_boundary();
         return Ok(AccordTransitionOutcome {
             id: doc.id().to_string(),
             previous_status,
@@ -532,7 +525,6 @@ pub(crate) fn transition(
             synced_state: None,
             event_name: accord::event_name(action).to_string(),
             path: log_path,
-            checkpoint,
         });
     }
 
@@ -552,7 +544,6 @@ pub(crate) fn transition(
         event_data.as_ref(),
     )?;
     drop(_hierarchy_lock);
-    let checkpoint = checkpoint_boundary();
 
     Ok(AccordTransitionOutcome {
         id: doc.id().to_string(),
@@ -562,7 +553,6 @@ pub(crate) fn transition(
         synced_state,
         event_name,
         path: doc.path,
-        checkpoint,
     })
 }
 

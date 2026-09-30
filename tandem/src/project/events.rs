@@ -1,9 +1,8 @@
 //! Concrete per-actor event-ledger operations.
 
 use std::fs::{self, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
 
 use uuid::Uuid;
 
@@ -91,10 +90,21 @@ pub(crate) fn actor_id(project: &TandemProject) -> Result<String, CliError> {
     persisted_actor_id(project)
 }
 
+/// Location of this checkout's actor identity: the checkout's own Git
+/// directory for a Git-backed board (never inside the synced board), or
+/// `.tandem/actor-id` for a board outside Git.
+pub(crate) fn actor_id_path(project: &TandemProject) -> PathBuf {
+    match project.git() {
+        Some(git) => git.git_dir.join("tandem-actor-id"),
+        None => project.data_dir().join("actor-id"),
+    }
+}
+
 fn persisted_actor_id(project: &TandemProject) -> Result<String, CliError> {
-    let path = project.data_dir().join("actor-id");
-    fs::create_dir_all(project.data_dir()).map_err(|error| identity_error(&path, error))?;
-    ensure_git_ignored(project, &path)?;
+    let path = actor_id_path(project);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| identity_error(&path, error))?;
+    }
     match fs::read_to_string(&path) {
         Ok(content) => parse_persisted_actor_id(&path, &content),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -139,209 +149,6 @@ fn identity_error(path: &Path, error: std::io::Error) -> CliError {
         "Event actor identity failure: could not read or write {}: {error}",
         display_path(path)
     ))
-}
-
-fn ensure_git_ignored(project: &TandemProject, actor_path: &Path) -> Result<(), CliError> {
-    let Some((git_root, exclude_path)) = git_paths(project.root())? else {
-        return Ok(());
-    };
-    let relative = actor_path.strip_prefix(&git_root).map_err(|_| {
-        CliError::user(format!(
-            "Event actor identity failure: {} is outside Git worktree {}",
-            display_path(actor_path),
-            display_path(&git_root)
-        ))
-    })?;
-    let relative_arg = relative.as_os_str();
-    if let Some(parent) = exclude_path.parent() {
-        fs::create_dir_all(parent).map_err(|error| identity_error(&exclude_path, error))?;
-    }
-    let mut exclude = OpenOptions::new()
-        .read(true)
-        .append(true)
-        .create(true)
-        .open(&exclude_path)
-        .map_err(|error| identity_error(&exclude_path, error))?;
-    exclude
-        .lock()
-        .map_err(|error| identity_error(&exclude_path, error))?;
-    let result = (|| {
-        let tracked = Command::new("git")
-            .arg("-C")
-            .arg(&git_root)
-            .args(["ls-files", "--error-unmatch", "--"])
-            .arg(relative_arg)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map_err(|error| git_identity_error(project.root(), error))?;
-        if tracked.success() {
-            return Err(CliError::user(format!(
-                "Event actor identity failure: {} is tracked by Git. Run `git rm --cached {}` so each checkout keeps its own actor identity; a shared identity collapses per-actor ledgers and breaks `<actor>:<seq>` uniqueness.",
-                display_path(actor_path),
-                relative.to_string_lossy()
-            )));
-        }
-        if tracked.code() != Some(1) {
-            return Err(CliError::user(format!(
-                "Event actor identity failure: Git could not determine whether {} is tracked",
-                display_path(actor_path)
-            )));
-        }
-
-        let ignored = Command::new("git")
-            .arg("-C")
-            .arg(&git_root)
-            .args(["check-ignore", "--quiet", "--"])
-            .arg(relative_arg)
-            .status()
-            .map_err(|error| git_identity_error(project.root(), error))?;
-        if ignored.success() {
-            return Ok(());
-        }
-        if ignored.code() != Some(1) {
-            return Err(CliError::user(format!(
-                "Event actor identity failure: Git could not check whether {} is ignored",
-                display_path(actor_path)
-            )));
-        }
-        let pattern = format!(
-            "/{}",
-            relative
-                .components()
-                .map(|component| component.as_os_str().to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("/")
-        );
-        exclude
-            .seek(SeekFrom::Start(0))
-            .map_err(|error| identity_error(&exclude_path, error))?;
-        let mut content = String::new();
-        exclude
-            .read_to_string(&mut content)
-            .map_err(|error| identity_error(&exclude_path, error))?;
-        if !content.lines().any(|line| line == pattern) {
-            if !content.is_empty() && !content.ends_with('\n') {
-                exclude
-                    .write_all(b"\n")
-                    .map_err(|error| identity_error(&exclude_path, error))?;
-            }
-            exclude
-                .write_all(format!("{pattern}\n").as_bytes())
-                .and_then(|_| exclude.sync_data())
-                .map_err(|error| identity_error(&exclude_path, error))?;
-        }
-        let ignored = Command::new("git")
-            .arg("-C")
-            .arg(&git_root)
-            .args(["check-ignore", "--quiet", "--"])
-            .arg(relative_arg)
-            .status()
-            .map_err(|error| git_identity_error(project.root(), error))?;
-        if ignored.success() {
-            Ok(())
-        } else if ignored.code() == Some(1) {
-            Err(CliError::user(format!(
-                "Event actor identity failure: {} is not ignored after updating Git's exclude file; remove any repository ignore negation and ensure `{pattern}` is effective",
-                display_path(actor_path)
-            )))
-        } else {
-            Err(CliError::user(format!(
-                "Event actor identity failure: Git could not verify that {} is ignored after updating its exclude file",
-                display_path(actor_path)
-            )))
-        }
-    })();
-    let _ = exclude.unlock();
-    result
-}
-
-fn git_paths(root: &Path) -> Result<Option<(PathBuf, PathBuf)>, CliError> {
-    let top = match Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["rev-parse", "--show-toplevel"])
-        .output()
-    {
-        Ok(output) => output,
-        Err(error)
-            if error.kind() == std::io::ErrorKind::NotFound
-                && nearest_git_metadata(root).is_none() =>
-        {
-            return Ok(None);
-        }
-        Err(error) => return Err(git_identity_error(root, error)),
-    };
-    if !top.status.success() {
-        if let Some(metadata) = nearest_git_metadata(root) {
-            return Err(CliError::user(format!(
-                "Event actor identity failure: Git could not inspect {} despite Git metadata at {}: {}",
-                display_path(root),
-                display_path(&metadata),
-                String::from_utf8_lossy(&top.stderr).trim()
-            )));
-        }
-        return Ok(None);
-    }
-    let git_root = output_path(root, "worktree root", &top)?;
-    let exclude = git_output(root, &["rev-parse", "--git-path", "info/exclude"])?;
-    if !exclude.status.success() {
-        return Err(CliError::user(
-            "Event actor identity failure: Git could not resolve its exclude file",
-        ));
-    }
-    let exclude_path = output_path(root, "exclude file", &exclude)?;
-    let exclude_path = if exclude_path.is_absolute() {
-        exclude_path
-    } else {
-        root.join(exclude_path)
-    };
-    Ok(Some((git_root, exclude_path)))
-}
-
-fn nearest_git_metadata(root: &Path) -> Option<PathBuf> {
-    root.ancestors()
-        .map(|ancestor| ancestor.join(".git"))
-        .find(|path| path.exists())
-}
-
-fn git_output(root: &Path, args: &[&str]) -> Result<Output, CliError> {
-    Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .output()
-        .map_err(|error| git_identity_error(root, error))
-}
-
-fn git_identity_error(root: &Path, error: std::io::Error) -> CliError {
-    let action = if error.kind() == std::io::ErrorKind::NotFound {
-        "the Git executable is required for this Git workspace but was not found"
-    } else {
-        "could not run Git"
-    };
-    CliError::user(format!(
-        "Event actor identity failure: {action} for {}: {error}",
-        display_path(root)
-    ))
-}
-
-fn output_path(root: &Path, label: &str, output: &Output) -> Result<PathBuf, CliError> {
-    let value = std::str::from_utf8(&output.stdout).map_err(|_| {
-        CliError::user(format!(
-            "Event actor identity failure: Git returned a non-Unicode {label} for {}",
-            display_path(root)
-        ))
-    })?;
-    let value = value.trim_end_matches(['\r', '\n']);
-    if value.is_empty() {
-        Err(CliError::user(format!(
-            "Event actor identity failure: Git returned an empty {label} for {}",
-            display_path(root)
-        )))
-    } else {
-        Ok(PathBuf::from(value))
-    }
 }
 
 pub(crate) fn is_safe_actor_id(actor: &str) -> bool {
@@ -463,35 +270,6 @@ mod tests {
         assert!(!is_safe_actor_id("../escape"));
         assert!(!is_safe_actor_id(""));
         assert!(is_safe_actor_id("actor_01-ABC.def"));
-    }
-
-    #[test]
-    fn tracked_actor_id_fails_with_remediation() {
-        let (project, root) = project();
-        fs::create_dir_all(project.data_dir()).unwrap();
-        fs::write(
-            project.data_dir().join("actor-id"),
-            "00000000-0000-0000-0000-000000000000\n",
-        )
-        .unwrap();
-        Command::new("git")
-            .args(["init", "--quiet"])
-            .current_dir(&root)
-            .status()
-            .unwrap();
-        Command::new("git")
-            .args(["add", ".tandem/actor-id"])
-            .current_dir(&root)
-            .status()
-            .unwrap();
-
-        let error = persisted_actor_id(&project).unwrap_err();
-        assert!(error.message.contains("git rm --cached .tandem/actor-id"));
-        assert!(error
-            .message
-            .contains("shared identity collapses per-actor ledgers"));
-        assert!(error.message.contains("<actor>:<seq>"));
-        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

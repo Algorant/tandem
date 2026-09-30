@@ -17,6 +17,7 @@ mod tests {
         let id = next_rule_id(&root, "always").unwrap();
         assert_eq!(id, "always-1");
         let rule = RuleRecord {
+            uid: None,
             id: id.clone(),
             category: "always".into(),
             source: Some("decision-1".into()),

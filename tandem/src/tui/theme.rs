@@ -2229,6 +2229,7 @@ accent = "wat"
         )
         .unwrap();
         TandemProject {
+            git: None,
             root: PathBuf::new(),
             data_dir: PathBuf::new(),
             tasks_dir: tandem_dir.join("board"),

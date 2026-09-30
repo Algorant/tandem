@@ -969,7 +969,7 @@ mod tests {
         ));
         let project = TandemProject::initialize(
             &root,
-            &crate::protocol::config::default_project_config("Web test"),
+            &crate::protocol::config::default_project_config("Web test", "test-workspace"),
         )
         .unwrap();
         fs::write(

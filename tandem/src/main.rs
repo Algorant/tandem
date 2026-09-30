@@ -43,31 +43,6 @@ impl CliError {
             envelope: None,
         }
     }
-
-    /// A standalone checkpoint failure. There is no successful record write to
-    /// preserve, so this fails closed with exit code 1 and a checkpoint-specific
-    /// JSON envelope instead of the generic lifecycle `status: failed` data.
-    pub(crate) fn checkpoint_failure(message: impl Into<String>) -> Self {
-        let message = message.into();
-        let checkpoint = serde_json::json!({
-            "status": "failed",
-            "commit": serde_json::Value::Null,
-            "error": message.as_str(),
-        });
-        Self {
-            envelope: Some(serde_json::json!({
-                "ok": false,
-                "error": {
-                    "code": "checkpoint",
-                    "message": message.as_str(),
-                    "details": { "checkpoint": checkpoint },
-                }
-            })),
-            message,
-            code: 1,
-            json: false,
-        }
-    }
 }
 
 impl From<io::Error> for CliError {

@@ -2,7 +2,7 @@
 //!
 //! Review must name one of the Task's current `accord.acceptance` criteria
 //! byte-exactly. Rejected requests must not mutate the record, the event log,
-//! or Git checkpoint state.
+//! or source Git state.
 
 use serde_json::Value;
 use std::fs;
@@ -85,13 +85,14 @@ fn setup(label: &str) -> PathBuf {
         "add failed: {}",
         String::from_utf8_lossy(&add.stderr)
     );
-    git(&root, &["add", ".tandem"]);
+    fs::write(root.join("README.md"), "fixture\n").unwrap();
+    git(&root, &["add", "README.md"]);
     git(&root, &["commit", "--quiet", "-m", "fixture baseline"]);
     root
 }
 
 #[test]
-fn exact_acceptance_criterion_enters_validation_and_batches_metadata() {
+fn exact_acceptance_criterion_enters_validation_without_touching_source_git() {
     let root = setup("exact");
     let before_head = git(&root, &["rev-parse", "HEAD"]);
     let review = run(
@@ -114,7 +115,7 @@ fn exact_acceptance_criterion_enters_validation_and_batches_metadata() {
     let envelope = json(&review);
     assert_eq!(envelope["ok"], true);
     assert_eq!(envelope["data"]["state"], "validation");
-    assert_eq!(envelope["data"]["checkpoint"]["status"], "batched");
+    assert_eq!(envelope["data"]["sync"]["status"], "local-only");
 
     let shown = json(&run(&root, &["show", "task-1", "--json"]));
     assert_eq!(shown["data"]["state"], "validation");
@@ -126,18 +127,18 @@ fn exact_acceptance_criterion_enters_validation_and_batches_metadata() {
     assert_eq!(
         git(&root, &["rev-parse", "HEAD"]),
         before_head,
-        "root Task review must persist metadata without a checkpoint commit"
+        "board changes never create source commits"
     );
     assert!(String::from_utf8_lossy(&event_bytes(&root)).contains("review.requested"));
     assert!(
-        !git(&root, &["status", "--porcelain"]).is_empty(),
-        "review must leave pending metadata for the next explicit checkpoint"
+        git(&root, &["status", "--porcelain"]).is_empty(),
+        "board changes never dirty the source checkout"
     );
     fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
-fn mismatched_criterion_is_rejected_without_record_event_or_checkpoint_mutation() {
+fn mismatched_criterion_is_rejected_without_record_event_or_git_mutation() {
     let root = setup("mismatch");
     let task_path = root.join(".tandem/tasks/task-1.md");
     let before_record = fs::read(&task_path).unwrap();

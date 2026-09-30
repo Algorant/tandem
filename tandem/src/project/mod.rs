@@ -22,16 +22,15 @@ use crate::protocol::hierarchy::{
 };
 use crate::CliError;
 
-pub(crate) mod checkpoint;
 pub(crate) mod events;
 pub(crate) mod frontmatter;
+pub(crate) mod git;
+pub(crate) mod migrate;
 pub(crate) mod rules;
 #[cfg(test)]
 mod rules_contract_tests;
+pub(crate) mod sync;
 pub(crate) mod write;
-pub(crate) use checkpoint::{
-    checkpoint, consolidate_checkpoint, CheckpointOutcome, CheckpointStatus, Consolidation,
-};
 pub(crate) use frontmatter::{
     patch_accord_content, patch_frontmatter_content, patch_resolution_content, render_accord_block,
     replace_markdown_body,
@@ -46,6 +45,9 @@ pub(crate) struct TandemProject {
     pub(crate) logs_dir: PathBuf,
     pub(crate) config_path: PathBuf,
     pub(crate) events_path: PathBuf,
+    /// Git context when the board belongs to a Git repository. The board is
+    /// then the main worktree's `.tandem/`, shared by every linked worktree.
+    pub(crate) git: Option<git::GitContext>,
 }
 
 impl TandemProject {
@@ -54,12 +56,13 @@ impl TandemProject {
     }
 
     pub(crate) fn discover_from(start: &Path) -> Result<Self, CliError> {
+        let git = git::detect(start);
         let mut dir = start.to_path_buf();
         loop {
             let tandem_dir = dir.join(".tandem");
             let config_path = tandem_dir.join("tandem.md");
             if config_path.is_file() {
-                return Ok(Self::with_paths(dir, tandem_dir, config_path));
+                return Ok(Self::with_paths(dir, tandem_dir, config_path).with_git(git));
             }
 
             // The normative compatibility path is deliberately checked after
@@ -76,6 +79,17 @@ impl TandemProject {
                 break;
             }
         }
+        // A linked worktree has no board of its own: it uses the main
+        // worktree's board. A missing board is restored from the local safety
+        // copy or downloaded from the remote `tandem` branch.
+        if let Some(git) = git {
+            let root = git.main_worktree.clone();
+            let data_dir = root.join(".tandem");
+            let config_path = data_dir.join("tandem.md");
+            if config_path.is_file() || sync::recover_board(&git)? {
+                return Ok(Self::with_paths(root, data_dir, config_path).with_git(Some(git)));
+            }
+        }
         Err(CliError::user(
             "No Tandem workspace found. Run `tandem init` first.",
         ))
@@ -89,7 +103,18 @@ impl TandemProject {
             logs_dir: data_dir.join("logs"),
             events_path: data_dir.join("events.jsonl"),
             config_path,
+            git: None,
         }
+    }
+
+    fn with_git(mut self, git: Option<git::GitContext>) -> Self {
+        self.git = git;
+        self
+    }
+
+    /// The Git context of a Git-backed board.
+    pub(crate) fn git(&self) -> Option<&git::GitContext> {
+        self.git.as_ref()
     }
 
     /// The resolved project root for standard and compatibility discovery.
@@ -131,11 +156,10 @@ impl TandemProject {
             fs::create_dir_all(data_dir.join("events"))?;
             let config_path = data_dir.join("tandem.md");
             fs::write(&config_path, config)?;
-            Ok(Self::with_paths(
-                root.to_path_buf(),
-                data_dir.clone(),
-                config_path,
-            ))
+            Ok(
+                Self::with_paths(root.to_path_buf(), data_dir.clone(), config_path)
+                    .with_git(git::detect(root)),
+            )
         })();
         if result.is_err() && created_data_dir {
             let _ = fs::remove_dir_all(&data_dir);
@@ -188,11 +212,47 @@ impl TandemProject {
         Ok(docs)
     }
 
+    /// Finds a document by ID. A provisional ID that has since been numbered
+    /// still resolves through its uid prefix; an ambiguous prefix is an error.
     pub(crate) fn find_document(&self, id: &str) -> Result<Option<StoredDocument>, CliError> {
-        Ok(self
-            .read_documents()?
+        let documents = self.read_documents()?;
+        if let Some(document) = documents.iter().find(|document| document.id() == id) {
+            return Ok(Some(document.clone()));
+        }
+        let Some((_, hex)) = crate::protocol::ids::provisional_parts(id) else {
+            return Ok(None);
+        };
+        let mut matches = documents
             .into_iter()
-            .find(|document| document.id() == id))
+            .filter(|document| {
+                document
+                    .field("uid")
+                    .is_some_and(|uid| uid.replace('-', "").starts_with(hex))
+            })
+            .collect::<Vec<_>>();
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.pop()),
+            _ => Err(CliError::user(format!(
+                "`{id}` is ambiguous: it matches {}",
+                matches
+                    .iter()
+                    .map(|document| document.id().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+        }
+    }
+
+    /// Maps a possibly outdated provisional ID to the record's current ID.
+    pub(crate) fn current_id(&self, id: &str) -> Result<String, CliError> {
+        if !crate::protocol::ids::is_provisional(id) {
+            return Ok(id.to_string());
+        }
+        Ok(self
+            .find_document(id)?
+            .map(|document| document.id().to_string())
+            .unwrap_or_else(|| id.to_string()))
     }
 
     pub(crate) fn read_board_document(&self, id: &str) -> Result<Option<StoredDocument>, CliError> {
@@ -666,7 +726,16 @@ pub(crate) fn read_document(
     let content = fs::read_to_string(path).map_err(|error| {
         CliError::user(format!("failed to read {}: {error}", display_path(path)))
     })?;
-    let (frontmatter, body) = split_frontmatter(&content).map_err(|message| {
+    parse_document(path, location, &content)
+}
+
+/// Parses document source that is already in memory.
+pub(crate) fn parse_document(
+    path: &Path,
+    location: DocumentLocation,
+    content: &str,
+) -> Result<StoredDocument, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(|message| {
         CliError::user(format!("Parse failure: {}: {message}", display_path(path)))
     })?;
     let fields = parse_frontmatter_fields(&frontmatter).map_err(|message| {

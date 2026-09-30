@@ -3,12 +3,14 @@
 //! Workflow-state semantics live in [`super::workflow`]. See the normative
 //! [workspace config fields](../../../protocol/plan/spec.md#workspace-config-fields).
 
-pub(crate) const PROTOCOL_VERSION: &str = "0.3.0";
+pub(crate) const PROTOCOL_VERSION: &str = "0.4.0";
 
-pub(crate) fn default_project_config(title: &str) -> String {
+/// The `tandem.md` of a new workspace. `workspace_id` permanently identifies
+/// the board across clones and machines.
+pub(crate) fn default_project_config(title: &str, workspace_id: &str) -> String {
     let quoted_title = yaml_double_quote(title);
     format!(
-        "---\nprotocolVersion: {PROTOCOL_VERSION}\ntype: workspace\ntitle: {quoted_title}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: validation\n    title: Validation\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {title}\n"
+        "---\nprotocolVersion: {PROTOCOL_VERSION}\nworkspaceId: {workspace_id}\ntype: workspace\ntitle: {quoted_title}\nstates:\n  - id: todo\n    title: To Do\n  - id: in-progress\n    title: In Progress\n  - id: validation\n    title: Validation\nrules:\n  always: []\n  never: []\n  prefer: []\n  context: []\n---\n\n# {title}\n"
     )
 }
 
