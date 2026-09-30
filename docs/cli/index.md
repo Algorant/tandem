@@ -35,7 +35,7 @@ From a local checkout, use `cargo install --path tandem --locked`.
 
 ## Command index
 
-- Workspace: [`init`](#tandem-init), [`upgrade`](#tandem-upgrade), [`checkpoint`](#tandem-checkpoint)
+- Workspace: [`init`](#tandem-init), [`sync`](#tandem-sync), [`migrate`](#tandem-migrate)
 - Board documents: [`list`](#tandem-list), [`show`](#tandem-show), [`add`](#tandem-add), [`move`](#tandem-move), [`update`](#tandem-update), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel), [`search`](#tandem-search)
 - Friction inbox: [`papercut`](#tandem-papercut)
 - History: [`log`](#tandem-log)
@@ -368,38 +368,38 @@ tandem cancel <id> --reason <text>
 - JSON/Log/TUI reads expose `canceled`; legacy Logs without `completion.outcome` default to `completed`.
 - Out of scope: permanent deletion, cascades, same-ID recreation, a dedicated recreate command, and a TUI cancellation action. TUI read/render compatibility is required.
 
-### `tandem checkpoint`
+### `tandem sync`
 
-- Purpose: explicitly flush pending owning `.tandem/` changes into Git for host commit/push workflows without creating or changing a Task, Accord, Rule, Decision, or event.
-- Kind: mutation (Git only).
+- Purpose: synchronize the board with the repository's `tandem` branch now. Tandem already syncs after every change, before reads older than 60 seconds, and in the background of the TUI and web view, so this is rarely needed.
+- Kind: mutation (board and `tandem` branch only; never the source branch, index, or working tree).
 - Syntax:
 
 ```text
-tandem checkpoint [--consolidate]
+tandem sync
+tandem sync status
+tandem sync resolve <id> --keep local|remote|edited
 ```
 
-- Accepted options: `--consolidate` and the global `-j/--json`. Any other argument is a usage error.
-- Behavior:
-  - normally stages only the owning `.tandem/` path (`git add -A -- .tandem`) and, when that path has staged changes, records them in one ordinary commit with the fixed subject `chore(tandem): checkpoint metadata`;
-  - is strictly forward-only: it never amends, rebases, folds, or otherwise rewrites an existing commit, so pre-existing source commit identities are stable across a flush;
-  - creates at most one commit per invocation and appends it as a new child of the current HEAD regardless of whether HEAD is pushed or a merge;
-  - never touches unrelated staged, unstaged, or untracked files, and preserves unrelated index entries;
-  - is an idempotent no-op on a clean `.tandem/` (reports `clean` and creates no commit);
-  - treats an owning `.tandem/` as local-only only when it has no Git index entries, no `HEAD` tree entries, Git reports the directory ignored (`git check-ignore`), and there are no non-ignored untracked files beneath it. Git errors fail closed. Local-only mode skips staging and committing and preserves ignored bytes; tracked content, including staged deletions, stays on the normal path;
-  - with `--consolidate`, skips only the flush for local-only metadata and still runs every push-boundary safety guard. It refuses without rewriting if an eligible checkpoint commit is already in the unpushed range;
-  - writes no records or events.
-- Host boundary handoff: create the real source commit, run `tandem checkpoint` automatically at the commit/push boundary, require a clean `.tandem/`, then push. A successful local-only result is also consolidated push-boundary success. `tandem checkpoint && git push` is fail-closed. Automatic wiring is a Pi adapter prerequisite; see `plan/task-40-pi-handoff.md`.
-- Success JSON envelopes (`--json`):
+- `tandem sync` fetches, merges record by record, numbers records that still have temporary `<prefix>-new-<hex>` IDs, and pushes without force. Offline, local changes stay saved and the result is `pending`.
+- `tandem sync status` works without network access. It reports the remote, whether local changes are waiting, the last fetch, the last problem, open conflicts, and held edits (local files that cannot be published, such as unparsable Markdown or a changed `uid`).
+- `tandem sync resolve` settles a conflict: `local` keeps this machine's version, `remote` keeps the shared version, and `edited` keeps the file as you edited it in `.tandem/`. Changes to a conflicted record are refused until it is resolved.
+- JSON: `{"ok":true,"data":{"sync":{"status":"synced|pending|local-only|not-git","message":null,"renamed":{},"conflicts":[],"held":[]}},"warnings":[]}`. Every mutation includes the same `data.sync` object and reports the record's final ID.
 
-```json
-{"ok":true,"data":{"checkpoint":{"status":"checkpointed|clean","commit":"<sha>|null"}},"warnings":[]}
-{"ok":true,"data":{"checkpoint":{"status":"clean","commit":null,"localOnly":true}},"warnings":[]}
-{"ok":true,"data":{"checkpoint":{"status":"consolidated","oldHead":"<sha>","newHead":"<sha>","commit":"<sha>","collapsed":0}},"warnings":[]}
-{"ok":true,"data":{"checkpoint":{"status":"consolidated","oldHead":"<sha>","newHead":"<sha>","commit":"<sha>","collapsed":0,"localOnly":true}},"warnings":[]}
+### `tandem migrate`
+
+- Purpose: move a protocol 0.3.0 board that source commits track to the repository's `tandem` branch. Run once per repository, on one machine.
+- Kind: mutation.
+- Syntax:
+
+```text
+tandem migrate [--dry-run]
+tandem migrate --adopt [--dry-run]
 ```
 
-`localOnly` is omitted for tracked repositories. In local-only consolidation, `oldHead` and `newHead` are the unchanged HEAD and `collapsed` is zero.
-- Failure exits `1` with `{"ok":false,"error":{"code":"checkpoint","message":"...","details":{"checkpoint":{"status":"failed","commit":null,"error":"..."}}}}` on stdout in JSON mode and a stderr message in human mode. A failed tracked flush leaves the pending change staged for inspection.
+- `tandem migrate` requires a Git remote without a `tandem` branch, a branch that is not behind its upstream, and no staged changes. It adds a permanent `uid` to every record, publishes the board, and creates one source commit (`chore(tandem): move the Tandem board to the tandem branch`) that stops tracking `.tandem/` and ignores it. Push that commit normally.
+- `tandem migrate --adopt` is for another machine that still has unpushed or uncommitted 0.3.0 board changes. Run it before `git pull`. It merges those changes into the shared board, renumbers records that were never published (reporting old and new IDs), and restores the tracked legacy files so `git pull` can remove them. A machine without local board changes just pulls.
+- `--dry-run` reports what would change and changes nothing.
+- See [Upgrading to independent sync](/guides/upgrading-to-independent-sync/).
 
 ### `tandem log`
 

@@ -10,6 +10,7 @@ For first-time usage, start with the [Quickstart](/quick-start/). It walks throu
 
 - [Human in the Loop](/guides/human-in-the-loop/) — keep people in the loop for decisions, validation, and delivery.
 - [Fully Agentic](/guides/fully-agentic-workflow/) — let an agent coordinate and complete routine work with clear safeguards.
+- [Upgrading to independent sync](/guides/upgrading-to-independent-sync/) — move existing repositories to the `tandem` branch and set up each machine.
 
 ## Related starting points
 

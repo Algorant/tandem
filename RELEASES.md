@@ -2,6 +2,29 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.15.0
+
+Tandem v0.15.0 syncs each repository's board through its own `tandem` branch, so working on several machines no longer produces ID collisions or blocked pulls. This is protocol 0.4.0; existing boards are converted once with `tandem migrate`.
+
+### Added
+
+- The board syncs through a Tandem-managed `tandem` branch on the repository's existing remote, separate from source commits. Changes publish immediately, reads older than a minute refresh first, and the TUI and web view sync in the background. Offline changes are saved and publish on the next use.
+- Every record has a permanent `uid`. IDs stay sequential: a record created while it cannot sync shows a temporary `task-new-…` ID and gets its number on first sync, with references rewritten. Temporary IDs keep working in commands.
+- Changes from different machines merge record by record. Only a contradiction on one record, such as two different titles or completing a Task on one machine while editing it on another, waits for `tandem sync resolve <id> --keep local|remote|edited`; everything else keeps syncing.
+- `tandem sync`, `tandem sync status`, and `tandem sync resolve`.
+- `tandem migrate` moves a 0.3.0 board to the `tandem` branch in one source commit; `tandem migrate --adopt` brings over another machine's unpushed board changes and renumbers records that were never published.
+- A local safety copy restores unsynced board changes after `git clean` or checking out an older commit. Hand edits to `.tandem/` sync; edits that cannot be published stay local with the reason.
+- A fresh clone downloads the board on its first Tandem command, and every linked worktree uses the main worktree's board.
+
+### Changed
+
+- `.tandem/` is no longer tracked by source commits, and board changes never appear in `git status`. Each checkout's actor identity moves to its Git directory.
+- Mutation JSON reports `data.sync` instead of `data.checkpoint` and always returns the record's final ID.
+
+### Removed
+
+- `tandem checkpoint` and `tandem checkpoint --consolidate`.
+
 ## 0.14.1
 
 Tandem v0.14.1 lets checkpoints work in repositories that intentionally keep `.tandem/` out of Git.

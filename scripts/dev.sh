@@ -47,24 +47,22 @@ sandbox() {
         git init --quiet
         git config user.name 'Tandem dev sandbox'
         git config user.email dev-sandbox@example.invalid
+        printf 'Tandem dev sandbox\n' > README.md
+        git add README.md
+        git commit --quiet -m 'dev sandbox baseline'
         "$binary" init --title 'Tandem dev sandbox' >/dev/null
         "$binary" add task 'Explore assignment workflows' --kind epic --acceptance 'Inspect the grouped assignments' >/dev/null
         "$binary" add task 'Assignment with a milestone' --parent task-1 --acceptance 'Inspect complete scope and milestone progress' --constraint 'Sandbox only' --validation 'Native assignment read' >/dev/null
         "$binary" add task 'Dependent assignment' --parent task-1 --blocker task-2 --acceptance 'Inspect the blocker context' >/dev/null
-        "$binary" add task 'Milestone: try a batched action' --parent task-2 --acceptance 'Progress persists without its own checkpoint' >/dev/null
+        "$binary" add task 'Milestone: try an action' --parent task-2 --acceptance 'Progress persists on the board' >/dev/null
         "$binary" add task 'Example papercut' --priority low --tag papercut --acceptance 'Inspect filtered papercuts' >/dev/null
         "$binary" add task 'Try Actions: claim, block, resume, deliver, complete' --acceptance 'Use a to exercise the native workflow' --acceptance 'Preserve meaningful evidence in Logs' >/dev/null
         "$binary" add task 'Completed example' --acceptance 'Read final delivery evidence in Logs' >/dev/null
         "$binary" add decision 'Use a disposable Git sandbox' --body 'Dev lifecycle actions must not commit the real project records.' >/dev/null
         "$binary" rules add prefer 'Keep experiments inside this sandbox' >/dev/null
-        git add -- .tandem
-        git commit --quiet -m 'dev sandbox baseline'
         "$binary" accord claim task-6 --assignee dev-example >/dev/null
         "$binary" accord deliver task-6 --summary 'Example outcome' --evidence 'Native delivery and archive from the dev build' >/dev/null
         "$binary" complete task-6 >/dev/null
-        # Lifecycle writes persist without Git; one explicit forward flush makes
-        # the sandbox clean for inspection.
-        "$binary" checkpoint >/dev/null
     )
     printf '%s\n' "$dir"
 }
@@ -77,7 +75,7 @@ smoke() {
         before="$(git rev-parse HEAD)"
         token="$("$binary" assignment task-2 --json | jq -er '.data.definitionToken')"
         milestone="$("$binary" accord claim task-2-1 --assignee dev-smoke --json)"
-        jq -e '.ok and .data.recordWritten and .data.checkpoint.status == "batched"' <<< "$milestone" >/dev/null
+        jq -e '.ok and .data.recordWritten and .data.sync.status == "local-only"' <<< "$milestone" >/dev/null
         [[ "$(git rev-parse HEAD)" == "$before" ]]
         [[ "$("$binary" assignment task-2 --json | jq -er '.data.definitionToken')" == "$token" ]]
         if invalid="$("$binary" accord deliver task-5 --summary 'No evidence must fail' --json)"; then
@@ -86,15 +84,14 @@ smoke() {
         fi
         jq -e '.ok == false' <<< "$invalid" >/dev/null
         "$binary" show task-5 --json | jq -e '.data.accordStatus == "ready"' >/dev/null
-        "$binary" accord claim task-2 --assignee dev-smoke --json | jq -e '.ok and .data.recordWritten and .data.checkpoint.status == "batched"' >/dev/null
+        "$binary" accord claim task-2 --assignee dev-smoke --json | jq -e '.ok and .data.recordWritten and .data.sync.status == "local-only"' >/dev/null
         [[ "$(git rev-parse HEAD)" == "$before" ]]
-        "$binary" checkpoint --json | jq -e '.ok and .data.checkpoint.status == "checkpointed"' >/dev/null
-        [[ "$(git rev-parse HEAD)" != "$before" ]]
-        [[ -z "$(git status --porcelain -- .tandem)" ]]
+        [[ -z "$(git status --porcelain)" ]]
+        git rev-parse --verify --quiet refs/tandem/pending >/dev/null
         [[ "$("$binary" assignment task-2 --json | jq -er '.data.definitionToken')" == "$token" ]]
-        [[ -z "$(git ls-files -- .tandem/actor-id)" ]]
+        [[ -f "$(git rev-parse --git-dir)/tandem-actor-id" ]]
     )
-    echo 'PASS: assignment freshness, evidence rejection, milestone batching, and explicit forward checkpoint flush.'
+    echo 'PASS: assignment freshness, evidence rejection, board changes outside source history, and the local safety copy.'
 }
 
 if [[ "$mode" == check ]]; then
@@ -111,7 +108,7 @@ case "$mode" in
         ;;
     project)
         workspace="$repo_root"
-        echo 'Real project mode: lifecycle actions can commit this checkout’s .tandem records.' >&2
+        echo 'Real project mode: lifecycle actions change and sync this repository’s real board.' >&2
         ;;
     *)
         if [[ -z "$workspace" ]]; then

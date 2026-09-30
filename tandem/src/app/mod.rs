@@ -9,6 +9,7 @@ pub(crate) mod error;
 pub(crate) use error::{Error, ErrorKind};
 pub(crate) mod accord;
 pub(crate) mod assignment;
+pub(crate) mod background_sync;
 pub(crate) mod decisions;
 pub(crate) mod dto;
 pub(crate) mod project;

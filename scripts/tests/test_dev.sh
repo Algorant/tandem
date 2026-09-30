@@ -21,9 +21,9 @@ binary="$repo_root/tandem/target/release/tandem"
 for sandbox in "$first" "$second"; do
     [[ -d "$sandbox/.git" && "$sandbox" != "$repo_root" ]]
     [[ "$(git -C "$sandbox" rev-parse --show-toplevel)" == "$sandbox" ]]
-    [[ "$(git -C "$sandbox" rev-list --count HEAD)" == 2 ]]
+    [[ "$(git -C "$sandbox" rev-list --count HEAD)" == 1 ]]
     [[ -z "$(git -C "$sandbox" status --porcelain)" ]]
-    [[ -z "$(git -C "$sandbox" ls-files -- .tandem/actor-id)" ]]
+    [[ -z "$(git -C "$sandbox" ls-files -- .tandem)" ]]
     (
         cd "$sandbox"
         "$binary" show task-5 --json | jq -e '.data.accordStatus == "ready" and .data.location == "board"' >/dev/null

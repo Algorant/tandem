@@ -55,7 +55,7 @@ dev-sandbox:
 dev-test:
 	@./scripts/dev.sh shell
 
-# Run native/CLI tests and a Git-backed assignment/checkpoint smoke test.
+# Run native/CLI tests and a Git-backed assignment and board smoke test.
 dev-check:
 	@./scripts/dev.sh check
 

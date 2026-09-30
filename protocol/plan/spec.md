@@ -1,19 +1,19 @@
-# Tandem Protocol 0.3.0 Specification
+# Tandem Protocol 0.4.0 Specification
 
 **Status:** accepted normative specification  
-**Date:** 2026-08-30
+**Date:** 2026-09-30 (0.4.0 independent sync; 0.3.0 accepted 2026-08-30)
 
-This document defines the only runtime protocol supported by Tandem 0.3.0. `protocol/` is normative; Rust in `tandem/src/protocol/` is executable semantics. No migration, conversion, compatibility reader, backup, or fallback is defined.
+This document defines the only runtime protocol supported by Tandem 0.4.0. `protocol/` is normative; Rust in `tandem/src/protocol/` is executable semantics. The one-time `tandem migrate` conversion from 0.3.0 is defined in [`../README.md`](../README.md#migration); no compatibility reader or fallback exists. Sync semantics are in [`../README.md`](../README.md#sync) and the design record [`independent-metadata-sync.md`](independent-metadata-sync.md).
 
 ## Workspace
 
-`.tandem/tandem.md` is YAML-frontmatter Markdown. Required fields are `protocolVersion: 0.3.0`, `title`, and `states`. The default states are `todo`, `in-progress`, and `validation`. Active records are in `.tandem/tasks/`; Decisions in `.tandem/decisions/`; Rules in `.tandem/rules/`; archived Tasks in `.tandem/logs/`; audit ledgers in `.tandem/events/<actor-id>.jsonl`. `.tandem/actor-id` is ignored checkout-local identity and is generated/owned by Tandem.
+`.tandem/tandem.md` is YAML-frontmatter Markdown. Required fields are `protocolVersion: 0.4.0`, `workspaceId`, `title`, and `states`. The default states are `todo`, `in-progress`, and `validation`. Active records are in `.tandem/tasks/`; Decisions in `.tandem/decisions/`; Rules in `.tandem/rules/`; archived Tasks in `.tandem/logs/`; audit ledgers in `.tandem/events/<actor-id>.jsonl`. Actor identity is `<git-dir>/tandem-actor-id` per checkout (`.tandem/actor-id` outside Git); it is generated and owned by Tandem and never synced. In a Git repository the board is the main worktree's ignored `.tandem/`, shared by linked worktrees and synced through the `tandem` branch.
 
-Discovery is repository-local and requires `.tandem/tandem.md`. A different protocol version is an operational error identifying detected and required versions.
+Discovery is repository-local and requires `.tandem/tandem.md`, falling back to the main worktree's board from a linked worktree, then to the local safety copy or the remote `tandem` branch when the board is missing. A different protocol version is an operational error identifying detected and required versions.
 
 ## Task records
 
-Task frontmatter requires `id`, `type: task`, `title`, `state` (active records), and `accord` (active records). Optional fields are `kind: epic`, `priority` (`low|medium|high|critical`), `effort` (`trivial|small|medium|large`), `tags`, `assignee`, `parentId`, `blockers`, `references`, `relatedFiles`, timestamps, and legacy inline `subtasks` preserved as inert checklist data.
+Task frontmatter requires `id`, `uid`, `type: task`, `title`, `state` (active records), and `accord` (active records). Optional fields are `kind: epic`, `priority` (`low|medium|high|critical`), `effort` (`trivial|small|medium|large`), `tags`, `assignee`, `parentId`, `blockers`, `references`, `relatedFiles`, timestamps, and legacy inline `subtasks` preserved as inert checklist data.
 
 Roles are resolved from documents, never inferred from ID shape:
 
@@ -21,17 +21,17 @@ Roles are resolved from documents, never inferred from ID shape:
 - Task: normal task, root or direct child of an Epic, global `task-N` ID.
 - Subtask: normal task directly beneath a Task, immutable `task-N-M` ID, leaf.
 
-Only these relationships exist: `epic-task` and `subtask`. Parent IDs resolve to active Tasks only. Epics cannot have parents, Subtasks cannot have children, arbitrary depth is invalid, and reparenting that changes role or invalidates an ID is rejected. Allocation scans active and archived records without reuse.
+Only these relationships exist: `epic-task` and `subtask`. Parent IDs resolve to active Tasks only. Epics cannot have parents, Subtasks cannot have children, arbitrary depth is invalid, and reparenting that changes role or invalidates an ID is rejected. Allocation scans active and archived records without reuse. On a board that syncs through a remote, new records start with provisional `task-new-<hex>` IDs, valid in any role, and receive their sequential ID at first publication.
 
 Papercuts are ordinary low-priority Tasks tagged `papercut`; no Papercut type or storage exists.
 
 ## Decisions
 
-Decision records require `id`, `type: decision`, and `title`, and remain in `decisions/`. Optional metadata is `status` (`proposed|accepted|rejected|deprecated|superseded`), `deciders`, `supersedes`, `references`, `tags`, `createdAt`, `updatedAt`, and automatic `decidedAt` on acceptance/rejection. ADR Context, Decision, Consequences, Alternatives, and Supersession are Markdown body sections. Manual `date`, `supersededBy`, and prose metadata flags are not fields.
+Decision records require `id`, `uid`, `type: decision`, and `title`, and remain in `decisions/`. Optional metadata is `status` (`proposed|accepted|rejected|deprecated|superseded`), `deciders`, `supersedes`, `references`, `tags`, `createdAt`, `updatedAt`, and automatic `decidedAt` on acceptance/rejection. ADR Context, Decision, Consequences, Alternatives, and Supersession are Markdown body sections. Manual `date`, `supersededBy`, and prose metadata flags are not fields.
 
 ## Rules
 
-Each Rule is one Markdown file in `rules/` with composite ID `<category>-N`, category `always|never|prefer|context`, optional `source`, `createdAt`, and `updatedAt`. Rule text is the Markdown body. Reclassification is delete-and-add. Missing sources are warnings.
+Each Rule is one Markdown file in `rules/` with composite ID `<category>-N` (provisionally `<category>-new-<hex>`), a `uid`, category `always|never|prefer|context`, optional `source`, `createdAt`, and `updatedAt`. Rule text is the Markdown body. Reclassification is delete-and-add. Missing sources are warnings.
 
 ## Accord
 
@@ -49,10 +49,13 @@ Every durable mutation emits exactly one structured event. Reads emit none. Each
 
 ## Interface requirements
 
-The canonical CLI uses clap derive and generated help. Its 23 leaves are:
+The canonical CLI uses clap derive and generated help. Its 27 leaves are:
 
 ```text
 init
+sync
+sync status|resolve
+migrate
 add task|decision
 show
 list

@@ -55,7 +55,11 @@ struct WebState {
 pub(crate) fn run(project: TandemProject, options: Options) -> Result<(), CliError> {
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|error| CliError::user(format!("failed to start web runtime: {error}")))?;
-    runtime.block_on(serve(project, options))
+    // The read-only web view keeps its board current in the background.
+    let background = crate::app::background_sync::BackgroundSync::start(&project);
+    let result = runtime.block_on(serve(project, options));
+    background.finish();
+    result
 }
 
 async fn serve(project: TandemProject, options: Options) -> Result<(), CliError> {

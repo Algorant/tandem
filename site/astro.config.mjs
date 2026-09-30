@@ -100,6 +100,7 @@ export default defineConfig({
           items: [
             { label: 'Human in the Loop', link: '/guides/human-in-the-loop/' },
             { label: 'Fully Agentic', link: '/guides/fully-agentic-workflow/' },
+            { label: 'Upgrading to Sync', link: '/guides/upgrading-to-independent-sync/' },
           ],
         },
         {

@@ -83,9 +83,15 @@ use validation::ValidationPrompt;
 use workflow_prompt::WorkflowPrompt;
 
 pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
+    if let Some(message) = app::project::historical(&workspace) {
+        return Err(CliError::user(format!("cannot open the TUI: {message}")));
+    }
+    let background = crate::app::background_sync::BackgroundSync::start(&workspace);
     let mut app = TuiApp::load(workspace)?;
-    let mut session = TerminalSession::enter()?;
-    app.run(&mut session)
+    let result =
+        TerminalSession::enter().and_then(|mut session| app.run(&mut session, &background));
+    background.finish();
+    result
 }
 
 fn sort_documents(docs: &mut [Document], sort: BoardSort) {
@@ -319,9 +325,17 @@ impl TuiApp {
         Ok(app)
     }
 
-    fn run(&mut self, session: &mut TerminalSession) -> Result<(), CliError> {
+    fn run(
+        &mut self,
+        session: &mut TerminalSession,
+        background: &crate::app::background_sync::BackgroundSync,
+    ) -> Result<(), CliError> {
         let mut redraw = true;
         loop {
+            if let Some(note) = background.take_note() {
+                self.status = note;
+                redraw = true;
+            }
             redraw |= self.reload_if_changed();
             redraw |= self.expire_transient_status();
             if redraw {

@@ -92,13 +92,14 @@ Use `tandem papercut add` or an adapter's thin equivalent when small, non-blocki
 
 Do not use a Papercut when work is blocked; use the blocking lifecycle. Do not use one instead of a planned fix; create a Task and reference the Papercut. A thin Pi adapter maps `tandem_papercut` actions (`add`, `list`, `show`, `resolve`) to CLI argument arrays, requests JSON for reads, and leaves parsing, IDs, status, references, writes, and events to Tandem.
 
-## Commit durable workspace data with judgment
+## Leave syncing to Tandem
 
-Tandem is local-first. When `.tandem/` is tracked, commit durable coordination changes often enough to keep them visible to collaborators, portable across clones and worktrees, and safe from cleanup or reset. Active workspace rules can define a more specific cadence.
+In a Git repository the board syncs through the repository's `tandem` branch, separately from source commits. Tandem publishes every mutation, refreshes stale reads, and resolves routine concurrent changes itself. An agent or adapter does not stage, commit, push, or pull `.tandem/`, and source commits never include it.
 
-Use coherent lifecycle boundaries rather than one Git commit for every Tandem command or minor mutation. Group coordination changes with related project work when they form one logical unit; otherwise combine related task, accord, event, rule, and Board-to-Logs changes in one focused coordination commit.
-
-Before integration, branch changes, session shutdown, handoff, or push, inspect pending changes and local-only commits. Squash related local and unshared Tandem commits when they represent one coordination unit and doing so preserves clear history. Never rewrite pushed or otherwise shared history without explicit authority. Never silently stash, discard, or partially commit Tandem state.
+- Use the ID a mutation returns. A record created while offline has a temporary `<prefix>-new-<hex>` ID until it syncs; the temporary ID keeps resolving afterwards.
+- Treat `data.sync.status` as information: `pending` means the change is saved locally and will publish later. It is not a failure.
+- When a result or `tandem sync status` reports a conflict or held edit, surface it to the responsible human. Resolve only with `tandem sync resolve <id> --keep local|remote|edited` when authorized. Never edit, delete, or rename `.tandem/` files to fix sync.
+- A linked worktree (for example a delegated Worker's) uses the main worktree's board; it has no `.tandem/` of its own.
 
 ## Adapter boundary
 
@@ -118,6 +119,7 @@ It must not:
 - allocate IDs or reclassify relationships;
 - silently initialize or upgrade a workspace;
 - generate, copy, parse, or override Tandem actor identity;
+- stage, commit, push, or rewrite `.tandem/` or the `tandem` branch;
 - infer lifecycle authority from command availability;
 - promote one repository's active rules into universal guidance;
 - hide protocol warnings or contradictory instructions.

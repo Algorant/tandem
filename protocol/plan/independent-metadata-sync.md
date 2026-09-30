@@ -1,6 +1,6 @@
 # Independent metadata sync
 
-Status: **proposed design for Algorant review** (task-48). Q1–Q3 resolved by Algorant on 2026-09-30. Implementation is task-49 and must not begin until this document is approved.
+Status: **approved by Algorant on 2026-09-30** (task-48, decision-9); implemented as protocol 0.4.0 in task-49. Normative behavior is in [`../README.md`](../README.md#sync); this document keeps the design record and its reasoning.
 Date: 2026-09-30
 
 ## 1. Summary

@@ -98,7 +98,7 @@ Only Tasks are delegated initially. One Task worker owns its leaf Subtasks as a 
 - **`just dev-test`** opens a shell in a fresh sandbox with the dev `tandem` first
   on `PATH`; **`just dev-sandbox`** creates a sandbox and prints its path.
 - **`just dev-check`** runs the native/CLI suite and a Git-backed smoke test for
-  assignment freshness, evidence validation, milestone batching, and checkpoints
+  assignment freshness, evidence validation, board changes outside source history, and the safety copy
   (requires `jq`). **`just dev-build`** only builds the release binary.
 
 No command installs the binary. Sandboxes are retained at the printed temporary
