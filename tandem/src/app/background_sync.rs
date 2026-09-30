@@ -15,6 +15,9 @@ use crate::project::TandemProject;
 
 const PUBLISH_INTERVAL: Duration = Duration::from_secs(2);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+/// After a failed attempt (usually offline), wait this long before trying
+/// again so the board lock stays free for interactive changes.
+const RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub(crate) struct BackgroundSync {
     stop: Arc<AtomicBool>,
@@ -59,9 +62,12 @@ fn run(workspace: &TandemProject, stop: &AtomicBool, note: &Mutex<Option<String>
     let mut last_refresh: Option<Instant> = None;
     let mut last_message: Option<String> = None;
     let mut last_publish = Instant::now();
+    let mut retry_after: Option<Instant> = None;
     while !stop.load(Ordering::Relaxed) {
-        let refresh_due = last_refresh.is_none_or(|at| at.elapsed() >= REFRESH_INTERVAL);
-        let publish_due = last_publish.elapsed() >= PUBLISH_INTERVAL;
+        let waiting = retry_after.is_some_and(|at| Instant::now() < at);
+        let refresh_due =
+            !waiting && last_refresh.is_none_or(|at| at.elapsed() >= REFRESH_INTERVAL);
+        let publish_due = !waiting && last_publish.elapsed() >= PUBLISH_INTERVAL;
         if refresh_due || publish_due {
             if crate::app::project::historical(workspace).is_none() {
                 let mode = if refresh_due {
@@ -71,6 +77,8 @@ fn run(workspace: &TandemProject, stop: &AtomicBool, note: &Mutex<Option<String>
                 };
                 let report = sync::sync(workspace, mode)
                     .unwrap_or_else(|error| Report::pending(error.message));
+                retry_after = matches!(report.outcome, Outcome::Pending(_))
+                    .then(|| Instant::now() + RETRY_INTERVAL);
                 let message = describe(&report);
                 if message.is_some() && message != last_message {
                     if let Ok(mut slot) = note.lock() {
