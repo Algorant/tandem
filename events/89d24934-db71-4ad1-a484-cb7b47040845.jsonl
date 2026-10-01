@@ -282,3 +282,4 @@
 {"ts":"2026-10-01T22:21:03Z","event":"task.created","id":"task-56","summary":"Add typed links between records: relates-to, duplicates, fixed-by, supersedes","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":282}
 {"ts":"2026-10-01T22:21:04Z","event":"task.created","id":"task-57","summary":"Show Standard, Research, and Papercuts lanes in tandem web","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":283}
 {"ts":"2026-10-01T22:21:05Z","event":"task.created","id":"task-58","summary":"Update or retire extensions/pi-tandem for research and papercut kinds","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":284}
+{"ts":"2026-10-01T22:21:15Z","event":"task.updated","id":"task-22","summary":"Updated task-22 metadata: references, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":285}
