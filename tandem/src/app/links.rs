@@ -406,7 +406,7 @@ mod tests {
         assert!(removed.changed);
         let source = read(&project, &one);
         assert!(source.field("links.relates-to").is_none());
-        assert_eq!(source.field("links.supersedes").is_some(), true);
+        assert!(source.field("links.supersedes").is_some());
         remove(&project, &one, "supersedes", &two).unwrap();
         let content = fs::read_to_string(&read(&project, &one).path).unwrap();
         assert!(!content.contains("links:"));

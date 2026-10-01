@@ -1316,7 +1316,7 @@ pub(crate) fn publish_upgrade(
             let tree = engine.write_tree(converted, &[&snapshot.raw, &remote_side])?;
             let commit = engine.commit(
                 &tree,
-                &[remote_commit.clone()],
+                std::slice::from_ref(&remote_commit),
                 &format!("tandem: upgrade the board to protocol {PROTOCOL_VERSION}"),
             )?;
             match engine.push(remote, &commit)? {
