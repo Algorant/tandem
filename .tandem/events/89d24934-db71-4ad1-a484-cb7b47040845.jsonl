@@ -269,3 +269,7 @@
 {"ts":"2026-10-01T06:30:00Z","event":"accord.claimed","id":"task-49-8","summary":"Accord claim for task-49-8","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":269}
 {"ts":"2026-10-01T06:30:59Z","event":"accord.delivered","id":"task-49-10","summary":"Accord deliver for task-49-10","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":270}
 {"ts":"2026-10-01T06:30:59Z","event":"task.completed","id":"task-49-10","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":271}
+{"ts":"2026-10-01T06:38:02Z","event":"accord.delivered","id":"task-49-8","summary":"Accord deliver for task-49-8","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":272}
+{"ts":"2026-10-01T06:38:02Z","event":"task.completed","id":"task-49-8","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":273}
+{"ts":"2026-10-01T06:38:02Z","event":"accord.delivered","id":"task-49","summary":"Accord deliver for task-49","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":274}
+{"ts":"2026-10-01T06:38:02Z","event":"task.completed","id":"task-49","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":275}
