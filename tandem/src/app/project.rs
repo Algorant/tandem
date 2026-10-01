@@ -129,6 +129,11 @@ pub(crate) fn ensure_current_protocol(project: &TandemProject) -> Result<(), Err
             )));
         }
     }
+    if version == "0.4.0" {
+        return Err(Error::user(format!(
+            "This board uses protocol 0.4.0; this Tandem version requires {PROTOCOL_VERSION}. Run `tandem migrate` to upgrade it. Every machine that shares this board must install this Tandem version before the board is migrated and synced, because older versions cannot read the new kinds or protocol version."
+        )));
+    }
     Err(Error::user(format!(
         "Unsupported protocol version `{version}` detected; this Tandem version requires {PROTOCOL_VERSION}."
     )))

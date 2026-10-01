@@ -16,7 +16,7 @@ fn landing_and_help_need_no_workspace() {
     assert!(landing_text.contains("review               Request exceptional human validation"));
     assert!(landing_text.contains("rules list|add|edit|delete  Manage project rules"));
     assert!(landing_text.contains("sync                 Sync the board with the tandem branch"));
-    assert!(landing_text.contains("migrate              Move a 0.3.0 board to the tandem branch"));
+    assert!(landing_text.contains("migrate              Upgrade a 0.3.0 or 0.4.0 board"));
     assert!(landing_text.contains("Run 'tandem <command> --help' for detailed usage."));
     let help = bin().arg("--help").output().unwrap();
     assert!(help.status.success());

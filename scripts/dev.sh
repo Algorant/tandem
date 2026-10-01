@@ -55,7 +55,7 @@ sandbox() {
         "$binary" add task 'Assignment with a milestone' --parent task-1 --acceptance 'Inspect complete scope and milestone progress' --constraint 'Sandbox only' --validation 'Native assignment read' >/dev/null
         "$binary" add task 'Dependent assignment' --parent task-1 --blocker task-2 --acceptance 'Inspect the blocker context' >/dev/null
         "$binary" add task 'Milestone: try an action' --parent task-2 --acceptance 'Progress persists on the board' >/dev/null
-        "$binary" add task 'Example papercut' --priority low --tag papercut --acceptance 'Inspect filtered papercuts' >/dev/null
+        "$binary" add task 'Example papercut' --kind papercut >/dev/null
         "$binary" add task 'Try Actions: claim, block, resume, deliver, complete' --acceptance 'Use a to exercise the native workflow' --acceptance 'Preserve meaningful evidence in Logs' >/dev/null
         "$binary" add task 'Completed example' --acceptance 'Read final delivery evidence in Logs' >/dev/null
         "$binary" add decision 'Use a disposable Git sandbox' --body 'Dev lifecycle actions must not commit the real project records.' >/dev/null

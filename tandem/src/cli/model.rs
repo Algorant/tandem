@@ -28,7 +28,7 @@ pub(crate) enum Command {
     Cancel(CancelArgs),
     /// Synchronize the board with the repository's `tandem` branch
     Sync(SyncArgs),
-    /// Move a protocol 0.3.0 board to the repository's `tandem` branch
+    /// Upgrade an older board: move 0.3.0 to the `tandem` branch, or convert 0.4.0 to 0.5.0
     Migrate(MigrateArgs),
     Rules(RulesArgs),
     Tui,
@@ -94,7 +94,7 @@ pub(crate) enum AddCommand {
 pub(crate) struct AddTaskArgs {
     #[arg(allow_hyphen_values = true)]
     pub(crate) title: String,
-    #[arg(long, required = true, allow_hyphen_values = true)]
+    #[arg(long, allow_hyphen_values = true)]
     pub(crate) acceptance: Vec<String>,
     #[arg(long, allow_hyphen_values = true)]
     pub(crate) body: Option<String>,
@@ -156,6 +156,9 @@ pub(crate) struct ListArgs {
     pub(crate) r#type: Option<String>,
     #[arg(long)]
     pub(crate) state: Option<String>,
+    /// Only Tasks of this kind: epic, research, or papercut
+    #[arg(long)]
+    pub(crate) kind: Option<String>,
     #[arg(long)]
     pub(crate) priority: Option<String>,
     #[arg(long)]
@@ -185,6 +188,9 @@ pub(crate) struct SearchArgs {
     pub(crate) r#type: Option<String>,
     #[arg(long)]
     pub(crate) state: Option<String>,
+    /// Only Tasks of this kind: epic, research, or papercut
+    #[arg(long)]
+    pub(crate) kind: Option<String>,
     #[arg(long, action = clap::ArgAction::Append)]
     pub(crate) tag: Vec<String>,
     #[arg(long)]

@@ -45,6 +45,7 @@ pub(crate) struct AssignmentNodeDto {
     #[serde(rename = "type")]
     pub(crate) document_type: String,
     pub(crate) role: &'static str,
+    pub(crate) kind: Option<String>,
     pub(crate) title: String,
     pub(crate) body: String,
     pub(crate) location: &'static str,
@@ -180,6 +181,7 @@ fn node(
         id: document.id().to_string(),
         document_type: document.doc_type().to_string(),
         role: role.as_str(),
+        kind: document.kind().map(str::to_string),
         title: document.title().to_string(),
         body: document.body.clone(),
         location: document.location.as_str(),

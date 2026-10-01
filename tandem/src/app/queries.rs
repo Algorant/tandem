@@ -69,6 +69,7 @@ pub(crate) struct ReadSnapshot {
 #[derive(Debug, Default)]
 pub(crate) struct ListFilter<'a> {
     pub(crate) state: Option<&'a str>,
+    pub(crate) kind: Option<&'a str>,
     pub(crate) doc_type: Option<&'a str>,
     pub(crate) priority: Option<&'a str>,
     pub(crate) effort: Option<&'a str>,
@@ -90,6 +91,7 @@ pub(crate) struct SearchResult {
 pub(crate) struct SearchFilter<'a> {
     pub(crate) query: &'a str,
     pub(crate) state: Option<&'a str>,
+    pub(crate) kind: Option<&'a str>,
     pub(crate) doc_type: Option<&'a str>,
     pub(crate) tags: &'a [String],
     pub(crate) parent: Option<&'a str>,
@@ -287,6 +289,7 @@ pub(crate) fn search_documents(
     let mut results = docs
         .into_iter()
         .filter(|doc| filter.doc_type.is_none_or(|kind| doc.doc_type() == kind))
+        .filter(|doc| filter.kind.is_none_or(|kind| doc.kind() == Some(kind)))
         .filter(|doc| {
             if doc.location == DocumentLocation::Logs {
                 filter.state.is_none()
@@ -360,6 +363,7 @@ fn matches_filter(doc: &Document, filter: &ListFilter<'_>) -> bool {
     filter
         .state
         .is_none_or(|state| state_matches_filter(doc.field("state"), state))
+        && filter.kind.is_none_or(|kind| doc.kind() == Some(kind))
         && filter
             .doc_type
             .is_none_or(|doc_type| doc.doc_type() == doc_type)
@@ -438,8 +442,8 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning == "task-1 references missing target missing-task."));
-        // Legacy papercut-* IDs resolve to nothing in protocol 0.3.0: Papercuts
-        // are Tasks tagged papercut, so a stale papercut-N reference warns.
+        // Legacy papercut-* IDs resolve to nothing: Papercuts are Tasks of
+        // kind papercut, so a stale papercut-N reference warns.
         assert!(read
             .warnings
             .iter()

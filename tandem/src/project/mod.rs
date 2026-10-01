@@ -1056,7 +1056,7 @@ mod tests {
         .unwrap();
         assert!(project.reference_target_exists("task-1").unwrap());
         assert!(!project.reference_target_exists("task-9").unwrap());
-        // Legacy papercut-* IDs are not documents in protocol 0.3.0.
+        // Legacy papercut-* IDs are not documents; Papercuts are task-N.
         assert!(!project.reference_target_exists("papercut-1").unwrap());
         fs::remove_dir_all(root).unwrap();
     }

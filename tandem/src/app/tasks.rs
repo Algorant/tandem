@@ -18,9 +18,12 @@ use crate::project::{
 };
 use crate::protocol::accord::{status as accord_status, AccordRecord};
 use crate::protocol::document::{
-    is_absolute_reference_url, parse_field_values, validate_task_kind, EFFORTS, PRIORITIES,
+    acceptance_is_optional, is_absolute_reference_url, parse_field_values, validate_task_kind,
+    EFFORTS, KIND_PAPERCUT, PAPERCUT_DEFAULT_PRIORITY, PRIORITIES,
 };
-use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship};
+use crate::protocol::hierarchy::{
+    papercut_subtask_message, DocumentLocation, ParentRelationship, TaskRole,
+};
 use crate::protocol::ids::next_sequential_number as next_sequential_number_for_ids;
 use crate::protocol::workflow::{
     ResolutionRecord, RESOLUTION_OUTCOME_CANCELED, RESOLUTION_OUTCOME_COMPLETED,
@@ -182,9 +185,15 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
     let state = options.state.as_deref().unwrap_or("todo").to_string();
     validate_state(workspace, &state)?;
     validate_task_kind_option(options.kind.as_deref(), "add --kind")?;
-    if options.acceptance.is_empty() {
+    let kind = options
+        .kind
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    if options.acceptance.is_empty() && !acceptance_is_optional(kind.as_deref()) {
         return Err(Error::usage(
-            "add requires at least one --acceptance <text>",
+            "add requires at least one --acceptance <text>; only --kind papercut may omit it",
         ));
     }
     validate_optional_vocabulary(
@@ -194,12 +203,10 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         "priority",
     )?;
     validate_optional_vocabulary(options.effort.as_deref(), "add --effort", EFFORTS, "effort")?;
-    let kind = options
-        .kind
+    let priority = options
+        .priority
         .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string);
+        .or((kind.as_deref() == Some(KIND_PAPERCUT)).then_some(PAPERCUT_DEFAULT_PRIORITY));
 
     if kind.as_deref() == Some("epic") && options.parent.is_some() {
         return Err(Error::user(
@@ -213,6 +220,14 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         .as_deref()
         .map(|parent| resolve_parent_relationship(&hierarchy, "task", parent))
         .transpose()?;
+    if kind.as_deref() == Some(KIND_PAPERCUT)
+        && parent_relationship == Some(ParentRelationship::Subtask)
+    {
+        return Err(Error::user(papercut_subtask_message(&format!(
+            "a papercut under {}",
+            options.parent.as_deref().unwrap_or("")
+        ))));
+    }
     if let Some(parent) = options.parent.as_deref() {
         let parent_document = hierarchy
             .document(parent)
@@ -266,7 +281,7 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             push_optional_line(&mut lines, "kind", kind.as_deref());
             lines.push(format!("title: {}", yaml_double_quote(&title)));
             lines.push(format!("state: {state}"));
-            push_optional_line(&mut lines, "priority", options.priority.as_deref());
+            push_optional_line(&mut lines, "priority", priority);
             push_optional_line(&mut lines, "effort", options.effort.as_deref());
             push_optional_line(&mut lines, "assignee", options.assignee.as_deref());
             push_optional_line(&mut lines, "dueDate", options.due_date.as_deref());
@@ -437,6 +452,12 @@ pub(crate) fn update(
     let prospective_role = prospective_hierarchy
         .task_role(&prospective)?
         .expect("prospective task has a task role");
+    if prospective.kind() == Some(KIND_PAPERCUT) && prospective_role == TaskRole::Subtask {
+        return Err(Error::user(papercut_subtask_message(&format!(
+            "papercut {}",
+            doc.id()
+        ))));
+    }
     if options.parent.is_some() && old_role != prospective_role {
         return Err(Error::user(format!(
             "Validation failed: reparenting {} would change its canonical role from {} to {}; IDs are immutable",
@@ -762,9 +783,11 @@ fn apply_accord_definition_update(
         .clear
         .iter()
         .any(|field| field == "acceptance" || field == "criterion");
-    if clears_acceptance {
+    let final_kind = options.kind.as_deref().map(str::trim).or(doc.kind());
+    let acceptance_optional = acceptance_is_optional(final_kind);
+    if clears_acceptance && !acceptance_optional {
         return Err(Error::user(format!(
-            "Validation failed: {} cannot clear acceptance; an active task requires at least one criterion",
+            "Validation failed: {} cannot clear acceptance; an active task requires at least one criterion (only a papercut may have none)",
             doc.id()
         )));
     }
@@ -802,8 +825,14 @@ fn apply_accord_definition_update(
         "acceptance",
         &mut acceptance,
         &options.acceptance,
-        false,
+        clears_acceptance,
     );
+    if options.kind.is_some() && acceptance.is_empty() && !acceptance_optional {
+        return Err(Error::user(format!(
+            "Validation failed: {} requires at least one acceptance criterion unless it is a papercut; add --acceptance <text>",
+            doc.id()
+        )));
+    }
     let mut constraints = accord.constraints.clone();
     apply(
         changes,
@@ -1061,15 +1090,13 @@ mod tests {
             "---\nprotocolVersion: 0.3.0\nstates: [todo, in-progress, validation]\n---\n",
         )
         .unwrap();
-        // A Papercut is a low-priority Task tagged papercut in protocol 0.3.0,
-        // so its ID is a real document target for loose references.
+        // A Papercut is a Task of kind papercut, so its ID is a real document
+        // target for loose references.
         let tagged = add(
             &project,
             AddOptions {
-                acceptance: vec!["friction captured".to_string()],
                 title: Some("Small friction".to_string()),
-                tags: vec!["papercut".to_string()],
-                priority: Some("low".to_string()),
+                kind: Some("papercut".to_string()),
                 ..Default::default()
             },
         )
@@ -1078,10 +1105,8 @@ mod tests {
         let update_papercut_id = add(
             &project,
             AddOptions {
-                acceptance: vec!["friction captured".to_string()],
                 title: Some("More friction".to_string()),
-                tags: vec!["papercut".to_string()],
-                priority: Some("low".to_string()),
+                kind: Some("papercut".to_string()),
                 ..Default::default()
             },
         )
@@ -1484,6 +1509,92 @@ mod tests {
         .unwrap_err();
         assert!(error.message.contains("archived parent"));
         assert!(error.message.contains("Board"));
+        fs::remove_dir_all(project.root()).unwrap();
+    }
+
+    #[test]
+    fn papercut_needs_only_a_title_defaults_low_and_never_becomes_a_subtask() {
+        let root = std::env::temp_dir().join(format!(
+            "tandem-app-papercut-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let project = TandemProject::initialize(
+            &root,
+            "---\nprotocolVersion: 0.5.0\nstates: [todo, in-progress, validation]\n---\n",
+        )
+        .unwrap();
+        let papercut = |title: &str, parent: Option<String>, priority: Option<&str>| AddOptions {
+            title: Some(title.to_string()),
+            kind: Some("papercut".to_string()),
+            parent,
+            priority: priority.map(str::to_string),
+            ..Default::default()
+        };
+        let plain = add(&project, papercut("Plain", None, None)).unwrap();
+        let source = fs::read_to_string(&plain.path).unwrap();
+        assert!(source.contains("kind: \"papercut\"\n"), "{source}");
+        assert!(source.contains("priority: \"low\"\n"), "{source}");
+        assert!(!source.contains("acceptance"), "{source}");
+        let high = add(&project, papercut("High", None, Some("high"))).unwrap();
+        assert!(fs::read_to_string(&high.path)
+            .unwrap()
+            .contains("priority: \"high\""));
+
+        for kind in [None, Some("research"), Some("epic")] {
+            let error = add(
+                &project,
+                AddOptions {
+                    title: Some("No acceptance".to_string()),
+                    kind: kind.map(str::to_string),
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+            assert_eq!(
+                error.message,
+                "add requires at least one --acceptance <text>; only --kind papercut may omit it"
+            );
+        }
+
+        let epic = add(
+            &project,
+            AddOptions {
+                title: Some("Epic".to_string()),
+                kind: Some("epic".to_string()),
+                acceptance: vec!["ok".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        add(
+            &project,
+            papercut("Under epic", Some(epic.id.clone()), None),
+        )
+        .unwrap();
+        let task = add(
+            &project,
+            AddOptions {
+                title: Some("Task".to_string()),
+                acceptance: vec!["ok".to_string()],
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let error = add(
+            &project,
+            papercut("Under task", Some(task.id.clone()), None),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error.message,
+            format!(
+                "Validation failed: a papercut under {} cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic",
+                task.id
+            )
+        );
         fs::remove_dir_all(project.root()).unwrap();
     }
 }

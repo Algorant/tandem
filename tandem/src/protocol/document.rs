@@ -11,7 +11,16 @@ use crate::protocol::config::DECISION_STATUSES;
 
 pub(crate) const PRIORITIES: &[&str] = &["low", "medium", "high", "critical"];
 pub(crate) const EFFORTS: &[&str] = &["trivial", "small", "medium", "large"];
-pub(crate) const TASK_KINDS: &[&str] = &["epic"];
+/// Task kinds. A Task without `kind` is a standard Task.
+pub(crate) const TASK_KINDS: &[&str] = &["epic", "research", "papercut"];
+pub(crate) const KIND_PAPERCUT: &str = "papercut";
+/// Priority a papercut receives when none is given.
+pub(crate) const PAPERCUT_DEFAULT_PRIORITY: &str = "low";
+
+/// Only a papercut may exist without acceptance criteria.
+pub(crate) fn acceptance_is_optional(kind: Option<&str>) -> bool {
+    kind == Some(KIND_PAPERCUT)
+}
 pub(crate) const SUPPORTED_DOCUMENT_TYPES: &[&str] = &["task", "decision"];
 
 /// Parsed document meaning. Project code retains its source path and location

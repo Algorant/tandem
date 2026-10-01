@@ -1,5 +1,10 @@
-//! One-time move of a protocol 0.3.0 board from source commits to the
-//! repository's `tandem` branch.
+//! Protocol version steps for `tandem migrate`.
+//!
+//! - 0.3.0 → current: one-time move of a board from source commits to the
+//!   repository's `tandem` branch, converted to the current protocol.
+//! - 0.4.0 → 0.5.0: in-place upgrade that turns the `research` and
+//!   `papercut` tags of active Board Tasks into `kind`s. Logs are never
+//!   rewritten.
 //!
 //! `migrate` runs once, on one machine: it gives every record a permanent
 //! `uid`, publishes the board as the first commit of the `tandem` branch, and
@@ -8,27 +13,45 @@
 //! changes: it merges them into the shared board (renumbering records that
 //! were never published) before that machine pulls the source commit.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::git::{self, GitCall, GitContext};
-use super::sync::{self, top_field, Files, Report};
+use super::sync::{self, top_field, Files, Report, Upgraded};
+use super::{patch_frontmatter_content, yaml_double_quote, ProjectHierarchy, TandemProject};
 use crate::protocol::config::PROTOCOL_VERSION;
+use crate::protocol::hierarchy::{DocumentLocation, TaskRole};
 use crate::protocol::ids::{provisional_id, replace_id_token};
 use crate::CliError;
 
 const LEGACY_VERSION: &str = "0.3.0";
+const PREVIOUS_VERSION: &str = "0.4.0";
+/// Tags that became Task kinds in protocol 0.5.0.
+const KIND_TAGS: [&str; 2] = ["research", "papercut"];
 const SOURCE_COMMIT_MESSAGE: &str = "chore(tandem): move the Tandem board to the tandem branch";
+
+/// Outcome of turning `research`/`papercut` tags into kinds.
+#[derive(Debug, Default)]
+pub(crate) struct KindConversion {
+    /// `(task id, kind)` for every converted active Task.
+    pub(crate) converted: Vec<(String, String)>,
+    /// `(task id, reason)` for every Task left unchanged.
+    pub(crate) skipped: Vec<(String, String)>,
+}
 
 #[derive(Debug)]
 pub(crate) struct MigrateReport {
     pub(crate) dry_run: bool,
-    pub(crate) remote: String,
+    pub(crate) from_version: String,
+    pub(crate) remote: Option<String>,
     pub(crate) records: usize,
     pub(crate) files: usize,
-    pub(crate) migrated_from: String,
+    pub(crate) migrated_from: Option<String>,
     pub(crate) source_commit: Option<String>,
+    /// How the upgrade reached the shared board (0.4.0 step only).
+    pub(crate) upgraded: Option<Upgraded>,
+    pub(crate) kinds: KindConversion,
 }
 
 #[derive(Debug)]
@@ -44,6 +67,8 @@ pub(crate) struct AdoptReport {
     pub(crate) renumbered: Vec<(String, String)>,
     pub(crate) unpushed_commits: Vec<String>,
     pub(crate) needs_pull: bool,
+    /// Tasks whose tag could not be turned into a kind, with the reason.
+    pub(crate) kinds_skipped: Vec<(String, String)>,
 }
 
 struct Legacy {
@@ -166,17 +191,220 @@ fn move_actor_id(ctx: &GitContext, board: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+/// Replaces the `protocolVersion` of a `tandem.md` with the current one.
+fn with_current_version(content: &str) -> String {
+    let mut output = String::with_capacity(content.len() + 8);
+    let mut done = false;
+    for line in content.split_inclusive('\n') {
+        if !done && line.starts_with("protocolVersion:") {
+            output.push_str(&format!("protocolVersion: {PROTOCOL_VERSION}\n"));
+            done = true;
+        } else {
+            output.push_str(line);
+        }
+    }
+    output
+}
+
+/// Inserts `kind: <kind>` after the `type:` line, or after `uid:`/`id:`.
+fn insert_kind_line(content: &str, kind: &str) -> String {
+    let lines: Vec<&str> = content.split_inclusive('\n').collect();
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(1)
+        .find(|(_, line)| line.trim() == "---")
+        .map_or(lines.len(), |(index, _)| index);
+    let position = lines[..end]
+        .iter()
+        .position(|line| line.starts_with("type:"))
+        .or_else(|| {
+            lines[..end]
+                .iter()
+                .rposition(|line| line.starts_with("uid:") || line.starts_with("id:"))
+        });
+    let Some(position) = position else {
+        return content.to_string();
+    };
+    let mut output = String::with_capacity(content.len() + 24);
+    for (index, line) in lines.iter().enumerate() {
+        output.push_str(line);
+        if index == position {
+            if !line.ends_with('\n') {
+                output.push('\n');
+            }
+            output.push_str(&format!("kind: {kind}\n"));
+        }
+    }
+    output
+}
+
+/// Turns the `research`/`papercut` tag of every active Board Task into a
+/// `kind` and drops that tag. Logs, decisions, and rules are never changed.
+///
+/// A Task is left unchanged, and reported with its reason, when the
+/// conversion is ambiguous: both tags, an existing different kind (for
+/// example an Epic), or a papercut that would be a Subtask. Nothing is guessed.
+pub(crate) fn convert_kinds(files: &Files) -> Result<(Files, KindConversion), CliError> {
+    let mut documents = Vec::new();
+    for (path, content) in files {
+        let location = if path.starts_with("logs/") {
+            DocumentLocation::Logs
+        } else if path.starts_with("tasks/") || path.starts_with("decisions/") {
+            DocumentLocation::Board
+        } else {
+            continue;
+        };
+        if !path.ends_with(".md") {
+            continue;
+        }
+        documents.push(
+            super::parse_document(&PathBuf::from(".tandem").join(path), location, content)
+                .map_err(|error| CliError::user(format!("cannot migrate: {}", error.message)))?,
+        );
+    }
+    let hierarchy = ProjectHierarchy::from_documents(documents)
+        .map_err(|error| CliError::user(format!("cannot migrate: {}", error.message)))?;
+    let mut output = files.clone();
+    let mut report = KindConversion::default();
+    for (path, content) in files {
+        if !path.starts_with("tasks/") || !path.ends_with(".md") {
+            continue;
+        }
+        let Some(doc) = hierarchy.document(&record_id(path, content)) else {
+            continue;
+        };
+        if doc.doc_type() != "task" {
+            continue;
+        }
+        let tags = doc.values("tags");
+        let hits: Vec<&str> = KIND_TAGS
+            .into_iter()
+            .filter(|kind| tags.iter().any(|tag| tag == kind))
+            .collect();
+        let id = doc.id().to_string();
+        let kind = match hits.as_slice() {
+            [] => continue,
+            [kind] => *kind,
+            _ => {
+                report
+                    .skipped
+                    .push((id, "tagged both research and papercut".to_string()));
+                continue;
+            }
+        };
+        if let Some(existing) = doc.kind().filter(|existing| *existing != kind) {
+            report.skipped.push((
+                id,
+                format!("already has kind `{existing}` and a `{kind}` tag"),
+            ));
+            continue;
+        }
+        if kind == "papercut" {
+            match hierarchy.task_role(doc) {
+                Ok(Some(TaskRole::Subtask)) => {
+                    report.skipped.push((
+                        id,
+                        "a papercut cannot be a Subtask; place it at the top level or directly under an Epic first".to_string(),
+                    ));
+                    continue;
+                }
+                Err(error) => {
+                    report
+                        .skipped
+                        .push((id, format!("cannot determine placement: {}", error.message)));
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        let remaining: Vec<String> = tags.into_iter().filter(|tag| tag != kind).collect();
+        let mut updates = BTreeMap::new();
+        let mut removes = Vec::new();
+        if remaining.is_empty() {
+            removes.push("tags");
+        } else {
+            updates.insert(
+                "tags".to_string(),
+                format!(
+                    "[{}]",
+                    remaining
+                        .iter()
+                        .map(|tag| yaml_double_quote(tag))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+            );
+        }
+        let mut patched = patch_frontmatter_content(content, &updates, &removes)?;
+        if doc.kind().is_none() {
+            patched = insert_kind_line(&patched, kind);
+        }
+        output.insert(path.clone(), patched);
+        report.converted.push((id, kind.to_string()));
+    }
+    report.converted.sort();
+    report.skipped.sort();
+    Ok((output, report))
+}
+
+/// Upgrades a protocol 0.4.0 board to the current protocol in place.
+fn upgrade_previous(project: &TandemProject, dry_run: bool) -> Result<MigrateReport, CliError> {
+    let board = project.data_dir().to_path_buf();
+    let _lock = super::write::HierarchyLock::acquire(project)?;
+    let files = sync::read_board_dir(&board).map_err(CliError::user)?;
+    let (mut converted, kinds) = convert_kinds(&files)?;
+    if let Some(config) = converted.get_mut("tandem.md") {
+        *config = with_current_version(config);
+    }
+    let remote = project.git().and_then(sync::remote_name);
+    let mut report = MigrateReport {
+        dry_run,
+        from_version: PREVIOUS_VERSION.to_string(),
+        remote: remote.clone(),
+        records: files.keys().filter(|path| is_record(path)).count(),
+        files: files.len(),
+        migrated_from: None,
+        source_commit: None,
+        upgraded: None,
+        kinds,
+    };
+    if dry_run {
+        return Ok(report);
+    }
+    let upgraded = match (project.git(), remote) {
+        (Some(ctx), Some(remote)) => sync::publish_upgrade(ctx, &board, &remote, &converted)?,
+        _ => Upgraded::NotSynced,
+    };
+    if upgraded == Upgraded::NotSynced {
+        for (path, content) in &converted {
+            if files.get(path) != Some(content) {
+                super::write::write_atomic(&board.join(path), content)?;
+            }
+        }
+    }
+    report.upgraded = Some(upgraded);
+    Ok(report)
+}
+
 pub(crate) fn migrate(start: &Path, dry_run: bool) -> Result<MigrateReport, CliError> {
-    let Legacy { ctx, board, remote } = legacy(start)?;
-    match legacy_version(&board)?.as_str() {
+    let project = TandemProject::discover_from(start)?;
+    let version = top_field(&project.read_config_raw()?, "protocolVersion").unwrap_or_default();
+    match version.as_str() {
         LEGACY_VERSION => {}
-        PROTOCOL_VERSION => return Err(CliError::user("this board is already migrated")),
+        PREVIOUS_VERSION => return upgrade_previous(&project, dry_run),
+        PROTOCOL_VERSION => {
+            return Err(CliError::user(format!(
+                "this board is already at protocol {PROTOCOL_VERSION}; nothing to migrate"
+            )))
+        }
         other => {
             return Err(CliError::user(format!(
-                "tandem migrate converts protocol {LEGACY_VERSION} boards; found `{other}`"
+                "tandem migrate converts protocol {LEGACY_VERSION} and {PREVIOUS_VERSION} boards; found `{other}`"
             )))
         }
     }
+    let Legacy { ctx, board, remote } = legacy(start)?;
     if sync::fetch_remote_board(&ctx, &remote)?.is_some() {
         return Err(CliError::user(format!(
             "`{remote}` already has a `tandem` branch: another machine migrated this repository. Run `tandem migrate --adopt` here instead."
@@ -200,10 +428,11 @@ pub(crate) fn migrate(start: &Path, dry_run: bool) -> Result<MigrateReport, CliE
         ));
     }
     let legacy_files = sync::read_board_dir(&board).map_err(CliError::user)?;
+    let (kind_files, kinds) = convert_kinds(&legacy_files)?;
     let workspace_id = new_uid();
     let mut converted = Files::new();
     let mut records = 0;
-    for (path, content) in &legacy_files {
+    for (path, content) in &kind_files {
         let content = if path == "tandem.md" {
             convert_config(content, &workspace_id, &migrated_from)
         } else if is_record(path) {
@@ -216,11 +445,14 @@ pub(crate) fn migrate(start: &Path, dry_run: bool) -> Result<MigrateReport, CliE
     }
     let mut report = MigrateReport {
         dry_run,
-        remote: remote.clone(),
+        from_version: LEGACY_VERSION.to_string(),
+        remote: Some(remote.clone()),
         records,
         files: converted.len(),
-        migrated_from,
+        migrated_from: Some(migrated_from),
         source_commit: None,
+        upgraded: None,
+        kinds,
     };
     if dry_run {
         return Ok(report);
@@ -281,6 +513,12 @@ pub(crate) fn adopt(start: &Path, dry_run: bool) -> Result<AdoptReport, CliError
     let remote_config = remote_files
         .get("tandem.md")
         .ok_or_else(|| CliError::user("the shared board has no tandem.md"))?;
+    let remote_version = top_field(remote_config, "protocolVersion").unwrap_or_default();
+    if remote_version != PROTOCOL_VERSION {
+        return Err(CliError::user(format!(
+            "the shared board uses protocol {remote_version}, but this Tandem version requires {PROTOCOL_VERSION}. Adopt with the Tandem release that migrated it, then run `tandem migrate` to upgrade the board"
+        )));
+    }
     let workspace_id = top_field(remote_config, "workspaceId").unwrap_or_default();
     let migrated_from = top_field(remote_config, "migratedFrom").ok_or_else(|| {
         CliError::user("the shared board does not record where it was migrated from")
@@ -300,6 +538,10 @@ pub(crate) fn adopt(start: &Path, dry_run: bool) -> Result<AdoptReport, CliError
         files.extend(sync::read_board_dir(&board).map_err(CliError::user)?);
         files
     };
+
+    // Local legacy tags become kinds exactly as in the shared board.
+    let (legacy_base, _) = convert_kinds(&legacy_base)?;
+    let (legacy_local, kinds_skipped) = convert_kinds(&legacy_local)?;
 
     // Permanent uids: shared records take the shared board's uid.
     let mut uids: HashMap<String, String> = remote_files
@@ -355,6 +597,7 @@ pub(crate) fn adopt(start: &Path, dry_run: bool) -> Result<AdoptReport, CliError
         renumbered: Vec::new(),
         unpushed_commits: Vec::new(),
         needs_pull: false,
+        kinds_skipped: kinds_skipped.skipped,
     };
     if config_present {
         let log = git_text(
@@ -447,6 +690,128 @@ pub(crate) fn adopt(start: &Path, dry_run: bool) -> Result<AdoptReport, CliError
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn task(id: &str, extra: &str) -> String {
+        format!("---\nid: {id}\nuid: u-{id}\ntype: task\ntitle: \"T\"\nstate: todo\n{extra}accord:\n  status: \"ready\"\n  acceptance: [\"ok\"]\n---\n\nBody\n")
+    }
+
+    fn board(entries: &[(&str, String)]) -> Files {
+        entries
+            .iter()
+            .map(|(path, content)| (path.to_string(), content.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn tags_become_kinds_in_place_and_empty_tag_lists_disappear() {
+        let files = board(&[
+            (
+                "tasks/task-1.md",
+                task("task-1", "tags: [papercut, \"friction\"]\n"),
+            ),
+            (
+                "tasks/task-2.md",
+                task("task-2", "tags:\n  - research\n  - docs\n"),
+            ),
+            ("tasks/task-3.md", task("task-3", "tags: [research]\n")),
+            ("tasks/task-4.md", task("task-4", "tags: [docs]\n")),
+        ]);
+        let (out, report) = convert_kinds(&files).unwrap();
+        assert_eq!(
+            report.converted,
+            vec![
+                ("task-1".to_string(), "papercut".to_string()),
+                ("task-2".to_string(), "research".to_string()),
+                ("task-3".to_string(), "research".to_string()),
+            ]
+        );
+        assert!(report.skipped.is_empty());
+        assert_eq!(
+            out["tasks/task-1.md"],
+            task("task-1", "tags: [\"friction\"]\n")
+                .replace("type: task\n", "type: task\nkind: papercut\n")
+        );
+        assert!(out["tasks/task-2.md"].contains("type: task\nkind: research\n"));
+        assert!(out["tasks/task-2.md"].contains("tags: [\"docs\"]\n"));
+        assert!(!out["tasks/task-3.md"].contains("tags:"));
+        assert!(out["tasks/task-3.md"].ends_with("Body\n"));
+        assert_eq!(out["tasks/task-4.md"], files["tasks/task-4.md"]);
+    }
+
+    #[test]
+    fn ambiguous_tasks_are_reported_and_left_byte_identical() {
+        let files = board(&[
+            (
+                "tasks/task-1.md",
+                task("task-1", "tags: [research, papercut]\n"),
+            ),
+            (
+                "tasks/task-2.md",
+                task("task-2", "kind: epic\ntags: [research]\n"),
+            ),
+            ("tasks/task-3.md", task("task-3", "tags: [papercut]\n")),
+            (
+                "tasks/task-3-1.md",
+                task("task-3-1", "parentId: task-3\ntags: [papercut]\n"),
+            ),
+            (
+                "tasks/task-2-ok.md",
+                task("task-2-ok", "parentId: task-2\ntags: [papercut]\n"),
+            ),
+        ]);
+        let (out, report) = convert_kinds(&files).unwrap();
+        let skipped: Vec<&str> = report.skipped.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(skipped, vec!["task-1", "task-2", "task-3-1"]);
+        assert_eq!(out["tasks/task-1.md"], files["tasks/task-1.md"]);
+        assert_eq!(out["tasks/task-2.md"], files["tasks/task-2.md"]);
+        assert_eq!(out["tasks/task-3-1.md"], files["tasks/task-3-1.md"]);
+        assert!(report.skipped[2].1.contains("cannot be a Subtask"));
+        // A papercut directly under an Epic and a root papercut convert.
+        let converted: Vec<&str> = report.converted.iter().map(|(id, _)| id.as_str()).collect();
+        assert_eq!(converted, vec!["task-2-ok", "task-3"]);
+    }
+
+    #[test]
+    fn logs_decisions_and_rules_are_never_rewritten() {
+        let log = task(
+            "task-8",
+            "tags: [research]\nresolution:\n  outcome: \"completed\"\n",
+        );
+        let decision =
+            "---\nid: decision-1\nuid: u-d\ntype: decision\ntitle: \"D\"\ntags: [research]\n---\n";
+        let files = board(&[
+            ("tasks/task-1.md", task("task-1", "tags: [research]\n")),
+            ("logs/task-9.md", task("task-9", "tags: [papercut]\n")),
+            ("logs/task-8.md", log),
+            ("decisions/decision-1.md", decision.to_string()),
+            (
+                "rules/always-1.md",
+                "---\nid: always-1\ncategory: always\ntags: [papercut]\n---\nKeep.\n".to_string(),
+            ),
+        ]);
+        let (out, report) = convert_kinds(&files).unwrap();
+        assert_eq!(report.converted.len(), 1);
+        for path in [
+            "logs/task-9.md",
+            "logs/task-8.md",
+            "decisions/decision-1.md",
+            "rules/always-1.md",
+        ] {
+            assert_eq!(out[path], files[path], "{path}");
+        }
+    }
+
+    #[test]
+    fn kind_line_goes_after_type_or_after_the_identity() {
+        assert_eq!(
+            insert_kind_line("---\nid: a\nuid: u\ntitle: x\n---\n", "research"),
+            "---\nid: a\nuid: u\nkind: research\ntitle: x\n---\n"
+        );
+        assert_eq!(
+            with_current_version("---\nprotocolVersion: 0.4.0\nworkspaceId: w\n---\n"),
+            format!("---\nprotocolVersion: {PROTOCOL_VERSION}\nworkspaceId: w\n---\n")
+        );
+    }
 
     #[test]
     fn conversion_inserts_uid_and_config_identity_deterministically() {

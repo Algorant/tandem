@@ -1,10 +1,10 @@
-# Tandem Protocol 0.4.0
+# Tandem Protocol 0.5.0
 
 This directory is the normative specification for Tandem's local-first coordination format. The executable implementation is `tandem/src/protocol/`; filesystem discovery and persistence belong to `tandem/src/project/`.
 
 ## Workspace layout
 
-A 0.4.0 workspace contains:
+A 0.5.0 workspace contains:
 
 ```text
 .tandem/
@@ -18,7 +18,7 @@ A 0.4.0 workspace contains:
 
 In a Git repository the board is the `.tandem/` folder of the main worktree, ignored by the source branch and synchronized through the repository's `tandem` branch (see [Sync](#sync)). Every linked worktree uses the main worktree's board. A board outside Git is a plain local folder.
 
-The workspace frontmatter must contain `protocolVersion: 0.4.0`, a permanent `workspaceId` (random UUID), `title`, and the active `states` (`todo`, `in-progress`, `validation`). A migrated board also records `migratedFrom`, the source commit whose 0.3.0 board it came from. Another protocol version fails clearly with both detected and required versions; a 0.3.0 board is converted once with `tandem migrate`.
+The workspace frontmatter must contain `protocolVersion: 0.5.0`, a permanent `workspaceId` (random UUID), `title`, and the active `states` (`todo`, `in-progress`, `validation`). A migrated board also records `migratedFrom`, the source commit whose 0.3.0 board it came from. Another protocol version fails clearly with both detected and required versions; a 0.3.0 or 0.4.0 board is converted once with `tandem migrate` (see [Migration](#migration)). **Every machine that shares a board must install the new Tandem before that board is migrated to 0.5.0 and synced:** older versions reject the new protocol version and the `research` and `papercut` kinds.
 
 Actor identity is checkout-local: `<git-dir>/tandem-actor-id` for the current checkout (a linked worktree has its own Git directory), or `.tandem/actor-id` for a board outside Git. It is never inside the synced board and never committed.
 
@@ -30,7 +30,20 @@ Every Task, Subtask, Epic, Decision, and Rule has a permanent `uid` (random UUID
 
 Tasks use immutable global `task-N` IDs for root Tasks, Epics, and direct Epic children. A normal Task directly beneath a normal Task is a leaf Subtask with immutable `task-N-M` ID. A provisional `task-new-<hex>` ID is valid in every role until publication. Epics (`kind: epic`) are root-only. Subtasks cannot have children, and reparenting may not change role or invalidate the ID. `parentId` is task-only and resolves only Epic → Task or Task → Subtask relationships. Decisions are linked with `references`, never hierarchy.
 
-Active Tasks have `state` and a mandatory `accord` with at least one `acceptance` criterion. State is exactly `todo`, `in-progress`, or `validation`. Papercuts are ordinary low-priority Tasks tagged `papercut`.
+Active Tasks have `state` and a mandatory `accord`. State is exactly `todo`, `in-progress`, or `validation`.
+
+### Task kinds
+
+`kind` is optional and is exactly one of `epic`, `research`, or `papercut`; any other value is invalid. A Task without `kind` is a standard Task. Tags are topical only: Tandem never reads a tag as a kind, and there is no tag fallback. Classification comes from `kind` alone, and there are no standing container records.
+
+| Kind | Required at `add` | Default | Placement |
+| --- | --- | --- | --- |
+| none (standard) | title, at least one `acceptance` criterion | none | root, Epic child, or Subtask |
+| `epic` | title, at least one `acceptance` criterion | none | root only |
+| `research` | title, at least one `acceptance` criterion | none | anywhere, including as a Subtask |
+| `papercut` | title only; `acceptance` optional | `priority: low`, overridable | root Task or direct child of an Epic; **never a Subtask** |
+
+Only a papercut may have no acceptance criterion; `update --clear acceptance` is valid only for a papercut, and changing a papercut to another kind requires an acceptance criterion in the same update. A papercut is placed at the top level or directly under an Epic. Creating one beneath a Task, reparenting one into a Task, or changing the kind of an existing Subtask to `papercut` is a structural validation error, and a board containing such a record is invalid. Archived Logs keep any legacy `research`/`papercut` tags unchanged; nothing reads them as kinds.
 
 Decision metadata includes `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`), automatic `createdAt`/`updatedAt`, automatic `decidedAt` on acceptance or rejection, `deciders`, `supersedes`, `references`, and `tags`. ADR prose belongs in the Markdown body. There are no manual `date`, `supersededBy`, or prose metadata flags.
 
@@ -82,7 +95,11 @@ Mutations publish immediately. Reads refresh first when the last fetch is older 
 
 ## Migration
 
-`tandem migrate` converts a 0.3.0 board that source commits track: it requires a remote without a `tandem` branch, a branch not behind its upstream, and no staged changes; adds a `uid` to every record and `workspaceId`/`migratedFrom` to `tandem.md`; publishes the board as the root commit of the `tandem` branch; moves the checkout's actor identity into its Git directory; and creates one source commit that stops tracking `.tandem/` and ignores it. `--dry-run` reports without changing anything.
+`tandem migrate` is the single version-stepping command. It reads the board's `protocolVersion` and runs the matching step; any other version, including an already-current board, fails with a clear error. `--dry-run` reports without changing anything.
+
+**0.4.0 → 0.5.0** converts the active Board in place and bumps `protocolVersion` in the same change. For every active Task (not Decisions, Rules, or Logs) tagged `research` or `papercut` it sets `kind` to that value and removes that tag, removing `tags` when no tag is left. A Task is left unchanged and reported, never guessed, when it carries both tags, already has a different kind (for example an Epic), or is a papercut-tagged Subtask. Archived Logs are never rewritten. On a Git-backed board with a remote the upgraded files are published as one commit on the `tandem` branch on top of the current shared tip (the board must be synced and without conflicts first). If another machine already published the 0.5.0 board, `migrate` instead downloads it, and it refuses if this checkout holds changes that were never synced. A board with no remote, or one that has never been synced, is rewritten locally. Install the new Tandem on every machine before running this step.
+
+**0.3.0 → 0.5.0** converts a 0.3.0 board that source commits track, applying the same tag-to-kind conversion to its active Tasks: it requires a remote without a `tandem` branch, a branch not behind its upstream, and no staged changes; adds a `uid` to every record and `workspaceId`/`migratedFrom` to `tandem.md`; publishes the board as the root commit of the `tandem` branch; moves the checkout's actor identity into its Git directory; and creates one source commit that stops tracking `.tandem/` and ignores it. `--dry-run` reports without changing anything.
 
 On another machine with unpushed or uncommitted 0.3.0 board changes, `tandem migrate --adopt` (before pulling the migration commit) merges them into the shared board from the common legacy base, gives records that were never published provisional IDs so they are renumbered, stores the result in the safety copy, and restores the tracked legacy files so `git pull` can remove them. A machine without local board changes just pulls; its first Tandem command downloads the board.
 
@@ -90,6 +107,6 @@ On another machine with unpushed or uncommitted 0.3.0 board changes, `tandem mig
 
 The Rust CLI is clap-derived. The exact command tree is documented by generated help and has 28 leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `sync`; `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; and `web`. Global `-j/--json`, `-h/--help`, and `-V/--version` work before or after subcommands. JSON success and operational/usage errors are stdout-only envelopes. Human results use stdout and warnings/errors use stderr. Exit codes are 0 success, 1 operational failure, and 2 usage failure. Every mutation's JSON result includes `data.sync`: `{"status":"synced|pending|local-only|not-git","message":...,"renamed":{"<provisional>":"<id>"},"conflicts":[{"id","reason"}],"held":[{"path","reason"}]}` and reports the record's final ID. A sync that cannot complete never undoes a saved change and never fails the command; the result is `pending`.
 
-`assignment <task-id> --json` returns the complete current Task and direct milestone definition with an opaque freshness token and derived blocker readiness; assignment nodes also include derived `attemptCount`, `reworkCount`, and `discardedCount`; see [`assignment.md`](assignment.md). A planned validation beginning with `$ ` is a runnable command: after removing the prefix and leading whitespace, the command runs from the Task repository root and exit 0 passes. Other planned validations are manual checks. Assignment JSON classifies each item as `{ "kind": "command" | "manual", "text": "..." }` and strips `$ ` from command text; `show --json` preserves the raw validation strings. Adapters should require captured command output for command entries and may refuse integration on a non-zero exit. Tandem does not execute these commands, and Tasks with no command entries are unaffected. `list` and `search` support `--scope active|archived|all`, defaulting to active. `update` never mutates state, assignee, or Accord status. Repeated list values replace the complete list; absent values remain unchanged; `--clear` removes lists and optional scalars. Human prose accepts leading hyphens while typed IDs, enums, and numbers remain strict.
+`assignment <task-id> --json` returns the complete current Task and direct milestone definition with an opaque freshness token and derived blocker readiness; assignment nodes also include derived `attemptCount`, `reworkCount`, and `discardedCount`; see [`assignment.md`](assignment.md). A planned validation beginning with `$ ` is a runnable command: after removing the prefix and leading whitespace, the command runs from the Task repository root and exit 0 passes. Other planned validations are manual checks. Assignment JSON classifies each item as `{ "kind": "command" | "manual", "text": "..." }` and strips `$ ` from command text; `show --json` preserves the raw validation strings. Adapters should require captured command output for command entries and may refuse integration on a non-zero exit. Tandem does not execute these commands, and Tasks with no command entries are unaffected. `add task` and `update` accept `--kind epic|research|papercut`; `list` and `search` accept one `--kind` value with the same validation. `list` and `search` support `--scope active|archived|all`, defaulting to active. `update` never mutates state, assignee, or Accord status. Repeated list values replace the complete list; absent values remain unchanged; `--clear` removes lists and optional scalars. Human prose accepts leading hyphens while typed IDs, enums, and numbers remain strict.
 
-There is no `upgrade`, `move`, `version`, or `checkpoint` command, `log`, `decision`, or `papercut` command family, compatibility parser, or fallback. `migrate` is the one-time 0.3.0 conversion.
+There is no `upgrade`, `move`, `version`, or `checkpoint` command, `log`, `decision`, or `papercut` command family, compatibility parser, or fallback. `migrate` converts 0.3.0 and 0.4.0 boards once.

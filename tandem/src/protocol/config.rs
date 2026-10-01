@@ -3,7 +3,7 @@
 //! Workflow-state semantics live in [`super::workflow`]. See the normative
 //! [workspace config fields](../../../protocol/plan/spec.md#workspace-config-fields).
 
-pub(crate) const PROTOCOL_VERSION: &str = "0.4.0";
+pub(crate) const PROTOCOL_VERSION: &str = "0.5.0";
 
 /// The `tandem.md` of a new workspace. `workspace_id` permanently identifies
 /// the board across clones and machines.

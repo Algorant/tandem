@@ -1,6 +1,6 @@
 //! Typed CLI-to-application conversion and dispatch.
 use super::model::*;
-use crate::project::sync::{self, Mode, Outcome, Report};
+use crate::project::sync::{self, Mode, Outcome, Report, Upgraded};
 use crate::project::TandemProject;
 use crate::{app, CliError};
 
@@ -254,6 +254,15 @@ fn assignment(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliErro
     Ok(super::StartupRequest::Exit)
 }
 
+/// Rejects a `--kind` filter value outside the Task kind vocabulary.
+fn validate_kind_filter(kind: Option<&str>) -> Result<(), CliError> {
+    match kind {
+        Some(kind) => crate::protocol::document::validate_task_kind(kind)
+            .map_err(|message| CliError::user(format!("Validation failed: {message}"))),
+        None => Ok(()),
+    }
+}
+
 fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let (project, warnings) = open_read()?;
     let docs = app::queries::documents_for_scope(
@@ -264,8 +273,10 @@ fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
             Scope::All => app::queries::Scope::All,
         },
     )?;
+    validate_kind_filter(args.kind.as_deref())?;
     let filter = app::queries::ListFilter {
         state: args.state.as_deref(),
+        kind: args.kind.as_deref(),
         doc_type: args.r#type.as_deref(),
         priority: args.priority.as_deref(),
         effort: args.effort.as_deref(),
@@ -363,9 +374,11 @@ fn search(args: SearchArgs, json: bool) -> Result<super::StartupRequest, CliErro
             Scope::All => app::queries::Scope::All,
         },
     )?;
+    validate_kind_filter(args.kind.as_deref())?;
     let filter = app::queries::SearchFilter {
         query: &args.query,
         state: args.state.as_deref(),
+        kind: args.kind.as_deref(),
         doc_type: args.r#type.as_deref(),
         tags: &args.tag,
         parent: args.parent.as_deref(),
@@ -912,6 +925,7 @@ fn migrate(args: MigrateArgs, json: bool) -> Result<super::StartupRequest, CliEr
                     "renumbered": report.renumbered.iter().map(|(old, new)| serde_json::json!({"old": old, "new": new})).collect::<Vec<_>>(),
                     "unpushedCommits": report.unpushed_commits,
                     "needsPull": report.needs_pull,
+                    "kindsSkipped": report.kinds_skipped.iter().map(|(id, reason)| serde_json::json!({"id": id, "reason": reason})).collect::<Vec<_>>(),
                     "sync": report.sync.as_ref().map(sync_json),
                 },"warnings":[]})
             );
@@ -941,36 +955,97 @@ fn migrate(args: MigrateArgs, json: bool) -> Result<super::StartupRequest, CliEr
                     println!("  {commit}");
                 }
             }
+            if !report.kinds_skipped.is_empty() {
+                println!("Tags left as tags (not converted to kinds):");
+                for (id, reason) in &report.kinds_skipped {
+                    println!("  {id}: {reason}");
+                }
+            }
             if report.needs_pull {
                 println!("Next: run `git pull`. The board returns automatically afterwards.");
             }
         }
     } else {
         let report = crate::project::migrate::migrate(&cwd, args.dry_run)?;
+        let to_version = crate::protocol::config::PROTOCOL_VERSION;
         if json {
             println!(
                 "{}",
                 serde_json::json!({"ok":true,"data":{
                     "dryRun": report.dry_run,
+                    "fromVersion": report.from_version,
+                    "toVersion": to_version,
                     "remote": report.remote,
                     "records": report.records,
                     "files": report.files,
                     "migratedFrom": report.migrated_from,
                     "sourceCommit": report.source_commit,
+                    "upgraded": report.upgraded.map(|upgraded| match upgraded {
+                        Upgraded::Published => "published",
+                        Upgraded::Received => "received",
+                        Upgraded::NotSynced => "notSynced",
+                    }),
+                    "kinds": {
+                        "converted": report.kinds.converted.iter().map(|(id, kind)| serde_json::json!({"id": id, "kind": kind})).collect::<Vec<_>>(),
+                        "skipped": report.kinds.skipped.iter().map(|(id, reason)| serde_json::json!({"id": id, "reason": reason})).collect::<Vec<_>>(),
+                    },
                 },"warnings":[]})
             );
-        } else if report.dry_run {
-            println!(
-                "Would move {} file(s) ({} record(s)) to the `tandem` branch on {}, then create one source commit that stops tracking .tandem/.",
-                report.files, report.records, report.remote
-            );
         } else {
-            println!(
-                "Moved {} record(s) to the `tandem` branch on {}.\nCreated source commit {} that stops tracking .tandem/.\nNext: push it with `git push`, then run `git pull` (or `tandem migrate --adopt` if they have unpushed board changes) on your other machines.",
-                report.records,
-                report.remote,
-                report.source_commit.as_deref().unwrap_or("?")
-            );
+            let remote = report.remote.as_deref().unwrap_or("-");
+            if report.from_version == "0.3.0" {
+                if report.dry_run {
+                    println!(
+                        "Would move {} file(s) ({} record(s)) to the `tandem` branch on {remote} as protocol {to_version}, then create one source commit that stops tracking .tandem/.",
+                        report.files, report.records
+                    );
+                } else {
+                    println!(
+                        "Moved {} record(s) to the `tandem` branch on {remote} as protocol {to_version}.\nCreated source commit {} that stops tracking .tandem/.\nNext: push it with `git push`, then run `git pull` (or `tandem migrate --adopt` if they have unpushed board changes) on your other machines.",
+                        report.records,
+                        report.source_commit.as_deref().unwrap_or("?")
+                    );
+                }
+            } else if report.dry_run {
+                println!(
+                    "Would upgrade the board from protocol {} to {to_version} ({} file(s)).",
+                    report.from_version, report.files
+                );
+            } else {
+                match report.upgraded {
+                    Some(Upgraded::Published) => println!(
+                        "Upgraded the board from protocol {} to {to_version} and published it on the `tandem` branch of {remote}.\nNext: install this Tandem version on every other machine that shares this board, then run `tandem migrate` there.",
+                        report.from_version
+                    ),
+                    Some(Upgraded::Received) => println!(
+                        "Another machine already upgraded the shared board to protocol {to_version}; downloaded it."
+                    ),
+                    _ => println!(
+                        "Upgraded the board from protocol {} to {to_version}. It is not synced to a remote, so nothing was published.",
+                        report.from_version
+                    ),
+                }
+            }
+            if report.upgraded != Some(Upgraded::Received) {
+                let verb = if report.dry_run {
+                    "Would convert"
+                } else {
+                    "Converted"
+                };
+                println!(
+                    "{verb} {} Task tag(s) to kinds.",
+                    report.kinds.converted.len()
+                );
+                for (id, kind) in &report.kinds.converted {
+                    println!("  {id} -> kind {kind}");
+                }
+                if !report.kinds.skipped.is_empty() {
+                    println!("Left unchanged (nothing is guessed):");
+                    for (id, reason) in &report.kinds.skipped {
+                        println!("  {id}: {reason}");
+                    }
+                }
+            }
         }
     }
     Ok(super::StartupRequest::Exit)

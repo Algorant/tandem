@@ -312,6 +312,7 @@ async fn board_api(State(state): State<WebState>, uri: Uri) -> Response {
         )?;
         let filter = ListFilter {
             state: query.get("state").map(String::as_str),
+            kind: None,
             doc_type: query.get("type").map(String::as_str),
             priority: query.get("priority").map(String::as_str),
             effort: query.get("effort").map(String::as_str),

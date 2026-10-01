@@ -88,9 +88,9 @@ Search Tandem records before an ad hoc filesystem scan when the question concern
 
 ## Record small friction without interrupting work
 
-Use `tandem papercut add` or an adapter's thin equivalent when small, non-blocking friction causes confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. Then continue current work. A failed tool call is only a signal: expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.
+Use `tandem add task --kind papercut` or an adapter's thin equivalent when small, non-blocking friction causes confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. Then continue current work. A failed tool call is only a signal: expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.
 
-Do not use a Papercut when work is blocked; use the blocking lifecycle. Do not use one instead of a planned fix; create a Task and reference the Papercut. A thin Pi adapter maps `tandem_papercut` actions (`add`, `list`, `show`, `resolve`) to CLI argument arrays, requests JSON for reads, and leaves parsing, IDs, status, references, writes, and events to Tandem.
+Do not use a Papercut when work is blocked; use the blocking lifecycle. Do not use one instead of a planned fix; create a Task and reference the Papercut. A thin adapter maps its papercut intent to CLI argument arrays (`add task --kind papercut`, `list --kind papercut`), requests JSON for reads, and leaves parsing, IDs, validation, writes, and events to Tandem.
 
 ## Leave syncing to Tandem
 
@@ -109,7 +109,7 @@ A conforming adapter can:
 - expose read and mutation operations in framework-native schemas;
 - invoke Tandem without shell interpolation;
 - request structured output for reads;
-- expose Papercut inbox actions through the same CLI-only boundary;
+- expose papercut Tasks (`--kind papercut`) through the same CLI-only boundary;
 - preserve and render Tandem results and diagnostics;
 - add framework-specific approval and confirmation UX.
 

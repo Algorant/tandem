@@ -1229,6 +1229,116 @@ pub(crate) fn publish_initial(
     .map_err(CliError::user)
 }
 
+/// How a protocol upgrade reached the shared board.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Upgraded {
+    /// This checkout published the upgraded board as one commit.
+    Published,
+    /// Another machine already upgraded the shared board; it was downloaded.
+    Received,
+    /// This board has never been synced; the files were not touched.
+    NotSynced,
+}
+
+/// Moves a synced board from the previous protocol version to the current
+/// one in one commit on the `tandem` branch.
+///
+/// `converted` is the complete upgraded file set computed from the board on
+/// disk. The board is written, then pushed without force; a rejected or failed
+/// push restores the original files. When another machine has already
+/// published the upgraded board, this checkout only downloads it, and refuses
+/// if it holds changes that were never synced.
+pub(crate) fn publish_upgrade(
+    ctx: &GitContext,
+    board: &Path,
+    remote: &str,
+    converted: &Files,
+) -> Result<Upgraded, CliError> {
+    let engine = Engine::new(ctx, board);
+    (|| -> Result<Upgraded, String> {
+        let Some(base_commit) = engine.ref_commit(BASE_REF)? else {
+            return Ok(Upgraded::NotSynced);
+        };
+        if !load_conflicts(ctx).is_empty() {
+            return Err("this board has unresolved sync conflicts; resolve them with the previous Tandem release (`tandem sync status`) before migrating".to_string());
+        }
+        let base_side = engine.load_tree(&base_commit)?;
+        let snapshot = engine.snapshot(&base_side, &[])?;
+        let Some(remote_commit) = engine.fetch(remote)? else {
+            return Err(format!("`{remote}` has no `{BRANCH}` branch to upgrade"));
+        };
+        let remote_side = engine.load_tree(&remote_commit)?;
+        let remote_version = remote_side
+            .files
+            .get("tandem.md")
+            .and_then(|config| top_field(config, "protocolVersion"));
+        if remote_version.as_deref() == Some(PROTOCOL_VERSION) {
+            if snapshot.raw.files != base_side.files {
+                return Err(format!(
+                    "another machine already upgraded this board to protocol {PROTOCOL_VERSION}, but this checkout has changes that were never synced. Sync them with the previous Tandem release first, or move them aside, then run `tandem migrate` again"
+                ));
+            }
+            for path in snapshot.raw.files.keys() {
+                if !remote_side.files.contains_key(path) {
+                    fs::remove_file(board.join(path)).map_err(|error| error.to_string())?;
+                }
+            }
+            for (path, content) in &remote_side.files {
+                if snapshot.raw.files.get(path) != Some(content) {
+                    write_file(&board.join(path), content)?;
+                }
+            }
+            engine.update_ref(BASE_REF, &remote_commit)?;
+            engine.record_fetch();
+            let _ = engine.snapshot(&remote_side, &[])?;
+            return Ok(Upgraded::Received);
+        }
+        if remote_commit != base_commit {
+            return Err("this board is behind the shared board; sync it with the previous Tandem release (`tandem sync`), then run `tandem migrate` again".to_string());
+        }
+        validate_board(converted).map_err(|message| {
+            format!("cannot migrate: the upgraded board would be invalid ({message})")
+        })?;
+        let restore = |engine: &Engine<'_>| -> Result<(), String> {
+            for (path, content) in &snapshot.raw.files {
+                if converted.get(path) != Some(content) {
+                    write_file(&engine.board.join(path), content)?;
+                }
+            }
+            Ok(())
+        };
+        for (path, content) in converted {
+            if snapshot.raw.files.get(path) != Some(content) {
+                write_file(&board.join(path), content)?;
+            }
+        }
+        let published = (|| -> Result<String, String> {
+            let tree = engine.write_tree(converted, &[&snapshot.raw, &remote_side])?;
+            let commit = engine.commit(
+                &tree,
+                &[remote_commit.clone()],
+                &format!("tandem: upgrade the board to protocol {PROTOCOL_VERSION}"),
+            )?;
+            match engine.push(remote, &commit)? {
+                Push::Accepted => Ok(commit),
+                Push::Rejected => Err("the shared board changed while migrating; run `tandem migrate` again".to_string()),
+            }
+        })();
+        let commit = match published {
+            Ok(commit) => commit,
+            Err(error) => {
+                restore(&engine)?;
+                return Err(error);
+            }
+        };
+        engine.update_ref(BASE_REF, &commit)?;
+        engine.record_fetch();
+        let _ = engine.snapshot(&engine.load_tree(&commit)?, &[])?;
+        Ok(Upgraded::Published)
+    })()
+    .map_err(CliError::user)
+}
+
 /// Fetches the remote board, returning its commit and files.
 pub(crate) fn fetch_remote_board(
     ctx: &GitContext,

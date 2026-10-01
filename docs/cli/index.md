@@ -37,7 +37,7 @@ From a local checkout, use `cargo install --path tandem --locked`.
 
 - Workspace: [`init`](#tandem-init), [`sync`](#tandem-sync), [`migrate`](#tandem-migrate)
 - Board documents: [`list`](#tandem-list), [`show`](#tandem-show), [`add`](#tandem-add), [`move`](#tandem-move), [`update`](#tandem-update), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel), [`search`](#tandem-search)
-- Friction inbox: [`papercut`](#tandem-papercut)
+- Papercuts: [`papercut` kind](#papercuts)
 - History: [`log`](#tandem-log)
 - Work agreements: [`accord`](#tandem-accord)
 - Coordination rules: [`rules`](#tandem-rules)
@@ -78,33 +78,6 @@ This section is the implementation-facing CLI reference for v0. Syntax examples 
   - warnings do not make a command fail unless paired with a structural error.
 - Error wording prefixes recoverable categories where possible: `Parse failure`, `Validation failed`, `Write conflict`, `Write failure`, and `Event append failure`. Event append failures note that the file mutation may already be on disk and needs inspection/repair.
 
-### `tandem upgrade`
-
-- Purpose: explicitly upgrade a discovered legacy Tandem workspace to the current protocol version.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem upgrade
-```
-
-- Accepted options: none. Passing any option or extra argument is a usage error.
-- Workspace and upgrade rules:
-  - Tandem discovers the nearest `.tandem/` workspace from the current directory.
-  - A workspace using protocol `0.1.0` is upgrade-only. Ordinary commands do not upgrade it implicitly; run this command explicitly first.
-  - A workspace already using the current protocol `0.2.0` is left unchanged and reports that it is already current.
-  - Unsupported protocol versions are rejected. The command does not guess or perform multi-version upgrades.
-- Upgrade behavior: updates the workspace protocol version from `0.1.0` to `0.2.0` and canonicalizes legacy `priority: med` and `priority: normal` values to `medium` in active documents and Logs. It preserves document bodies, unknown frontmatter, legacy declarations, and other content. Preserved custom types become read-only after upgrade.
-- Success output:
-
-```text
-Upgraded Tandem project protocol: 0.1.0 -> 0.2.0
-Preserved existing content while canonicalizing legacy `med` and `normal` priorities to `medium` in documents and logs.
-```
-
-  An already-current workspace prints `Tandem project is already at protocol 0.2.0.`. Example: `tandem upgrade`.
-- Error behavior: fails when no workspace is discoverable, the workspace cannot be read or written, its protocol version is unsupported, or a concurrent file change creates a write conflict. A failed upgrade is not implicit or silently retried by another command.
-
 ### `tandem init`
 
 - Purpose: create a new Tandem workspace in the current project.
@@ -131,12 +104,13 @@ tandem init [--title <title>] [--force]
 - Syntax:
 
 ```text
-tandem list [--state <state>] [--type <type>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--parent <id>] [--accord <status>] [--review <status>] [--json]
+tandem list [--state <state>] [--type <type>] [--kind <kind>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--parent <id>] [--accord <status>] [--review <status>] [--json]
 ```
 
 - Required inputs: none.
 - Optional inputs:
-  - filters: `--state`, `--type`, `--priority`, `--tag`, `--assignee`, `--parent`, `--accord`, `--review`.
+  - filters: `--state`, `--type`, `--kind`, `--priority`, `--tag`, `--assignee`, `--parent`, `--accord`, `--review`.
+  - `--kind <epic|research|papercut>`: one value, validated; selects Tasks whose `kind` matches exactly. A standard Task (no kind) is never matched. An invalid value fails with `Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`. Tags are never read as kinds.
   - `--parent <id>` selects documents whose `parentId` matches exactly, whether the parent is a task or another Tandem document type.
   - `--json`: emit structured output.
 - Human output shape: compact table grouped or sorted by state. Resolve hierarchy from documents: direct Epic children use `epic-task`, children of Tasks use `subtask`, and valid non-task targets use generic `parent`. Never classify from ID shape.
@@ -239,21 +213,21 @@ tandem show <id> [--json]
 - Syntax:
 
 ```text
-tandem add --title <title> [--state <state>] [--kind epic] [--description <text>] [--priority <priority>] [--effort <effort>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--json]
+tandem add --title <title> [--state <state>] [--kind <epic|research|papercut>] [--description <text>] [--priority <priority>] [--effort <effort>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--json]
 ```
 
 - Required inputs:
   - `--title <title>`.
 - Optional inputs:
   - `--state <state>` defaults to `todo`.
-  - `--kind epic`: mark the new root task as an Epic while preserving `type: task` and the task ID namespace. `--kind epic` and `--parent` cannot be combined because Epics cannot have parents.
+  - `--kind <epic|research|papercut>`: set the Task kind while preserving `type: task` and the task ID namespace; omit it for a standard Task. `--kind epic` and `--parent` cannot be combined because Epics cannot have parents. `--kind research` may sit anywhere. `--kind papercut` needs only a title, so `--acceptance` is optional for it, defaults to `--priority low` unless a priority is given, and may be a root Task or a direct child of an Epic but never a Subtask. Every other Task needs at least one `--acceptance <text>`. See [Papercuts](#papercuts).
   - `--parent <id>`: create a normal task linked through canonical `parentId`. A resolved Epic parent creates a global-ID Task with `epic-task`; a resolved Task parent creates a leaf `task-N-M` Subtask with `subtask`; a decision/custom parent creates a global-ID Task with generic `parent`. Attaching beneath a Subtask is an error. Global Epic/Task allocation and per-Task Subtask suffix allocation both scan active board documents and completed logs and reserve without overwriting.
   - metadata: `--description`, `--priority`, `--effort`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`. `--effort` records the project's effort value without changing workflow state. `--reference <ref>` accepts a document ID or an absolute `http(s)` URL; URL references are opaque loose links and are never fetched or warned about, while an unresolved document ID warns. Repository paths belong in `--related-file`, not `--reference`.
   - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
 - Human output shape: labeled created-task summary with ID, state, title, and file path. Epic-parent creation uses Task-of-Epic language, Task-parent creation uses `Created subtask`/`Subtask of`, and non-task parents retain `Created task`/generic `Parent`.
 - JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
 - Exit/error notes:
-  - fails on invalid state, unsupported kind, invalid referenced parent/blocker, a parented Epic, attachment beneath a Subtask, a role/ID mismatch, or failed write. Direct Epic Tasks never receive hierarchical IDs.
+  - fails on invalid state, unsupported kind (`Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`), missing acceptance on a non-papercut (`add requires at least one --acceptance <text>; only --kind papercut may omit it`), a papercut under a Task (`Validation failed: a papercut under <task-id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`), invalid referenced parent/blocker, a parented Epic, attachment beneath a Subtask, a role/ID mismatch, or failed write. Direct Epic Tasks never receive hierarchical IDs.
 
 ### `tandem move`
 
@@ -283,7 +257,7 @@ tandem move <id> --state <state>
 - Syntax:
 
 ```text
-tandem update <task-id> [--title <title>] [--body <markdown>] [--kind epic] [--priority <critical|high|medium|low>] [--effort <effort>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--clear <field>]
+tandem update <task-id> [--title <title>] [--body <markdown>] [--kind <epic|research|papercut>] [--priority <critical|high|medium|low>] [--effort <effort>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--clear <field>]
 tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--decider <name>] [--supersedes <decision-id>] [--tag <tag>] [--reference <ref>] [--related-file <path>] [--clear <field>]
 ```
 
@@ -301,7 +275,9 @@ tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <pro
   - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata. Decision `status` is ADR record metadata, not Task workflow state or Accord status.
   - completed logs are not updated.
 - Validation:
-  - kind, when set, must be `epic`; an Epic must have no `parentId`.
+  - kind, when set, must be `epic`, `research`, or `papercut`; an Epic must have no `parentId`.
+  - a papercut may never be a Subtask: `--parent <task-id>` on a papercut, or `--kind papercut` on a Subtask, fails with `Validation failed: papercut <id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`.
+  - only a papercut may have no acceptance criterion: `--clear acceptance` on any other Task fails with `<id> cannot clear acceptance; an active task requires at least one criterion (only a papercut may have none)`, and changing a papercut without acceptance to another kind requires `--acceptance` in the same call (`<id> requires at least one acceptance criterion unless it is a papercut; add --acceptance <text>`).
   - priority must be one of `critical`, `high`, `medium`, or `low`.
   - decision `status` must be exactly `proposed`, `accepted`, `rejected`, `deprecated`, or `superseded`; padded values with leading or trailing whitespace are rejected rather than normalized.
   - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata and are never treated as document references.
@@ -387,7 +363,7 @@ tandem sync resolve <id> --keep local|remote|edited
 
 ### `tandem migrate`
 
-- Purpose: move a protocol 0.3.0 board that source commits track to the repository's `tandem` branch. Run once per repository, on one machine.
+- Purpose: the single version-stepping command. It reads the board's `protocolVersion` and runs the matching one-time step: a protocol 0.3.0 board is moved to the repository's `tandem` branch, and a protocol 0.4.0 board is upgraded to 0.5.0. Any other version, including a board already at 0.5.0, fails.
 - Kind: mutation.
 - Syntax:
 
@@ -396,10 +372,14 @@ tandem migrate [--dry-run]
 tandem migrate --adopt [--dry-run]
 ```
 
-- `tandem migrate` requires a Git remote without a `tandem` branch, a branch that is not behind its upstream, and no staged changes. It adds a permanent `uid` to every record, publishes the board, and creates one source commit (`chore(tandem): move the Tandem board to the tandem branch`) that stops tracking `.tandem/` and ignores it. Push that commit normally.
-- `tandem migrate --adopt` is for another machine that still has unpushed or uncommitted 0.3.0 board changes. Run it before `git pull`. It merges those changes into the shared board, renumbers records that were never published (reporting old and new IDs), and restores the tracked legacy files so `git pull` can remove them. A machine without local board changes just pulls.
+- **Install the new Tandem on every machine that shares the board before migrating it to 0.5.0 and syncing.** Older Tandem versions reject the new protocol version and the `research` and `papercut` kinds.
+- **0.4.0 → 0.5.0.** Sets `kind` from the `research` or `papercut` tag on active Board Tasks and removes that tag, bumps `protocolVersion`, and publishes both as one commit on the `tandem` branch (the board must be synced and free of conflicts first). Tasks tagged both, tasks that already have a different kind (for example Epics), and papercut-tagged Subtasks are reported and left unchanged; nothing is guessed. Archived Logs, Decisions, and Rules are never rewritten. When another machine already upgraded the shared board, `migrate` downloads it instead (and refuses if this checkout holds unsynced changes). A board without a remote is rewritten locally. Run it once per repository; run it again on each other machine to receive the upgrade.
+- **0.3.0 → 0.5.0.** Requires a Git remote without a `tandem` branch, a branch that is not behind its upstream, and no staged changes. It adds a permanent `uid` to every record, applies the same tag-to-kind conversion, publishes the board, and creates one source commit (`chore(tandem): move the Tandem board to the tandem branch`) that stops tracking `.tandem/` and ignores it. Push that commit normally.
+- `tandem migrate --adopt` is for another machine that still has unpushed or uncommitted 0.3.0 board changes and a shared board already at 0.5.0. Run it before `git pull`. It merges those changes into the shared board, renumbers records that were never published (reporting old and new IDs), and restores the tracked legacy files so `git pull` can remove them. A machine without local board changes just pulls.
 - `--dry-run` reports what would change and changes nothing.
-- See [Upgrading to independent sync](/guides/upgrading-to-independent-sync/).
+- JSON (`--json`): `{"ok":true,"data":{"dryRun":false,"fromVersion":"0.4.0","toVersion":"0.5.0","remote":"origin","records":12,"files":15,"migratedFrom":null,"sourceCommit":null,"upgraded":"published|received|notSynced|null","kinds":{"converted":[{"id":"task-7","kind":"papercut"}],"skipped":[{"id":"task-9","reason":"tagged both research and papercut"}]}},"warnings":[]}`. `upgraded` is `null` for the 0.3.0 step and on `--dry-run`.
+- Errors: `this board is already at protocol 0.5.0; nothing to migrate`; `tandem migrate converts protocol 0.3.0 and 0.4.0 boards; found \`<version>\``. Ordinary commands on a 0.4.0 board fail with `This board uses protocol 0.4.0; this Tandem version requires 0.5.0. Run \`tandem migrate\` to upgrade it. Every machine that shares this board must install this Tandem version before the board is migrated and synced, because older versions cannot read the new kinds or protocol version.`
+- See [Upgrading to independent sync](/guides/upgrading-to-independent-sync/) for the 0.3.0 step.
 
 ### `tandem log`
 
@@ -534,7 +514,7 @@ tandem log search <query> [--json]
 - Syntax:
 
 ```text
-tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
+tandem search <query> [--state <state>] [--type <type>] [--kind <kind>] [--parent <id>] [--json]
 ```
 
 - Required inputs:
@@ -542,6 +522,7 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
 - Optional inputs:
   - `--state <state>` filters active board results.
   - `--type <type>` filters by document type.
+  - `--kind <epic|research|papercut>` filters to Tasks of that kind (one value, validated like `list --kind`).
   - `--parent <id>` filters active and completed results to documents with that parent, including generic non-task parent targets.
   - `--json`: emit structured output.
 - Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, resolved `RELATION` (`epic-task`, `subtask`, or generic `parent`), parent ID, and match snippet.
@@ -577,28 +558,23 @@ tandem search <query> [--state <state>] [--type <type>] [--parent <id>] [--json]
 }
 ```
 
-### `tandem papercut`
+### Papercuts
 
-Papercuts record small, non-blocking friction without creating Tasks or entering Board workflow. Use a Task instead when corrective work needs planning or ownership. Use the blocking lifecycle when work cannot continue.
+A papercut is a Task with `kind: papercut`: small, non-blocking friction that caused confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. There is no `papercut` command; use `add task`, `update`, `list --kind papercut`, and `search --kind papercut`.
 
 ```sh
-tandem papercut add --title "Edit errors hide ambiguous matches" \
-  --body "The workaround is to search for each source location first." \
-  --tag tooling \
-  --reference task-173
-
-tandem papercut list
-tandem papercut list --status resolved --json
-tandem papercut list --all
-tandem papercut show papercut-1 --json
-tandem papercut resolve papercut-1 \
-  --note "The error now lists all ambiguous source locations." \
-  --reference task-201
+tandem add task "Edit errors hide ambiguous matches" --kind papercut --tag tooling
+tandem add task "Setup docs omit the env var" --kind papercut --parent task-12 --priority medium
+tandem list --kind papercut
+tandem search "ambiguous" --kind papercut
 ```
 
-`list` shows open Papercuts by default. Use one `--status open|resolved` filter or `--all`; do not combine them. `show` returns metadata, body, path, and `location: papercuts`. `resolve` updates the same file, requires a note, and can append references. Duplicate titles are valid, and the MVP has no delete or reopen command.
-
-`list` and `show` support the standard JSON envelope. Global `tandem search` finds Papercut title, body, status, tags, references, and resolution note and reports `location: papercuts`. Papercuts never appear in `tandem list`, Logs, hierarchy, Accord, review, or completion progress. The TUI exposes open Papercuts only through its read-only utility panel; they are not Board items or a fifth main view.
+- A papercut needs only a title. `--acceptance` is optional for it and required for every other Task.
+- `priority` defaults to `low`; pass `--priority` to override.
+- Placement: a root Task or a direct child of an Epic. A papercut is never a Subtask; creating, reparenting, or re-kinding one into a Subtask fails validation.
+- Tags are topical only. `research` and `papercut` tags are not read as kinds; `tandem migrate` converts old tags on active Board Tasks once (see [`tandem migrate`](#tandem-migrate)).
+- `show --json` and `assignment <task-id> --json` report `kind` (`data.root.kind` for an assignment; `null` for a standard Task).
+- Use a blocking lifecycle when work cannot continue, and a normal Task when the fix needs planning.
 
 ### `tandem accord`
 

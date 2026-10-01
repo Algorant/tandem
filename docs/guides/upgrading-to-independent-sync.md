@@ -89,3 +89,14 @@ Nothing to remember. Tandem syncs after every change, refreshes before reads tha
 - Pull the migration commit on a machine with unpushed board changes before running `tandem migrate --adopt`.
 - Force-push, delete, or rewrite the `tandem` branch.
 - Copy a clone's `.git` directory to another machine; clone instead. If a copy already exists, delete `.git/tandem-actor-id` in the copy.
+
+## Upgrading a 0.4.0 board to 0.5.0 (Task kinds)
+
+Protocol 0.5.0 adds the `research` and `papercut` Task kinds. **Install the new Tandem on every machine that shares the board before you migrate it, because older versions reject the new protocol version and the new kinds.** Then, on one machine:
+
+```sh
+tandem migrate --dry-run   # shows which active Tasks would change and which are skipped
+tandem migrate
+```
+
+The command turns the `research` or `papercut` tag of each active Board Task into a `kind` (removing that tag) and publishes the result with the new protocol version as one commit on the `tandem` branch. Tasks it cannot convert unambiguously (tagged both, already a different kind such as an Epic, or a papercut-tagged Subtask) are listed and left unchanged. Archived Logs are not touched. On each other machine run `tandem migrate` once; it downloads the upgraded board. If the board is behind the shared board or has unsynced changes, `migrate` stops and says what to do first.

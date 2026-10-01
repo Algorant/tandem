@@ -12,6 +12,15 @@ use super::diagnostic::Diagnostic;
 use super::document::{validate_task_kind, Document, EFFORTS, PRIORITIES};
 use super::ids::{global_task_number, subtask_suffix};
 
+/// Placement rule shared by every papercut diagnostic.
+pub(crate) const PAPERCUT_PLACEMENT_RULE: &str =
+    "a papercut must be a root Task or a direct child of an Epic";
+
+/// Error for a papercut that would be a Subtask; `subject` names it.
+pub(crate) fn papercut_subtask_message(subject: &str) -> String {
+    format!("Validation failed: {subject} cannot be a Subtask; {PAPERCUT_PLACEMENT_RULE}")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TaskRole {
     Epic,
@@ -258,6 +267,13 @@ impl HierarchyIndex {
                 doc.id()
             )));
         }
+        if role == TaskRole::Subtask && doc.kind() == Some(super::document::KIND_PAPERCUT) {
+            return Err(Diagnostic::error(format!(
+                "Validation failed for {}: papercut {} cannot be a Subtask; {PAPERCUT_PLACEMENT_RULE}",
+                doc.diagnostic_source_label(),
+                doc.id()
+            )));
+        }
         // An unpublished record carries a provisional ID in every role until
         // publication assigns its role-specific sequential ID.
         let provisional = crate::protocol::ids::provisional_parts(doc.id())
@@ -371,6 +387,30 @@ mod tests {
             fields.insert("kind".to_string(), kind.to_string());
         }
         HierarchyDocument::new(Document::new(fields, String::new()), format!("{id}.md"))
+    }
+
+    #[test]
+    fn papercut_may_be_root_or_epic_child_but_never_a_subtask() {
+        let valid = HierarchyIndex::from_documents(vec![
+            document("task-1", None, Some("epic")),
+            document("task-2", Some("task-1"), Some("papercut")),
+            document("task-3", None, Some("papercut")),
+            document("task-4", None, None),
+            document("task-4-1", Some("task-4"), Some("research")),
+        ])
+        .unwrap();
+        valid.validate_all_task_hierarchies().unwrap();
+
+        let invalid = HierarchyIndex::from_documents(vec![
+            document("task-4", None, None),
+            document("task-4-1", Some("task-4"), Some("papercut")),
+        ])
+        .unwrap();
+        let message = invalid.validate_all_task_hierarchies().unwrap_err().message;
+        assert!(
+            message.contains("papercut task-4-1 cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic"),
+            "{message}"
+        );
     }
 
     #[test]

@@ -63,16 +63,16 @@ Decision documents preserve durable product, architecture, or project choices.
 
 Decisions do not use task workflow state. They remain active records until superseded or deprecated.
 
-## Papercuts
+## Papercuts and research
 
-A Papercut is small, non-blocking friction that caused confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. It can describe misleading instructions, a missing helper, an awkward workflow, or a surprising tool contract.
+A **papercut** is a Task with `kind: papercut`: small, non-blocking friction that caused confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. It needs only a title, defaults to low priority, and is either a root Task or a direct child of an Epic, never a Subtask. Record one and continue current work. If work is blocked, use the blocking lifecycle.
 
-Papercuts are an inbox, not work management. They do not become Tasks, blockers, Accords, Decisions, Rules, Logs, or telemetry. Record one and continue current work. If work is blocked, use the blocking lifecycle. If a fix needs planning and ownership, create a normal Task that references the Papercut, then resolve the Papercut with a note and Task reference.
+A **research** Task (`kind: research`) is investigation with a written outcome. It needs a title and acceptance like any Task and can sit anywhere, including as a Subtask. A Task with no kind is a standard Task; `kind: epic` marks a grouping root.
 
 ```sh
-tandem papercut add --title "Setup requires an undocumented environment variable" --tag docs
-tandem papercut list
-tandem papercut resolve papercut-1 --note "The setup guide now documents it." --reference task-42
+tandem add task "Setup requires an undocumented environment variable" --kind papercut --tag docs
+tandem add task "Compare static site generators" --kind research --acceptance "Recommendation recorded"
+tandem list --kind papercut
 ```
 
 ## Logs and events
@@ -96,7 +96,6 @@ A Tandem workspace is a repository with a `.tandem/` directory:
 ├── tandem.md        # workspace config and rules
 ├── board/           # active tasks and decisions
 ├── logs/            # completed task history
-├── papercuts/       # optional non-blocking friction inbox
 ├── events/          # per-actor lifecycle event logs
 └── events.jsonl     # legacy global event log
 ```

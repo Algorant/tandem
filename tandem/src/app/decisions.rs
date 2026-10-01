@@ -625,10 +625,8 @@ mod tests {
         let papercut_id = crate::app::tasks::add(
             &project,
             crate::app::tasks::AddOptions {
-                acceptance: vec!["friction captured".to_string()],
                 title: Some("Decision friction".to_string()),
-                tags: vec!["papercut".to_string()],
-                priority: Some("low".to_string()),
+                kind: Some("papercut".to_string()),
                 ..Default::default()
             },
         )

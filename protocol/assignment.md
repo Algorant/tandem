@@ -50,7 +50,8 @@ returns a JSON envelope:
 }
 ```
 
-`root` and every `milestones` item contain the complete `body`, `title`,
+`root` and every `milestones` item contain the complete `body`, `title`, `role`,
+`kind` (`epic`, `research`, `papercut`, or `null` for a standard Task),
 `acceptance`, `constraints`, `plannedValidation`, `ownedScope` (the native
 `relatedFiles` list), and `dependencies`. They also include derived
 `attemptCount`, `reworkCount`, and `discardedCount` from the Task's Accord
@@ -61,8 +62,8 @@ the Task and are returned in native query order. Archived milestones remain
 visible in the assignment with their archived outcome.
 
 `definitionToken` is an opaque native token for the current definition. It
-covers the root and direct milestones, including their IDs, hierarchy fields,
-titles, bodies, owned scope, blockers, acceptance, constraints, and planned
+covers the root and direct milestones, including their IDs, hierarchy fields
+(including `kind`), titles, bodies, owned scope, blockers, acceptance, constraints, and planned
 validation. Members are canonically ordered by native ID before hashing, so
 progress that changes presentation order cannot change the token. It excludes
 workflow state, Accord status, assignee, evidence, progress notes, tags, loose

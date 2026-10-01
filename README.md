@@ -53,7 +53,7 @@ tandem init --title "My Project"
 
 ## [placeholder for workflow diagram]
 
-Initialization creates a `.tandem/` workspace containing active Board documents, completed or canceled Logs, lifecycle events, project rules, and configuration. The first `tandem papercut add` lazily creates an optional searchable inbox for small, non-blocking friction. The Markdown files remain the source of truth; use the CLI or TUI for structured updates.
+Initialization creates a `.tandem/` workspace containing active Board documents, completed or canceled Logs, lifecycle events, project rules, and configuration. Small, non-blocking friction is recorded as a Task with `kind: papercut` (`tandem add task "..." --kind papercut`), and open-ended investigation as `kind: research`; see the [protocol](protocol/README.md#task-kinds). The Markdown files remain the source of truth; use the CLI or TUI for structured updates.
 
 [placeholder for .tandem directory structure]
 
@@ -70,9 +70,12 @@ protocol validation and project I/O. [`cli`](tandem/src/cli/) and
 [`main.rs`](tandem/src/main.rs) only composes process startup and exit handling,
 and `tui/mod.rs` wires the terminal application and cohesive TUI modules.
 
-New projects use protocol `0.2.0`. A discovered `0.1.0` project requires an
-explicit `tandem upgrade` before ordinary project operations; upgrades are not
-implicit.
+New projects use protocol `0.5.0`. An older board is converted once with
+`tandem migrate` (0.3.0 moves to the `tandem` branch, 0.4.0 upgrades to 0.5.0,
+turning `research` and `papercut` tags on active Board Tasks into Task kinds);
+it is never converted implicitly. **Install the new Tandem on every machine
+that shares a board before migrating it to 0.5.0 and syncing**: older versions
+reject the new protocol version and kinds.
 
 ## Everyday workflow
 
@@ -105,7 +108,7 @@ No command installs the binary. Sandboxes are retained at the printed temporary
 path for inspection; each new invocation gets a fresh repository. Explicit
 agent-configured preview routes still make `just dev` use the selected worktree
 and fixture; clearing a route restores the safe sandbox default. No automatic
-workspace upgrade or fallback to the real project occurs.
+workspace migration or fallback to the real project occurs.
 
 ## TUI
 
@@ -145,21 +148,22 @@ Tandem is available under the [MIT License](LICENSE).
 
 Tested procedure (2026-08-31) for moving an existing pre-0.3.0 coordination
 workspace to the protocol 0.3.0 binary. There is deliberately no
-`upgrade`/`migrate` command, converter, or compatibility reader — the new
-binary only opens 0.3.0 workspaces, so migration is owner-side and
-semi-manual. This procedure is a working draft and may be removed once the
+converter or compatibility reader for pre-0.3.0 workspaces — the new
+binary only opens 0.3.0 and later workspaces, so this migration is owner-side
+and semi-manual. (`tandem migrate` handles only the 0.3.0 → 0.5.0 and
+0.4.0 → 0.5.0 steps.) This procedure is a working draft and may be removed once the
 migration surface stabilizes.
 
 1. **Install and verify the new binary.** `curl -fsSL https://trytandem.dev/install.sh | sh` then confirm `tandem --version` reports the 0.12.x release.
 2. **Archive the old workspace in git.** Move the whole `.tandem` directory aside (for example `.tandem mv .tandem .tandem_old`), add the ignored actor identity (`printf '.tandem_old/actor-id\n' >> .gitignore`), and commit. The archived state stays recoverable and the board/log/papercut history is not destroyed.
 3. **Initialize the new workspace.** `tandem init --title "..."` creates a minimal protocol 0.3.0 config (states, empty rule categories).
 4. **Transpose durable records by recreating them.** The fresh workspace uses new IDs and mandatory Accord, so recreate rather than copy:
-   - Active state: `tandem add task "..." --acceptance "criterion" [...]` for each retained Task (mandatory Accord acceptance). Add Papercut-tagged low-priority Tasks for friction notes. Old references and provenance can be dropped; a one-line "continued from task-N, archived under .tandem_old" note preserves context without dangling references.
+   - Active state: `tandem add task "..." --acceptance "criterion" [...]` for each retained Task (mandatory Accord acceptance). Add `--kind papercut` Tasks (acceptance optional, low priority by default) for friction notes. Old references and provenance can be dropped; a one-line "continued from task-N, archived under .tandem_old" note preserves context without dangling references.
    - Rules: `tandem rules add <category> "<text>"` per rule. Omit `--source` when it pointed at archived records.
    - Key ADR decisions: `tandem add decision "..." --body ...` then set `status: accepted` and `decidedAt` (at present the CLI cannot update decision documents — see below).
 5. **Verify.** `tandem list`, `show`, `search`, `rules list`, `accord claim/deliver`, and the TUI should behave normally against the fresh workspace.
 
-Defects surfaced by the first run of this procedure (tracked as papercut-tagged
+Defects surfaced by the first run of this procedure (tracked as papercut
 Tasks and a fix Task in the workspace): `tandem update` rejects decision
 documents; `add decision` wrote files to `.tandem/tasks` instead of
 `.tandem/decisions` (place them there when this is seen); and rules are still

@@ -1,19 +1,19 @@
-# Tandem Protocol 0.4.0 Specification
+# Tandem Protocol 0.5.0 Specification
 
 **Status:** accepted normative specification  
-**Date:** 2026-09-30 (0.4.0 independent sync; 0.3.0 accepted 2026-08-30)
+**Date:** 2026-10-01 (0.5.0 Task kinds; 0.4.0 independent sync 2026-09-30; 0.3.0 accepted 2026-08-30)
 
-This document defines the only runtime protocol supported by Tandem 0.4.0. `protocol/` is normative; Rust in `tandem/src/protocol/` is executable semantics. The one-time `tandem migrate` conversion from 0.3.0 is defined in [`../README.md`](../README.md#migration); no compatibility reader or fallback exists. Sync semantics are in [`../README.md`](../README.md#sync) and the design record [`independent-metadata-sync.md`](independent-metadata-sync.md).
+This document defines the only runtime protocol supported by Tandem 0.5.0. `protocol/` is normative; Rust in `tandem/src/protocol/` is executable semantics. The one-time `tandem migrate` conversions from 0.3.0 and 0.4.0 are defined in [`../README.md`](../README.md#migration); no compatibility reader or fallback exists. Sync semantics are in [`../README.md`](../README.md#sync) and the design record [`independent-metadata-sync.md`](independent-metadata-sync.md).
 
 ## Workspace
 
-`.tandem/tandem.md` is YAML-frontmatter Markdown. Required fields are `protocolVersion: 0.4.0`, `workspaceId`, `title`, and `states`. The default states are `todo`, `in-progress`, and `validation`. Active records are in `.tandem/tasks/`; Decisions in `.tandem/decisions/`; Rules in `.tandem/rules/`; archived Tasks in `.tandem/logs/`; audit ledgers in `.tandem/events/<actor-id>.jsonl`. Actor identity is `<git-dir>/tandem-actor-id` per checkout (`.tandem/actor-id` outside Git); it is generated and owned by Tandem and never synced. In a Git repository the board is the main worktree's ignored `.tandem/`, shared by linked worktrees and synced through the `tandem` branch.
+`.tandem/tandem.md` is YAML-frontmatter Markdown. Required fields are `protocolVersion: 0.5.0`, `workspaceId`, `title`, and `states`. The default states are `todo`, `in-progress`, and `validation`. Active records are in `.tandem/tasks/`; Decisions in `.tandem/decisions/`; Rules in `.tandem/rules/`; archived Tasks in `.tandem/logs/`; audit ledgers in `.tandem/events/<actor-id>.jsonl`. Actor identity is `<git-dir>/tandem-actor-id` per checkout (`.tandem/actor-id` outside Git); it is generated and owned by Tandem and never synced. In a Git repository the board is the main worktree's ignored `.tandem/`, shared by linked worktrees and synced through the `tandem` branch.
 
 Discovery is repository-local and requires `.tandem/tandem.md`, falling back to the main worktree's board from a linked worktree, then to the local safety copy or the remote `tandem` branch when the board is missing. A different protocol version is an operational error identifying detected and required versions.
 
 ## Task records
 
-Task frontmatter requires `id`, `uid`, `type: task`, `title`, `state` (active records), and `accord` (active records). Optional fields are `kind: epic`, `priority` (`low|medium|high|critical`), `effort` (`trivial|small|medium|large`), `tags`, `assignee`, `parentId`, `blockers`, `references`, `relatedFiles`, timestamps, and legacy inline `subtasks` preserved as inert checklist data.
+Task frontmatter requires `id`, `uid`, `type: task`, `title`, `state` (active records), and `accord` (active records). Optional fields are `kind` (`epic|research|papercut`), `priority` (`low|medium|high|critical`), `effort` (`trivial|small|medium|large`), `tags`, `assignee`, `parentId`, `blockers`, `references`, `relatedFiles`, timestamps, and legacy inline `subtasks` preserved as inert checklist data.
 
 Roles are resolved from documents, never inferred from ID shape:
 
@@ -23,7 +23,7 @@ Roles are resolved from documents, never inferred from ID shape:
 
 Only these relationships exist: `epic-task` and `subtask`. Parent IDs resolve to active Tasks only. Epics cannot have parents, Subtasks cannot have children, arbitrary depth is invalid, and reparenting that changes role or invalidates an ID is rejected. Allocation scans active and archived records without reuse. On a board that syncs through a remote, new records start with provisional `task-new-<hex>` IDs, valid in any role, and receive their sequential ID at first publication.
 
-Papercuts are ordinary low-priority Tasks tagged `papercut`; no Papercut type or storage exists.
+`kind` is `epic`, `research`, or `papercut`; a Task with no `kind` is standard, and tags are topical only (no code reads a `research` or `papercut` tag as a kind). A `research` Task may sit anywhere. A `papercut` Task needs only a title (acceptance optional), defaults to `priority: low` (overridable), and is a root Task or a direct child of an Epic, never a Subtask; creating, reparenting, or re-kinding one into a Subtask is a structural validation error. No Papercut type or storage exists. See [Task kinds](../README.md#task-kinds).
 
 ## Decisions
 
@@ -35,7 +35,7 @@ Each Rule is one Markdown file in `rules/` with composite ID `<category>-N` (pro
 
 ## Accord
 
-Active statuses are `ready`, `claimed`, `delivered`, `rework`, and `blocked`; `accepted` and `failed` occur only in Logs. Every active Task has at least one `accord.acceptance` criterion. Optional accord fields are `constraints`, planned `validation`, current `note`, and delivery data. `acceptance`, `constraints`, and `validation` are flat string lists; ownership lives only in the top-level `assignee`. Accord definition fields — `acceptance`, `constraints`, and planned `validation` — are durable: every status transition preserves them unchanged. Only an explicit `update` may rewrite them.
+Active statuses are `ready`, `claimed`, `delivered`, `rework`, and `blocked`; `accepted` and `failed` occur only in Logs. Every active Task has at least one `accord.acceptance` criterion, except a `papercut`, whose acceptance is optional. Optional accord fields are `constraints`, planned `validation`, current `note`, and delivery data. `acceptance`, `constraints`, and `validation` are flat string lists; ownership lives only in the top-level `assignee`. Accord definition fields — `acceptance`, `constraints`, and planned `validation` — are durable: every status transition preserves them unchanged. Only an explicit `update` may rewrite them.
 
 `claim` sets top-level `assignee`; `deliver` requires `summary` and one or more `evidence`; `rework`, `block`, `release`, and `fail` take one note; `resume` changes blocked to claimed; `release` clears assignee and returns to ready. `complete` atomically accepts delivered work and archives it. `fail` atomically archives failure.
 

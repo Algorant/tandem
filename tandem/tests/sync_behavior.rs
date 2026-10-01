@@ -641,3 +641,234 @@ fn migration_moves_a_legacy_board_and_adopts_unpushed_work_elsewhere() {
     );
     assert_eq!(ids(&c_path), vec!["task-1", "task-2", "task-3"]);
 }
+
+// -- protocol 0.4.0 -> 0.5.0 -------------------------------------------------
+
+/// Rewrites the board's protocol version on disk and publishes the result as
+/// a raw commit on the shared `tandem` branch, the way a 0.4.0 Tandem would
+/// have left it, then rebases this checkout's sync bookkeeping onto it.
+fn downgrade_board_to_previous_protocol(repo: &Path) {
+    let config = repo.join(".tandem/tandem.md");
+    let content = fs::read_to_string(&config).unwrap();
+    fs::write(
+        &config,
+        content.replace("protocolVersion: 0.5.0", "protocolVersion: 0.4.0"),
+    )
+    .unwrap();
+    let git_dir = repo.join(".git");
+    let index = git_dir.join("tandem-test-index");
+    let run = |args: &[&str]| -> String {
+        let output = Command::new("git")
+            .args(["--git-dir", git_dir.to_str().unwrap()])
+            .args(["--work-tree", repo.join(".tandem").to_str().unwrap()])
+            .args(args)
+            .env("GIT_INDEX_FILE", &index)
+            .current_dir(repo.join(".tandem"))
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    };
+    run(&[
+        "add",
+        "-A",
+        "--",
+        "tandem.md",
+        "tasks",
+        "logs",
+        "decisions",
+        "rules",
+        "events",
+    ]);
+    let tree = run(&["write-tree"]);
+    let parent = run(&["rev-parse", "refs/tandem/base"]);
+    let commit = run(&[
+        "commit-tree",
+        &tree,
+        "-p",
+        &parent,
+        "-m",
+        "previous protocol",
+    ]);
+    run(&["update-ref", "refs/tandem/base", &commit]);
+    run(&[
+        "push",
+        "--quiet",
+        "origin",
+        &format!("{commit}:refs/heads/tandem"),
+    ]);
+    let _ = fs::remove_file(index);
+}
+
+fn field(repo: &Path, id: &str, name: &str) -> Value {
+    ok(repo, &["show", id])["data"][name].clone()
+}
+
+#[test]
+fn migrate_upgrades_a_previous_protocol_board_once_for_every_machine() {
+    let (world, a, _b) = World::two_machines("upgrade");
+    let papercut = add_task(&a, "Papercut");
+    let research = add_task(&a, "Research");
+    let both = add_task(&a, "Both tags");
+    let epic = add_task(&a, "Epic");
+    let archived = add_task(&a, "Archived papercut");
+    let id = |value: &Value| value["data"]["id"].as_str().unwrap().to_string();
+    let (papercut, research, both, epic, archived) = (
+        id(&papercut),
+        id(&research),
+        id(&both),
+        id(&epic),
+        id(&archived),
+    );
+    let sub = id(&ok(
+        &a,
+        &[
+            "add",
+            "task",
+            "Papercut subtask",
+            "--parent",
+            &research,
+            "--acceptance",
+            "done",
+            "--tag",
+            "papercut",
+        ],
+    ));
+    // Build the 0.4.0 tag vocabulary: kinds did not exist, tags carried them.
+    ok(
+        &a,
+        &[
+            "update", &papercut, "--tag", "papercut", "--tag", "friction",
+        ],
+    );
+    ok(&a, &["update", &research, "--tag", "research"]);
+    ok(
+        &a,
+        &["update", &both, "--tag", "research", "--tag", "papercut"],
+    );
+    ok(
+        &a,
+        &["update", &epic, "--kind", "epic", "--tag", "research"],
+    );
+    ok(&a, &["update", &archived, "--tag", "papercut"]);
+    ok(&a, &["cancel", &archived, "--note", "not needed"]);
+    let log_path = a.join(format!(".tandem/logs/{archived}.md"));
+    let log_before = fs::read(&log_path).unwrap();
+    downgrade_board_to_previous_protocol(&a);
+
+    // Machine B downloads the 0.4.0 board and is refused with the upgrade path.
+    let b = world.clone("b2");
+    let refused = fails(&b, &["list"]);
+    assert!(refused.contains("This board uses protocol 0.4.0; this Tandem version requires 0.5.0. Run `tandem migrate` to upgrade it. Every machine that shares this board must install this Tandem version before the board is migrated and synced"), "{refused}");
+    let refused = fails(&a, &["sync"]);
+    assert!(
+        refused.contains("Run `tandem migrate` to upgrade it"),
+        "{refused}"
+    );
+
+    let dry = ok(&a, &["migrate", "--dry-run"]);
+    assert_eq!(dry["data"]["fromVersion"], "0.4.0");
+    assert_eq!(dry["data"]["toVersion"], "0.5.0");
+    assert_eq!(
+        dry["data"]["kinds"]["converted"].as_array().unwrap().len(),
+        2
+    );
+    assert!(fs::read_to_string(a.join(".tandem/tandem.md"))
+        .unwrap()
+        .contains("protocolVersion: 0.4.0"));
+
+    let migrated = ok(&a, &["migrate"]);
+    assert_eq!(migrated["data"]["upgraded"], "published");
+    assert_eq!(
+        migrated["data"]["kinds"]["converted"],
+        serde_json::json!([
+            {"id": papercut, "kind": "papercut"},
+            {"id": research, "kind": "research"},
+        ])
+    );
+    let skipped = migrated["data"]["kinds"]["skipped"].as_array().unwrap();
+    let reasons: Vec<(&str, &str)> = skipped
+        .iter()
+        .map(|item| {
+            (
+                item["id"].as_str().unwrap(),
+                item["reason"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert!(
+        reasons.contains(&(both.as_str(), "tagged both research and papercut")),
+        "{reasons:?}"
+    );
+    assert!(
+        reasons.contains(&(
+            epic.as_str(),
+            "already has kind `epic` and a `research` tag"
+        )),
+        "{reasons:?}"
+    );
+    assert!(
+        reasons
+            .iter()
+            .any(|(id, reason)| *id == sub && reason.contains("a papercut cannot be a Subtask")),
+        "{reasons:?}"
+    );
+
+    assert_eq!(field(&a, &papercut, "kind"), "papercut");
+    assert_eq!(
+        field(&a, &papercut, "tags"),
+        serde_json::json!(["friction"])
+    );
+    assert_eq!(field(&a, &research, "kind"), "research");
+    assert_eq!(field(&a, &research, "tags"), serde_json::json!([]));
+    assert_eq!(field(&a, &both, "kind"), Value::Null);
+    assert_eq!(
+        field(&a, &both, "tags"),
+        serde_json::json!(["research", "papercut"])
+    );
+    assert_eq!(field(&a, &epic, "kind"), "epic");
+    assert_eq!(field(&a, &sub, "kind"), Value::Null);
+    assert_eq!(
+        fs::read(&log_path).unwrap(),
+        log_before,
+        "Logs stay byte-identical"
+    );
+    assert!(git(&a, &["show", "refs/tandem/base:tandem.md"]).contains("protocolVersion: 0.5.0"));
+    assert_eq!(ok(&a, &["sync"])["data"]["sync"]["status"], "synced");
+
+    // B downloads the already upgraded shared board instead of converting.
+    let received = ok(&b, &["migrate"]);
+    assert_eq!(received["data"]["upgraded"], "received");
+    assert_eq!(field(&b, &papercut, "kind"), "papercut");
+    assert_eq!(
+        fs::read(b.join(".tandem/tasks").join(format!("{papercut}.md"))).unwrap(),
+        fs::read(a.join(".tandem/tasks").join(format!("{papercut}.md"))).unwrap()
+    );
+
+    let again = fails(&a, &["migrate"]);
+    assert!(
+        again.contains("this board is already at protocol 0.5.0; nothing to migrate"),
+        "{again}"
+    );
+}
+
+#[test]
+fn migrate_refuses_an_unknown_protocol_version() {
+    let (_world, a, _b) = World::two_machines("unknown-version");
+    let config = a.join(".tandem/tandem.md");
+    let content = fs::read_to_string(&config).unwrap();
+    fs::write(
+        &config,
+        content.replace("protocolVersion: 0.5.0", "protocolVersion: 0.2.0"),
+    )
+    .unwrap();
+    let error = fails(&a, &["migrate"]);
+    assert!(
+        error.contains("tandem migrate converts protocol 0.3.0 and 0.4.0 boards; found `0.2.0`"),
+        "{error}"
+    );
+}

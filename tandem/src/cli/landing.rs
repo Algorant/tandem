@@ -26,7 +26,7 @@ pub(crate) fn print() {
     println!("Workspace");
     println!("  sync                 Sync the board with the tandem branch");
     println!("  sync status|resolve  Inspect or resolve sync conflicts");
-    println!("  migrate              Move a 0.3.0 board to the tandem branch");
+    println!("  migrate              Upgrade a 0.3.0 or 0.4.0 board");
     println!("  rules list|add|edit|delete  Manage project rules");
     println!("  tui                  Open the terminal interface");
     println!("  web                  Open the web interface");

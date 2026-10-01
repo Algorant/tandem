@@ -8,7 +8,8 @@
 - [x] Define typed `.tandem/tasks`, `decisions`, `rules`, `logs`, and per-actor `events` storage.
 - [x] Define Task/Decision documents and fixed Epic → Task → Subtask hierarchy.
 - [x] Define mandatory active Task Accord, exceptional validation, and atomic archive flows.
-- [x] Define tagged-Task Papercuts and per-file Rules.
+- [x] Define per-file Rules.
+- [x] Define Task kinds `epic`, `research`, and `papercut` (protocol 0.5.0); Papercuts are no longer tag-defined.
 - [x] Define structured event envelope and actor-local identity.
 - [x] Define global JSON, generated help, exit codes, scope, clear, and list replacement semantics.
 
