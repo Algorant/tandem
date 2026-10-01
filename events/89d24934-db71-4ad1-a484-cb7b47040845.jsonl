@@ -295,3 +295,4 @@
 {"ts":"2026-10-01T23:32:36Z","event":"task.completed","id":"task-55-1","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":295}
 {"ts":"2026-10-01T23:32:38Z","event":"task.completed","id":"task-55-2","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":296}
 {"ts":"2026-10-01T23:32:39Z","event":"task.completed","id":"task-55-3","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":297}
+{"ts":"2026-10-01T23:32:56Z","event":"accord.delivered","id":"task-55","summary":"Accord deliver for task-55","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":298}
