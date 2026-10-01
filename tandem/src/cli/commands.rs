@@ -76,7 +76,8 @@ fn refresh_for_read(project: &TandemProject) -> Vec<String> {
 
 fn open_read() -> Result<(TandemProject, Vec<String>), CliError> {
     let project = app::project::open()?;
-    let warnings = refresh_for_read(&project);
+    let mut warnings = refresh_for_read(&project);
+    warnings.extend(project.held_edit_warnings());
     Ok((project, warnings))
 }
 

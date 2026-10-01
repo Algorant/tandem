@@ -188,11 +188,51 @@ impl TandemProject {
     }
 
     pub(crate) fn read_board_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
-        read_documents(&self.tasks_dir, DocumentLocation::Board)
+        self.read_record_dir(&self.tasks_dir, DocumentLocation::Board)
     }
 
     pub(crate) fn read_log_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
-        read_documents(&self.logs_dir, DocumentLocation::Logs)
+        self.read_record_dir(&self.logs_dir, DocumentLocation::Logs)
+    }
+
+    /// Reads one record directory. On a Git-backed board an unparsable record
+    /// is a held edit: sync keeps it local, and every other command skips it
+    /// so unrelated work continues ([`Self::held_edit_warnings`] reports it).
+    fn read_record_dir(
+        &self,
+        dir: &Path,
+        location: DocumentLocation,
+    ) -> Result<Vec<StoredDocument>, CliError> {
+        if self.git.is_some() {
+            Ok(read_documents_tolerant(
+                dir,
+                location,
+                "Board",
+                &mut Vec::new(),
+            ))
+        } else {
+            read_documents(dir, location)
+        }
+    }
+
+    /// One warning per record file that cannot be parsed and is therefore
+    /// skipped and held back from sync.
+    pub(crate) fn held_edit_warnings(&self) -> Vec<String> {
+        if self.git.is_none() {
+            return Vec::new();
+        }
+        let mut warnings = Vec::new();
+        for dir in [&self.tasks_dir, &self.decisions_dir(), &self.logs_dir] {
+            let mut found = Vec::new();
+            read_documents_tolerant(dir, DocumentLocation::Board, "Board", &mut found);
+            warnings.extend(found.into_iter().filter_map(|warning| {
+                let detail = warning.strip_prefix("Board load warning: ")?;
+                Some(format!(
+                    "skipped a record that cannot be read and is held from sync: {detail}"
+                ))
+            }));
+        }
+        warnings
     }
 
     /// Loose references may target a document by ID.
@@ -204,10 +244,9 @@ impl TandemProject {
         let mut docs = self.read_board_documents()?;
         // Decisions are active durable records stored separately from Tasks,
         // but remain part of the common document lookup/read model.
-        docs.extend(read_documents(
-            &self.data_dir().join("decisions"),
-            DocumentLocation::Board,
-        )?);
+        docs.extend(
+            self.read_record_dir(&self.data_dir().join("decisions"), DocumentLocation::Board)?,
+        );
         docs.extend(self.read_log_documents()?);
         Ok(docs)
     }

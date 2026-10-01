@@ -498,6 +498,46 @@ fn linked_worktrees_share_the_main_board() {
     assert!(git(&worktree, &["status", "--porcelain"]).is_empty());
 }
 
+#[test]
+fn a_held_broken_edit_does_not_stop_other_work() {
+    let (world, a, b) = World::two_machines("held-broken");
+    add_task(&a, "One");
+    add_task(&a, "Two");
+    ok(&b, &["sync"]);
+    let broken = b.join(".tandem/tasks/task-2.md");
+    let bytes = "---\nid: task-2\ntitle: [unclosed\n---\n";
+    fs::write(&broken, bytes).unwrap();
+    let listed = ok(&b, &["list"]);
+    assert_eq!(listed["data"].as_array().unwrap().len(), 1);
+    assert!(listed["warnings"][0]
+        .as_str()
+        .unwrap()
+        .contains("held from sync"));
+    let worktree = world.root.join("b-feature");
+    git(
+        &b,
+        &[
+            "worktree",
+            "add",
+            "--quiet",
+            "-b",
+            "feature",
+            worktree.to_str().unwrap(),
+        ],
+    );
+    let created = add_task(&worktree, "From the worktree");
+    assert_eq!(created["data"]["id"], "task-3");
+    assert!(created["data"]["sync"]["held"][0]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("tasks/task-2.md"));
+    ok(&b, &["sync"]);
+    ok(&a, &["sync"]);
+    assert_eq!(ids(&a), vec!["task-1", "task-2", "task-3"]);
+    assert_eq!(title(&a, "task-2"), "Two");
+    assert_eq!(fs::read_to_string(&broken).unwrap(), bytes);
+}
+
 fn legacy_board(repo: &Path) {
     let board = repo.join(".tandem");
     fs::create_dir_all(board.join("tasks")).unwrap();
