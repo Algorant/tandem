@@ -3,15 +3,17 @@ id: task-22
 uid: 5bee27a0-1956-45a8-a7f0-0ea5701cf1ee
 type: task
 title: "Review modeling of research and papercut tasks without duplicating Board display work"
-state: todo
 references: ["task-21", "task-55", "task-56", "task-57", "task-58"]
 tags: ["tui", "taxonomy"]
 accord:
   status: "ready"
   acceptance: ["Document representative research and papercut workflows and identify differences requiring protocol semantics rather than presentation/filtering.", "Compare ordinary Tasks with tags, task kinds and first-class types, including lifecycle, hierarchy, metadata, interoperability and migration costs.", "Use task-21's agreed overlapping Papercuts view as the display baseline; do not duplicate its counts/navigation implementation or block it on taxonomy choices.", "Recommend a model for each category with rationale and explicitly unresolved product questions, including jointly tagged Tasks where relevant.", "Produce scoped follow-ups only after direction is agreed; make no taxonomy or TUI implementation changes under this exploration."]
-  updatedAt: "2026-09-11T14:24:35Z"
+  updatedAt: "2026-10-01T22:42:52Z"
 createdAt: "2026-09-07T13:41:48Z"
-updatedAt: "2026-10-01T22:21:15Z"
+updatedAt: "2026-10-01T22:42:52Z"
+archivedAt: "2026-10-01T22:42:52Z"
+resolution:
+  outcome: "completed"
 ---
 ## Goal
 Evaluate whether research and papercut workflows need semantics beyond ordinary Tasks with tags. Compare tags, task kinds, and first-class types using concrete lifecycle, hierarchy, metadata, interoperability, and migration needs. Classification must not become workflow state.
