@@ -2,6 +2,29 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.16.0
+
+Tandem v0.16.0 makes research and papercut first-class Task kinds and adds typed links between records. This is protocol 0.5.0; existing boards are converted once with `tandem migrate`.
+
+### Breaking changes
+
+- Protocol 0.5.0. Older Tandem versions cannot read a 0.5.0 board. Every machine that shares a board must run v0.16.0 before that board is migrated and synced; then run `tandem migrate` once per board. Until it is migrated, a 0.4.0 board refuses other commands and names this step.
+- Research and papercut work is classified only by `kind`. The `research` and `papercut` tags no longer mean anything special, and Tandem no longer reads them as kinds anywhere.
+- The TUI papercut inbox (`i`) is removed. Papercuts have their own Board tab instead.
+
+### Added
+
+- `research` and `papercut` Task kinds, next to `epic`. A papercut needs only a title, defaults to `priority: low`, and may be a root Task or a direct Epic child, but never a Subtask. Research may sit anywhere.
+- `--kind` on `list` and `search`. `tandem assignment --json` reports `kind` for the root and each milestone.
+- `tandem migrate` upgrades a 0.4.0 board in place. Active Board Tasks tagged `research` or `papercut` gain the matching kind, and the tag is removed. Ambiguous records are reported and left unchanged, and archived Logs are not touched. A synced board publishes the upgrade as one change that other machines receive on their next sync.
+- Typed links between records: `relates-to`, `duplicates`, `fixed-by`, `fixes`, and `supersedes`. Manage them with `tandem link add|remove`, filter with `list --link` and `--linked-to`, and see outgoing and incoming links in `show`. `references` stays as untyped context.
+- `tandem complete <id> --fixed-by <record>` closes a Task as fixed by another record and records the link. `complete` also accepts `--note`.
+
+### Changed
+
+- TUI Board tabs are now ALL (the default), then each workflow state, then RESEARCH and PAPERCUTS. The kind tabs list matching Tasks from every state, each with its parent. Kind badges and the `f` kind filter come from `kind`.
+- `add` requires `--acceptance` for every kind except papercut, and only a papercut may clear its acceptance.
+
 ## 0.15.0
 
 Tandem v0.15.0 syncs each repository's board through its own `tandem` branch, so working on several machines no longer produces ID collisions or blocked pulls. This is protocol 0.4.0; existing boards are converted once with `tandem migrate`.
