@@ -121,9 +121,9 @@ https://github.com/Algorant/tandem/releases/latest/download/tandem-installer.sh
 
 GitHub Pages cannot express this redirect from the repository, and `site/public/install.sh` must not be restored as a shell wrapper. Keep OS/architecture detection, release asset selection, checksums, and install behavior in cargo-dist's generated installer. The install should remain user-local/no-sudo. If users cannot run `tandem` after install, direct them to add the reported cargo-dist bin directory, commonly `~/.local/bin` or `~/.cargo/bin`, to `PATH`.
 
-### Install target for `pi-tandem`
+### Install target for integrations
 
-`pi-tandem` resolves `tandem` in this order:
+Integrations resolve `tandem` in this order:
 
 1. `TANDEM_BIN`
 2. `tandem` on `$PATH`
@@ -142,10 +142,10 @@ cargo install --path tandem --locked
 tandem --version
 ```
 
-For Pi smoke tests without installing globally, set an explicit binary path:
+To use a local build without installing globally, set an explicit binary path:
 
 ```text
-TANDEM_BIN="$PWD/tandem/target/release/tandem" pi -e ./extensions/pi-tandem/index.ts
+TANDEM_BIN="$PWD/tandem/target/release/tandem"
 ```
 
 ### Release validation commands
@@ -168,10 +168,6 @@ cd ..
 node --check tandem/src/web/app.js
 node --check tandem/src/web/api.js
 node --check tandem/src/web/ui.js
-bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
-TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
-TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
-TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 git diff --check
 
 # `just release X.Y.Z` performs these checks before reporting success:

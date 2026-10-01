@@ -103,7 +103,7 @@ The earlier `add --subtask <title>` inline-checklist authoring path is deprecate
 
 Current release: `tandem` package version `0.6.5`, `tandem` binary, annotated git tag `tandem-v0.6.5`.
 
-Downstream integrations such as `pi-tandem` can install the released CLI with:
+Downstream integrations can install the released CLI with:
 
 ```text
 cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.5 --path tandem --locked
@@ -116,7 +116,7 @@ cargo install --path tandem --locked
 tandem --version
 ```
 
-`pi-tandem` should locate the installed binary through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
+Integrations should call the installed `tandem` binary (with `--json` for reads), locating it through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
 
 ## Implemented TUI themes and keys
 

@@ -1,15 +1,11 @@
 ---
 title: Extensions
-description: Tandem integration adapters.
+description: Integrating with Tandem through the CLI.
 ---
-Extensions connect Tandem with the tools you use to plan and coordinate work. This page lists official Tandem extensions as they become available.
+The `tandem` CLI is Tandem's integration surface. Any agent or editor integration should call the installed `tandem` binary with an argument array (no shell interpolation) and use `--json` for reads. Tandem remains responsible for IDs, validation, relationships, storage, status, search, and events; an integration must not parse or mutate Tandem Markdown itself.
 
-## Official Pi extension
+For example, an integration records small, non-blocking friction with `tandem add task --kind papercut` and lists it with `tandem list --kind papercut --json`.
 
-### pi-tandem
+Tandem does not currently ship an official adapter for any agent framework. The former `pi-tandem` Pi adapter was retired from this repository.
 
-`pi-tandem` is a thin adapter over an installed `tandem` CLI. It exposes Task, Accord, Log, Rule, Decision, Papercut, search, initialization, and status tools without parsing or mutating Tandem Markdown itself.
-
-Use `tandem_papercut` with `add`, `list`, `show`, or `resolve` for small, non-blocking friction. Read actions use CLI JSON. Tandem remains responsible for Papercut IDs, validation, references, storage, status, search, and events.
-
-See the [`pi-tandem` source](https://github.com/Algorant/tandem/tree/main/extensions/pi-tandem).
+See [Agents and adapters](/guides/agents-and-adapters/) for the framework-neutral integration contract.

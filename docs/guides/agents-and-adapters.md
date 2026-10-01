@@ -88,9 +88,9 @@ Search Tandem records before an ad hoc filesystem scan when the question concern
 
 ## Record small friction without interrupting work
 
-Use `tandem add task --kind papercut` or an adapter's thin equivalent when small, non-blocking friction causes confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. Then continue current work. A failed tool call is only a signal: expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.
+Use `tandem add task --kind papercut` (or an integration's thin equivalent) when small, non-blocking friction causes confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. Then continue current work. A failed tool call is only a signal: expected test failures, empty searches, and deliberate invalid probes are not automatically Papercuts.
 
-Do not use a Papercut when work is blocked; use the blocking lifecycle. Do not use one instead of a planned fix; create a Task and reference the Papercut. A thin adapter maps its papercut intent to CLI argument arrays (`add task --kind papercut`, `list --kind papercut`), requests JSON for reads, and leaves parsing, IDs, validation, writes, and events to Tandem.
+Do not use a Papercut when work is blocked; use the blocking lifecycle. Do not use one instead of a planned fix; create a Task and reference the Papercut. A thin integration maps its papercut intent to CLI argument arrays (`add task --kind papercut`, `list --kind papercut`), requests JSON for reads, and leaves parsing, IDs, validation, writes, and events to Tandem.
 
 ## Leave syncing to Tandem
 
@@ -124,4 +124,4 @@ It must not:
 - promote one repository's active rules into universal guidance;
 - hide protocol warnings or contradictory instructions.
 
-Adapter repositories should consume this contract and keep implementation details in their own code and maintainer documentation.
+The `tandem` CLI, with `--json` for reads, is the integration surface. Adapter repositories should consume this contract and keep implementation details in their own code and maintainer documentation.

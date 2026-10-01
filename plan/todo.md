@@ -29,7 +29,7 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [x] Reworked the Board into count-labeled state subviews with a full-width selected-state list and richer rows while preserving quick-add and `H`/`L` task moves.
 - [x] Added first-class TUI theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, plus workspace `theme = "name"` selection and `default-dark`/`verdigris` preset examples.
 - [x] Added `extensions/` as the third major area for agent/editor integrations.
-- [x] Added the initial `extensions/pi-tandem` Pi adapter MVP over installed `tandem`.
+- [x] Added and later retired the `extensions/pi-tandem` Pi adapter (decision-10); the `tandem` CLI with `--json` is the integration surface.
 - [x] Established the accepted `protocol` → `project` → `app` architecture with peer CLI/TUI interfaces, `project::TandemProject`, `tui/mod.rs`, protocol `0.2.0` compatibility, real-command coverage, and strict Clippy checkpoints.
 
 ## Current tasks
@@ -44,13 +44,12 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [ ] Revisit standalone split CLI/TUI crate only after v0 if packaging/user needs justify it.
 - [ ] Do not create schemas or fixtures in v0; revisit after TUI MVP/protocol stabilization.
 - [ ] Track any remaining open naming/vocabulary decisions after detailed spec updates.
-- [ ] Test `pi-tandem` as a project-local Pi extension before any global Pi config promotion.
 
 ## Task tag convention
 
 Use task tags as lightweight delegation/filter hints, not as protocol schema.
 
-- Put one primary area tag first: `protocol`, `tui`, `pi-tandem`, `docs`, `config`, `rules`, or `ui`.
+- Put one primary area tag first: `protocol`, `tui`, `docs`, `config`, `rules`, or `ui`.
 - Add only a few capability/workflow tags when they help filtering, such as `accord`, `review`, `logs`, `editor`, `relationships`, `delegation`, `taxonomy`, `smoke`, or `validation`.
 - Concrete TUI facet tags like `theme`, `keyboard`, `mouse`, and `markdown` are fine when they route work better than a broad `tui` tag alone.
 - Keep tags lowercase/kebab-case and avoid meta tags like `mvp` or `polish` unless they materially help delegation.
@@ -60,8 +59,7 @@ Use task tags as lightweight delegation/filter hints, not as protocol schema.
 1. Add safe Review action buttons/mutations, likely accord accept/rework and completion/archive prompts.
 2. Continue Board mutations after quick-add and move/change-state, likely edit, complete, or accord actions.
 3. Continue remaining TUI polish without adding schemas or fixtures in v0.
-4. Smoke `pi-tandem` in a real Pi session with project-local loading, then consider global Pi config promotion only as a separate reviewed step.
-5. Migrate/dogfood Tandem documents after the TUI can manage them safely.
+4. Migrate/dogfood Tandem documents after the TUI can manage them safely.
 
 ## Open questions
 

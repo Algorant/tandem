@@ -18,7 +18,7 @@ protocol/      Normative protocol source of truth and detailed specification
 tandem/        Executable Rust protocol, project/app layers, CLI, and Ratatui TUI
 docs/          Public documentation source
 site/          Astro Starlight documentation site
-extensions/    Agent and editor adapters, including pi-tandem
+extensions/    Home for future agent and editor integrations over the tandem CLI
 ```
 ## Install
 

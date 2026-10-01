@@ -1,74 +1,27 @@
 # Tandem Extensions
 
-This area contains agent/editor integrations for Tandem.
+This directory is the home for future Tandem agent and editor integrations. It currently contains no integrations.
 
-Current scope is intentionally narrow: integrations should adapt existing Tandem control surfaces, especially the installed `tandem` CLI, instead of reimplementing Tandem protocol parsing or mutation behavior.
+The Pi adapter (`pi-tandem`) was retired from this repository (decision-10). The `tandem` CLI, with `--json` for reads, is the integration surface: any agent or editor integration should call the installed `tandem` binary and consume its JSON output.
 
-## Layout
-
-```text
-extensions/
-├── README.md
-├── plan/
-│   ├── spec.md
-│   └── todo.md
-└── pi-tandem/
-    ├── README.md
-    ├── index.ts
-    ├── pi-tandem.md
-    ├── plan/
-    │   ├── spec.md
-    │   └── todo.md
-    └── tests/
-        └── smoke.ts
-```
-
-## Current integrations
-
-- `pi-tandem/` — a lightweight Pi extension that exposes `tandem_*` tools and `/tandem` diagnostics over an installed `tandem` CLI.
-
-## Adapter principle
+## Integration principle
 
 ```text
 LLM / editor agent → integration adapter → installed tandem CLI → app/project → .tandem workspace
 ```
 
-Adapters may own:
-
-- Pi/editor tool schemas and command registration.
-- Prompt guidance and agent ergonomics.
-- Output formatting, truncation, and diagnostics.
-- Local smoke tests for the adapter surface.
-
-Adapters must not own:
+Integrations may own framework-specific tool schemas, prompt guidance, output rendering, and diagnostics. They must not own:
 
 - Tandem protocol semantics.
-- Markdown/frontmatter mutation behavior.
+- Markdown/frontmatter parsing or mutation.
 - ID allocation or relationship reclassification.
-- Alternate task, accord, rule, decision, or log parsers beyond trivial CLI JSON output handling.
+- Alternate task, accord, rule, decision, or log parsers beyond handling CLI JSON output.
 
-Normative behavior belongs in repository `protocol/`; executable behavior belongs
-in `tandem/src/protocol/` and shared `app` operations over
-`project::TandemProject`. The current `pi-tandem` integration is CLI-only: it
-must not import Rust internals, discover an alternate application API, or bypass
-the installed CLI. Adapters pass through and consume the CLI's canonical
-hierarchy:
-
-```text
-task-10       Epic: global ID
-└── task-11   Task: global ID; `epic-task`; delegation root
-    └── task-11-1   Subtask: parent-derived leaf; `subtask`; worker checklist item
-```
-
-Only Tasks are delegated initially. Epics and Subtasks are not independent delegation roots, and no adapter may add compatibility for hierarchical direct Epic children, global-ID Subtasks, or deeper nesting.
-
-## Testing and promotion
-
-Work starts as repository-local extension code and smoke tests. Global Pi config promotion is a later, explicit step after review; do not edit `~/.pi/agent` from this repo task.
+Normative behavior belongs in repository `protocol/`; executable behavior belongs in `tandem/src/protocol/` and shared `app` operations over `project::TandemProject`. Integrations use `execFile` or an equivalent argument-array API, never shell interpolation, and must not import Rust internals or bypass the CLI.
 
 See also:
 
 - `plan/spec.md` — extension-area design
 - `plan/todo.md` — extension-area todo
-- `pi-tandem/README.md` — Pi extension usage and tool mapping
+- `../docs/guides/agents-and-adapters.md` — framework-neutral integration guidance
 - `../README.md` — parent project overview

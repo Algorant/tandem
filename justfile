@@ -152,10 +152,6 @@ release VERSION:
 	bun audit --audit-level=high
 	cd ..
 	bun build --no-bundle tandem/src/web/app.js tandem/src/web/api.js tandem/src/web/ui.js --outdir /tmp/tandem-web-syntax-check
-	bun --check extensions/pi-tandem/index.ts extensions/pi-tandem/tests/smoke.ts extensions/pi-tandem/tests/pi-runtime-smoke.ts extensions/pi-tandem/tests/relationship-smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/relationship-smoke.ts
-	TANDEM_BIN="$PWD/tandem/target/release/tandem" bun extensions/pi-tandem/tests/pi-runtime-smoke.ts
 	git diff --check
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main

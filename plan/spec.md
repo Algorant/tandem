@@ -26,14 +26,9 @@ tandem/
 │       └── todo.md
 └── extensions/
     ├── README.md
-    ├── plan/
-    │   ├── spec.md
-    │   └── todo.md
-    └── pi-tandem/
-        ├── README.md
-        └── plan/
-            ├── spec.md
-            └── todo.md
+    └── plan/
+        ├── spec.md
+        └── todo.md
 ```
 
 ## Naming model
@@ -45,7 +40,6 @@ tandem/
 - CLI binary: `tandem`
 - TUI source area: `tandem/`
 - Integrations area: `extensions/`
-- Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes unless explicitly revisited
 
@@ -68,7 +62,7 @@ Current areas:
 
 - `protocol/` — the normative protocol source of truth: Tandem on-disk format, lifecycle, accord/review/log semantics, and local v3 direction inspired by Brainfile. `tandem/src/protocol/` is its executable Rust implementation.
 - `tandem/` — one Rust binary crate containing executable `protocol`, concrete `project::TandemProject`, shared `app` operations, and peer CLI/TUI interfaces. `main.rs` and `tui/mod.rs` are wiring roots.
-- `extensions/` — agent/editor integrations. The first integration is `pi-tandem`, a lightweight Pi adapter over an installed `tandem` CLI.
+- `extensions/` — home for future agent/editor integrations over the installed `tandem` CLI (`--json` for reads). The `pi-tandem` adapter was retired (decision-10).
 - `plan/` — parent project coordination and cross-cutting decisions.
 
 Do not overdesign the repository. For v0, keep CLI/TUI implementation under `tandem/`, keep integrations under `extensions/`, and do not add a root Rust workspace, `crates/`, standalone core crates, schemas, fixtures, CI, or dependency choices. Revisit only after implementation pressure proves the need.
@@ -112,10 +106,8 @@ CLI/TUI:
 
 Extensions:
 
-- `extensions/pi-tandem` is the first v0 integration.
-- `pi-tandem` is a thin Pi adapter over installed `tandem`, not a TypeScript Tandem protocol implementation.
-- Extension tools must use `execFile`/argument arrays, prefer `tandem --json` read paths where supported, preserve human-readable mutation output, and provide diagnostics for missing `tandem`, missing `.tandem`, unsupported CLI surface, and command failures.
-- Project-local extension testing comes before any global Pi config promotion.
+- The `tandem` CLI with `--json` is the integration surface; the `pi-tandem` adapter was retired (decision-10) and `extensions/` currently holds no integrations.
+- Integrations must be thin: use `execFile`/argument arrays, prefer `tandem --json` read paths, and never reimplement Tandem protocol parsing or mutation.
 
 
 ## Near-term milestones
@@ -129,4 +121,3 @@ Extensions:
 7. Continue the first Ratatui/crossterm TUI MVP from the current Board/Review/Logs/Rules/Decisions shell toward richer mutations and polish.
 8. Add TUI accord/review/completion flows.
 9. Keep Brainfile as a design reference only; no Brainfile import/migration work is required for v0.
-10. Smoke `pi-tandem` locally as a Pi extension before considering canonical global Pi config promotion.
