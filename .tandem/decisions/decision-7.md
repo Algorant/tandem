@@ -7,7 +7,8 @@ deciders: ["Algorant"]
 tags: ["protocol", "events", "identity", "worktrees", "safety"]
 createdAt: "2026-08-31T20:52:47Z"
 decidedAt: "2026-07-15T00:00:00Z"
-updatedAt: "2026-08-31T20:52:47Z"
+updatedAt: "2026-09-30T04:40:26Z"
+references: ["decision-9"]
 ---
 
 ## Status
@@ -27,3 +28,7 @@ Event actor identity is non-configurable. Tandem always reuses the canonical ran
 - One independent writable checkout or linked worktree has exactly one local actor identity.
 - A global environment variable cannot collapse separate worktrees onto one ledger.
 - Persisted actor UUIDs and per-actor ledgers remain valid with no migration.
+
+## Amendment (decision-9, 2026-09-30)
+
+With protocol 0.4.0 the identity file moves out of the synced board: each checkout keeps its UUID in its own Git directory as `tandem-actor-id` (a linked worktree has its own), or in `.tandem/actor-id` for a board outside Git. `tandem migrate` moves an existing identity there so its ledger continues. The guarantee above is unchanged. Copying a clone's `.git` directory to another machine copies its identity; delete `tandem-actor-id` in the copy.

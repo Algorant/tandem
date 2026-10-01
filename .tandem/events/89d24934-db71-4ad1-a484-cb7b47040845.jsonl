@@ -218,3 +218,54 @@
 {"ts":"2026-09-28T21:36:33Z","event":"accord.delivered","id":"task-47","summary":"Accord deliver for task-47","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":218}
 {"ts":"2026-09-28T21:36:33Z","event":"task.completed","id":"task-47","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":219}
 {"ts":"2026-09-29T18:30:34Z","event":"task.created","id":"task-48","summary":"Review and redesign cross-machine sync: collision-free IDs, conflict-free commits/pushes, and an automated reconcile flow","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":220}
+{"ts":"2026-09-30T02:50:14Z","event":"task.created","id":"task-49","summary":"Implement independent native metadata sync for seamless multi-machine Tandem use","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":221}
+{"ts":"2026-09-30T02:50:56Z","event":"task.updated","id":"task-48","summary":"Updated task-48 metadata: references, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":222}
+{"ts":"2026-09-30T03:39:39Z","event":"accord.claimed","id":"task-48","summary":"Accord claim for task-48","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":223}
+{"ts":"2026-09-30T03:41:03Z","event":"task.created","id":"task-50","summary":"Event envelope in code contradicts protocol spec (summary vs data)","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":224}
+{"ts":"2026-09-30T03:41:03Z","event":"task.created","id":"task-51","summary":"Workspace docs describe the pre-0.3.0 layout","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":225}
+{"ts":"2026-09-30T03:53:49Z","event":"accord.delivered","id":"task-48","summary":"Accord deliver for task-48","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":226}
+{"ts":"2026-09-30T03:53:49Z","event":"task.completed","id":"task-48","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":227}
+{"ts":"2026-09-30T03:53:49Z","event":"task.updated","id":"task-49","summary":"Updated task-49 metadata: relatedFiles, constraints, blockers","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":228}
+{"ts":"2026-09-30T03:54:17Z","event":"task.created","id":"task-49-1","summary":"Step 1 spike: validate sync mechanics in throwaway repositories","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":229}
+{"ts":"2026-09-30T03:54:17Z","event":"task.created","id":"task-49-2","summary":"Step 2: write protocol 0.4.0 and record the decision","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":230}
+{"ts":"2026-09-30T03:54:17Z","event":"task.created","id":"task-49-3","summary":"Step 3: record identity (hidden UUIDs, temporary labels, numbering at first sync)","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":231}
+{"ts":"2026-09-30T03:54:17Z","event":"task.created","id":"task-49-4","summary":"Step 4: sync engine core (safety copy, fetch, publish, restore, status)","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":232}
+{"ts":"2026-09-30T03:54:17Z","event":"task.created","id":"task-49-5","summary":"Step 5: semantic merge and conflict resolution","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":233}
+{"ts":"2026-09-30T03:54:18Z","event":"task.created","id":"task-49-6","summary":"Step 6: automatic sync in CLI, TUI, and web; remove checkpoint","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":234}
+{"ts":"2026-09-30T03:54:18Z","event":"task.created","id":"task-49-7","summary":"Step 7: migration (tandem migrate and migrate --adopt)","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":235}
+{"ts":"2026-09-30T03:54:18Z","event":"task.created","id":"task-49-8","summary":"Step 8: end-to-end verification, documentation, and release","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":236}
+{"ts":"2026-09-30T03:54:18Z","event":"task.created","id":"task-49-9","summary":"Step 9: agent rollout and bootstrap guide","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":237}
+{"ts":"2026-09-30T03:55:22Z","event":"accord.claimed","id":"task-49","summary":"Accord claim for task-49","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":238}
+{"ts":"2026-09-30T03:55:22Z","event":"accord.claimed","id":"task-49-1","summary":"Accord claim for task-49-1","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":239}
+{"ts":"2026-09-30T03:57:17Z","event":"accord.delivered","id":"task-49-1","summary":"Accord deliver for task-49-1","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":240}
+{"ts":"2026-09-30T03:57:17Z","event":"task.completed","id":"task-49-1","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":241}
+{"ts":"2026-09-30T04:40:13Z","event":"decision.created","id":"decision-9","summary":"Sync the board through a tandem branch with permanent uids and numbering at first sync","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":242}
+{"ts":"2026-09-30T04:40:26Z","event":"decision.updated","id":"decision-9","summary":"Updated decision-9 metadata: status, decidedAt","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":243}
+{"ts":"2026-09-30T04:40:26Z","event":"decision.updated","id":"decision-7","summary":"Updated decision-7 metadata: references, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":244}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-2","summary":"Accord claim for task-49-2","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":245}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-2","summary":"Accord deliver for task-49-2","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":246}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-2","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":247}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-3","summary":"Accord claim for task-49-3","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":248}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-3","summary":"Accord deliver for task-49-3","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":249}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-3","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":250}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-4","summary":"Accord claim for task-49-4","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":251}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-4","summary":"Accord deliver for task-49-4","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":252}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-4","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":253}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-5","summary":"Accord claim for task-49-5","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":254}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-5","summary":"Accord deliver for task-49-5","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":255}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-5","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":256}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-6","summary":"Accord claim for task-49-6","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":257}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-6","summary":"Accord deliver for task-49-6","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":258}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-6","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":259}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-7","summary":"Accord claim for task-49-7","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":260}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.delivered","id":"task-49-7","summary":"Accord deliver for task-49-7","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":261}
+{"ts":"2026-09-30T04:51:40Z","event":"task.completed","id":"task-49-7","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":262}
+{"ts":"2026-09-30T04:51:40Z","event":"accord.claimed","id":"task-49-9","summary":"Accord claim for task-49-9","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":263}
+{"ts":"2026-09-30T04:51:41Z","event":"accord.delivered","id":"task-49-9","summary":"Accord deliver for task-49-9","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":264}
+{"ts":"2026-09-30T04:51:41Z","event":"task.completed","id":"task-49-9","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":265}
+{"ts":"2026-09-30T04:51:58Z","event":"task.created","id":"task-52","summary":"CLI reference still documents pre-0.3.0 commands","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":266}
+{"ts":"2026-09-30T16:55:42Z","event":"task.created","id":"task-49-10","summary":"Keep local commands working while a broken hand edit is held","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":267}
+{"ts":"2026-10-01T06:30:00Z","event":"accord.claimed","id":"task-49-10","summary":"Accord claim for task-49-10","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":268}
+{"ts":"2026-10-01T06:30:00Z","event":"accord.claimed","id":"task-49-8","summary":"Accord claim for task-49-8","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":269}
+{"ts":"2026-10-01T06:30:59Z","event":"accord.delivered","id":"task-49-10","summary":"Accord deliver for task-49-10","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":270}
+{"ts":"2026-10-01T06:30:59Z","event":"task.completed","id":"task-49-10","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":271}
