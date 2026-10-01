@@ -3,19 +3,21 @@ id: task-56
 uid: 1bd31435-ea2b-4099-ba34-a558f0e8d3f3
 type: task
 title: "Add typed links between records: relates-to, duplicates, fixed-by, supersedes"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "medium"
 references: ["task-22", "task-55"]
 tags: ["protocol", "relationships"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The protocol defines typed links between records (at least `relates-to`, `duplicates`, `fixed-by`/`fixes`, `supersedes`) and documents their storage shape and how they relate to the existing `references`.", "The CLI can add, remove, show, and filter typed links, and `complete` can record that a Task was resolved as fixed by another record.", "Tests cover link validation (unknown targets, self-links, archived targets) and the fixed-by completion path."]
+  claimedAt: "2026-10-01T22:43:32Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-01T22:21:03Z"
+  updatedAt: "2026-10-01T22:43:32Z"
 createdAt: "2026-10-01T22:21:03Z"
-updatedAt: "2026-10-01T22:43:21Z"
+updatedAt: "2026-10-01T22:43:32Z"
 relatedFiles: ["protocol/README.md", "tandem/src/protocol/document.rs", "tandem/src/app", "tandem/src/cli"]
+assignee: "worker-task-56-86f3e9df"
 ---
 
 ## Description
