@@ -28,7 +28,7 @@ Current direction is intentionally simple:
 - `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
 - The Rust architecture is implemented as `protocol`, `project`, `app`, `cli`, and `tui` modules in one binary crate. `project::TandemProject` owns concrete `.tandem/` discovery and filesystem safety; shared `app` operations coordinate protocol rules and project I/O; CLI and TUI are peer interfaces. `main.rs` and `tui/mod.rs` are wiring roots, not protocol or persistence owners.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
-- `extensions/` is the scoped home for agent/editor integrations. The first integration is `extensions/pi-tandem/`, a lightweight Pi adapter over an installed `tandem` CLI; extension code must not duplicate Tandem protocol parsing or mutation behavior.
+- `extensions/` is the scoped home for future agent/editor integrations. It currently holds no integration: the `pi-tandem` adapter was retired (`decision-10`), and the `tandem` CLI with `--json` is the integration surface. Integration code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
 - Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
 
@@ -97,10 +97,9 @@ CLI/TUI:
 │       └── todo.md        # CLI/TUI todo
 └── extensions/
     ├── README.md          # integrations area README
-    ├── plan/
-    │   ├── spec.md        # integrations area draft
-    │   └── todo.md        # integrations todo
-    └── pi-tandem/         # Pi adapter over tandem CLI
+    └── plan/
+        ├── spec.md        # integrations area draft
+        └── todo.md        # integrations todo
 ```
 
 The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI/extensions into separate repositories unless explicitly asked.
@@ -123,9 +122,6 @@ Primary planning documents:
 - `extensions/README.md`
 - `extensions/plan/spec.md`
 - `extensions/plan/todo.md`
-- `extensions/pi-tandem/README.md`
-- `extensions/pi-tandem/plan/spec.md`
-- `extensions/pi-tandem/plan/todo.md`
 
 ## Naming rules
 
@@ -138,7 +134,6 @@ Use these names consistently unless the user explicitly changes them:
 - CLI binary: `tandem`
 - CLI/TUI area: `tandem/`
 - Integrations area: `extensions/`
-- Pi extension adapter: `pi-tandem`
 - Work agreement object: `accord`
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
@@ -189,10 +184,8 @@ CLI/TUI:
 Extensions:
 
 - Keep integrations under `extensions/` for now.
-- Model `pi-tandem` after `pi-web-tools`: a thin Pi adapter over an installed CLI.
-- Use `execFile`/argument arrays and avoid shell interpolation.
-- Do not duplicate Tandem protocol parsing or mutation behavior in TypeScript; call `tandem` and keep behavior in the CLI/protocol.
-- Test project-local extension behavior first; promote to canonical global Pi config only in an explicit later task.
+- Any future integration is a thin adapter over an installed `tandem` CLI: use `execFile`/argument arrays, avoid shell interpolation, and consume CLI JSON.
+- Do not duplicate Tandem protocol parsing or mutation behavior in an integration; call `tandem` and keep behavior in the CLI/protocol.
 
 ## Protocol architecture refactor campaign (completed)
 
@@ -266,7 +259,7 @@ When changing implementation code:
 - Add tests with protocol changes; do not add schemas or fixtures in v0.
 - Change normative semantics in `protocol/` first, then update `tandem/src/protocol/`; do not infer roles, IDs, lifecycle, accord, review, or event rules in `project`, CLI, TUI, or extensions.
 - Route durable CLI and TUI mutations through shared `app` operations over `project::TandemProject`.
-- Keep `pi-tandem` CLI-only: it may build argument arrays and consume CLI JSON, but must never parse or mutate Tandem Markdown/frontmatter or reclassify protocol relationships.
+- Keep any integration CLI-only: it may build argument arrays and consume CLI JSON, but must never parse or mutate Tandem Markdown/frontmatter or reclassify protocol relationships.
 - Do not create opaque state as the only source of truth.
 
 ## File editing rules
