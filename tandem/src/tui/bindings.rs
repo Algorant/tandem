@@ -12,13 +12,12 @@ pub(super) enum BindingScope {
     Logs,
     Rules,
     Decisions,
-    Utility,
     Dialogs,
     Mouse,
 }
 
 impl BindingScope {
-    pub(super) const ALL: [Self; 11] = [
+    pub(super) const ALL: [Self; 10] = [
         Self::Global,
         Self::Navigation,
         Self::CurrentView,
@@ -27,7 +26,6 @@ impl BindingScope {
         Self::Logs,
         Self::Rules,
         Self::Decisions,
-        Self::Utility,
         Self::Dialogs,
         Self::Mouse,
     ];
@@ -42,7 +40,6 @@ impl BindingScope {
             Self::Logs => "Logs",
             Self::Rules => "Rules",
             Self::Decisions => "Decisions",
-            Self::Utility => "Utility inbox",
             Self::Dialogs => "Dialogs and text input",
             Self::Mouse => "Mouse",
         }
@@ -196,21 +193,6 @@ pub(super) const BINDINGS: &[Binding] = &[
         scope: BindingScope::Decisions,
         keys: "Enter",
         description: "expand or collapse selected decision",
-    },
-    Binding {
-        scope: BindingScope::Utility,
-        keys: "i · Esc",
-        description: "close and restore the underlying view",
-    },
-    Binding {
-        scope: BindingScope::Utility,
-        keys: "Tab · Shift-Tab",
-        description: "change list/detail focus",
-    },
-    Binding {
-        scope: BindingScope::Utility,
-        keys: "Enter",
-        description: "open the selected utility item in detail",
     },
     Binding {
         scope: BindingScope::Dialogs,

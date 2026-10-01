@@ -130,34 +130,11 @@ impl TuiApp {
             tab_area,
         );
         let context_area = header_inner_row(area, 1);
-        let indicator_width = (self.papercut_indicator_text().chars().count() as u16)
-            .saturating_add(2)
-            .min(context_area.width);
-        let context_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(0), Constraint::Length(indicator_width)])
-            .split(context_area);
         frame.render_widget(
             Paragraph::new(context).style(self.theme.panel_style()),
-            context_chunks[0],
-        );
-        let indicator_area = Rect {
-            x: context_chunks[1].x.saturating_add(1),
-            y: context_chunks[1].y,
-            width: context_chunks[1].width.saturating_sub(1),
-            height: context_chunks[1].height,
-        };
-        frame.render_widget(
-            Paragraph::new(self.papercut_indicator_line()).style(self.theme.panel_style()),
-            indicator_area,
+            context_area,
         );
         self.register_view_tab_hits(tab_area);
-        if context_chunks[1].width > 0 {
-            self.hits.push(HitRegion {
-                rect: context_chunks[1],
-                action: HitAction::TogglePapercuts,
-            });
-        }
     }
 
     pub(super) fn view_tab_line(&self, width: u16) -> Line<'static> {
@@ -364,7 +341,6 @@ impl TuiApp {
             || self.workflow_prompt.is_some()
             || self.rules_prompt_active()
             || self.decision_prompt_active()
-            || self.papercuts_open()
             || self.show_help
         {
             None
@@ -431,11 +407,6 @@ impl TuiApp {
                 status,
                 self.theme.status_style(StatusTone::Warning),
             ))
-        } else if self.papercuts_open() {
-            Line::from(Span::styled(
-                self.papercuts_footer_text(),
-                self.theme.text_style(),
-            ))
         } else {
             self.footer_line_for_text(match self.view {
                 TuiView::Board => self.board_footer_text(),
@@ -498,10 +469,6 @@ impl TuiApp {
         }
         if self.text_input_active() {
             self.register_footer_hit(area, text, "[Help]", HitAction::ShowHelp);
-            return;
-        }
-        if self.papercuts_open() {
-            self.register_footer_hit(area, text, "i/Esc close", HitAction::TogglePapercuts);
             return;
         }
         match self.view {
@@ -635,9 +602,6 @@ impl TuiApp {
             || self.decision_prompt_active()
         {
             return "dialog";
-        }
-        if self.papercuts_open() {
-            return "Utility inbox";
         }
         self.view.label()
     }

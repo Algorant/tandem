@@ -106,7 +106,7 @@ This todo tracks CLI/TUI planning and implementation tasks. The current CLI/TUI 
 - [x] Implemented Board state movement, later standardized as the explicit `m` picker with valid configured targets, graph-safe mutation, reload, and visible errors.
 - [x] Implemented TUI quick-add: `a` opens a title prompt, Enter creates a basic task in the selected/default configured state, Esc cancels, and success reloads/selects the new task.
 - [x] Implemented top-level TUI view switching: Board, Logs, Rules, and Decisions tabs; `1`..`4` keyboard switching; mouse tab switching; and initial non-Board view scaffolding while preserving Board quick-add and move flows. Validation now lives as a Board state/subview.
-- [x] Added the read-only global Papercuts utility inbox without a fifth main view:
+- [x] Added the read-only global Papercuts utility inbox without a fifth main view (superseded and removed by task-55: Board tabs are ALL, states, RESEARCH, PAPERCUTS driven by `kind`):
   - compact open-count indicator in every main-view header, with muted zero state and mouse hit target
   - global `i`/`Esc` open-close behavior that preserves the underlying view, selection, focus, filters, arrangement, and scroll
   - responsive open-only list/detail panel with keyboard and mouse selection, focus, and scrolling

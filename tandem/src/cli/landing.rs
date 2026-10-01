@@ -1,6 +1,6 @@
-//! Workspace-free landing surface for Tandem 0.4.0.
+//! Workspace-free landing surface for Tandem 0.5.0.
 pub(crate) fn print() {
-    println!("tandem - Tandem CLI 0.4.0");
+    println!("tandem - Tandem CLI 0.5.0");
     println!();
     println!("Work");
     println!("  init                 Create a Tandem workspace");

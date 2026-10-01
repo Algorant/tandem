@@ -48,9 +48,6 @@ impl TuiApp {
             TuiView::Rules => 6,
             TuiView::Decisions => 7,
         };
-        if self.papercuts_open() {
-            self.help_section = 8;
-        }
         if let Some(picker) = self.board_picker.as_ref() {
             self.help_section = if picker.kind == pickers::PickerKind::Validation {
                 4
@@ -376,16 +373,30 @@ impl TuiApp {
         }
 
         self.expand_active_task_ancestors(id);
-        for state_index in 0..self.states.len() {
-            let Some(state_name) = self.states.get(state_index) else {
+        // The current view wins; otherwise follow the record to the first
+        // state tab that shows it, then ALL, then a kind tab.
+        let views = board_views(&self.states);
+        let current = self.selected_view.min(views.len().saturating_sub(1));
+        let rank = |index: usize| match views[index] {
+            BoardView::State(_) => 0,
+            BoardView::All => 1,
+            BoardView::Kind(_) => 2,
+        };
+        let mut rest = (0..views.len())
+            .filter(|index| *index != current)
+            .collect::<Vec<_>>();
+        rest.sort_by_key(|index| rank(*index));
+        let order = std::iter::once(current).chain(rest).collect::<Vec<_>>();
+        for view_index in order {
+            let Some(view) = views.get(view_index) else {
                 continue;
             };
             if let Some(item_index) = self
-                .state_board_entries(state_name)
+                .board_entries(view)
                 .iter()
                 .position(|entry| entry.doc.id() == id)
             {
-                self.selected_state = state_index;
+                self.selected_view = view_index;
                 self.selected_item = item_index;
                 if reset_scroll {
                     self.detail_scroll = 0;
@@ -469,10 +480,13 @@ impl TuiApp {
             };
             return;
         }
-        // The Papercuts lens is flat: a row has no rendered subtree, so Enter
-        // and double-click always open the inline preview for that record
-        // instead of an invisible hierarchy expansion.
-        if self.selected_board_state().as_deref() == Some(PAPERCUTS_SUBVIEW) {
+        // Kind tabs are flat: a row has no rendered subtree, so Enter and
+        // double-click always open the inline preview for that record instead
+        // of an invisible hierarchy expansion.
+        if self
+            .selected_board_view()
+            .is_some_and(|view| view.is_flat())
+        {
             self.toggle_board_preview();
             return;
         }
@@ -546,8 +560,8 @@ impl TuiApp {
                 "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
             return;
         }
-        if self.selected_state > 0 {
-            self.selected_state -= 1;
+        if self.selected_view > 0 {
+            self.selected_view -= 1;
             self.selected_item = 0;
             self.detail_scroll = 0;
         }
@@ -560,8 +574,8 @@ impl TuiApp {
                 "Epic Board groups all workflow states; press b for State Board tabs.".to_string();
             return;
         }
-        if self.selected_state + 1 < self.board_section_count() {
-            self.selected_state += 1;
+        if self.selected_view + 1 < self.board_section_count() {
+            self.selected_view += 1;
             self.selected_item = 0;
             self.detail_scroll = 0;
         }
@@ -569,13 +583,13 @@ impl TuiApp {
     }
 
     pub(super) fn board_section_count(&self) -> usize {
-        board_subview_tabs(&self.states, &self.docs, &self.board_filters).len()
+        board_views(&self.states).len()
     }
 
-    pub(super) fn selected_board_state(&self) -> Option<String> {
-        board_subview_tabs(&self.states, &self.docs, &self.board_filters)
-            .get(self.selected_state)
-            .map(|tab| tab.state.clone())
+    pub(super) fn selected_board_view(&self) -> Option<BoardView> {
+        board_views(&self.states)
+            .into_iter()
+            .nth(self.selected_view)
     }
 
     pub(super) fn previous_item(&mut self) {
@@ -671,8 +685,8 @@ impl TuiApp {
             self.states.push("todo".to_string());
         }
         let section_count = self.board_section_count();
-        if self.selected_state >= section_count {
-            self.selected_state = section_count.saturating_sub(1);
+        if self.selected_view >= section_count {
+            self.selected_view = section_count.saturating_sub(1);
         }
         let count = self.selected_state_count();
         if count == 0 {
@@ -697,8 +711,8 @@ impl TuiApp {
         if self.board_arrangement == BoardArrangement::Epic {
             return self.epic_board_entries().len();
         }
-        self.selected_board_state()
-            .map(|state| self.state_board_entries(&state).len())
+        self.selected_board_view()
+            .map(|view| self.board_entries(&view).len())
             .unwrap_or(0)
     }
 
@@ -710,21 +724,21 @@ impl TuiApp {
                 .nth(self.selected_item)
                 .map(|entry| entry.doc);
         }
-        let state = self.selected_board_state()?;
-        self.state_board_entries(&state)
+        let view = self.selected_board_view()?;
+        self.board_entries(&view)
             .into_iter()
             .nth(self.selected_item)
             .map(|entry| entry.doc)
     }
 
-    pub(super) fn state_board_entries(&self, state: &str) -> Vec<StateBoardEntry<'_>> {
+    pub(super) fn board_entries(&self, view: &BoardView) -> Vec<StateBoardEntry<'_>> {
         let Some(hierarchy) = self.hierarchy.valid_index() else {
             return Vec::new();
         };
         state_board_entries_with_hierarchy(
             &self.docs,
             &self.logs,
-            state,
+            view,
             &self.board_filters,
             &self.expanded_board_hierarchy_ids,
             hierarchy,
@@ -1073,16 +1087,6 @@ pub(super) fn document_state_label(doc: &Document) -> String {
         .filter(|state| !state.trim().is_empty())
         .unwrap_or("unfiled")
         .to_string()
-}
-
-/// Shared Papercut classification: an active Board Task tagged `papercut`.
-/// Every Papercut surface — the global header count, the read-only `i` panel,
-/// and the Board's flat Papercuts lens — uses this predicate so their totals
-/// agree. Tagged Decisions and archived Logs records are not Papercuts.
-pub(super) fn is_papercut_doc(doc: &Document) -> bool {
-    is_board_visible_doc(doc)
-        && is_task_doc(doc)
-        && doc.values("tags").iter().any(|tag| tag == "papercut")
 }
 
 pub(super) fn is_decision_doc(doc: &Document) -> bool {

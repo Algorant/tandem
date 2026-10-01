@@ -90,6 +90,7 @@ impl BoardSort {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(super) struct BoardFilters {
+    pub(super) kind: Option<String>,
     pub(super) tag: Option<String>,
     pub(super) priority: Option<String>,
     pub(super) delivered_untriaged: bool,
@@ -97,11 +98,17 @@ pub(super) struct BoardFilters {
 
 impl BoardFilters {
     pub(super) fn is_active(&self) -> bool {
-        self.tag.is_some() || self.priority.is_some() || self.delivered_untriaged
+        self.kind.is_some()
+            || self.tag.is_some()
+            || self.priority.is_some()
+            || self.delivered_untriaged
     }
 
     pub(super) fn summary(&self) -> String {
         let mut parts = Vec::new();
+        if let Some(kind) = self.kind.as_deref() {
+            parts.push(format!("kind {kind}"));
+        }
         if let Some(tag) = self.tag.as_deref() {
             parts.push(format!("#{}", tag));
         }
@@ -147,80 +154,91 @@ impl TuiHierarchySnapshot {
     }
 }
 
-/// Board subview that gathers active Papercut-tagged Tasks into one flat,
-/// overlapping tag lens. It is a display grouping, not a workflow state.
-pub(super) const PAPERCUTS_SUBVIEW: &str = "__papercuts";
+/// Task kinds that get their own flat Board tab, in tab order. Classification
+/// reads the `kind` field only; tags never decide a tab.
+pub(super) const KIND_VIEWS: [&str; 2] = ["research", "papercut"];
+
+/// One Board tab. `All` and `State` share the hierarchy tree; `Kind` is a flat,
+/// cross-state list. Kind tabs overlap the others: a Task stays in its own
+/// workflow state tab and in `All`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) enum BoardView {
+    All,
+    State(String),
+    Kind(&'static str),
+}
+
+impl BoardView {
+    pub(super) fn label(&self) -> String {
+        match self {
+            Self::All => "ALL".to_string(),
+            Self::State(state) => display_state_label(state),
+            Self::Kind("papercut") => "PAPERCUTS".to_string(),
+            Self::Kind(kind) => kind.to_uppercase(),
+        }
+    }
+
+    /// Whether `doc` belongs to this view, before Board filters.
+    pub(super) fn includes(&self, doc: &Document) -> bool {
+        match self {
+            Self::All => true,
+            Self::State(state) => document_state_label(doc) == state.as_str(),
+            Self::Kind(kind) => doc.field("kind") == Some(*kind),
+        }
+    }
+
+    pub(super) fn is_flat(&self) -> bool {
+        matches!(self, Self::Kind(_))
+    }
+}
+
+/// Tab order: ALL, each workflow state, then one tab per kind in `KIND_VIEWS`.
+pub(super) fn board_views(states: &[String]) -> Vec<BoardView> {
+    std::iter::once(BoardView::All)
+        .chain(states.iter().cloned().map(BoardView::State))
+        .chain(KIND_VIEWS.into_iter().map(BoardView::Kind))
+        .collect()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct BoardSubviewTab {
-    pub(super) state: String,
+pub(super) struct BoardViewTab {
+    pub(super) view: BoardView,
     /// Records matching the active Board filters.
     pub(super) count: usize,
     /// Records before Board filters; differs from `count` only while filtering.
     pub(super) total_count: usize,
 }
 
-pub(super) fn board_subview_tabs(
+pub(super) fn board_view_tabs(
     states: &[String],
     docs: &[Document],
     filters: &BoardFilters,
-) -> Vec<BoardSubviewTab> {
-    // State tabs overlap with the Papercuts lens: a Papercut-tagged Task still
-    // belongs to its own workflow state. The Papercuts tab is an additional
-    // tag-based projection, not an exclusive partition.
-    let mut tabs = states
-        .iter()
-        .map(|state| {
-            let total_count = docs
-                .iter()
-                .filter(|doc| {
-                    is_board_visible_doc(doc) && document_state_label(doc) == state.as_str()
-                })
-                .count();
-            let count = docs
-                .iter()
-                .filter(|doc| {
-                    is_board_visible_doc(doc) && document_state_label(doc) == state.as_str()
-                })
-                .filter(|doc| board_filters_match(doc, filters))
-                .count();
-            BoardSubviewTab {
-                state: state.clone(),
-                count,
-                total_count,
+) -> Vec<BoardViewTab> {
+    board_views(states)
+        .into_iter()
+        .map(|view| {
+            let members = || {
+                docs.iter()
+                    .filter(|doc| is_board_visible_doc(doc) && view.includes(doc))
+            };
+            BoardViewTab {
+                count: members()
+                    .filter(|doc| board_filters_match(doc, filters))
+                    .count(),
+                total_count: members().count(),
+                view: view.clone(),
             }
         })
-        .collect::<Vec<_>>();
-    let total_count = docs.iter().filter(|doc| is_papercut_doc(doc)).count();
-    let count = docs
-        .iter()
-        .filter(|doc| is_papercut_doc(doc))
-        .filter(|doc| board_filters_match(doc, filters))
-        .count();
-    tabs.push(BoardSubviewTab {
-        state: PAPERCUTS_SUBVIEW.to_string(),
-        count,
-        total_count,
-    });
-    tabs
+        .collect()
 }
 
-pub(super) fn state_tab_title(state: &str, count: usize) -> String {
-    format!(" {} {} ", display_state_label(state), count)
-}
-
-/// Tab label for a Board subview. When Board filters narrow a view, show the
+/// Tab label for a Board view. When Board filters narrow a view, show the
 /// filtered count against the unfiltered total so the two are distinguishable.
-pub(super) fn board_subview_title(tab: &BoardSubviewTab) -> String {
+pub(super) fn board_view_title(tab: &BoardViewTab) -> String {
     if tab.count == tab.total_count {
-        state_tab_title(&tab.state, tab.count)
+        format!(" {} {} ", tab.view.label(), tab.count)
     } else {
-        format!(
-            " {} {}/{} ",
-            display_state_label(&tab.state),
-            tab.count,
-            tab.total_count
-        )
+        format!(" {} {}/{} ", tab.view.label(), tab.count, tab.total_count)
     }
 }
 
@@ -308,9 +326,9 @@ pub(super) struct StateBoardEntry<'a> {
     pub(super) has_active_children: bool,
     pub(super) expanded: bool,
     pub(super) last_sibling: bool,
-    /// True for the flat overlapping Papercuts lens, where a row shows
-    /// `parentId` context instead of tree nesting.
-    pub(super) papercut_lens: bool,
+    /// True for a flat kind-tab row, which shows `parentId` context instead of
+    /// tree nesting.
+    pub(super) flat: bool,
 }
 
 #[cfg(test)]
@@ -328,25 +346,27 @@ pub(super) fn state_board_entries<'a>(
     state_board_entries_with_hierarchy(
         active_docs,
         completed_logs,
-        state,
+        &BoardView::State(state.to_string()),
         filters,
         expanded_ids,
         hierarchy,
     )
 }
 
-/// Flat overlapping Papercuts lens: one row per active Board Task tagged
-/// `papercut`, in document order, with no ancestor-path requirement. A row
-/// carries `parentId` context but never nests, and references never contribute
-/// membership or hierarchy.
-pub(super) fn papercut_board_entries<'a>(
+/// Flat kind tab: one row per active Board Task whose `kind` matches, in
+/// document order, with no ancestor-path requirement. A row carries `parentId`
+/// context but never nests, and references never contribute membership or
+/// hierarchy.
+pub(super) fn kind_board_entries<'a>(
     active_docs: &'a [Document],
+    kind: &str,
     filters: &BoardFilters,
     hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
     active_docs
         .iter()
-        .filter(|doc| is_papercut_doc(doc))
+        .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
+        .filter(|doc| doc.field("kind") == Some(kind))
         .filter(|doc| board_filters_match(doc, filters))
         .map(|doc| StateBoardEntry {
             doc,
@@ -359,7 +379,7 @@ pub(super) fn papercut_board_entries<'a>(
             has_active_children: false,
             expanded: false,
             last_sibling: false,
-            papercut_lens: true,
+            flat: true,
         })
         .collect()
 }
@@ -367,26 +387,26 @@ pub(super) fn papercut_board_entries<'a>(
 pub(super) fn state_board_entries_with_hierarchy<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
-    state: &str,
+    view: &BoardView,
     filters: &BoardFilters,
     expanded_ids: &BTreeSet<String>,
     hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
-    if state == PAPERCUTS_SUBVIEW {
-        return papercut_board_entries(active_docs, filters, hierarchy);
+    if let BoardView::Kind(kind) = view {
+        return kind_board_entries(active_docs, kind, filters, hierarchy);
     }
     let mut entries = Vec::new();
     for root in active_docs.iter().filter(|doc| {
         is_board_visible_doc(doc) && is_state_board_root(doc, active_docs, completed_logs)
     }) {
         let mut visited = BTreeSet::from([root.id().to_string()]);
-        let root_matches_state = document_state_label(root) == state;
+        let root_matches_state = view.includes(root);
         let descendant_matches_state = is_task_doc(root)
             && task_subtree_matches_filters(
                 root.id(),
                 active_docs,
                 completed_logs,
-                state,
+                view,
                 filters,
                 &mut visited,
             );
@@ -428,13 +448,13 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
                 root.id(),
                 active_docs,
                 completed_logs,
-                state,
+                view,
                 filters,
             ),
             has_active_children,
             expanded,
             last_sibling: false,
-            papercut_lens: false,
+            flat: false,
         });
         if is_task_doc(root) {
             collect_visible_state_descendants(
@@ -443,7 +463,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
                 (
                     active_docs,
                     completed_logs,
-                    state,
+                    view,
                     filters,
                     expanded_ids,
                     expanded,
@@ -477,7 +497,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
     projection: (
         &'a [Document],
         &[Document],
-        &str,
+        &BoardView,
         &BoardFilters,
         &BTreeSet<String>,
         bool,
@@ -486,7 +506,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
     visited: &mut BTreeSet<String>,
     entries: &mut Vec<StateBoardEntry<'a>>,
 ) {
-    let (active_docs, completed_logs, target_state, filters, expanded_ids, parent_open, hierarchy) =
+    let (active_docs, completed_logs, target_view, filters, expanded_ids, parent_open, hierarchy) =
         projection;
     for child in active_docs
         .iter()
@@ -498,12 +518,12 @@ pub(super) fn collect_visible_state_descendants<'a>(
         }
         let mut match_visited = visited.clone();
         let subtree_matches = !filters.is_active()
-            || (document_state_label(child) == target_state && board_filters_match(child, filters))
+            || (target_view.includes(child) && board_filters_match(child, filters))
             || task_subtree_matches_filters(
                 child.id(),
                 active_docs,
                 completed_logs,
-                target_state,
+                target_view,
                 filters,
                 &mut match_visited,
             );
@@ -530,13 +550,13 @@ pub(super) fn collect_visible_state_descendants<'a>(
                 child.id(),
                 active_docs,
                 completed_logs,
-                target_state,
+                target_view,
                 filters,
             ),
             has_active_children,
             expanded,
             last_sibling: false,
-            papercut_lens: false,
+            flat: false,
         });
         collect_visible_state_descendants(
             child.id(),
@@ -544,7 +564,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
             (
                 active_docs,
                 completed_logs,
-                target_state,
+                target_view,
                 filters,
                 expanded_ids,
                 expanded,
@@ -567,7 +587,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
                 (
                     active_docs,
                     completed_logs,
-                    target_state,
+                    target_view,
                     filters,
                     expanded_ids,
                     true,
@@ -630,14 +650,14 @@ fn count_matching_descendants(
     parent_id: &str,
     active_docs: &[Document],
     completed_logs: &[Document],
-    target_state: &str,
+    target_view: &BoardView,
     filters: &BoardFilters,
 ) -> usize {
     fn walk(
         parent_id: &str,
         active: &[Document],
         logs: &[Document],
-        state: &str,
+        view: &BoardView,
         filters: &BoardFilters,
         visited: &mut BTreeSet<String>,
     ) -> usize {
@@ -650,12 +670,12 @@ fn count_matching_descendants(
             }
             if child.location == DocumentLocation::Board
                 && is_board_visible_doc(child)
-                && document_state_label(child) == state
+                && view.includes(child)
                 && board_filters_match(child, filters)
             {
                 count += 1;
             }
-            count += walk(child.id(), active, logs, state, filters, visited);
+            count += walk(child.id(), active, logs, view, filters, visited);
         }
         count
     }
@@ -663,7 +683,7 @@ fn count_matching_descendants(
         parent_id,
         active_docs,
         completed_logs,
-        target_state,
+        target_view,
         filters,
         &mut BTreeSet::from([parent_id.to_string()]),
     )
@@ -673,7 +693,7 @@ pub(super) fn task_subtree_matches_filters(
     parent_id: &str,
     active_docs: &[Document],
     completed_logs: &[Document],
-    target_state: &str,
+    target_view: &BoardView,
     filters: &BoardFilters,
     visited: &mut BTreeSet<String>,
 ) -> bool {
@@ -683,13 +703,12 @@ pub(super) fn task_subtree_matches_filters(
         .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
         .any(|child| {
             visited.insert(child.id().to_string())
-                && ((document_state_label(child) == target_state
-                    && board_filters_match(child, filters))
+                && ((target_view.includes(child) && board_filters_match(child, filters))
                     || task_subtree_matches_filters(
                         child.id(),
                         active_docs,
                         completed_logs,
-                        target_state,
+                        target_view,
                         filters,
                         visited,
                     ))
@@ -705,7 +724,7 @@ pub(super) fn task_subtree_matches_filters(
                         completed.id(),
                         active_docs,
                         completed_logs,
-                        target_state,
+                        target_view,
                         filters,
                         visited,
                     )
@@ -1118,8 +1137,11 @@ pub(super) fn board_scan_chips(
             theme.progress_chip_style(StatusTone::Accent),
         ));
     }
-    for (kind_chip, tone) in work_type_tag_chips(doc, theme) {
+    if let Some((kind_chip, tone)) = kind_chip(doc, theme) {
         chips.push((kind_chip, theme.progress_chip_style(tone)));
+    }
+    for (tag_chip, tone) in work_type_tag_chips(doc, theme) {
+        chips.push((tag_chip, theme.progress_chip_style(tone)));
     }
     if let Some((visual_chip, tone)) = validation_visual_chip(doc, theme) {
         chips.push((visual_chip, theme.progress_chip_style(tone)));
@@ -1211,8 +1233,8 @@ pub(super) fn state_lines_for_entry(
         chip_text(&format!("{state:<4}"), theme),
         theme.state_chip_style(&document_state_label(doc)),
     ));
-    if entry.papercut_lens {
-        if let Some(parent_context) = papercut_parent_context(relationship_context) {
+    if entry.flat {
+        if let Some(parent_context) = flat_parent_context(relationship_context) {
             chips.push((truncate(&parent_context, meta_width), theme.muted_style()));
         }
     }
@@ -1247,9 +1269,9 @@ pub(super) fn state_lines_for_entry(
     lines
 }
 
-/// Human-readable `parentId` context for a flat Papercuts row. Reserved for the
-/// overlapping lens; References are loose links and never appear here.
-pub(super) fn papercut_parent_context(
+/// Human-readable `parentId` context for a flat kind-tab row. References are
+/// loose links and never appear here.
+pub(super) fn flat_parent_context(
     relationship_context: &BoardRelationshipContext,
 ) -> Option<String> {
     let parent_id = relationship_context.parent_id.as_deref()?;
@@ -1626,11 +1648,22 @@ pub(super) fn priority_chip(priority: &str, theme: &TuiTheme) -> Option<String> 
     Some(chip_text(&label, theme))
 }
 
+/// Badge for a research or papercut Task, read from `kind` only. The Epic
+/// badge comes from the derived hierarchy role. Opt out with the `research` or
+/// `papercut` badge id.
+pub(super) fn kind_chip(doc: &Document, theme: &TuiTheme) -> Option<(String, StatusTone)> {
+    let (kind, label, tone) = match doc.field("kind")? {
+        "research" => ("research", "RESEARCH", StatusTone::Accent),
+        "papercut" => ("papercut", "PAPERCUT", StatusTone::Sand),
+        _ => return None,
+    };
+    (!theme.badge_disabled(kind)).then(|| (chip_text(label, theme), tone))
+}
+
 pub(super) fn work_type_tag_chips(doc: &Document, theme: &TuiTheme) -> Vec<(String, StatusTone)> {
     let tags = document_tags(doc);
     let mut chips = Vec::new();
     for (tag, default_label) in [
-        ("research", "RESEARCH"),
         ("spike", "SPIKE"),
         ("deliverable", "DELIVERABLE"),
         ("bug", "BUG"),
@@ -1678,7 +1711,7 @@ pub(super) fn configured_or_default_tag_chip(
 }
 
 pub(super) fn is_builtin_board_tag(tag: &str) -> bool {
-    ["research", "spike", "deliverable", "bug", "feat", "chore"]
+    ["spike", "deliverable", "bug", "feat", "chore"]
         .iter()
         .any(|candidate| tag_matches(tag, candidate))
 }
@@ -1698,6 +1731,14 @@ pub(super) fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) ->
         Span::raw(" "),
     ];
 
+    if let Some(kind) = filters.kind.as_deref() {
+        spans.push(Span::styled(" kind ", theme.muted_style()));
+        spans.push(Span::styled(
+            chip_text(&kind.to_uppercase(), theme),
+            theme.progress_chip_style(StatusTone::Accent),
+        ));
+        spans.push(Span::raw(" "));
+    }
     if let Some(tag) = filters.tag.as_deref() {
         spans.push(Span::styled(
             chip_text(&format!("#{}", tag), theme),
@@ -1725,6 +1766,11 @@ pub(super) fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) ->
 }
 
 pub(super) fn board_filters_match(doc: &Document, filters: &BoardFilters) -> bool {
+    if let Some(kind) = filters.kind.as_deref() {
+        if doc.field("kind") != Some(kind) {
+            return false;
+        }
+    }
     if let Some(tag) = filters.tag.as_deref() {
         if !document_tags(doc)
             .iter()
@@ -1744,6 +1790,20 @@ pub(super) fn board_filters_match(doc: &Document, filters: &BoardFilters) -> boo
 pub(super) fn is_delivered_untriaged(doc: &Document) -> bool {
     normalize_filter_value(&document_state_label(doc)) == "in-progress"
         && accord_status(doc).is_some_and(|status| normalized_accord_status(status) == "delivered")
+}
+
+/// Kinds present on active Board Tasks, in protocol order.
+pub(super) fn board_filter_kinds(docs: &[Document]) -> Vec<String> {
+    let present = docs
+        .iter()
+        .filter(|doc| is_board_visible_doc(doc))
+        .filter_map(|doc| doc.field("kind"))
+        .collect::<BTreeSet<_>>();
+    crate::protocol::document::TASK_KINDS
+        .iter()
+        .filter(|kind| present.contains(**kind))
+        .map(|kind| kind.to_string())
+        .collect()
 }
 
 pub(super) fn board_filter_tags(docs: &[Document]) -> Vec<String> {
@@ -2891,7 +2951,7 @@ mod tests {
         .unwrap();
 
         let mut app = TuiApp::load(workspace).unwrap();
-        app.selected_state = 0;
+        app.selected_view = 0;
         app.clamp_selection();
         let mut terminal = Terminal::new(TestBackend::new(46, 24)).unwrap();
         terminal

@@ -110,7 +110,7 @@ impl TuiApp {
     pub(in crate::tui) fn draw_epic_board_list(&mut self, frame: &mut Frame<'_>, area: Rect) {
         self.hits.push(HitRegion {
             rect: area,
-            action: HitAction::SelectState(self.selected_state),
+            action: HitAction::SelectBoardView(self.selected_view),
         });
 
         let entries = self.epic_board_entries();
@@ -180,7 +180,7 @@ impl TuiApp {
                     }
                 })
                 .collect::<Vec<_>>();
-            self.register_board_row_hits(area, self.selected_state, state.offset(), &row_heights);
+            self.register_board_row_hits(area, self.selected_view, state.offset(), &row_heights);
         } else {
             frame.render_widget(list, area);
         }
@@ -191,24 +191,24 @@ impl TuiApp {
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(1)])
             .split(area);
-        let subviews = board_subview_tabs(&self.states, &self.docs, &self.board_filters);
+        let subviews = board_view_tabs(&self.states, &self.docs, &self.board_filters);
         let titles = subviews
             .iter()
-            .map(|tab| Line::from(board_subview_title(tab)))
+            .map(|tab| Line::from(board_view_title(tab)))
             .collect::<Vec<_>>();
         let tabs = Tabs::new(titles)
-            .select(self.selected_state)
+            .select(self.selected_view)
             .style(self.theme.tab_style())
             .highlight_style(self.theme.state_tab_selected_style());
         frame.render_widget(tabs, chunks[0]);
         self.register_state_tab_hits(chunks[0], &subviews);
-        self.draw_state_list(frame, chunks[1], self.selected_state);
+        self.draw_state_list(frame, chunks[1], self.selected_view);
     }
 
     pub(in crate::tui) fn register_state_tab_hits(
         &mut self,
         area: Rect,
-        subviews: &[BoardSubviewTab],
+        subviews: &[BoardViewTab],
     ) {
         if area.width == 0 || area.height == 0 {
             return;
@@ -216,7 +216,7 @@ impl TuiApp {
         let mut x = area.x;
         let right = area.x.saturating_add(area.width);
         for (index, tab) in subviews.iter().enumerate() {
-            let width = (board_subview_title(tab).chars().count() as u16).saturating_add(1);
+            let width = (board_view_title(tab).chars().count() as u16).saturating_add(1);
             if x >= right {
                 break;
             }
@@ -229,7 +229,7 @@ impl TuiApp {
                         width: clamped_width,
                         height: 1,
                     },
-                    action: HitAction::SelectState(index),
+                    action: HitAction::SelectBoardView(index),
                 });
             }
             x = x.saturating_add(width);
@@ -244,37 +244,38 @@ impl TuiApp {
     ) {
         self.hits.push(HitRegion {
             rect: area,
-            action: HitAction::SelectState(state_index),
+            action: HitAction::SelectBoardView(state_index),
         });
 
-        let subviews = board_subview_tabs(&self.states, &self.docs, &self.board_filters);
-        let Some(state_name) = subviews.get(state_index).map(|tab| tab.state.as_str()) else {
+        let Some(view) = board_views(&self.states).into_iter().nth(state_index) else {
             return;
         };
-        let entries = self.state_board_entries(state_name);
+        let entries = self.board_entries(&view);
         let row_count = entries.len();
-        let state_task_count = self
+        let view_task_count = self
             .docs
             .iter()
-            .filter(|doc| is_board_visible_doc(doc))
-            .filter(|doc| document_state_label(doc) == state_name)
+            .filter(|doc| is_board_visible_doc(doc) && view.includes(doc))
             .filter(|doc| board_filters_match(doc, &self.board_filters))
             .count();
         let content_width = area.width.saturating_sub(4) as usize;
         let preview_line_limit = inline_preview_line_limit_for_area(area);
         let items = if entries.is_empty() {
-            let empty_text = if state_name == PAPERCUTS_SUBVIEW {
+            let empty_text = if let BoardView::Kind(kind) = view {
                 if self.board_filters.is_active() {
-                    "No Papercut-tagged tasks match the active Board filters."
+                    format!("No {kind} tasks match the active Board filters.")
                 } else {
-                    "No active Papercut-tagged tasks on the Board."
+                    format!("No active {kind} tasks on the Board.")
                 }
             } else if self.board_filters.is_active() {
                 "No hierarchy matches the active Board filters. Press f to adjust filters."
-            } else if state_task_count > 0 {
-                "Tasks in this state are nested under parents in other state tabs."
+                    .to_string()
+            } else if view_task_count > 0 {
+                "Tasks in this state are nested under parents in other state tabs.".to_string()
+            } else if view == BoardView::All {
+                "No active items on the Board.".to_string()
             } else {
-                "No active items in this state. Press a to quick-add here."
+                "No active items in this state.".to_string()
             };
             vec![ListItem::new(Line::from(Span::styled(
                 empty_text,

@@ -11,6 +11,7 @@ pub(super) enum PickerKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PickerAction {
+    SetKind(Option<String>),
     SetTag(Option<String>),
     SetPriority(Option<String>),
     SetDeliveredUntriaged(bool),
@@ -57,6 +58,28 @@ impl BoardPicker {
 impl TuiApp {
     pub(super) fn start_filter_picker(&mut self) {
         let mut options = Vec::new();
+        let kinds = board_filter_kinds(&self.docs);
+        if kinds.is_empty() {
+            options.push(PickerOption {
+                label: "Kind filter".into(),
+                detail: "Unavailable: no kinds on active Board items".into(),
+                enabled: false,
+                action: PickerAction::SetKind(None),
+            });
+        } else {
+            for kind in kinds {
+                options.push(PickerOption {
+                    label: format!("Kind  {kind}"),
+                    detail: if self.board_filters.kind.as_deref() == Some(kind.as_str()) {
+                        "Current filter".into()
+                    } else {
+                        "Show tasks of this kind".into()
+                    },
+                    enabled: self.board_filters.kind.as_deref() != Some(kind.as_str()),
+                    action: PickerAction::SetKind(Some(kind)),
+                });
+            }
+        }
         let tags = board_filter_tags(&self.docs);
         if tags.is_empty() {
             options.push(PickerOption {
@@ -112,6 +135,12 @@ impl TuiApp {
             action: PickerAction::SetDeliveredUntriaged(true),
         });
         options.extend([
+            PickerOption {
+                label: "Clear kind".into(),
+                detail: "Remove only the kind filter".into(),
+                enabled: self.board_filters.kind.is_some(),
+                action: PickerAction::SetKind(None),
+            },
             PickerOption {
                 label: "Clear tag".into(),
                 detail: "Remove only the tag filter".into(),
@@ -353,6 +382,10 @@ impl TuiApp {
         let selected_id = self.selected_doc().map(|doc| doc.id().to_string());
         self.board_picker = None;
         match option.action {
+            PickerAction::SetKind(value) => {
+                self.board_filters.kind = value;
+                self.restore_filtered_selection(selected_id.as_deref());
+            }
             PickerAction::SetTag(value) => {
                 self.board_filters.tag = value;
                 self.restore_filtered_selection(selected_id.as_deref());

@@ -93,20 +93,6 @@ impl TuiApp {
             return Ok(KeyAction::Continue);
         }
 
-        if self.papercuts_open() {
-            match key.code {
-                KeyCode::Char('q') => return Ok(KeyAction::Quit),
-                KeyCode::Char('?') => self.open_help(),
-                KeyCode::Char('i') | KeyCode::Esc => self.close_papercuts(),
-                KeyCode::Char(ch) if TuiView::from_digit(ch).is_some() => {
-                    self.close_papercuts();
-                    self.switch_view(TuiView::from_digit(ch).unwrap());
-                }
-                _ => self.handle_papercuts_key(key),
-            }
-            return Ok(KeyAction::Continue);
-        }
-
         match key.code {
             KeyCode::Esc => match self.view {
                 TuiView::Board if self.focus == FocusPane::Detail => self.focus = FocusPane::Board,
@@ -121,7 +107,6 @@ impl TuiApp {
             KeyCode::Char('r') => {
                 self.reload();
             }
-            KeyCode::Char('i') => self.toggle_papercuts(),
             KeyCode::Char(ch) if TuiView::from_digit(ch).is_some() => {
                 self.switch_view(TuiView::from_digit(ch).unwrap())
             }
@@ -145,8 +130,7 @@ impl TuiApp {
             KeyCode::Char('a') if self.view == TuiView::Board => self.start_workflow_picker(),
             KeyCode::Char('v') if self.view == TuiView::Board => self.start_validation_picker(),
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
-            // State Board tabs are peers, including the derived Papercuts tab.
-            // `i` intentionally remains the read-only inbox popover shortcut.
+            // Board tabs are peers: ALL, each workflow state, then the kind tabs.
             KeyCode::Tab if self.view == TuiView::Board => self.next_state(),
             KeyCode::BackTab if self.view == TuiView::Board => self.previous_state(),
             KeyCode::Tab => self.focus_next(),
@@ -205,11 +189,6 @@ impl TuiApp {
             }
             return KeyAction::Continue;
         }
-        if self.papercuts_open() {
-            self.handle_papercuts_mouse(mouse);
-            return KeyAction::Continue;
-        }
-
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let hit = self
@@ -221,24 +200,24 @@ impl TuiApp {
                 if let Some(hit) = hit {
                     match hit.action {
                         HitAction::SwitchView(view) => self.switch_view(view),
-                        HitAction::SelectState(index) if self.view == TuiView::Board => {
-                            self.selected_state =
+                        HitAction::SelectBoardView(index) if self.view == TuiView::Board => {
+                            self.selected_view =
                                 index.min(self.board_section_count().saturating_sub(1));
                             self.selected_item = 0;
                             self.detail_scroll = 0;
                             self.focus = FocusPane::Board;
                             self.clamp_selection();
                         }
-                        HitAction::SelectState(_) => {}
+                        HitAction::SelectBoardView(_) => {}
                         HitAction::SelectBoardItem(state_index, item_index)
                             if self.view == TuiView::Board =>
                         {
                             let state_index =
                                 state_index.min(self.board_section_count().saturating_sub(1));
-                            let was_selected = self.selected_state == state_index
+                            let was_selected = self.selected_view == state_index
                                 && self.selected_item == item_index
                                 && self.focus == FocusPane::Board;
-                            self.selected_state = state_index;
+                            self.selected_view = state_index;
                             self.selected_item = item_index;
                             self.detail_scroll = 0;
                             self.focus = FocusPane::Board;
@@ -339,14 +318,10 @@ impl TuiApp {
                             self.focus = FocusPane::Detail
                         }
                         HitAction::FocusDecisionList | HitAction::FocusDecisionDetail => {}
-                        HitAction::TogglePapercuts => self.toggle_papercuts(),
                         HitAction::ConfirmModal
                         | HitAction::CancelModal
                         | HitAction::HelpSection(_)
                         | HitAction::CloseHelp => {}
-                        HitAction::FocusPapercutList
-                        | HitAction::SelectPapercut(_)
-                        | HitAction::FocusPapercutDetail => {}
                     }
                 }
             }
@@ -397,7 +372,7 @@ impl TuiApp {
                     self.scroll_detail_up(amount.unsigned_abs());
                 }
             }
-            Some(HitAction::SelectState(_))
+            Some(HitAction::SelectBoardView(_))
             | Some(HitAction::SelectBoardItem(_, _))
             | Some(HitAction::ToggleBoardExpansion)
             | None => {
