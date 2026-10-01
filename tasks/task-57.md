@@ -14,7 +14,8 @@ accord:
   acceptance: ["The web Board shows Standard, Research, and Papercuts lanes derived from `kind`, each with a count; empty lanes collapse to a header.", "A research Task nested under another parent still appears in the Research lane with parent context.", "The layout is reviewed against the Sideshow mockup and checked in a browser."]
   updatedAt: "2026-10-01T22:21:04Z"
 createdAt: "2026-10-01T22:21:04Z"
-updatedAt: "2026-10-01T22:21:04Z"
+updatedAt: "2026-10-01T23:33:17Z"
+relatedFiles: ["tandem/src/web.rs", "tandem/src/web/ui.js", "tandem/src/web/app.js", "tandem/src/web/app.css"]
 ---
 
 ## Description
