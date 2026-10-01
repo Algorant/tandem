@@ -14,7 +14,8 @@ accord:
   validation: ["$ just dev-check"]
   updatedAt: "2026-10-01T22:21:03Z"
 createdAt: "2026-10-01T22:21:03Z"
-updatedAt: "2026-10-01T22:21:03Z"
+updatedAt: "2026-10-01T22:43:21Z"
+relatedFiles: ["protocol/README.md", "tandem/src/protocol/document.rs", "tandem/src/app", "tandem/src/cli"]
 ---
 
 ## Description
