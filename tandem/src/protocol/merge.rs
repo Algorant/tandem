@@ -18,6 +18,11 @@ const SET_FIELDS: &[&str] = &[
     "supersedes",
     "deciders",
     "filesChanged",
+    // Typed link lists (`links.<type>`), merged one level inside the nested map.
+    "relates-to",
+    "duplicates",
+    "fixed-by",
+    "fixes",
 ];
 
 /// Result of merging one file.
@@ -353,6 +358,23 @@ mod tests {
         assert!(merged.contains("  status: \"claimed\"\n"));
         assert!(merged.contains("updatedAt: \"2026-01-03T00:00:00Z\"\n---"));
         assert!(merged.ends_with("\nBody\n"));
+    }
+
+    #[test]
+    fn typed_link_lists_merge_as_sets() {
+        let base = BASE.replace(
+            "accord:",
+            "links:\n  fixed-by: [\"task-2\"]\n  relates-to: [\"task-3\"]\naccord:",
+        );
+        let local = base.replace("[\"task-2\"]", "[\"task-2\", \"task-4\"]");
+        let remote = base
+            .replace("[\"task-2\"]", "[\"task-2\", \"task-5\"]")
+            .replace("relates-to: [\"task-3\"]", "relates-to: [\"task-6\"]");
+        let Merged::Clean(merged) = merge_markdown(&base, &local, &remote, &no_text_merge) else {
+            panic!("expected clean merge");
+        };
+        assert!(merged.contains("  fixed-by: [\"task-2\", \"task-4\", \"task-5\"]\n"));
+        assert!(merged.contains("  relates-to: [\"task-6\"]\n"));
     }
 
     #[test]

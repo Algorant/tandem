@@ -22,6 +22,7 @@ pub(crate) fn print() {
     println!("  review               Request exceptional human validation");
     println!("  complete             Complete and archive a task");
     println!("  cancel               Cancel and archive a task");
+    println!("  link add|remove      Add or remove typed links between records");
     println!();
     println!("Workspace");
     println!("  sync                 Sync the board with the tandem branch");

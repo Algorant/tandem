@@ -26,6 +26,8 @@ pub(crate) enum Command {
     Review(ReviewArgs),
     Complete(CompleteArgs),
     Cancel(CancelArgs),
+    /// Add or remove typed links between records
+    Link(LinkArgs),
     /// Synchronize the board with the repository's `tandem` branch
     Sync(SyncArgs),
     /// Upgrade an older board: move 0.3.0 to the `tandem` branch, or convert 0.4.0 to 0.5.0
@@ -175,6 +177,12 @@ pub(crate) struct ListArgs {
     pub(crate) decision_status: Option<String>,
     #[arg(long)]
     pub(crate) resolution: Option<String>,
+    /// Only records with a link of this type (stored type or derived inverse)
+    #[arg(long)]
+    pub(crate) link: Option<String>,
+    /// Only records linked to this record
+    #[arg(long)]
+    pub(crate) linked_to: Option<String>,
     #[arg(long)]
     pub(crate) limit: Option<usize>,
 }
@@ -299,6 +307,30 @@ pub(crate) struct CompleteArgs {
     pub(crate) id: String,
     #[arg(long)]
     pub(crate) reviewer: Option<String>,
+    /// Resolve as fixed by another record, recording a `fixed-by` link
+    #[arg(long)]
+    pub(crate) fixed_by: Option<String>,
+    #[arg(long, allow_hyphen_values = true)]
+    pub(crate) note: Option<String>,
+}
+#[derive(Debug, Args)]
+pub(crate) struct LinkArgs {
+    #[command(subcommand)]
+    pub(crate) command: LinkCommand,
+}
+#[derive(Debug, Subcommand)]
+pub(crate) enum LinkCommand {
+    /// Add `<id> <type> <target>`
+    Add(LinkEditArgs),
+    /// Remove a stored link
+    Remove(LinkEditArgs),
+}
+#[derive(Debug, Args)]
+pub(crate) struct LinkEditArgs {
+    pub(crate) id: String,
+    /// relates-to, duplicates, fixed-by, fixes, or supersedes
+    pub(crate) link_type: String,
+    pub(crate) target: String,
 }
 #[derive(Debug, Args)]
 pub(crate) struct CancelArgs {

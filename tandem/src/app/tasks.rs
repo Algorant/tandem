@@ -152,6 +152,8 @@ pub(crate) struct CompleteOptions {
     pub(crate) id: String,
     pub(crate) note: Option<String>,
     pub(crate) reviewer: Option<String>,
+    /// Resolve the Task as fixed by this record (a typed `fixed-by` link).
+    pub(crate) fixed_by: Option<String>,
 }
 
 #[derive(Debug)]
@@ -936,9 +938,17 @@ pub(crate) fn complete(
     {
         return Err(Error::user(error.message.clone()));
     }
+    // The linked record delivered the work, so the missing-delivery warning
+    // for this Task's own Accord does not apply.
+    let fixed_by_links = options
+        .fixed_by
+        .as_deref()
+        .map(|target| crate::app::links::with_fixed_by(&hierarchy, &doc, target))
+        .transpose()?;
     let mut warnings = completion_diagnostics
         .into_iter()
         .filter(|diagnostic| diagnostic.severity == crate::protocol::diagnostic::Severity::Warning)
+        .filter(|_| fixed_by_links.is_none())
         .map(|diagnostic| diagnostic.message)
         .collect::<Vec<_>>();
     let has_completion_warnings = !warnings.is_empty();
@@ -970,11 +980,21 @@ pub(crate) fn complete(
             "filesChanged",
         ],
     )?;
+    let patched = match &fixed_by_links {
+        Some(links) => project::frontmatter::patch_links_content(&patched, links)?,
+        None => patched,
+    };
+    let note = options.note.or_else(|| {
+        options
+            .fixed_by
+            .as_ref()
+            .map(|target| format!("Fixed by {target}"))
+    });
     let patched = patch_resolution_content(
         &patched,
         &ResolutionRecord {
             outcome: Some(RESOLUTION_OUTCOME_COMPLETED.to_string()),
-            note: options.note,
+            note,
             reviewer: options.reviewer,
         },
     )?;

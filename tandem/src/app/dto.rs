@@ -48,6 +48,8 @@ pub(crate) struct DocumentDetailDto {
     pub(crate) completed_at: Option<String>,
     pub(crate) blockers: Vec<String>,
     pub(crate) references: Vec<String>,
+    pub(crate) links: Vec<crate::app::links::LinkDto>,
+    pub(crate) incoming_links: Vec<crate::app::links::IncomingLinkDto>,
     pub(crate) related_files: Vec<String>,
     pub(crate) parent: Option<Box<DocumentSummaryDto>>,
     pub(crate) children: Vec<DocumentSummaryDto>,
@@ -191,6 +193,8 @@ pub(crate) fn detail(read: &ReadSnapshot, document: &Document) -> Result<Documen
         reviewer: document.field("validation.reviewer").map(str::to_string),
         requested_at: document.field("validation.requestedAt").map(str::to_string),
     });
+    let (links, incoming_links) =
+        crate::app::links::dtos(&read.snapshot.hierarchy.documents, document.id());
     Ok(DocumentDetailDto {
         summary,
         body: document.body.clone(),
@@ -200,6 +204,8 @@ pub(crate) fn detail(read: &ReadSnapshot, document: &Document) -> Result<Documen
         completed_at: document.field("completedAt").map(str::to_string),
         blockers: values(document, "blockers"),
         references: values(document, "references"),
+        links,
+        incoming_links,
         related_files: values(document, "relatedFiles"),
         parent: parent.map(Box::new),
         children,

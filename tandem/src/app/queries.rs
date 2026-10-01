@@ -149,6 +149,9 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> 
                 ));
             }
         }
+        warnings.extend(crate::protocol::links::diagnostics(document, |id| {
+            hierarchy.document(id).is_some()
+        }));
     }
     for items in rules.values() {
         for item in items {

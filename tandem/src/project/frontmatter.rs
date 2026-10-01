@@ -163,6 +163,59 @@ pub(crate) fn patch_resolution_content(
     Ok(format!("---\n{}---\n{}", output, body))
 }
 
+/// Replaces the typed-link block while preserving unrelated source bytes. An
+/// empty link set removes the block.
+pub(crate) fn patch_links_content(
+    content: &str,
+    links: &[crate::protocol::links::Link],
+) -> Result<String, CliError> {
+    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let mut block = String::new();
+    for link_type in crate::protocol::links::link_types() {
+        let targets = crate::protocol::links::targets_of(links, link_type);
+        if !targets.is_empty() {
+            if block.is_empty() {
+                block.push_str("links:\n");
+            }
+            let targets = targets
+                .iter()
+                .map(|t| yaml_double_quote(t))
+                .collect::<Vec<_>>();
+            block.push_str(&format!("  {link_type}: [{}]\n", targets.join(", ")));
+        }
+    }
+    let mut output = String::new();
+    let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
+    let mut index = 0;
+    let mut replaced = false;
+    while index < lines.len() {
+        let raw = lines[index];
+        let line = raw.trim_end_matches('\n').trim_end_matches('\r');
+        if frontmatter_line_key(line) == Some(crate::protocol::links::LINKS_FIELD) {
+            output.push_str(&block);
+            replaced = true;
+            index += 1;
+            while index < lines.len() {
+                let next = lines[index].trim_end_matches('\n').trim_end_matches('\r');
+                if is_top_level_frontmatter_boundary(next) {
+                    break;
+                }
+                index += 1;
+            }
+        } else {
+            output.push_str(raw);
+            index += 1;
+        }
+    }
+    if !replaced {
+        if !output.is_empty() && !output.ends_with('\n') {
+            output.push('\n');
+        }
+        output.push_str(&block);
+    }
+    Ok(format!("---\n{}---\n{}", output, body))
+}
+
 fn render_resolution_block(resolution: &ResolutionRecord) -> String {
     let mut lines = vec!["resolution:".to_string()];
     lines.push(format!(

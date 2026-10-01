@@ -138,6 +138,7 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
         Command::Review(args) => review(args, json),
         Command::Complete(args) => complete(args, json),
         Command::Cancel(args) => cancel(args, json),
+        Command::Link(args) => link(args, json),
         Command::Sync(args) => sync_command(args, json),
         Command::Migrate(args) => migrate(args, json),
         Command::Rules(args) => rules(args, json),
@@ -288,6 +289,19 @@ fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
         resolution: args.resolution.as_deref(),
     };
     let mut documents = app::queries::filter_documents(docs, &filter);
+    if args.link.is_some() || args.linked_to.is_some() {
+        let linked_to = args
+            .linked_to
+            .as_deref()
+            .map(|id| project.current_id(id))
+            .transpose()?;
+        documents = app::links::filter_documents(
+            documents,
+            &project.read_documents()?,
+            args.link.as_deref(),
+            linked_to.as_deref(),
+        )?;
+    }
     if let Some(limit) = args.limit {
         documents.truncate(limit);
     }
@@ -319,7 +333,16 @@ fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
             );
         } else {
             print_warnings(&sync_warnings);
-            print!("{}", show_text(&doc));
+            let documents = project
+                .read_documents()?
+                .into_iter()
+                .map(|document| (document.id().to_string(), document))
+                .collect();
+            let (outgoing, incoming) = app::links::dtos(&documents, doc.id());
+            print!(
+                "{}",
+                show_text(&doc, app::links::text_lines(&outgoing, &incoming))
+            );
         }
         return Ok(super::StartupRequest::Exit);
     }
@@ -344,7 +367,7 @@ fn show(args: IdArgs, json: bool) -> Result<super::StartupRequest, CliError> {
 ///
 /// This is deliberately not a terminal rendering of the whole record. The TUI
 /// is the human read surface; `--json` is the machine read surface.
-fn show_text(doc: &crate::project::StoredDocument) -> String {
+fn show_text(doc: &crate::project::StoredDocument, link_lines: Vec<String>) -> String {
     let mut lines = vec![
         format!("ID: {}", doc.id()),
         format!("Type: {}", doc.doc_type()),
@@ -360,6 +383,7 @@ fn show_text(doc: &crate::project::StoredDocument) -> String {
     if let Some(assignee) = doc.field("assignee") {
         lines.push(format!("Assignee: {assignee}"));
     }
+    lines.extend(link_lines);
     lines.push(String::new());
     lines.join("\n")
 }
@@ -693,12 +717,17 @@ fn review(args: ReviewArgs, json: bool) -> Result<super::StartupRequest, CliErro
 
 fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let (project, id) = open_write_for(&args.id)?;
+    let fixed_by = args
+        .fixed_by
+        .map(|target| project.current_id(&target))
+        .transpose()?;
     let outcome = app::tasks::complete(
         &project,
         app::tasks::CompleteOptions {
             id,
             reviewer: args.reviewer,
-            ..Default::default()
+            note: args.note,
+            fixed_by,
         },
     )?;
     let report = publish(&project);
@@ -713,6 +742,39 @@ fn complete(args: CompleteArgs, json: bool) -> Result<super::StartupRequest, Cli
             eprintln!("Warning: {warning}");
         }
         println!("Completed {id} (record written; {})", sync_text(&report));
+    }
+    Ok(super::StartupRequest::Exit)
+}
+
+fn link(args: LinkArgs, json: bool) -> Result<super::StartupRequest, CliError> {
+    let (adding, edit) = match args.command {
+        LinkCommand::Add(edit) => (true, edit),
+        LinkCommand::Remove(edit) => (false, edit),
+    };
+    let (project, id) = open_write_for(&edit.id)?;
+    let target = project.current_id(&edit.target)?;
+    let outcome = if adding {
+        app::links::add(&project, &id, &edit.link_type, &target)?
+    } else {
+        app::links::remove(&project, &id, &edit.link_type, &target)?
+    };
+    let report = publish(&project);
+    let id = report.renamed(&outcome.id);
+    let target = report.renamed(&outcome.target);
+    if json {
+        println!(
+            "{}",
+            serde_json::json!({"ok":true,"data":{"id":id,"type":outcome.link_type,"target":target,"changed":outcome.changed,"recordWritten":outcome.changed,"sync":sync_json(&report)},"warnings":[]})
+        );
+    } else if !outcome.changed {
+        println!("Unchanged: {id} already {} {target}", outcome.link_type);
+    } else {
+        println!(
+            "{} {id} {} {target} (record written; {})",
+            if adding { "Linked" } else { "Unlinked" },
+            outcome.link_type,
+            sync_text(&report)
+        );
     }
     Ok(super::StartupRequest::Exit)
 }

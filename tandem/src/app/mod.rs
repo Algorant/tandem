@@ -12,6 +12,7 @@ pub(crate) mod assignment;
 pub(crate) mod background_sync;
 pub(crate) mod decisions;
 pub(crate) mod dto;
+pub(crate) mod links;
 pub(crate) mod project;
 pub(crate) mod queries;
 pub(crate) mod review;

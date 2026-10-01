@@ -27,6 +27,8 @@ pub(crate) const TASK_MOVED: &str = "task.moved";
 pub(crate) const TASK_UPDATED: &str = "task.updated";
 pub(crate) const TASK_COMPLETED: &str = "task.completed";
 pub(crate) const TASK_CANCELED: &str = "task.canceled";
+pub(crate) const TASK_LINKED: &str = "task.linked";
+pub(crate) const TASK_UNLINKED: &str = "task.unlinked";
 pub(crate) const DECISION_CREATED: &str = "decision.created";
 pub(crate) const DECISION_UPDATED: &str = "decision.updated";
 pub(crate) const RULES_UPDATED: &str = "rules.updated";
@@ -39,6 +41,8 @@ pub(crate) fn is_known_name(name: &str) -> bool {
             | TASK_UPDATED
             | TASK_COMPLETED
             | TASK_CANCELED
+            | TASK_LINKED
+            | TASK_UNLINKED
             | DECISION_CREATED
             | DECISION_UPDATED
             | RULES_UPDATED
