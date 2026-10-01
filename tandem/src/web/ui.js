@@ -77,53 +77,123 @@ function itemHref(item, location = item.location) {
   return `#document/${encodeURIComponent(item.id)}`;
 }
 
-function depthFor(item, byId) {
-  let depth = 0;
-  let parent = item.parentId;
-  const seen = new Set([item.id]);
-  while (parent && byId.has(parent) && !seen.has(parent) && depth < 2) {
-    seen.add(parent);
-    depth += 1;
-    parent = byId.get(parent).parentId;
-  }
-  return depth;
+// Lanes are a projection of the protocol `kind` alone. Tags are topical and
+// never classify a Task.
+const LANES = [
+  { id: 'standard', name: 'Standard', hint: 'ordered by priority, then ID' },
+  { id: 'research', name: 'Research', hint: 'kind: research · ordered by priority, then ID' },
+  { id: 'papercut', name: 'Papercuts', hint: 'kind: papercut · ordered by priority, then ID' },
+];
+const PRIORITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
+const PRIORITY_LABEL = { critical: 'CRIT', high: 'HIGH', medium: 'MED', low: 'LOW' };
+
+// A lane the reader collapsed stays collapsed across the revision-poll re-render.
+const collapsedLanes = new Set();
+
+function laneOf(item) {
+  if (item.kind === 'research') return 'research';
+  if (item.kind === 'papercut') return 'papercut';
+  return 'standard';
 }
 
-function orderedItems(items) {
-  const byId = new Map(items.map((item) => [item.id, item]));
+function idParts(id) {
+  return String(id).split('-').map((part) => (/^\d+$/.test(part) ? Number(part) : part));
+}
+
+function compareIds(a, b) {
+  const left = idParts(a);
+  const right = idParts(b);
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    if (left[i] === right[i]) continue;
+    if (left[i] === undefined) return -1;
+    if (right[i] === undefined) return 1;
+    if (typeof left[i] === typeof right[i]) return left[i] < right[i] ? -1 : 1;
+    return typeof left[i] === 'number' ? -1 : 1;
+  }
+  return 0;
+}
+
+function compareItems(a, b) {
+  const rank = (item) => PRIORITY_RANK[item.priority] ?? 4;
+  return rank(a) - rank(b) || compareIds(a.id, b.id);
+}
+
+// Orders one lane: priority then ID, with a Task nested beneath its parent when
+// that parent sits in the same lane. Anything else is a lane root and carries
+// its parent as context.
+function laneRows(laneItems) {
+  const ids = new Set(laneItems.map((item) => item.id));
   const children = new Map();
-  for (const item of items) {
-    const key = item.parentId && byId.has(item.parentId) ? item.parentId : null;
+  for (const item of [...laneItems].sort(compareItems)) {
+    const key = item.parentId && ids.has(item.parentId) ? item.parentId : null;
     if (!children.has(key)) children.set(key, []);
     children.get(key).push(item);
   }
-  const result = [];
-  const append = (parent) => {
+  const rows = [];
+  const append = (parent, depth, seen) => {
     for (const item of children.get(parent) || []) {
-      result.push(item);
-      append(item.id);
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      rows.push({ item, depth });
+      append(item.id, Math.min(depth + 1, 2), seen);
     }
   };
-  append(null);
-  for (const item of items) if (!result.includes(item)) result.push(item);
-  return { items: result, byId };
+  const seen = new Set();
+  append(null, 0, seen);
+  for (const item of laneItems) if (!seen.has(item.id)) rows.push({ item, depth: 0 });
+  return rows;
 }
 
-function taskCard(item, byId) {
-  const relationship = item.parentRelationship ? `${item.parentRelationship} · ` : '';
-  return el('article', { class: 'task-card', 'data-role': item.role, 'data-depth': depthFor(item, byId) }, [
-    el('div', { class: 'card-kicker', text: `${relationship}${item.id}` }),
-    el('h4', {}, el('a', { href: itemHref(item), text: item.title })),
-    item.assignee ? el('div', { class: 'card-meta', text: `Assignee: ${item.assignee}` }) : null,
-    badgeRow(item, false),
+function laneRow({ item, depth }, ctx) {
+  const parent = item.parentId && !ctx.inLane(item) ? ctx.byId.get(item.parentId) : null;
+  const childCount = ctx.childCounts.get(item.id) || 0;
+  const context = item.parentId && !ctx.inLane(item)
+    ? `under ${item.parentId}${parent ? ` · ${parent.title}` : ''}`
+    : null;
+  return el('li', { class: 'lane-row', 'data-depth': depth, 'data-kind': item.kind || 'task' }, [
+    el('span', { class: 'row-id', text: item.id }),
+    el('span', { class: 'chip', text: item.state || 'no state' }),
+    item.priority ? el('span', { class: 'chip', 'data-priority': item.priority, text: PRIORITY_LABEL[item.priority] || item.priority }) : null,
+    item.kind === 'epic' ? el('span', { class: 'chip chip-epic', text: 'EPIC' }) : null,
+    item.accordStatus && item.accordStatus !== 'ready' ? el('span', { class: 'chip', 'data-tone': statusTone(item.accordStatus), text: item.accordStatus }) : null,
+    el('span', { class: 'row-main' }, [
+      el('a', { class: 'row-title', href: itemHref(item), text: item.title }),
+      context ? el('span', { class: 'row-context', text: context }) : null,
+    ]),
+    childCount ? el('span', { class: 'row-children', text: `+${childCount} ${childCount === 1 ? 'child' : 'children'}` }) : null,
   ]);
+}
+
+function laneSection(lane, laneItems, ctx) {
+  const count = el('span', { class: 'lane-count', text: laneItems.length });
+  const name = el('span', { class: 'lane-name', text: lane.name });
+  const attrs = { class: 'lane', 'data-lane': lane.id, 'aria-label': `${lane.name} lane, ${laneItems.length} ${laneItems.length === 1 ? 'task' : 'tasks'}` };
+  if (!laneItems.length) {
+    // An empty lane collapses to its header.
+    return el('section', { ...attrs, 'data-empty': 'true' }, el('div', { class: 'lane-head' }, [
+      el('span', { class: 'lane-title' }, [name, count]),
+      el('span', { class: 'lane-hint', text: 'empty' }),
+    ]));
+  }
+  const details = el('details', { open: !collapsedLanes.has(lane.id) }, [
+    el('summary', { class: 'lane-head' }, [
+      el('span', { class: 'lane-title' }, [name, count]),
+      el('span', { class: 'lane-hint', text: lane.hint }),
+    ]),
+    el('ul', { class: 'lane-rows' }, laneRows(laneItems).map((row) => laneRow(row, ctx))),
+  ]);
+  details.addEventListener('toggle', () => {
+    if (details.open) collapsedLanes.delete(lane.id);
+    else collapsedLanes.add(lane.id);
+  });
+  return el('section', attrs, details);
 }
 
 export function renderBoard(data, filters, onFilter) {
   const states = data.states || [];
   const items = data.items.filter((item) => {
     const query = filters.query.trim().toLowerCase();
-    return !query || `${item.id} ${item.title} ${(item.tags || []).join(' ')}`.toLowerCase().includes(query);
+    return item.type === 'task' && (!query || `${item.id} ${item.title} ${(item.tags || []).join(' ')}`.toLowerCase().includes(query));
   });
   const stateOptions = [el('option', { value: '', text: 'All configured states' })];
   for (const state of states) stateOptions.push(el('option', { value: state, text: state }));
@@ -145,30 +215,18 @@ export function renderBoard(data, filters, onFilter) {
       priority: form.querySelector('#board-priority').value,
     });
   });
-  const columns = states
-    .filter((state) => !filters.state || state === filters.state)
-    .map((state) => {
-      const stateItems = items.filter((item) => item.state === state);
-      const ordered = orderedItems(stateItems);
-      return el('section', { class: 'board-column', 'aria-labelledby': `state-${state}` }, [
-        el('h3', { class: 'column-heading', id: `state-${state}` }, [el('span', { text: state }), el('span', { class: 'count', text: stateItems.length })]),
-        stateItems.length
-          ? el('div', { class: 'card-list' }, ordered.items.map((item) => taskCard(item, ordered.byId)))
-          : el('p', { class: 'empty', text: 'No documents in this state.' }),
-      ]);
-    });
-  const unconfigured = items.filter((item) => !states.includes(item.state));
-  if (unconfigured.length && !filters.state) {
-    const ordered = orderedItems(unconfigured);
-    columns.push(el('section', { class: 'board-column', 'aria-labelledby': 'state-other' }, [
-      el('h3', { class: 'column-heading', id: 'state-other' }, [el('span', { text: 'Other / no state' }), el('span', { class: 'count', text: unconfigured.length })]),
-      el('div', { class: 'card-list' }, ordered.items.map((item) => taskCard(item, ordered.byId))),
-    ]));
-  }
+  // Parent context and child counts read the whole payload, not the text
+  // filter, so a filtered-out parent is still named.
+  const byId = new Map(data.items.map((item) => [item.id, item]));
+  const childCounts = new Map();
+  for (const item of data.items) if (item.parentId) childCounts.set(item.parentId, (childCounts.get(item.parentId) || 0) + 1);
+  const laneIds = new Map(items.map((item) => [item.id, laneOf(item)]));
+  const ctx = { byId, childCounts, inLane: (item) => laneIds.get(item.parentId) === laneOf(item) };
+  const lanes = LANES.map((lane) => laneSection(lane, items.filter((item) => laneOf(item) === lane.id), ctx));
   return el('div', {}, [
-    heading('Board', 'Configured workflow states with canonical roles and relationships from the read API.'),
+    heading('Board', 'Tasks grouped into Standard, Research, and Papercuts lanes by their kind; the state, priority, and text filters narrow every lane.'),
     form,
-    columns.length ? el('div', { class: 'board' }, columns) : el('p', { class: 'empty', text: 'No configured state matches this filter.' }),
+    el('div', { class: 'lanes' }, lanes),
   ]);
 }
 

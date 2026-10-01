@@ -1046,6 +1046,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn board_api_exposes_kind_and_parent_context_for_lane_classification() {
+        let (root, project) = test_project();
+        for (id, extra, title) in [
+            ("task-5", "kind: epic\n", "Group"),
+            ("task-6", "kind: research\nparentId: task-5\n", "Nested research"),
+            ("task-7", "kind: papercut\ntags: [research]\n", "Tagged papercut"),
+        ] {
+            fs::write(
+                project.tasks_dir.join(format!("{id}.md")),
+                format!("---\nid: {id}\ntype: task\n{extra}title: {title}\nstate: todo\nacceptance: [done]\n---\n"),
+            )
+            .unwrap();
+        }
+        let app = router(project, TEST_HOST);
+        let (status, board) = json_request(app, "/api/v1/board").await;
+        assert_eq!(status, StatusCode::OK, "{board}");
+        let item = |id: &str| {
+            board["data"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["id"] == id)
+                .unwrap_or_else(|| panic!("{id} missing: {board}"))
+                .clone()
+        };
+        assert_eq!(item("task-5")["kind"], "epic");
+        let research = item("task-6");
+        assert_eq!(research["kind"], "research");
+        assert_eq!(research["parentId"], "task-5");
+        assert_eq!(research["parentRelationship"], "epic-task");
+        // Tags stay topical: a `research` tag does not change the papercut kind.
+        assert_eq!(item("task-7")["kind"], "papercut");
+        assert!(item("task-1")["kind"].is_null());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn bundled_board_derives_lanes_from_kind_alone() {
+        assert!(UI_JS.contains("item.kind === 'research'"));
+        assert!(UI_JS.contains("item.kind === 'papercut'"));
+        assert!(UI_JS.contains("data-empty"));
+        assert!(UI_JS.contains("under ${item.parentId}"));
+    }
+
+    #[tokio::test]
     async fn logs_api_orders_archived_records_newest_first_with_completed_at_fallback() {
         let (root, project) = test_project();
         fs::write(
