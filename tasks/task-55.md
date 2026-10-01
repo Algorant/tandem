@@ -12,12 +12,12 @@ tags: ["protocol", "taxonomy"]
 accord:
   status: "claimed"
   acceptance: ["`research` and `papercut` are valid Task kinds across protocol, CLI, TUI, and docs, with the agreed required fields, default priority, and placement rule enforced by Tandem.", "Active Board records tagged `research` or `papercut` migrate to the matching kind. Archived Logs are untouched.", "No Tandem code path classifies research or papercut work by tag after this change."]
-  claimedAt: "2026-10-01T22:43:11Z"
+  claimedAt: "2026-10-01T23:02:50Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-01T22:43:11Z"
+  updatedAt: "2026-10-01T23:02:50Z"
 createdAt: "2026-10-01T22:20:35Z"
-updatedAt: "2026-10-01T22:43:11Z"
-assignee: "worker-task-55-e2f38237"
+updatedAt: "2026-10-01T23:02:50Z"
+assignee: "worker-task-55-379489ec"
 ---
 
 ## Description
