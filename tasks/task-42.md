@@ -2,12 +2,13 @@
 id: task-42
 uid: d1b1095a-2878-48c5-a817-12579d1c9288
 type: task
+kind: papercut
 title: "Reduce Epic/parent closure friction: derived closure, stale-blocker detection, guided evidence"
 state: todo
 priority: "low"
 effort: "medium"
 references: ["~/.pi task-100"]
-tags: ["workflow", "epic", "accord", "papercut"]
+tags: ["workflow", "epic", "accord"]
 accord:
   status: "ready"
   acceptance: ["Each friction class is confirmed or rejected against current Tandem behavior with a reproduction or source citation", "An approved design addresses Epic/parent closure without silently fabricating delivery evidence", "Stale blockers referencing archived records are detectable by a documented command or output", "The events-file ID collision observation is triaged (bug, expected, or not reproducible)"]

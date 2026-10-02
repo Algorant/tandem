@@ -2,11 +2,12 @@
 id: task-50
 uid: ef34cbd8-c699-4582-a2af-2ae1ed59bd51
 type: task
+kind: papercut
 title: "Event envelope in code contradicts protocol spec (summary vs data)"
 state: todo
 priority: "low"
 relatedFiles: ["protocol/plan/spec.md", "tandem/src/protocol/event.rs", "tandem/src/project/events.rs"]
-tags: ["papercut", "protocol"]
+tags: ["protocol"]
 accord:
   status: "ready"
   acceptance: ["The protocol spec and the executable event envelope agree on whether `summary` and `data` are required, with a test asserting the chosen contract."]

@@ -2,10 +2,11 @@
 id: task-59
 uid: b5a832b0-4012-47c4-a9c5-50a2e02fcb19
 type: task
+kind: papercut
 title: "just dev-check skips clippy and the docs audit, so the release gate catches them late"
 state: todo
 priority: "low"
-tags: ["papercut", "config", "validation"]
+tags: ["config", "validation"]
 accord:
   status: "ready"
   acceptance: ["`just dev-check` fails on the same clippy lints that the `just release` gate rejects."]

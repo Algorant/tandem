@@ -2,11 +2,12 @@
 id: task-51
 uid: eb7996da-f2bf-48ff-b3c3-c24e76495763
 type: task
+kind: papercut
 title: "Workspace docs describe the pre-0.3.0 layout"
 state: todo
 priority: "low"
 relatedFiles: ["docs/workspace/index.md", "protocol/README.md"]
-tags: ["papercut", "docs"]
+tags: ["docs"]
 accord:
   status: "ready"
   acceptance: ["docs/workspace/index.md matches the current protocol layout in protocol/README.md."]

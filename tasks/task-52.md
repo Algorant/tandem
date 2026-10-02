@@ -2,11 +2,12 @@
 id: task-52
 uid: 497b7bbb-125e-420a-a733-3021ff8e8654
 type: task
+kind: papercut
 title: "CLI reference still documents pre-0.3.0 commands"
 state: todo
 priority: "low"
 relatedFiles: ["docs/cli/index.md"]
-tags: ["papercut", "docs"]
+tags: ["docs"]
 accord:
   status: "ready"
   acceptance: ["docs/cli/index.md documents exactly the current clap command tree and no removed commands."]
