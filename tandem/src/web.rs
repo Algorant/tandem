@@ -1050,8 +1050,16 @@ mod tests {
         let (root, project) = test_project();
         for (id, extra, title) in [
             ("task-5", "kind: epic\n", "Group"),
-            ("task-6", "kind: research\nparentId: task-5\n", "Nested research"),
-            ("task-7", "kind: papercut\ntags: [research]\n", "Tagged papercut"),
+            (
+                "task-6",
+                "kind: research\nparentId: task-5\n",
+                "Nested research",
+            ),
+            (
+                "task-7",
+                "kind: papercut\ntags: [research]\n",
+                "Tagged papercut",
+            ),
         ] {
             fs::write(
                 project.tasks_dir.join(format!("{id}.md")),
