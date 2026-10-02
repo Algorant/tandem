@@ -206,6 +206,100 @@ fn papercut_placement_is_root_or_epic_child_never_subtask() {
 }
 
 #[test]
+fn nesting_research_or_papercut_warns_and_recommends_a_link() {
+    let dir = root("nesting-warning");
+    let epic = add(&dir, &["Epic", "--kind", "epic", "--acceptance", "ok"]);
+    let task = add(&dir, &["Parent task", "--acceptance", "ok"]);
+    let warnings = |value: &Value| -> Vec<String> {
+        value["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|warning| warning.as_str().unwrap().to_string())
+            .collect()
+    };
+
+    // add: the placement succeeds and warns, in JSON and as stderr text.
+    let added = run(
+        &dir,
+        &[
+            "add",
+            "task",
+            "Nested research",
+            "--kind",
+            "research",
+            "--parent",
+            &task,
+            "--acceptance",
+            "ok",
+        ],
+    );
+    assert_eq!(
+        warnings(&added),
+        vec![format!(
+            "a research Task under {task} is allowed but not recommended; prefer a root Task plus `tandem link add <id> relates-to {task}`"
+        )]
+    );
+    let output = bin()
+        .current_dir(&dir)
+        .args([
+            "add",
+            "task",
+            "Epic papercut",
+            "--kind",
+            "papercut",
+            "--parent",
+            &epic,
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("Warning: a papercut Task under {epic} is allowed")),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains(&format!("tandem link add <id> relates-to {epic}")),
+        "{stderr}"
+    );
+
+    // update --parent warns with the real id.
+    let root_research = add(
+        &dir,
+        &["Root research", "--kind", "research", "--acceptance", "ok"],
+    );
+    let updated = run(&dir, &["update", &root_research, "--parent", &epic]);
+    assert_eq!(
+        warnings(&updated),
+        vec![format!(
+            "a research Task under {epic} is allowed but not recommended; prefer a root Task plus `tandem link add {root_research} relates-to {epic}`"
+        )]
+    );
+
+    // Standard Tasks, root research, and unrelated updates stay quiet.
+    let plain = run(
+        &dir,
+        &[
+            "add",
+            "task",
+            "Plain sub",
+            "--parent",
+            &task,
+            "--acceptance",
+            "ok",
+        ],
+    );
+    assert!(warnings(&plain).is_empty());
+    let root_papercut = add(&dir, &["Root papercut", "--kind", "papercut"]);
+    assert!(warnings(&run(
+        &dir,
+        &["update", &root_papercut, "--priority", "high"]
+    ))
+    .is_empty());
+}
+
+#[test]
 fn acceptance_rules_follow_the_kind_on_update() {
     let dir = root("update");
     let papercut = add(

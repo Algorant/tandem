@@ -374,13 +374,12 @@ impl TuiApp {
 
         self.expand_active_task_ancestors(id);
         // The current view wins; otherwise follow the record to the first
-        // state tab that shows it, then ALL, then a kind tab.
+        // state tab that shows it, then ALL.
         let views = board_views(&self.states);
         let current = self.selected_view.min(views.len().saturating_sub(1));
         let rank = |index: usize| match views[index] {
             BoardView::State(_) => 0,
             BoardView::All => 1,
-            BoardView::Kind(_) => 2,
         };
         let mut rest = (0..views.len())
             .filter(|index| *index != current)
@@ -480,12 +479,12 @@ impl TuiApp {
             };
             return;
         }
-        // Kind tabs are flat: a row has no rendered subtree, so Enter and
-        // double-click always open the inline preview for that record instead
-        // of an invisible hierarchy expansion.
+        // Research and papercut rows are flat: a row has no rendered subtree,
+        // so Enter and double-click always open the inline preview for that
+        // record instead of an invisible hierarchy expansion.
         if self
-            .selected_board_view()
-            .is_some_and(|view| view.is_flat())
+            .selected_doc()
+            .is_some_and(|doc| BoardSection::of(doc) != BoardSection::Standard)
         {
             self.toggle_board_preview();
             return;

@@ -154,18 +154,12 @@ impl TuiHierarchySnapshot {
     }
 }
 
-/// Task kinds that get their own flat Board tab, in tab order. Classification
-/// reads the `kind` field only; tags never decide a tab.
-pub(super) const KIND_VIEWS: [&str; 2] = ["research", "papercut"];
-
-/// One Board tab. `All` and `State` share the hierarchy tree; `Kind` is a flat,
-/// cross-state list. Kind tabs overlap the others: a Task stays in its own
-/// workflow state tab and in `All`.
+/// One Board tab: ALL or one workflow state. Every tab has the same body,
+/// split into `BoardSection`s and filtered to the tab's state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum BoardView {
     All,
     State(String),
-    Kind(&'static str),
 }
 
 impl BoardView {
@@ -173,8 +167,6 @@ impl BoardView {
         match self {
             Self::All => "ALL".to_string(),
             Self::State(state) => display_state_label(state),
-            Self::Kind("papercut") => "PAPERCUTS".to_string(),
-            Self::Kind(kind) => kind.to_uppercase(),
         }
     }
 
@@ -183,21 +175,45 @@ impl BoardView {
         match self {
             Self::All => true,
             Self::State(state) => document_state_label(doc) == state.as_str(),
-            Self::Kind(kind) => doc.field("kind") == Some(*kind),
         }
-    }
-
-    pub(super) fn is_flat(&self) -> bool {
-        matches!(self, Self::Kind(_))
     }
 }
 
-/// Tab order: ALL, each workflow state, then one tab per kind in `KIND_VIEWS`.
+/// Tab order: ALL, then each workflow state.
 pub(super) fn board_views(states: &[String]) -> Vec<BoardView> {
     std::iter::once(BoardView::All)
         .chain(states.iter().cloned().map(BoardView::State))
-        .chain(KIND_VIEWS.into_iter().map(BoardView::Kind))
         .collect()
+}
+
+/// A kind section of a Board tab, in display order. Classification reads the
+/// `kind` field only; tags never decide a section. Standard holds every Task
+/// without a research or papercut kind, Epics included.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BoardSection {
+    Standard,
+    Research,
+    Papercuts,
+}
+
+impl BoardSection {
+    pub(super) const ALL: [Self; 3] = [Self::Standard, Self::Research, Self::Papercuts];
+
+    pub(super) fn of(doc: &Document) -> Self {
+        match doc.field("kind") {
+            Some("research") => Self::Research,
+            Some("papercut") => Self::Papercuts,
+            _ => Self::Standard,
+        }
+    }
+
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Standard => "STANDARD",
+            Self::Research => "RESEARCH",
+            Self::Papercuts => "PAPERCUTS",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,6 +246,36 @@ pub(super) fn board_view_tabs(
             }
         })
         .collect()
+}
+
+/// Records in one section of a view, after Board filters. Counts every
+/// matching record, including Subtasks nested in the STANDARD tree, so the
+/// section counts add up to the tab count.
+pub(super) fn board_section_count(
+    docs: &[Document],
+    view: &BoardView,
+    filters: &BoardFilters,
+    section: BoardSection,
+) -> usize {
+    docs.iter()
+        .filter(|doc| is_board_visible_doc(doc) && view.includes(doc))
+        .filter(|doc| BoardSection::of(doc) == section && board_filters_match(doc, filters))
+        .count()
+}
+
+/// Static section header row: a label and a count. Not selectable.
+pub(super) fn section_header_item(
+    section: BoardSection,
+    count: usize,
+    theme: &TuiTheme,
+) -> ListItem<'static> {
+    ListItem::new(Line::from(vec![
+        Span::styled(
+            section.label(),
+            theme.muted_style().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(format!(" {count}"), theme.muted_style()),
+    ]))
 }
 
 /// Tab label for a Board view. When Board filters narrow a view, show the
@@ -326,9 +372,9 @@ pub(super) struct StateBoardEntry<'a> {
     pub(super) has_active_children: bool,
     pub(super) expanded: bool,
     pub(super) last_sibling: bool,
-    /// True for a flat kind-tab row, which shows `parentId` context instead of
-    /// tree nesting.
-    pub(super) flat: bool,
+    /// Standard rows nest as a tree; research and papercut rows are flat and
+    /// show `parentId` context instead.
+    pub(super) section: BoardSection,
 }
 
 #[cfg(test)]
@@ -353,20 +399,21 @@ pub(super) fn state_board_entries<'a>(
     )
 }
 
-/// Flat kind tab: one row per active Board Task whose `kind` matches, in
-/// document order, with no ancestor-path requirement. A row carries `parentId`
-/// context but never nests, and references never contribute membership or
-/// hierarchy.
-pub(super) fn kind_board_entries<'a>(
+/// Flat research or papercut section: one row per active Board Task of that
+/// kind in the view's state, in document order, with no ancestor-path
+/// requirement. A row carries `parentId` context but never nests, and
+/// references never contribute membership or hierarchy.
+fn flat_section_entries<'a>(
     active_docs: &'a [Document],
-    kind: &str,
+    section: BoardSection,
+    view: &BoardView,
     filters: &BoardFilters,
     hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
     active_docs
         .iter()
         .filter(|doc| is_board_visible_doc(doc) && is_task_doc(doc))
-        .filter(|doc| doc.field("kind") == Some(kind))
+        .filter(|doc| BoardSection::of(doc) == section && view.includes(doc))
         .filter(|doc| board_filters_match(doc, filters))
         .map(|doc| StateBoardEntry {
             doc,
@@ -379,11 +426,13 @@ pub(super) fn kind_board_entries<'a>(
             has_active_children: false,
             expanded: false,
             last_sibling: false,
-            flat: true,
+            section,
         })
         .collect()
 }
 
+/// All Board rows of a view in display order: the STANDARD tree, then the flat
+/// RESEARCH and PAPERCUTS lists. Selection indexes this one sequence.
 pub(super) fn state_board_entries_with_hierarchy<'a>(
     active_docs: &'a [Document],
     completed_logs: &[Document],
@@ -392,12 +441,42 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
     expanded_ids: &BTreeSet<String>,
     hierarchy: &HierarchyIndex,
 ) -> Vec<StateBoardEntry<'a>> {
-    if let BoardView::Kind(kind) = view {
-        return kind_board_entries(active_docs, kind, filters, hierarchy);
+    let mut entries = standard_board_entries(
+        active_docs,
+        completed_logs,
+        view,
+        filters,
+        expanded_ids,
+        hierarchy,
+    );
+    for section in [BoardSection::Research, BoardSection::Papercuts] {
+        entries.extend(flat_section_entries(
+            active_docs,
+            section,
+            view,
+            filters,
+            hierarchy,
+        ));
     }
+    entries
+}
+
+/// The STANDARD section tree. Research and papercut Tasks never render here;
+/// they are transparent, so a standard descendant still nests under its
+/// nearest standard ancestor.
+fn standard_board_entries<'a>(
+    active_docs: &'a [Document],
+    completed_logs: &[Document],
+    view: &BoardView,
+    filters: &BoardFilters,
+    expanded_ids: &BTreeSet<String>,
+    hierarchy: &HierarchyIndex,
+) -> Vec<StateBoardEntry<'a>> {
     let mut entries = Vec::new();
     for root in active_docs.iter().filter(|doc| {
-        is_board_visible_doc(doc) && is_state_board_root(doc, active_docs, completed_logs)
+        is_board_visible_doc(doc)
+            && BoardSection::of(doc) == BoardSection::Standard
+            && is_state_board_root(doc, active_docs, completed_logs)
     }) {
         let mut visited = BTreeSet::from([root.id().to_string()]);
         let root_matches_state = view.includes(root);
@@ -454,7 +533,7 @@ pub(super) fn state_board_entries_with_hierarchy<'a>(
             has_active_children,
             expanded,
             last_sibling: false,
-            flat: false,
+            section: BoardSection::Standard,
         });
         if is_task_doc(root) {
             collect_visible_state_descendants(
@@ -516,6 +595,24 @@ pub(super) fn collect_visible_state_descendants<'a>(
         if !visited.insert(child.id().to_string()) {
             continue;
         }
+        if BoardSection::of(child) != BoardSection::Standard {
+            collect_visible_state_descendants(
+                child.id(),
+                depth,
+                (
+                    active_docs,
+                    completed_logs,
+                    target_view,
+                    filters,
+                    expanded_ids,
+                    parent_open,
+                    hierarchy,
+                ),
+                visited,
+                entries,
+            );
+            continue;
+        }
         let mut match_visited = visited.clone();
         let subtree_matches = !filters.is_active()
             || (target_view.includes(child) && board_filters_match(child, filters))
@@ -556,7 +653,7 @@ pub(super) fn collect_visible_state_descendants<'a>(
             has_active_children,
             expanded,
             last_sibling: false,
-            flat: false,
+            section: BoardSection::Standard,
         });
         collect_visible_state_descendants(
             child.id(),
@@ -631,7 +728,9 @@ pub(super) fn is_state_board_root(
             .iter()
             .find(|candidate| candidate.id() == parent_id && is_task_doc(candidate))
         {
-            saw_active_ancestor = true;
+            // Research and papercut ancestors are not in the tree, so they
+            // never make a standard Task a child.
+            saw_active_ancestor |= BoardSection::of(parent) == BoardSection::Standard;
             current = parent;
             continue;
         }
@@ -703,7 +802,9 @@ pub(super) fn task_subtree_matches_filters(
         .filter(|doc| normalized_parent_id(doc).as_deref() == Some(parent_id))
         .any(|child| {
             visited.insert(child.id().to_string())
-                && ((target_view.includes(child) && board_filters_match(child, filters))
+                && ((BoardSection::of(child) == BoardSection::Standard
+                    && target_view.includes(child)
+                    && board_filters_match(child, filters))
                     || task_subtree_matches_filters(
                         child.id(),
                         active_docs,
@@ -1095,7 +1196,12 @@ pub(super) fn board_item_lines_for_doc_with_context_and_limit(
     // Board rows are intentionally sparse. The Board is for scanning and choosing work;
     // details belong in expanded rows and the detail pane. Relationship context is shown
     // as nesting/expanded-row content, not noisy parent-id chips.
-    let chips = board_scan_chips(doc, relationship_context.task_role, theme);
+    let chips = board_scan_chips(
+        doc,
+        relationship_context.task_role,
+        BoardSection::Standard,
+        theme,
+    );
 
     let mut lines = vec![board_row_line(
         doc,
@@ -1124,6 +1230,7 @@ pub(super) fn board_item_lines_for_doc_with_context_and_limit(
 pub(super) fn board_scan_chips(
     doc: &Document,
     task_role: Option<TaskRole>,
+    section: BoardSection,
     theme: &TuiTheme,
 ) -> Vec<(String, Style)> {
     let priority = doc.field("priority").unwrap_or("-");
@@ -1137,7 +1244,11 @@ pub(super) fn board_scan_chips(
             theme.progress_chip_style(StatusTone::Accent),
         ));
     }
-    if let Some((kind_chip, tone)) = kind_chip(doc, theme) {
+    // A research or papercut row sits under its own section header, which
+    // already names the kind.
+    if let Some((kind_chip, tone)) =
+        kind_chip(doc, theme).filter(|_| section == BoardSection::Standard)
+    {
         chips.push((kind_chip, theme.progress_chip_style(tone)));
     }
     for (tag_chip, tone) in work_type_tag_chips(doc, theme) {
@@ -1233,15 +1344,17 @@ pub(super) fn state_lines_for_entry(
         chip_text(&format!("{state:<4}"), theme),
         theme.state_chip_style(&document_state_label(doc)),
     ));
-    if entry.flat {
-        if let Some(parent_context) = flat_parent_context(relationship_context) {
+    if entry.section != BoardSection::Standard {
+        if let Some(parent_context) = parent_context_chip(relationship_context) {
             chips.push((truncate(&parent_context, meta_width), theme.muted_style()));
         }
     }
     match entry.role {
-        StateBoardEntryRole::Root => chips.extend(board_scan_chips(doc, entry.task_role, theme)),
+        StateBoardEntryRole::Root => {
+            chips.extend(board_scan_chips(doc, entry.task_role, entry.section, theme));
+        }
         StateBoardEntryRole::Child if entry.depth == 0 => {
-            chips.extend(board_scan_chips(doc, entry.task_role, theme));
+            chips.extend(board_scan_chips(doc, entry.task_role, entry.section, theme));
         }
         StateBoardEntryRole::Child => {}
     }
@@ -1269,9 +1382,9 @@ pub(super) fn state_lines_for_entry(
     lines
 }
 
-/// Human-readable `parentId` context for a flat kind-tab row. References are
-/// loose links and never appear here.
-pub(super) fn flat_parent_context(
+/// Human-readable `parentId` context for a flat research or papercut row.
+/// References are loose links and never appear here.
+pub(super) fn parent_context_chip(
     relationship_context: &BoardRelationshipContext,
 ) -> Option<String> {
     let parent_id = relationship_context.parent_id.as_deref()?;

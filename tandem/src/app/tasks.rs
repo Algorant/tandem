@@ -179,6 +179,18 @@ pub(crate) struct CancelOutcome {
     pub(crate) log_path: PathBuf,
 }
 
+/// Warning for a research or papercut Task placed under a parent. The
+/// placement is allowed, but a root Task linked with `relates-to` keeps these
+/// Tasks out of the parent's tree.
+fn nested_kind_warning(id: &str, kind: Option<&str>, parent: Option<&str>) -> Option<String> {
+    let (kind, parent) = (kind?, parent?);
+    matches!(kind, "research" | KIND_PAPERCUT).then(|| {
+        format!(
+            "a {kind} Task under {parent} is allowed but not recommended; prefer a root Task plus `tandem link add {id} relates-to {parent}`"
+        )
+    })
+}
+
 /// Create a Task, Epic, or Subtask after canonical hierarchy validation.
 pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddOutcome, Error> {
     let _hierarchy_lock = project::write::HierarchyLock::acquire(workspace)?;
@@ -257,6 +269,11 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             warnings.push(format!("reference not found: {reference}"));
         }
     }
+    warnings.extend(nested_kind_warning(
+        "<id>",
+        kind.as_deref(),
+        options.parent.as_deref(),
+    ));
 
     let allocation_prefix = match (parent_relationship, options.parent.as_deref()) {
         (Some(ParentRelationship::Subtask), Some(parent)) => parent,
@@ -483,6 +500,16 @@ pub(crate) fn update(
         if !workspace.reference_target_exists(reference)? {
             warnings.push(format!("reference not found: {reference}"));
         }
+    }
+    let clears_parent = options.clear.iter().any(|field| field == "parent");
+    if (options.kind.is_some() || options.parent.is_some()) && !clears_parent {
+        warnings.extend(nested_kind_warning(
+            doc.id(),
+            prospective.kind(),
+            prospective
+                .field("parentId")
+                .filter(|parent| !parent.is_empty()),
+        ));
     }
 
     let mut updates = BTreeMap::new();

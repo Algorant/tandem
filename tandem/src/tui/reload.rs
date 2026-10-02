@@ -233,9 +233,8 @@ impl TuiApp {
     }
 
     /// Reload keeps the selected tab and, by id, the selected record. A record
-    /// that moved follows to the first state tab showing it, except on a flat
-    /// kind tab: if the record left that kind (or was removed or filtered out)
-    /// the tab stays open and clamps to a remaining row or an empty list.
+    /// that moved follows to the first state tab showing it, in whichever
+    /// section it is listed.
     fn restore_board_selection(&mut self, view: Option<BoardView>, board_doc_id: Option<&str>) {
         // No captured view means the first load: keep the default ALL tab.
         if let (Some(view), BoardArrangement::State) = (view, self.board_arrangement) {
@@ -250,21 +249,7 @@ impl TuiApp {
         let Some(id) = board_doc_id else {
             return;
         };
-        let in_flat_view = self.board_arrangement == BoardArrangement::State
-            && self
-                .selected_board_view()
-                .is_some_and(|view| view.is_flat());
-        if in_flat_view {
-            let position = self.selected_board_view().and_then(|view| {
-                self.board_entries(&view)
-                    .iter()
-                    .position(|e| e.doc.id() == id)
-            });
-            self.selected_item = position.unwrap_or(0);
-            self.clamp_selection();
-        } else {
-            self.select_document_by_id_preserving_scroll(id);
-        }
+        self.select_document_by_id_preserving_scroll(id);
     }
 
     pub(super) fn runtime_warnings(&self) -> Vec<String> {

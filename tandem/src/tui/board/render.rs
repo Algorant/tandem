@@ -180,7 +180,12 @@ impl TuiApp {
                     }
                 })
                 .collect::<Vec<_>>();
-            self.register_board_row_hits(area, self.selected_view, state.offset(), &row_heights);
+            let rows = row_heights
+                .iter()
+                .enumerate()
+                .map(|(index, height)| (*height, Some(index)))
+                .collect::<Vec<_>>();
+            self.register_board_row_hits(area, self.selected_view, state.offset(), &rows);
         } else {
             frame.render_widget(list, area);
         }
@@ -260,14 +265,12 @@ impl TuiApp {
             .count();
         let content_width = area.width.saturating_sub(4) as usize;
         let preview_line_limit = inline_preview_line_limit_for_area(area);
+        // One list item per row, plus a static header item before each
+        // section's first row. `item_entries` maps list items back to entries;
+        // headers map to none, so they are never selected, hit, or navigated.
+        let mut item_entries: Vec<Option<usize>> = Vec::new();
         let items = if entries.is_empty() {
-            let empty_text = if let BoardView::Kind(kind) = view {
-                if self.board_filters.is_active() {
-                    format!("No {kind} tasks match the active Board filters.")
-                } else {
-                    format!("No active {kind} tasks on the Board.")
-                }
-            } else if self.board_filters.is_active() {
+            let empty_text = if self.board_filters.is_active() {
                 "No hierarchy matches the active Board filters. Press f to adjust filters."
                     .to_string()
             } else if view_task_count > 0 {
@@ -283,25 +286,30 @@ impl TuiApp {
             )))]
         } else {
             let show_doc_type = entries.iter().any(|entry| entry.doc.doc_type() != "task");
-            entries
-                .iter()
-                .enumerate()
-                .map(|(index, entry)| {
-                    let context = self.relationship_context(entry.doc);
-                    state_list_item_for_entry(
-                        entry,
-                        &context,
-                        &self.theme,
-                        (
-                            content_width,
-                            show_doc_type,
-                            preview_line_limit,
-                            self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()),
-                            index == self.selected_item,
-                        ),
-                    )
-                })
-                .collect::<Vec<_>>()
+            let mut items = Vec::new();
+            for (index, entry) in entries.iter().enumerate() {
+                if index == 0 || entries[index - 1].section != entry.section {
+                    let count =
+                        board_section_count(&self.docs, &view, &self.board_filters, entry.section);
+                    items.push(section_header_item(entry.section, count, &self.theme));
+                    item_entries.push(None);
+                }
+                let context = self.relationship_context(entry.doc);
+                items.push(state_list_item_for_entry(
+                    entry,
+                    &context,
+                    &self.theme,
+                    (
+                        content_width,
+                        show_doc_type,
+                        preview_line_limit,
+                        self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()),
+                        index == self.selected_item,
+                    ),
+                ));
+                item_entries.push(Some(index));
+            }
+            items
         };
 
         let list = List::new(items)
@@ -316,26 +324,33 @@ impl TuiApp {
             .highlight_symbol("› ");
 
         if row_count > 0 {
+            let selected = self.selected_item.min(row_count - 1);
             let mut state = ListState::default();
-            state.select(Some(self.selected_item.min(row_count - 1)));
+            state.select(item_entries.iter().position(|item| *item == Some(selected)));
             frame.render_stateful_widget(list, area, &mut state);
-            let row_heights = entries
+            let rows = item_entries
                 .iter()
-                .map(|entry| {
-                    if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
-                        let context = self.relationship_context(entry.doc);
-                        1 + inline_preview_height_with_context(
-                            entry.doc,
-                            &context,
-                            content_width,
-                            preview_line_limit,
-                        )
-                    } else {
-                        1
+                .map(|item| match item {
+                    None => (1, None),
+                    Some(index) => {
+                        let entry = &entries[*index];
+                        let height =
+                            if self.expanded_board_doc_id.as_deref() == Some(entry.doc.id()) {
+                                let context = self.relationship_context(entry.doc);
+                                1 + inline_preview_height_with_context(
+                                    entry.doc,
+                                    &context,
+                                    content_width,
+                                    preview_line_limit,
+                                )
+                            } else {
+                                1
+                            };
+                        (height, Some(*index))
                     }
                 })
                 .collect::<Vec<_>>();
-            self.register_board_row_hits(area, state_index, state.offset(), &row_heights);
+            self.register_board_row_hits(area, state_index, state.offset(), &rows);
         } else {
             frame.render_widget(list, area);
         }
@@ -346,7 +361,7 @@ impl TuiApp {
         area: Rect,
         state_index: usize,
         first_visible_index: usize,
-        row_heights: &[u16],
+        rows: &[(u16, Option<usize>)],
     ) {
         if area.width <= 2 || area.height <= 2 {
             return;
@@ -355,24 +370,23 @@ impl TuiApp {
         let mut y = area.y.saturating_add(1);
         let width = area.width.saturating_sub(2);
         let bottom = area.y.saturating_add(area.height).saturating_sub(1);
-        for (index, height) in row_heights
-            .iter()
-            .copied()
-            .enumerate()
-            .skip(first_visible_index)
-        {
+        // `rows` holds each list item's height and the entry it selects; a
+        // section header has no entry and no hit region.
+        for (height, entry_index) in rows.iter().copied().skip(first_visible_index) {
             if y >= bottom {
                 break;
             }
-            self.hits.push(HitRegion {
-                rect: Rect {
-                    x: left,
-                    y,
-                    width,
-                    height: height.min(bottom.saturating_sub(y)),
-                },
-                action: HitAction::SelectBoardItem(state_index, index),
-            });
+            if let Some(index) = entry_index {
+                self.hits.push(HitRegion {
+                    rect: Rect {
+                        x: left,
+                        y,
+                        width,
+                        height: height.min(bottom.saturating_sub(y)),
+                    },
+                    action: HitAction::SelectBoardItem(state_index, index),
+                });
+            }
             y = y.saturating_add(height);
         }
     }

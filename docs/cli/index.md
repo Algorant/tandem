@@ -226,6 +226,7 @@ tandem add --title <title> [--state <state>] [--kind <epic|research|papercut>] [
   - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
 - Human output shape: labeled created-task summary with ID, state, title, and file path. Epic-parent creation uses Task-of-Epic language, Task-parent creation uses `Created subtask`/`Subtask of`, and non-task parents retain `Created task`/generic `Parent`.
 - JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
+- Warnings: a `--kind research` or `--kind papercut` Task placed under any `--parent` is allowed but warns (JSON `warnings` array and `Warning:` text on stderr): `a <kind> Task under <parent> is allowed but not recommended; prefer a root Task plus `tandem link add <id> relates-to <parent>``, where `<id>` is the new Task's ID.
 - Exit/error notes:
   - fails on invalid state, unsupported kind (`Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`), missing acceptance on a non-papercut (`add requires at least one --acceptance <text>; only --kind papercut may omit it`), a papercut under a Task (`Validation failed: a papercut under <task-id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`), invalid referenced parent/blocker, a parented Epic, attachment beneath a Subtask, a role/ID mismatch, or failed write. Direct Epic Tasks never receive hierarchical IDs.
 
@@ -279,6 +280,7 @@ tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <pro
   - a papercut may never be a Subtask: `--parent <task-id>` on a papercut, or `--kind papercut` on a Subtask, fails with `Validation failed: papercut <id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`.
   - only a papercut may have no acceptance criterion: `--clear acceptance` on any other Task fails with `<id> cannot clear acceptance; an active task requires at least one criterion (only a papercut may have none)`, and changing a papercut without acceptance to another kind requires `--acceptance` in the same call (`<id> requires at least one acceptance criterion unless it is a papercut; add --acceptance <text>`).
   - priority must be one of `critical`, `high`, `medium`, or `low`.
+  - a research or papercut Task that ends up under a parent through `--parent` or `--kind` succeeds but warns with the same recommendation as `add`: prefer a root Task plus `tandem link add <id> relates-to <parent>`.
   - decision `status` must be exactly `proposed`, `accepted`, `rejected`, `deprecated`, or `superseded`; padded values with leading or trailing whitespace are rejected rather than normalized.
   - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata and are never treated as document references.
   - flags that do not apply to the resolved document type are rejected before any write.
@@ -571,7 +573,7 @@ tandem search "ambiguous" --kind papercut
 
 - A papercut needs only a title. `--acceptance` is optional for it and required for every other Task.
 - `priority` defaults to `low`; pass `--priority` to override.
-- Placement: a root Task or a direct child of an Epic. A papercut is never a Subtask; creating, reparenting, or re-kinding one into a Subtask fails validation.
+- Placement: a root Task or a direct child of an Epic. A papercut is never a Subtask; creating, reparenting, or re-kinding one into a Subtask fails validation. Nesting a papercut (or research Task) under a parent is allowed but warns; prefer a root Task plus `tandem link add <id> relates-to <parent>`.
 - Tags are topical only. `research` and `papercut` tags are not read as kinds; `tandem migrate` converts old tags on active Board Tasks once (see [`tandem migrate`](#tandem-migrate)).
 - `show --json` and `assignment <task-id> --json` report `kind` (`data.root.kind` for an assignment; `null` for a standard Task).
 - Use a blocking lifecycle when work cannot continue, and a normal Task when the fix needs planning.

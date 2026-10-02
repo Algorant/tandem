@@ -185,6 +185,7 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                     serde_json::json!({"ok":true,"data":{"id":id,"sync":sync_json(&report)},"warnings":outcome.warnings})
                 );
             } else {
+                print_warnings(&outcome.warnings);
                 println!(
                     "Created task\nID: {id}\nTitle: {}\nSync: {}",
                     outcome.title,

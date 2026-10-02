@@ -130,7 +130,7 @@ impl TuiApp {
             KeyCode::Char('a') if self.view == TuiView::Board => self.start_workflow_picker(),
             KeyCode::Char('v') if self.view == TuiView::Board => self.start_validation_picker(),
             KeyCode::Char('/') if self.view == TuiView::Logs => self.start_log_search(),
-            // Board tabs are peers: ALL, each workflow state, then the kind tabs.
+            // Board tabs are peers: ALL, then each workflow state.
             KeyCode::Tab if self.view == TuiView::Board => self.next_state(),
             KeyCode::BackTab if self.view == TuiView::Board => self.previous_state(),
             KeyCode::Tab => self.focus_next(),

@@ -1556,7 +1556,7 @@ in-progress = "active"
         );
         assert_eq!(
             tabs.iter().map(|tab| tab.count).collect::<Vec<_>>(),
-            vec![1, 0, 0, 1, 0, 0]
+            vec![1, 0, 0, 1]
         );
     }
 
@@ -4709,7 +4709,7 @@ tone = "success"
     }
 
     #[test]
-    fn board_view_tabs_are_all_first_then_states_then_kinds() {
+    fn board_view_tabs_are_all_first_then_states() {
         let mut decision = decision_doc("decision-1");
         decision
             .fields
@@ -4743,42 +4743,33 @@ tone = "success"
                 (BoardView::State("todo".to_string()), 4, 4),
                 (BoardView::State("in-progress".to_string()), 0, 0),
                 (BoardView::State("review".to_string()), 1, 1),
-                (BoardView::Kind("research"), 1, 1),
-                (BoardView::Kind("papercut"), 1, 1),
             ]
         );
         let titles = tabs.iter().map(board_view_title).collect::<Vec<_>>();
         assert_eq!(
             titles,
-            vec![
-                " ALL 5 ",
-                " TODO 4 ",
-                " IN PROGRESS 0 ",
-                " REVIEW 1 ",
-                " RESEARCH 1 ",
-                " PAPERCUTS 1 ",
-            ]
+            vec![" ALL 5 ", " TODO 4 ", " IN PROGRESS 0 ", " REVIEW 1 "]
         );
     }
 
     #[test]
     fn board_view_title_distinguishes_filtered_and_total_counts() {
-        let kind = BoardView::Kind("papercut");
+        let view = BoardView::State("todo".to_string());
         assert_eq!(
             board_view_title(&BoardViewTab {
-                view: kind.clone(),
+                view: view.clone(),
                 count: 4,
                 total_count: 4,
             }),
-            " PAPERCUTS 4 "
+            " TODO 4 "
         );
         assert_eq!(
             board_view_title(&BoardViewTab {
-                view: kind,
+                view,
                 count: 2,
                 total_count: 4,
             }),
-            " PAPERCUTS 2/4 "
+            " TODO 2/4 "
         );
     }
 
@@ -4832,7 +4823,7 @@ tone = "success"
     }
 
     #[test]
-    fn kind_tab_lists_every_nested_match_once_and_overlaps_other_tabs() {
+    fn every_tab_splits_into_kind_sections_filtered_to_its_state() {
         let mut epic = doc_with_state("task-1", Some("todo"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
         let docs = vec![
@@ -4844,50 +4835,142 @@ tone = "success"
         ];
         let states = vec!["todo".to_string(), "in-progress".to_string()];
         let tabs = board_view_tabs(&states, &docs, &BoardFilters::default());
-        assert_eq!(tabs[0].count, 5, "ALL counts every active Task");
-        assert_eq!(tabs[1].count, 4, "state tabs include papercut tasks");
-        assert_eq!(tabs[2].count, 1);
-        assert_eq!(tabs[3].count, 0, "no research tasks");
-        assert_eq!(tabs[4].view, BoardView::Kind("papercut"));
-        assert_eq!(tabs[4].count, 4);
+        assert_eq!(
+            tabs.iter().map(|tab| tab.count).collect::<Vec<_>>(),
+            vec![5, 4, 1],
+            "tabs are state-only; sections do not get tabs"
+        );
 
-        let flat = state_board_entries_with_hierarchy(
-            &docs,
-            &[],
-            &BoardView::Kind("papercut"),
-            &BoardFilters::default(),
-            &BTreeSet::new(),
-            TuiHierarchySnapshot::from_documents(&docs, &[])
-                .valid_index()
-                .unwrap(),
+        let snapshot = TuiHierarchySnapshot::from_documents(&docs, &[]);
+        let sections = |view: &BoardView, expanded: &BTreeSet<String>| {
+            state_board_entries_with_hierarchy(
+                &docs,
+                &[],
+                view,
+                &BoardFilters::default(),
+                expanded,
+                snapshot.valid_index().unwrap(),
+            )
+            .iter()
+            .map(|entry| (entry.section, entry.doc.id().to_string(), entry.depth))
+            .collect::<Vec<_>>()
+        };
+        let row = |section, id: &str| (section, id.to_string(), 0);
+        // ALL: the Epic is the STANDARD tree; its papercut children are flat
+        // PAPERCUTS rows, never tree children, even when the Epic is expanded.
+        let all = vec![
+            row(BoardSection::Standard, "task-1"),
+            row(BoardSection::Papercuts, "task-2"),
+            row(BoardSection::Papercuts, "task-3"),
+            row(BoardSection::Papercuts, "task-4"),
+            row(BoardSection::Papercuts, "task-5"),
+        ];
+        assert_eq!(sections(&BoardView::All, &BTreeSet::new()), all);
+        assert_eq!(
+            sections(&BoardView::All, &BTreeSet::from(["task-1".to_string()])),
+            all
+        );
+        // A state tab filters every section to its state. The Epic matches
+        // only through papercut children, so it is not a STANDARD row.
+        assert_eq!(
+            sections(&BoardView::State("todo".to_string()), &BTreeSet::new()),
+            vec![
+                row(BoardSection::Standard, "task-1"),
+                row(BoardSection::Papercuts, "task-2"),
+                row(BoardSection::Papercuts, "task-3"),
+                row(BoardSection::Papercuts, "task-5"),
+            ]
         );
         assert_eq!(
-            flat.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
-            vec!["task-2", "task-3", "task-4", "task-5"],
-            "cross-state children and the root papercut are flat rows"
+            sections(
+                &BoardView::State("in-progress".to_string()),
+                &BTreeSet::new()
+            ),
+            vec![row(BoardSection::Papercuts, "task-4")]
         );
-        assert!(flat.iter().all(|entry| entry.flat
-            && entry.depth == 0
-            && matches!(entry.role, StateBoardEntryRole::Root)
-            && !entry.has_active_children));
 
-        // State tabs keep the hierarchy: the Epic is the root and its children
-        // stay collapsed until it is expanded.
-        let todo = state_board_entries(
+        // The Epic's `N hidden` counts all of its children, including the
+        // papercuts listed in the other section.
+        let entries = state_board_entries_with_hierarchy(
             &docs,
             &[],
-            "todo",
+            &BoardView::All,
             &BoardFilters::default(),
             &BTreeSet::new(),
+            snapshot.valid_index().unwrap(),
         );
-        assert_eq!(
-            todo.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
-            vec!["task-1", "task-5"]
-        );
+        assert_eq!(entries[0].hidden_matches, 3);
+        assert!(entries[1..]
+            .iter()
+            .all(|entry| entry.section == BoardSection::Papercuts
+                && matches!(entry.role, StateBoardEntryRole::Root)
+                && !entry.has_active_children));
     }
 
     #[test]
-    fn research_tab_covers_task_subtask_and_root_research() {
+    fn standard_tasks_under_research_nest_under_their_nearest_standard_ancestor() {
+        let mut epic = doc_with_state("task-1", Some("todo"));
+        epic.fields.insert("kind".to_string(), "epic".to_string());
+        let mut research = doc_with_state("task-2", Some("todo"));
+        research
+            .fields
+            .insert("kind".to_string(), "research".to_string());
+        research
+            .fields
+            .insert("parentId".to_string(), "task-1".to_string());
+        let mut subtask = doc_with_state("task-2-1", Some("todo"));
+        subtask
+            .fields
+            .insert("parentId".to_string(), "task-2".to_string());
+        let mut root_research = doc_with_state("task-3", Some("todo"));
+        root_research
+            .fields
+            .insert("kind".to_string(), "research".to_string());
+        let mut orphaned = doc_with_state("task-3-1", Some("todo"));
+        orphaned
+            .fields
+            .insert("parentId".to_string(), "task-3".to_string());
+        let docs = vec![epic, research, subtask, root_research, orphaned];
+        let snapshot = TuiHierarchySnapshot::from_documents(&docs, &[]);
+        let entries = |expanded: &BTreeSet<String>| {
+            state_board_entries_with_hierarchy(
+                &docs,
+                &[],
+                &BoardView::All,
+                &BoardFilters::default(),
+                expanded,
+                snapshot.valid_index().unwrap(),
+            )
+            .iter()
+            .map(|entry| (entry.section, entry.doc.id().to_string(), entry.depth))
+            .collect::<Vec<_>>()
+        };
+        let row = |section, id: &str, depth| (section, id.to_string(), depth);
+        // A standard Task never vanishes because its parent is a research
+        // Task: it is a root under a root research Task, and a direct child of
+        // the Epic that is its nearest standard ancestor.
+        assert_eq!(
+            entries(&BTreeSet::new()),
+            vec![
+                row(BoardSection::Standard, "task-1", 0),
+                row(BoardSection::Standard, "task-3-1", 0),
+                row(BoardSection::Research, "task-2", 0),
+                row(BoardSection::Research, "task-3", 0),
+            ]
+        );
+        assert_eq!(
+            entries(&BTreeSet::from(["task-1".to_string()])),
+            vec![
+                row(BoardSection::Standard, "task-1", 0),
+                row(BoardSection::Standard, "task-2-1", 1),
+                row(BoardSection::Standard, "task-3-1", 0),
+                row(BoardSection::Research, "task-2", 0),
+                row(BoardSection::Research, "task-3", 0),
+            ]
+        );
+    }
+    #[test]
+    fn research_section_covers_task_subtask_and_root_research() {
         let mut epic = doc_with_state("task-100", Some("todo"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
         let mut task_under_epic = doc_with_state("task-101", Some("todo"));
@@ -4907,16 +4990,20 @@ tone = "success"
             .insert("kind".to_string(), "research".to_string());
         let docs = vec![epic, task_under_epic, subtask, research_task];
 
-        let flat = state_board_entries_with_hierarchy(
+        let entries = state_board_entries_with_hierarchy(
             &docs,
             &[],
-            &BoardView::Kind("research"),
+            &BoardView::All,
             &BoardFilters::default(),
             &BTreeSet::new(),
             TuiHierarchySnapshot::from_documents(&docs, &[])
                 .valid_index()
                 .unwrap(),
         );
+        let flat = entries
+            .iter()
+            .filter(|entry| entry.section == BoardSection::Research)
+            .collect::<Vec<_>>();
         assert_eq!(
             flat.iter().map(|entry| entry.doc.id()).collect::<Vec<_>>(),
             vec!["task-101-1", "task-201"]
@@ -4925,8 +5012,16 @@ tone = "success"
             flat.iter().map(|entry| entry.task_role).collect::<Vec<_>>(),
             vec![Some(TaskRole::Subtask), Some(TaskRole::Task)]
         );
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|entry| entry.section == BoardSection::Standard)
+                .map(|entry| entry.doc.id())
+                .collect::<Vec<_>>(),
+            vec!["task-100"],
+            "the research Subtask is not a STANDARD tree row"
+        );
     }
-
     #[test]
     fn kinds_come_from_the_kind_field_never_from_tags() {
         let mut tagged_papercut = doc_with_state("task-1", Some("todo"));
@@ -4940,11 +5035,12 @@ tone = "success"
         let docs = vec![tagged_papercut, tagged_research];
         let theme = TuiTheme::default_dark();
 
-        let tabs = board_view_tabs(&["todo".to_string()], &docs, &BoardFilters::default());
-        assert_eq!(tabs[0].count, 2);
-        assert_eq!(tabs[2].count, 0, "tag does not make a research Task");
-        assert_eq!(tabs[3].count, 0, "tag does not make a papercut Task");
         for doc in &docs {
+            assert_eq!(
+                BoardSection::of(doc),
+                BoardSection::Standard,
+                "a tag does not move a Task out of STANDARD"
+            );
             assert!(kind_chip(doc, &theme).is_none());
             assert!(work_type_tag_chips(doc, &theme).is_empty());
         }
@@ -4953,9 +5049,8 @@ tone = "success"
         let mut archived = papercut_doc("task-9", "todo", None);
         archived.location = DocumentLocation::Logs;
         let tabs = board_view_tabs(&["todo".to_string()], &[archived], &BoardFilters::default());
-        assert_eq!(tabs[3].count, 0, "archived Logs are not Board kind rows");
+        assert_eq!(tabs[0].count, 0, "archived Logs are not Board rows");
     }
-
     #[test]
     fn kind_badges_come_from_kind_and_honor_the_opt_out() {
         let theme = TuiTheme::default_dark();
@@ -4970,16 +5065,19 @@ tone = "success"
         assert!(kind_chip(&research, &theme).unwrap().0.contains("RESEARCH"));
         assert!(kind_chip(&papercut, &theme).unwrap().0.contains("PAPERCUT"));
         assert!(kind_chip(&plain, &theme).is_none());
-        let chips = |doc: &Document| {
-            board_scan_chips(doc, None, &theme)
+        let chips = |doc: &Document, section: BoardSection| {
+            board_scan_chips(doc, None, section, &theme)
                 .into_iter()
                 .map(|(chip, _)| chip)
                 .collect::<Vec<_>>()
                 .join(" ")
         };
-        assert!(chips(&research).contains("RESEARCH"));
-        assert!(chips(&papercut).contains("PAPERCUT"));
-        assert!(!chips(&plain).contains("RESEARCH"));
+        assert!(chips(&research, BoardSection::Standard).contains("RESEARCH"));
+        assert!(chips(&papercut, BoardSection::Standard).contains("PAPERCUT"));
+        assert!(!chips(&plain, BoardSection::Standard).contains("RESEARCH"));
+        // Inside its own section the header already names the kind.
+        assert!(!chips(&research, BoardSection::Research).contains("RESEARCH"));
+        assert!(!chips(&papercut, BoardSection::Papercuts).contains("PAPERCUT"));
 
         let mut quiet = TuiTheme::default_dark();
         let warnings = quiet.apply_display_content(
@@ -5033,7 +5131,7 @@ disabled = ["papercut"]
     }
 
     #[test]
-    fn kind_tab_parent_context_uses_parent_id_not_references() {
+    fn section_parent_context_uses_parent_id_not_references() {
         let mut epic = doc_with_state("task-1", Some("todo"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
         let mut nested = papercut_doc("task-2", "todo", Some("task-1"));
@@ -5047,7 +5145,7 @@ disabled = ["papercut"]
         let docs = vec![epic, nested, referenced];
 
         let child_context = relationship_context_for_doc(&docs[1], &docs, &[]);
-        let context = flat_parent_context(&child_context).unwrap();
+        let context = parent_context_chip(&child_context).unwrap();
         assert!(context.contains("task-1"));
         assert!(
             !context.contains("task-9"),
@@ -5055,13 +5153,13 @@ disabled = ["papercut"]
         );
         let standalone_context = relationship_context_for_doc(&docs[2], &docs, &[]);
         assert!(
-            flat_parent_context(&standalone_context).is_none(),
+            parent_context_chip(&standalone_context).is_none(),
             "a reference is not a hierarchy parent"
         );
     }
 
     #[test]
-    fn kind_tab_renders_flat_rows_with_parent_context_and_correct_selection() {
+    fn sections_render_headers_flat_rows_parent_context_and_correct_selection() {
         let mut epic = doc_with_state("task-1", Some("todo"));
         epic.fields.insert("kind".to_string(), "epic".to_string());
         epic.fields
@@ -5075,107 +5173,170 @@ disabled = ["papercut"]
             papercut_doc("task-5", "todo", None),
         ];
         refresh_test_hierarchy(&mut app);
-        app.selected_view = app.board_section_count() - 1;
-        app.selected_item = 0;
-        app.clamp_selection();
-        assert_eq!(app.selected_board_view(), Some(BoardView::Kind("papercut")));
+        app.selected_view = 0;
 
         let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
         let text = terminal_text(&terminal);
         assert!(text.contains("ALL 5"), "ALL tab: {text}");
-        assert!(text.contains("PAPERCUTS 4"), "kind tab count: {text}");
-        for id in ["task-2", "task-3", "task-4", "task-5"] {
-            assert!(text.contains(id), "missing flat row {id}: {text}");
+        assert!(
+            !text.contains("RESEARCH 0") && !text.contains("PAPERCUTS 4 │"),
+            "no kind tabs: {text}"
+        );
+        assert!(text.contains("STANDARD 1"), "section header: {text}");
+        assert!(text.contains("PAPERCUTS 4"), "section header: {text}");
+        assert!(!text.contains("RESEARCH"), "empty section hidden: {text}");
+        for id in ["task-1", "task-2", "task-3", "task-4", "task-5"] {
+            assert!(text.contains(id), "missing row {id}: {text}");
         }
+        assert!(
+            text.contains("3 matches hidden"),
+            "Epic counts its papercut children: {text}"
+        );
         assert!(
             text.contains("Task of Epic: Friction epic"),
             "rows must show resolved hierarchy parent context: {text}"
         );
-        assert!(text.contains("PAPERCUT"), "kind badge: {text}");
+        assert!(
+            !text.contains(" PAPERCUT "),
+            "kind badge is dropped inside its own section: {text}"
+        );
 
+        // j/k step over the headers: row 0 is the Epic, then the papercuts.
+        app.handle_key(key(KeyCode::Char('j'))).unwrap();
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
         app.handle_key(key(KeyCode::Char('j'))).unwrap();
         assert_eq!(app.selected_doc().map(Document::id), Some("task-4"));
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let selected_line = terminal
+            .backend()
+            .buffer()
+            .content()
+            .chunks(120)
+            .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
+            .find(|line| line.contains('›'))
+            .expect("one highlighted row");
+        assert!(selected_line.contains("task-4"), "{selected_line}");
 
         app.handle_key(key(KeyCode::Enter)).unwrap();
         assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-4"));
         assert!(
             !app.expanded_board_hierarchy_ids.contains("task-4"),
-            "flat tab Enter must preview, not invisibly expand hierarchy"
+            "flat row Enter must preview, not invisibly expand hierarchy"
         );
         terminal.draw(|frame| app.draw(frame)).unwrap();
         assert!(terminal_text(&terminal).contains("Enter close preview"));
     }
 
     #[test]
-    fn kind_tab_mouse_selection_targets_the_matching_record() {
+    fn state_tab_shows_its_state_in_every_section_and_hides_empty_ones() {
+        let mut research = doc_with_state("task-3", Some("todo"));
+        research
+            .fields
+            .insert("kind".to_string(), "research".to_string());
         let mut app = keyboard_test_app();
         app.docs = vec![
+            doc_with_state("task-1", Some("todo")),
+            doc_with_state("task-2", Some("validation")),
+            research,
+            papercut_doc("task-4", "validation", None),
+        ];
+        refresh_test_hierarchy(&mut app);
+        app.selected_view = 0;
+        let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = terminal_text(&terminal);
+        assert_eq!(
+            app.selected_board_view(),
+            Some(BoardView::State("todo".to_string()))
+        );
+        assert!(text.contains("STANDARD 1"), "{text}");
+        assert!(text.contains("RESEARCH 1"), "{text}");
+        assert!(!text.contains("PAPERCUTS"), "empty section hidden: {text}");
+        assert!(
+            !text.contains("task-2") && !text.contains("task-4"),
+            "{text}"
+        );
+
+        app.handle_key(key(KeyCode::Tab)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let text = terminal_text(&terminal);
+        assert!(text.contains("STANDARD 1"), "{text}");
+        assert!(text.contains("PAPERCUTS 1"), "{text}");
+        assert!(!text.contains("RESEARCH"), "empty section hidden: {text}");
+    }
+    #[test]
+    fn section_mouse_selection_skips_headers_and_targets_the_matching_record() {
+        let mut app = keyboard_test_app();
+        app.docs = vec![
+            doc_with_state("task-9", Some("todo")),
             papercut_doc("task-10", "todo", None),
             papercut_doc("task-11", "todo", None),
             papercut_doc("task-12", "todo", None),
             papercut_doc("task-13", "todo", None),
         ];
         refresh_test_hierarchy(&mut app);
-        app.selected_view = app.board_section_count() - 1;
-        app.clamp_selection();
 
         let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
+        // Entry 3 is the third papercut after the one STANDARD row; the two
+        // header rows have no hit region.
         let row = app
             .hits
             .iter()
-            .find(|hit| matches!(hit.action, HitAction::SelectBoardItem(_, 2)))
+            .find(|hit| matches!(hit.action, HitAction::SelectBoardItem(_, 3)))
             .cloned()
-            .expect("third flat kind row should expose a mouse target");
+            .expect("a papercut row should expose a mouse target");
+        assert!(
+            !app.hits
+                .iter()
+                .any(|hit| matches!(hit.action, HitAction::SelectBoardItem(_, 5))),
+            "only five rows are selectable"
+        );
         app.handle_mouse(left_click(row.rect.x, row.rect.y));
         assert_eq!(app.selected_doc().map(Document::id), Some("task-12"));
 
         app.handle_mouse(left_click(row.rect.x, row.rect.y));
         assert_eq!(app.expanded_board_doc_id.as_deref(), Some("task-12"));
     }
-
     #[test]
-    fn board_tabs_cycle_through_all_states_and_kinds_for_keys_and_mouse() {
+    fn board_tabs_cycle_through_all_and_states_for_keys_and_mouse() {
         let mut app = keyboard_test_app();
-        app.docs.push(papercut_doc("task-10", "todo", None));
+        app.docs.push(papercut_doc("task-10", "validation", None));
         refresh_test_hierarchy(&mut app);
         app.selected_view = 0;
         let labels = board_views(&app.states)
             .iter()
             .map(BoardView::label)
             .collect::<Vec<_>>();
-        assert_eq!(
-            labels,
-            vec!["ALL", "TODO", "VALIDATION", "RESEARCH", "PAPERCUTS"]
-        );
-        for expected in 1..=4 {
+        assert_eq!(labels, vec!["ALL", "TODO", "VALIDATION"]);
+        for expected in 1..=2 {
             app.handle_key(key(KeyCode::Tab)).unwrap();
             assert_eq!(app.selected_view, expected);
         }
         app.handle_key(key(KeyCode::Tab)).unwrap();
-        assert_eq!(app.selected_view, 4, "tabs do not wrap");
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+        assert_eq!(app.selected_view, 2, "tabs do not wrap");
         app.handle_key(key(KeyCode::BackTab)).unwrap();
-        assert_eq!(app.selected_view, 3);
+        assert_eq!(app.selected_view, 1);
 
         let mut terminal = Terminal::new(TestBackend::new(120, 28)).unwrap();
         terminal.draw(|frame| app.draw(frame)).unwrap();
         let tab = app
             .hits
             .iter()
-            .find(|hit| hit.action == HitAction::SelectBoardView(4))
+            .find(|hit| hit.action == HitAction::SelectBoardView(2))
             .cloned()
-            .expect("PAPERCUTS tab should have a mouse target");
+            .expect("VALIDATION tab should have a mouse target");
         app.selected_view = 0;
         app.handle_mouse(left_click(tab.rect.x, tab.rect.y));
-        assert_eq!(app.selected_view, 4);
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+        assert_eq!(app.selected_view, 2);
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-2"));
     }
-
     #[test]
-    fn kind_tab_count_is_filtered_while_all_tab_shows_the_filter() {
+    fn section_counts_follow_filters_while_tabs_show_the_filtered_total() {
         let mut app = keyboard_test_app();
         app.docs = vec![
             papercut_doc("task-1", "todo", None),
@@ -5192,17 +5353,21 @@ disabled = ["papercut"]
             priority: Some("high".to_string()),
             ..BoardFilters::default()
         };
-        app.selected_view = app.board_section_count() - 1;
         app.clamp_selection();
 
-        assert_eq!(app.selected_state_count(), 1, "kind tab follows filters");
+        assert_eq!(app.selected_state_count(), 1, "sections follow filters");
         let tabs = board_view_tabs(&app.states, &app.docs, &app.board_filters);
-        let papercuts = tabs.last().unwrap();
-        assert_eq!((papercuts.count, papercuts.total_count), (1, 2));
-        assert_eq!(board_view_title(papercuts), " PAPERCUTS 1/2 ");
         assert_eq!(board_view_title(&tabs[0]), " ALL 1/2 ");
+        assert_eq!(
+            board_section_count(
+                &app.docs,
+                &BoardView::All,
+                &app.board_filters,
+                BoardSection::Papercuts
+            ),
+            1
+        );
     }
-
     #[test]
     fn selection_survives_reload_by_id_in_every_board_view() {
         let root = unique_test_dir("tandem-view-reload");
@@ -5227,12 +5392,7 @@ disabled = ["papercut"]
             Some(BoardView::All),
             "ALL is the default tab"
         );
-        for (index, expected) in [
-            (0, "task-2"),
-            (1, "task-2"),
-            (app.board_section_count() - 2, "task-12"),
-            (app.board_section_count() - 1, "task-11"),
-        ] {
+        for (index, expected) in [(0, "task-2"), (1, "task-2"), (0, "task-12"), (1, "task-11")] {
             app.selected_view = index;
             app.selected_item = 0;
             assert!(app.select_document_by_id_preserving_scroll(expected));
@@ -5250,11 +5410,11 @@ disabled = ["papercut"]
     }
 
     #[test]
-    fn kind_tab_survives_manual_and_auto_reload_without_jumping_tabs() {
-        let root = unique_test_dir("tandem-kind-tab-reload");
+    fn selection_follows_its_record_across_sections_on_manual_and_auto_reload() {
+        let root = unique_test_dir("tandem-section-reload");
         let workspace = TandemProject::initialize(
             &root,
-            &crate::protocol::config::default_project_config("Kind tab reload", "test-workspace"),
+            &crate::protocol::config::default_project_config("Section reload", "test-workspace"),
         )
         .unwrap();
         write_task_doc(&workspace, "task-1", "Ordinary task", "todo");
@@ -5262,32 +5422,32 @@ disabled = ["papercut"]
         write_papercut(&workspace, "task-11", "Second papercut", "Body");
 
         let mut app = TuiApp::load(workspace.clone()).unwrap();
-        app.selected_view = app.board_section_count() - 1;
-        app.selected_item = 1;
-        app.clamp_selection();
-        let papercuts = Some(BoardView::Kind("papercut"));
-        assert_eq!(app.selected_board_view(), papercuts);
+        assert!(app.select_document_by_id_preserving_scroll("task-11"));
+        assert_eq!(app.selected_board_view(), Some(BoardView::All));
         assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
 
         app.reload();
-        assert_eq!(app.selected_board_view(), papercuts);
+        assert_eq!(app.selected_board_view(), Some(BoardView::All));
         assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
 
-        // An external edit to a different match must not jump the tab.
+        // An external edit to a different record must not move the selection.
         app.last_reload_check = Instant::now() - Duration::from_secs(1);
         write_papercut(&workspace, "task-10", "First papercut edited", "Body");
         assert!(app.reload_if_changed());
-        assert_eq!(app.selected_board_view(), papercuts);
         assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
 
-        // Losing the kind keeps the tab and clamps to a remaining match.
+        // Losing the kind moves the record to STANDARD; the selection follows it.
         app.last_reload_check = Instant::now() - Duration::from_secs(1);
         write_task_doc(&workspace, "task-11", "Second no longer papercut", "todo");
         assert!(app.reload_if_changed());
-        assert_eq!(app.selected_board_view(), papercuts);
-        assert_eq!(app.selected_doc().map(Document::id), Some("task-10"));
+        assert_eq!(app.selected_board_view(), Some(BoardView::All));
+        assert_eq!(app.selected_doc().map(Document::id), Some("task-11"));
+        assert_eq!(
+            app.selected_doc().map(BoardSection::of),
+            Some(BoardSection::Standard)
+        );
 
-        // A filter that excludes the remaining match leaves the tab active and empty.
+        // A filter that excludes every record leaves the tab active and empty.
         app.board_filters = BoardFilters {
             priority: Some("high".to_string()),
             ..BoardFilters::default()
@@ -5295,13 +5455,11 @@ disabled = ["papercut"]
         app.clamp_selection();
         assert_eq!(app.selected_state_count(), 0);
         app.reload();
-        assert_eq!(app.selected_board_view(), papercuts);
         assert_eq!(app.selected_state_count(), 0);
         assert!(app.selected_doc().is_none());
 
         fs::remove_dir_all(root).unwrap();
     }
-
     #[test]
     fn the_papercut_inbox_and_its_header_indicator_are_gone() {
         let mut app = keyboard_test_app();
