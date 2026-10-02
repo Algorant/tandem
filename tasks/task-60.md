@@ -3,19 +3,21 @@ id: task-60
 uid: 0a1a71af-9885-4233-b0ab-675209d7038e
 type: task
 title: "TUI Board: state-only tabs with kind sections in every tab; warn on nested research/papercut"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-55", "task-57"]
 relatedFiles: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/app/tasks.rs", "docs/tui/index.md", "docs/cli/index.md"]
 tags: ["tui", "taxonomy"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Board tabs are ALL, TODO, IN PROGRESS, VALIDATION; the RESEARCH and PAPERCUTS tabs are gone.", "Every tab shows STANDARD, RESEARCH, PAPERCUTS sections with counts, filtered to that tab's state. Empty sections are hidden, and headers are static and skipped by navigation.", "STANDARD keeps the tree, and an Epic's N hidden counts all children. RESEARCH/PAPERCUTS are flat, without kind badges, and show a ↳ parent chip when nested.", "Placing a research or papercut Task under a parent via add or update --parent succeeds and prints a warning recommending a root Task plus `tandem link add`.", "Verified from a release build rendered in a Herdr pane (ANSI read). Tests, docs/tui, and docs/cli are updated, and `just dev-check` and strict clippy pass."]
+  claimedAt: "2026-10-02T04:18:39Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-02T04:18:27Z"
+  updatedAt: "2026-10-02T04:18:39Z"
 createdAt: "2026-10-02T04:01:32Z"
-updatedAt: "2026-10-02T04:18:27Z"
+updatedAt: "2026-10-02T04:18:39Z"
+assignee: "worker-task-60-311d0ff1"
 ---
 Agreed with Algorant on 2026-10-02 after the 0.16.1 cutover. The mockup is post 0w4eWzghXSs in the Sideshow session http://desktop-wsl.tail1cefc.ts.net:8228/session/urf4z8sWgj8. Keep it simple: no legacy compatibility, and no options beyond what is listed here.
 
