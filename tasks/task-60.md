@@ -2,24 +2,32 @@
 id: task-60
 uid: 0a1a71af-9885-4233-b0ab-675209d7038e
 type: task
-title: "TUI ALL tab: split rows into Standard, Research, and Papercuts sections"
+title: "TUI Board: state-only tabs with kind sections in every tab; warn on nested research/papercut"
 state: todo
 priority: "medium"
 effort: "medium"
 references: ["task-55", "task-57"]
-relatedFiles: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/mod.rs", "docs/tui/index.md"]
+relatedFiles: ["tandem/src/tui/board/mod.rs", "tandem/src/tui/board/render.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/app/tasks.rs", "docs/tui/index.md", "docs/cli/index.md"]
 tags: ["tui", "taxonomy"]
 accord:
   status: "ready"
-  acceptance: ["The TUI ALL tab shows Standard, Research, and Papercuts sections in that order, each with a header and count, classified from `kind` only.", "Standard keeps the existing tree; research and papercut Tasks nested under another parent appear in their own section with parent context.", "An empty section shows only its header. Selection, navigation, filters, sort, and reload-by-id work across sections; state and kind tabs are unchanged.", "Verified from a release build rendered in a Herdr pane (ANSI read), with tests and docs/tui updated."]
+  acceptance: ["Board tabs are ALL, TODO, IN PROGRESS, VALIDATION; the RESEARCH and PAPERCUTS tabs are gone.", "Every tab shows STANDARD, RESEARCH, PAPERCUTS sections with counts, filtered to that tab's state. Empty sections are hidden, and headers are static and skipped by navigation.", "STANDARD keeps the tree, and an Epic's N hidden counts all children. RESEARCH/PAPERCUTS are flat, without kind badges, and show a ↳ parent chip when nested.", "Placing a research or papercut Task under a parent via add or update --parent succeeds and prints a warning recommending a root Task plus `tandem link add`.", "Verified from a release build rendered in a Herdr pane (ANSI read). Tests, docs/tui, and docs/cli are updated, and `just dev-check` and strict clippy pass."]
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-02T04:01:32Z"
+  updatedAt: "2026-10-02T04:18:27Z"
 createdAt: "2026-10-02T04:01:32Z"
-updatedAt: "2026-10-02T04:01:32Z"
+updatedAt: "2026-10-02T04:18:27Z"
 ---
+Agreed with Algorant on 2026-10-02 after the 0.16.1 cutover. The mockup is post 0w4eWzghXSs in the Sideshow session http://desktop-wsl.tail1cefc.ts.net:8228/session/urf4z8sWgj8. Keep it simple: no legacy compatibility, and no options beyond what is listed here.
 
-## Description
+## TUI
+- Board tabs: ALL · TODO · IN PROGRESS · VALIDATION (the workflow states). Remove the RESEARCH and PAPERCUTS tabs and the `BoardView::Kind` path behind them.
+- Every tab has the same body: sections STANDARD, RESEARCH, PAPERCUTS, in that order, filtered to the tab's state (ALL = every state). Each section header shows a count. An empty section is hidden. Headers are static labels: not selectable, not collapsible, and skipped by `j`/`k`.
+- STANDARD (no kind, plus Epics) keeps today's tree, collapse, and `N hidden`. An Epic's `N hidden` counts all its children, including research/papercut children shown in the other sections.
+- RESEARCH and PAPERCUTS are flat lists. The kind badge is dropped inside its own section. A Task with a parent shows the existing `↳ parent` context chip. Classification comes from `kind` only.
+- Sort (`s`) and filters (`f`) apply within sections. Selection and reload-by-id work across sections.
 
-Requested by Algorant after the 0.16.1 cutover. The point of the ALL tab is the kind split. Today, ALL shows one interleaved tree, so papercuts and standard work are mixed by ID. This is independent of web lanes (task-57) and keeps the TUI static: the tabs, their order, and the state/kind tabs are unchanged.
+## CLI
+- `add` and `update --parent` still allow a research or papercut Task under a parent, and existing papercut placement rules still hold. They print a warning recommending a root Task plus `tandem link add <id> relates-to <parent>`.
 
-The ALL tab renders three titled sections in order: Standard (no kind, plus Epics), Research, Papercuts. Each section header shows a count. Standard keeps the existing parent/child tree. Research and Papercut rows that sit under another parent appear in their own section with parent context (the same `↳` chip as the kind tabs), not nested inside Standard. Classification comes from `kind` only.
+## Unchanged
+`tandem web`, the protocol (0.5.0), existing records. No migration.

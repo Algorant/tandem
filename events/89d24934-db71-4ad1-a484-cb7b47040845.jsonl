@@ -312,3 +312,4 @@
 {"ts":"2026-10-01T23:54:55Z","event":"accord.delivered","id":"task-57","summary":"Accord deliver for task-57","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":312}
 {"ts":"2026-10-01T23:54:57Z","event":"task.completed","id":"task-57","summary":"Completed","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":313}
 {"ts":"2026-10-02T04:01:32Z","event":"task.created","id":"task-60","summary":"TUI ALL tab: split rows into Standard, Research, and Papercuts sections","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":314}
+{"ts":"2026-10-02T04:18:27Z","event":"task.updated","id":"task-60","summary":"Updated task-60 metadata: title, relatedFiles, acceptance, body","actor":"89d24934-db71-4ad1-a484-cb7b47040845","seq":315}
