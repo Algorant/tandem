@@ -2,6 +2,20 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.16.1
+
+Tandem v0.16.1 groups the web Board into Standard, Research, and Papercuts lanes. It needs no migration and keeps protocol 0.5.0.
+
+### Changed
+
+- The `tandem web` Board shows three stacked lanes, Standard, Research, and Papercuts, derived from each Task's `kind`. Each lane has a count; an empty lane collapses to its header, and a lane you collapse stays collapsed across refreshes. A research or papercut Task nested under another parent appears in its own lane with its parent shown. Epics stay in Standard with their child count.
+- Rows on the web Board carry a state badge in place of per-state columns. The state, priority, and text filters are unchanged.
+- Decisions no longer appear on the web Board; they remain on their own tab.
+
+### Removed
+
+- The `pi-tandem` adapter. Integrations call the `tandem` CLI directly and consume its `--json` output.
+
 ## 0.16.0
 
 Tandem v0.16.0 makes research and papercut first-class Task kinds and adds typed links between records. This is protocol 0.5.0; existing boards are converted once with `tandem migrate`.
