@@ -2,6 +2,20 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.16.2
+
+Tandem v0.16.2 splits every TUI Board tab into Standard, Research, and Papercuts sections. It needs no migration and keeps protocol 0.5.0.
+
+### Changed
+
+- TUI Board tabs are ALL, TODO, IN PROGRESS, and VALIDATION. Each tab shows Standard, Research, and Papercuts sections for that state, with counts; empty sections are hidden and navigation skips the section headers. Standard keeps the parent/child tree. Research and Papercuts are flat lists, and a Task with a parent shows it.
+- `add` and `update --parent` warn when a research or papercut Task is placed under a parent, recommending a root Task linked with `tandem link add <id> relates-to <parent>`. The placement is still allowed.
+- `add task` now prints its warnings, such as a missing reference, in human output.
+
+### Removed
+
+- The TUI RESEARCH and PAPERCUTS Board tabs. The sections replace them.
+
 ## 0.16.1
 
 Tandem v0.16.1 groups the web Board into Standard, Research, and Papercuts lanes. It needs no migration and keeps protocol 0.5.0.
