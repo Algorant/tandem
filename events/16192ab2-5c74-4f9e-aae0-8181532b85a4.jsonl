@@ -1,2 +1,3 @@
 {"ts":"2026-10-03T03:11:26Z","event":"task.created","id":"task-61","summary":"update --clear parent on a subtask bypasses the role-change guard and writes an invalid board","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":1}
 {"ts":"2026-10-03T03:11:28Z","event":"task.created","id":"task-62","summary":"A validation-invalid local edit blocks every command and has no supported repair","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":2}
+{"ts":"2026-10-03T03:11:29Z","event":"task.created","id":"task-63","summary":"Concurrent add can return its provisional task-new ID after a parallel sync already numbered it","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":3}
