@@ -3,13 +3,12 @@ id: task-66
 uid: e0229697-98d6-4aa5-98ef-f46bab7fa54f
 type: task
 title: "Docs and agent guidance disagree with the 0.16.2 CLI lifecycle (move, update --status, deliver, review, complete)"
-state: "in-progress"
 priority: "medium"
 references: ["task-52", "task-51", "decision-8", "Algorant/.pi@9719220"]
 relatedFiles: ["docs/cli/index.md", "docs/guides/agents-and-adapters.md", "docs/guides/decisions.md", "docs/concepts/index.md", "AGENTS.md", "tandem/README.md", "protocol/README.md"]
 tags: ["docs", "accord", "review"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["docs/cli/index.md documents exactly the 0.16.2 clap command tree (verified against `tandem --help` and each subcommand's `--help`), with no `move`, `log`, `decision`, `papercut`, `upgrade`, `accord ready|accept`, or Task `update --status`, and with sections for `review`, `assignment`, `link`, and `accord resume|release`.", "The docs state the actual lifecycle: deliver requires --summary and non-empty --evidence and leaves state unchanged; validation is reached only through `tandem review <id> --criterion <exact acceptance criterion> --note`; `complete` accepts a delivered Accord and archives; completing an undelivered Task warns but succeeds, and the docs say so.", "docs/guides/agents-and-adapters.md, docs/guides/decisions.md, and docs/concepts/index.md contain no removed commands and no claim that delivery moves work to validation or that review.status is stored.", "The 'Locked v0' CLI command lists in AGENTS.md and tandem/README.md match the current CLI and protocol version, or are explicitly marked historical.", "A repository-wide search of docs/, AGENTS.md, README.md, and tandem/README.md for `tandem move`, `tandem log`, `tandem decision`, `accord accept`, and Task `--status` finds no live instruction.", "task-52 is resolved as fixed by this Task."]
   claimedAt: "2026-10-10T14:25:09Z"
   deliveredAt: "2026-10-10T14:34:06Z"
@@ -17,12 +16,15 @@ accord:
   summary: "The three accuracy fixes are committed (a9b3d5c on top of cc93d0e). docs/cli/index.md:81 now says review \"Does not change the Accord\". The rework row (:82) and the bullet at :218 now say it needs a `delivered` Accord or an existing `rework`, and :218 keeps the quoted error text. docs/guides/fully-agentic-workflow.md:57 now says Tandem keeps \"workflow state, accord status, and validation requests separate\". AGENTS.md:51 and tandem/README.md:286 do not imply that review needs a delivered Accord, so I left them unchanged. The doubtful items from the earlier report are untouched. `just site-build` passes."
   evidence: ["Review does not require a delivered Accord: docs/cli/index.md:81 reads 'Does not change the Accord.' Line 230 already read correctly. AGENTS.md:51 and tandem/README.md:286 say only that review is the only route to `validation`, with no delivered-Accord precondition.", "Rework precondition matches validate_transition: :82 and :218 now say a `delivered` Accord or an existing `rework`. The quoted error text is kept at :218.", "Review status is not stored: fully-agentic-workflow.md:57 now says 'workflow state, accord status, and validation requests separate'."]
   filesChanged: ["docs/cli/index.md", "docs/guides/fully-agentic-workflow.md"]
-  updatedAt: "2026-10-10T14:34:06Z"
+  updatedAt: "2026-10-10T14:34:07Z"
 createdAt: "2026-10-10T13:43:38Z"
-updatedAt: "2026-10-10T14:34:06Z"
+updatedAt: "2026-10-10T14:34:07Z"
 blockers: ["task-61", "task-62"]
 effort: "medium"
 assignee: "worker-task-66-d3bf7960"
+archivedAt: "2026-10-10T14:34:07Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
