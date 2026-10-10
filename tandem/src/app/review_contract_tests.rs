@@ -11,6 +11,7 @@ mod tests {
         let data = root.join(".tandem");
         let project = TandemProject {
             git: None,
+            held: Default::default(),
             root: root.clone(),
             data_dir: data.clone(),
             tasks_dir: data.join("tasks"),

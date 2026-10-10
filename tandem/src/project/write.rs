@@ -1,9 +1,11 @@
 //! Locking, snapshots, and atomic concrete Tandem-project writes.
 
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::project::{display_path, TandemProject};
@@ -70,7 +72,57 @@ pub(crate) struct FileSignature {
     modified: Option<SystemTime>,
 }
 
-pub(crate) fn read_file_snapshot(path: &Path) -> Result<(String, FileSnapshot), CliError> {
+/// The records of one board that are read as their shared version because
+/// their local edit is held from sync, as file path to (record ID, reason).
+/// [`read_file_snapshot`], which every mutation uses to read its target,
+/// refuses these files, so a change never lands on a held local file. Clones
+/// of a project share one set.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct HeldRecords(Arc<Mutex<BTreeMap<PathBuf, (String, String)>>>);
+
+impl HeldRecords {
+    /// Replaces the held records with `(path, id, reason)` entries.
+    pub(crate) fn replace(&self, records: Vec<(PathBuf, String, String)>) {
+        *self.lock() = records
+            .into_iter()
+            .map(|(path, id, reason)| (path, (id, reason)))
+            .collect();
+    }
+
+    /// The refusal for the held file `path`, if it is held.
+    fn error_for_path(&self, path: &Path) -> Option<CliError> {
+        let held = self.lock();
+        let (id, reason) = held.get(path)?;
+        Some(held_error(id, reason))
+    }
+
+    /// The refusal for the held record `id`, if it is held.
+    pub(crate) fn error_for_id(&self, id: &str) -> Option<CliError> {
+        let held = self.lock();
+        held.values()
+            .find(|(held_id, _)| held_id == id)
+            .map(|(id, reason)| held_error(id, reason))
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<PathBuf, (String, String)>> {
+        self.0.lock().unwrap_or_else(|poison| poison.into_inner())
+    }
+}
+
+fn held_error(id: &str, reason: &str) -> CliError {
+    CliError::user(format!(
+        "{id} has a local edit held from sync ({reason}). Restore the shared version with `tandem sync resolve {id} --keep remote` before changing it."
+    ))
+}
+
+/// Reads `path` for a change, refusing a file the project holds from sync.
+pub(crate) fn read_file_snapshot(
+    project: &TandemProject,
+    path: &Path,
+) -> Result<(String, FileSnapshot), CliError> {
+    if let Some(error) = project.held.error_for_path(path) {
+        return Err(error);
+    }
     let before = file_signature(path)?;
     let content = fs::read_to_string(path)?;
     let after = file_signature(path)?;
@@ -306,9 +358,14 @@ mod tests {
     fn stale_snapshot_rejects_replacement_without_overwriting_newer_content() {
         let root = project_root("conflict");
         let path = root.join("document.md");
+        let project = TandemProject::with_paths(
+            root.clone(),
+            root.join(".tandem"),
+            root.join(".tandem/tandem.md"),
+        );
         fs::create_dir_all(&root).unwrap();
         fs::write(&path, "before").unwrap();
-        let (_, snapshot) = read_file_snapshot(&path).unwrap();
+        let (_, snapshot) = read_file_snapshot(&project, &path).unwrap();
         fs::write(&path, "newer content").unwrap();
         assert!(ensure_file_unchanged(&path, &snapshot).is_err());
         assert_eq!(fs::read_to_string(&path).unwrap(), "newer content");
@@ -325,7 +382,7 @@ mod tests {
         fs::write(&project.config_path, "---\n---\n").unwrap();
         let board_path = project.tasks_dir.join("task-1.md");
         fs::write(&board_path, "---\nid: task-1\n---\n# retained\n").unwrap();
-        let (_, snapshot) = read_file_snapshot(&board_path).unwrap();
+        let (_, snapshot) = read_file_snapshot(&project, &board_path).unwrap();
         let log_path = archive_board_document(
             &project,
             &board_path,

@@ -48,6 +48,9 @@ pub(crate) struct TandemProject {
     /// Git context when the board belongs to a Git repository. The board is
     /// then the main worktree's `.tandem/`, shared by every linked worktree.
     pub(crate) git: Option<git::GitContext>,
+    /// Records read as their shared version because their local edit is
+    /// held from sync; filled by every read of a Git-backed board.
+    pub(crate) held: write::HeldRecords,
 }
 
 impl TandemProject {
@@ -104,6 +107,7 @@ impl TandemProject {
             events_path: data_dir.join("events.jsonl"),
             config_path,
             git: None,
+            held: write::HeldRecords::default(),
         }
     }
 
@@ -188,35 +192,31 @@ impl TandemProject {
     }
 
     pub(crate) fn read_board_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
-        self.read_record_dir(&self.tasks_dir, DocumentLocation::Board)
+        if self.git.is_some() {
+            return Ok(self.read_effective_in(&self.tasks_dir));
+        }
+        read_documents(&self.tasks_dir, DocumentLocation::Board)
     }
 
     pub(crate) fn read_log_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
-        self.read_record_dir(&self.logs_dir, DocumentLocation::Logs)
-    }
-
-    /// Reads one record directory. On a Git-backed board an unparsable record
-    /// is a held edit: sync keeps it local, and every other command skips it
-    /// so unrelated work continues ([`Self::held_edit_warnings`] reports it).
-    fn read_record_dir(
-        &self,
-        dir: &Path,
-        location: DocumentLocation,
-    ) -> Result<Vec<StoredDocument>, CliError> {
         if self.git.is_some() {
-            Ok(read_documents_tolerant(
-                dir,
-                location,
-                "Board",
-                &mut Vec::new(),
-            ))
-        } else {
-            read_documents(dir, location)
+            return Ok(self.read_effective_in(&self.logs_dir));
         }
+        read_documents(&self.logs_dir, DocumentLocation::Logs)
     }
 
-    /// One warning per record file that cannot be parsed and is therefore
-    /// skipped and held back from sync.
+    fn read_effective_in(&self, dir: &Path) -> Vec<StoredDocument> {
+        self.read_effective()
+            .documents
+            .into_iter()
+            .filter(|document| document.path.parent() == Some(dir))
+            .collect()
+    }
+
+    /// One warning per record that is held back from sync and therefore not
+    /// read as it is on disk: an unparsable record is skipped, and a record
+    /// whose local edit would make the shared board invalid is read as its
+    /// shared version (skipped when it was never shared).
     pub(crate) fn held_edit_warnings(&self) -> Vec<String> {
         if self.git.is_none() {
             return Vec::new();
@@ -232,7 +232,127 @@ impl TandemProject {
                 ))
             }));
         }
+        warnings.extend(self.read_effective().warnings);
         warnings
+    }
+
+    /// Reads every record of a Git-backed board. An unparsable record is
+    /// skipped. When the records are invalid together, a record whose local
+    /// edit would make the shared board invalid is a held edit: it is read as
+    /// its shared version (skipped when never shared) so other commands keep
+    /// working, and writes to it are refused (see [`write::held_error`]).
+    /// Nothing on disk changes; sync keeps the edit local.
+    fn read_effective(&self) -> EffectiveRecords {
+        let mut documents = read_documents_tolerant(
+            &self.tasks_dir,
+            DocumentLocation::Board,
+            "Board",
+            &mut Vec::new(),
+        );
+        documents.extend(read_documents_tolerant(
+            &self.decisions_dir(),
+            DocumentLocation::Board,
+            "Board",
+            &mut Vec::new(),
+        ));
+        documents.extend(read_documents_tolerant(
+            &self.logs_dir,
+            DocumentLocation::Logs,
+            "Board",
+            &mut Vec::new(),
+        ));
+        let data_dir = self.data_dir();
+        let unheld = |documents| {
+            self.held.replace(Vec::new());
+            EffectiveRecords {
+                documents,
+                warnings: Vec::new(),
+            }
+        };
+        if validate_documents(documents.clone()).is_ok() {
+            return unheld(documents);
+        }
+        let holds = sync::validation_holds_for_read(self).unwrap_or_default();
+        if holds.is_empty() {
+            return unheld(documents);
+        }
+        let is_record = |path: &str| {
+            ["tasks/", "decisions/", "logs/"]
+                .iter()
+                .any(|prefix| path.starts_with(prefix))
+        };
+        let mut replacements: HashMap<PathBuf, Option<StoredDocument>> = HashMap::new();
+        let mut appended = Vec::new();
+        let mut held_records = Vec::new();
+        let mut warnings = Vec::new();
+        for hold in &holds {
+            let local: Vec<PathBuf> = hold
+                .local_paths
+                .iter()
+                .filter(|path| is_record(path))
+                .map(|path| data_dir.join(path))
+                .collect();
+            let shared: Vec<StoredDocument> = hold
+                .base
+                .iter()
+                .filter(|(path, _)| is_record(path))
+                .filter_map(|(path, content)| {
+                    let location = if path.starts_with("logs/") {
+                        DocumentLocation::Logs
+                    } else {
+                        DocumentLocation::Board
+                    };
+                    parse_document(&data_dir.join(path), location, content).ok()
+                })
+                .collect();
+            let files = hold
+                .local_paths
+                .iter()
+                .map(|path| format!(".tandem/{path}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            warnings.push(if shared.is_empty() {
+                format!(
+                    "skipped {}: its new local record {files} is held from sync: {}",
+                    hold.id, hold.reason
+                )
+            } else {
+                format!(
+                    "reading the shared version of {}: its local edit {files} is held from sync: {}",
+                    hold.id, hold.reason
+                )
+            });
+            for path in local
+                .iter()
+                .chain(shared.iter().map(|document| &document.path))
+            {
+                held_records.push((path.clone(), hold.id.clone(), hold.reason.clone()));
+            }
+            // A held file is replaced in place by its shared version, or
+            // dropped when that lives at another path.
+            for path in local {
+                replacements.insert(path, None);
+            }
+            for document in shared {
+                match replacements.get_mut(&document.path) {
+                    Some(slot) => *slot = Some(document),
+                    None => appended.push(document),
+                }
+            }
+        }
+        self.held.replace(held_records);
+        let mut effective = Vec::new();
+        for document in documents {
+            match replacements.remove(&document.path) {
+                Some(replacement) => effective.extend(replacement),
+                None => effective.push(document),
+            }
+        }
+        effective.extend(appended);
+        EffectiveRecords {
+            documents: effective,
+            warnings,
+        }
     }
 
     /// Loose references may target a document by ID.
@@ -241,14 +361,29 @@ impl TandemProject {
     }
 
     pub(crate) fn read_documents(&self) -> Result<Vec<StoredDocument>, CliError> {
+        if self.git.is_some() {
+            return Ok(self.read_effective().documents);
+        }
         let mut docs = self.read_board_documents()?;
         // Decisions are active durable records stored separately from Tasks,
         // but remain part of the common document lookup/read model.
-        docs.extend(
-            self.read_record_dir(&self.data_dir().join("decisions"), DocumentLocation::Board)?,
-        );
+        docs.extend(read_documents(
+            &self.decisions_dir(),
+            DocumentLocation::Board,
+        )?);
         docs.extend(self.read_log_documents()?);
         Ok(docs)
+    }
+
+    /// Refuses to change a record whose local edit is held from sync.
+    pub(crate) fn refuse_held(&self, id: &str) -> Result<(), CliError> {
+        if self.git.is_some() {
+            self.read_effective();
+            if let Some(error) = self.held.error_for_id(id) {
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 
     /// Finds a document by ID. A provisional ID that has since been numbered
@@ -369,6 +504,24 @@ impl TandemProject {
         }
         events
     }
+}
+
+/// The records of a Git-backed board as commands read them, with a warning
+/// for each record that is held from sync.
+struct EffectiveRecords {
+    documents: Vec<StoredDocument>,
+    warnings: Vec<String>,
+}
+
+/// Validates records as one board: metadata and Task hierarchy.
+pub(crate) fn validate_documents(documents: Vec<StoredDocument>) -> Result<(), String> {
+    let hierarchy = ProjectHierarchy::from_documents(documents).map_err(|error| error.message)?;
+    hierarchy
+        .validate_document_metadata()
+        .map_err(|error| error.message)?;
+    hierarchy
+        .validate_all_task_hierarchies()
+        .map_err(|error| error.message)
 }
 
 /// Concrete project snapshot adapter over the protocol-only hierarchy index.

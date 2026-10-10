@@ -177,7 +177,7 @@ fn write_links(
     target: &str,
     verb: &str,
 ) -> Result<(), Error> {
-    let (content, signature) = read_file_snapshot(&source.path)?;
+    let (content, signature) = read_file_snapshot(project, &source.path)?;
     let patched = patch_links_content(&content, stored)?;
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), current_timestamp());

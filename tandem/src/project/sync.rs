@@ -21,7 +21,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::git::{self, GitCall, GitContext};
 use super::write::HierarchyLock;
-use super::{parse_document, split_frontmatter, ProjectHierarchy, TandemProject};
+use super::{parse_document, split_frontmatter, TandemProject};
 use crate::protocol::hierarchy::DocumentLocation;
 use crate::protocol::ids::{
     assign_sequential_ids, is_provisional, replace_id_token, NumberingKind, NumberingRecord,
@@ -71,6 +71,9 @@ pub(crate) struct ConflictSummary {
 pub(crate) struct Held {
     pub(crate) path: String,
     pub(crate) reason: String,
+    /// The record ID of a validation hold, which `tandem sync resolve <id>
+    /// --keep remote` can repair. `None` for holds that have no such repair.
+    pub(crate) id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -223,17 +226,21 @@ pub(crate) fn conflict_for(project: &TandemProject, id: &str) -> Option<Conflict
         .find(|conflict| conflict.id == id)
 }
 
-/// Resolves an open conflict and leaves the chosen version in the board for
-/// the next sync to publish.
-pub(crate) fn resolve(project: &TandemProject, id: &str, keep: Keep) -> Result<Conflict, CliError> {
+/// Resolves an open conflict, or a record whose local edit is held because it
+/// would make the shared board invalid, and leaves the chosen version in the
+/// board for the next sync to publish. A validation hold has no local version
+/// worth keeping, so only `Keep::Remote` repairs it.
+pub(crate) fn resolve(project: &TandemProject, id: &str, keep: Keep) -> Result<(), CliError> {
     let Some(ctx) = project.git() else {
         return Err(CliError::user("this board is not in a Git repository"));
     };
     let _lock = HierarchyLock::acquire(project)?;
-    let conflict = load_conflicts(ctx)
+    let Some(conflict) = load_conflicts(ctx)
         .into_iter()
         .find(|conflict| conflict.id == id)
-        .ok_or_else(|| CliError::user(format!("no open sync conflict for {id}")))?;
+    else {
+        return restore_validation_hold(project, ctx, id, keep);
+    };
     let board = project.data_dir();
     let (content, path, other) = match keep {
         Keep::Local => (
@@ -269,7 +276,68 @@ pub(crate) fn resolve(project: &TandemProject, id: &str, keep: Keep) -> Result<C
         }
     }
     fs::remove_file(conflict_path(ctx, &conflict.key))?;
-    Ok(conflict)
+    Ok(())
+}
+
+/// Replaces a validation-held record with its last shared version, or removes
+/// it when it never reached the shared board.
+fn restore_validation_hold(
+    project: &TandemProject,
+    ctx: &GitContext,
+    id: &str,
+    keep: Keep,
+) -> Result<(), CliError> {
+    let engine = Engine::new(ctx, project.data_dir());
+    let holds = engine.validation_holds_now(false).map_err(CliError::user)?;
+    let Some(hold) = holds.into_iter().find(|hold| hold.id == id) else {
+        return Err(CliError::user(format!("no open sync conflict for {id}")));
+    };
+    if keep != Keep::Remote {
+        return Err(CliError::user(format!(
+            "{id} has a local edit held from sync ({}). Its local version cannot be published, so only `tandem sync resolve {id} --keep remote` can repair it.",
+            hold.reason
+        )));
+    }
+    let board = project.data_dir();
+    for path in &hold.local_paths {
+        if hold.base.iter().any(|(base_path, _)| base_path == path) {
+            continue;
+        }
+        let path = board.join(path);
+        if path.exists() {
+            fs::remove_file(&path)?;
+            note_removed(project, &path)?;
+        }
+    }
+    for (path, content) in &hold.base {
+        super::write::write_atomic(&board.join(path), content)?;
+    }
+    Ok(())
+}
+
+/// A record whose local edit would make the shared board invalid, with the
+/// shared version it falls back to.
+#[derive(Debug, Clone)]
+pub(crate) struct LocalHold {
+    pub(crate) id: String,
+    pub(crate) reason: String,
+    /// Board-relative paths of the held local files.
+    pub(crate) local_paths: Vec<String>,
+    /// Board-relative path and content of the last shared version; empty for
+    /// a record that was never published.
+    pub(crate) base: Vec<(String, String)>,
+}
+
+/// The validation holds of the current board, computed locally from the
+/// board files and the last merged shared version. Empty unless the board
+/// syncs through a remote and has been published; `None` when they cannot be
+/// computed. Takes no lock and writes nothing, so callers that already hold
+/// the board lock may use it.
+pub(crate) fn validation_holds_for_read(project: &TandemProject) -> Option<Vec<LocalHold>> {
+    let ctx = project.git()?;
+    Engine::new(ctx, project.data_dir())
+        .validation_holds_now(true)
+        .ok()
 }
 
 /// Restores a missing board from the safety copy, or downloads it from the
@@ -443,16 +511,90 @@ impl<'a> Engine<'a> {
         let open = load_conflicts(self.ctx);
         let snapshot = self.snapshot(&base_side, &open)?;
         let state = State::load(self.ctx);
+        let remote = remote_name(self.ctx);
+        let mut held = snapshot.held.clone();
+        if remote.is_some() {
+            // Holds a sync would add; an error here is a problem with the
+            // shared board itself, which sync reports.
+            if let Ok(holds) = validation_holds(&base_side, &snapshot.local) {
+                for (key, reason) in holds {
+                    for path in paths_for_key(&snapshot.raw.files, &key) {
+                        held.push(Held {
+                            path: format!(".tandem/{path}"),
+                            reason: reason.clone(),
+                            id: Some(record_id(&path, &snapshot.raw.files[&path])),
+                        });
+                    }
+                }
+            }
+        }
         Ok(StatusReport {
             git: true,
-            remote: remote_name(self.ctx),
+            remote,
             published: base.is_some(),
             pending: base.is_none() || snapshot.local.oids != base_side.oids,
             conflicts: summaries(&open),
-            held: snapshot.held,
+            held,
             last_fetch: state.last_fetch,
             last_error: state.last_error,
         })
+    }
+
+    /// Records whose local edit would make the shared board invalid, read
+    /// straight from the board files without touching any ref or index.
+    fn validation_holds_now(&self, require_base: bool) -> Result<Vec<LocalHold>, String> {
+        if remote_name(self.ctx).is_none() {
+            return Ok(Vec::new());
+        }
+        let base = self.ref_commit(BASE_REF)?;
+        if base.is_none() && require_base {
+            return Ok(Vec::new());
+        }
+        let base_side = match &base {
+            Some(commit) => self.load_tree(commit)?,
+            None => Side::default(),
+        };
+        let files = read_board_dir(&self.board)?;
+        let raw = Side {
+            oids: files
+                .iter()
+                .map(|(path, content)| (path.clone(), fake_oid(content)))
+                .collect(),
+            files,
+        };
+        let base_side = Side {
+            oids: base_side
+                .files
+                .iter()
+                .map(|(path, content)| (path.clone(), fake_oid(content)))
+                .collect(),
+            files: base_side.files,
+        };
+        let open = load_conflicts(self.ctx);
+        let (local, _, _) = effective_local(&raw, &base_side, &open);
+        Ok(validation_holds(&base_side, &local)?
+            .into_iter()
+            .map(|(key, reason)| {
+                let local_paths = paths_for_key(&local.files, &key);
+                let id = local_paths
+                    .first()
+                    .map(|path| record_id(path, &local.files[path]))
+                    .unwrap_or_else(|| key.clone());
+                let base = paths_for_key(&base_side.files, &key)
+                    .into_iter()
+                    .map(|path| {
+                        let content = base_side.files[&path].clone();
+                        (path, content)
+                    })
+                    .collect();
+                LocalHold {
+                    id,
+                    reason,
+                    local_paths,
+                    base,
+                }
+            })
+            .collect())
     }
 
     fn recover(&self) -> Result<bool, String> {
@@ -535,56 +677,7 @@ impl<'a> Engine<'a> {
         }
         let _ = fs::remove_file(self.state.join("removed"));
 
-        let open_keys: Vec<&str> = open.iter().map(|conflict| conflict.key.as_str()).collect();
-        let base_uids = uid_index(&base.files);
-        let mut local = raw.clone();
-        let mut held = Vec::new();
-        let mut held_paths = Vec::new();
-        let paths: Vec<String> = raw
-            .files
-            .keys()
-            .chain(base.files.keys())
-            .cloned()
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .collect();
-        for path in paths {
-            let local_content = raw.files.get(&path);
-            let base_content = base.files.get(&path);
-            if local_content == base_content {
-                continue;
-            }
-            let key = local_content
-                .map(|content| entry_key(&path, content))
-                .or_else(|| base_content.map(|content| entry_key(&path, content)))
-                .unwrap_or_else(|| format!("path:{path}"));
-            let problem = if open_keys.contains(&key.as_str()) {
-                Some("has an unresolved sync conflict; run `tandem sync status`".to_string())
-            } else {
-                local_content.and_then(|content| {
-                    local_problem(&path, content, base_content.map(String::as_str), &base_uids)
-                })
-            };
-            if let Some(reason) = problem {
-                if !open_keys.contains(&key.as_str()) {
-                    held.push(Held {
-                        path: format!(".tandem/{path}"),
-                        reason,
-                    });
-                }
-                held_paths.push(path.clone());
-                match base_content {
-                    Some(content) => {
-                        local.files.insert(path.clone(), content.clone());
-                        local.oids.insert(path.clone(), base.oids[&path].clone());
-                    }
-                    None => {
-                        local.files.remove(&path);
-                        local.oids.remove(&path);
-                    }
-                }
-            }
-        }
+        let (local, held, held_paths) = effective_local(&raw, base, open);
         Ok(Snapshot {
             raw,
             local,
@@ -652,6 +745,7 @@ impl<'a> Engine<'a> {
                     result.held.push(Held {
                         path: format!(".tandem/{path}"),
                         reason: reason.clone(),
+                        id: Some(record_id(&path, &snapshot.raw.files[&path])),
                     });
                     result.held_paths.push(path);
                 }
@@ -1615,6 +1709,64 @@ fn uid_index(files: &Files) -> HashMap<String, (String, String)> {
         .collect()
 }
 
+/// The effective local side: every changed local file that cannot be
+/// published (or whose record has an open conflict) is replaced by its base
+/// version. Returns the side with the holds and their paths.
+fn effective_local(raw: &Side, base: &Side, open: &[Conflict]) -> (Side, Vec<Held>, Vec<String>) {
+    let open_keys: Vec<&str> = open.iter().map(|conflict| conflict.key.as_str()).collect();
+    let base_uids = uid_index(&base.files);
+    let mut local = raw.clone();
+    let mut held = Vec::new();
+    let mut held_paths = Vec::new();
+    let paths: Vec<String> = raw
+        .files
+        .keys()
+        .chain(base.files.keys())
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    for path in paths {
+        let local_content = raw.files.get(&path);
+        let base_content = base.files.get(&path);
+        if local_content == base_content {
+            continue;
+        }
+        let key = local_content
+            .map(|content| entry_key(&path, content))
+            .or_else(|| base_content.map(|content| entry_key(&path, content)))
+            .unwrap_or_else(|| format!("path:{path}"));
+        let problem = if open_keys.contains(&key.as_str()) {
+            Some("has an unresolved sync conflict; run `tandem sync status`".to_string())
+        } else {
+            local_content.and_then(|content| {
+                local_problem(&path, content, base_content.map(String::as_str), &base_uids)
+            })
+        };
+        if let Some(reason) = problem {
+            if !open_keys.contains(&key.as_str()) {
+                held.push(Held {
+                    path: format!(".tandem/{path}"),
+                    reason,
+                    id: None,
+                });
+            }
+            held_paths.push(path.clone());
+            match base_content {
+                Some(content) => {
+                    local.files.insert(path.clone(), content.clone());
+                    local.oids.insert(path.clone(), base.oids[&path].clone());
+                }
+                None => {
+                    local.files.remove(&path);
+                    local.oids.remove(&path);
+                }
+            }
+        }
+    }
+    (local, held, held_paths)
+}
+
 /// Why a locally changed file cannot be published, if it cannot.
 fn local_problem(
     path: &str,
@@ -1826,13 +1978,39 @@ fn validate_board(files: &Files) -> Result<(), String> {
             .map_err(|error| error.message)?;
         documents.push(document);
     }
-    let hierarchy = ProjectHierarchy::from_documents(documents).map_err(|error| error.message)?;
-    hierarchy
-        .validate_document_metadata()
-        .map_err(|error| error.message)?;
-    hierarchy
-        .validate_all_task_hierarchies()
-        .map_err(|error| error.message)
+    super::validate_documents(documents)
+}
+
+/// The changed local records that would make the board invalid: repeatedly
+/// validates `local`, holding the changed records the error names until the
+/// rest is valid. Returns each held record key with the reason. An error
+/// that no changed record explains is returned as is.
+fn validation_holds(base: &Side, local: &Side) -> Result<Vec<(String, String)>, String> {
+    let mut held: Vec<(String, String)> = Vec::new();
+    for _ in 0..10 {
+        let mut effective = local.clone();
+        for (key, _) in &held {
+            revert_key(&mut effective, base, key);
+        }
+        let Err(message) = validate_board(&effective.files) else {
+            return Ok(held);
+        };
+        let culprits: Vec<String> = changed_keys(base, &effective)
+            .into_iter()
+            .filter(|(_, id)| mentions(&message, id))
+            .map(|(key, _)| key)
+            .collect();
+        if culprits.is_empty() {
+            return Err(message);
+        }
+        for key in culprits {
+            held.push((
+                key,
+                format!("would make the shared board invalid: {message}"),
+            ));
+        }
+    }
+    Err("could not produce a valid board".to_string())
 }
 
 fn changed_keys(base: &Side, local: &Side) -> Vec<(String, String)> {

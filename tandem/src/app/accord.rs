@@ -260,7 +260,7 @@ fn apply_validation_action(
         )));
     }
 
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     let mut accord = AccordRecord::from_document(&doc, &now);
     match action {
@@ -441,7 +441,7 @@ pub(crate) fn transition(
     validate_accord_inputs(action, &options)?;
     let previous_status = accord_status(&doc).unwrap_or("missing").to_string();
     accord::validate_transition(action, &previous_status).map_err(Error::user)?;
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     let mut accord = AccordRecord::from_document(&doc, &now);
     apply_accord_action(&mut accord, action, status, &options);

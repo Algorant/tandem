@@ -538,6 +538,281 @@ fn a_held_broken_edit_does_not_stop_other_work() {
     assert_eq!(fs::read_to_string(&broken).unwrap(), bytes);
 }
 
+/// Machine B holds a Task with one Subtask, both published. The Subtask file
+/// is then rewritten by hand without its `parentId`: it parses, but a
+/// Subtask-shaped ID without a parent would make the shared board invalid.
+fn held_subtask(label: &str) -> (World, PathBuf, PathBuf, PathBuf, String) {
+    let (world, a, b) = World::two_machines(label);
+    add_task(&a, "Parent");
+    ok(
+        &a,
+        &[
+            "add",
+            "task",
+            "Child",
+            "--parent",
+            "task-1",
+            "--acceptance",
+            "done",
+        ],
+    );
+    ok(&b, &["sync"]);
+    let child = b.join(".tandem/tasks/task-1-1.md");
+    let shared = fs::read_to_string(&child).unwrap();
+    assert!(shared.contains("parentId:"));
+    let invalid: String = shared
+        .lines()
+        .filter(|line| !line.starts_with("parentId:"))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    fs::write(&child, invalid).unwrap();
+    (world, a, b, child, shared)
+}
+
+fn held_entries(envelope: &Value, pointer: &str) -> Vec<(String, String, Option<String>)> {
+    envelope
+        .pointer(pointer)
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|held| {
+            (
+                held["path"].as_str().unwrap().to_string(),
+                held["reason"].as_str().unwrap().to_string(),
+                held["id"].as_str().map(str::to_string),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn a_validation_invalid_edit_is_held_and_other_work_continues() {
+    let (world, a, b, child, shared) = held_subtask("held-invalid");
+    let invalid = fs::read_to_string(&child).unwrap();
+
+    // Reads still list the records and name the held file.
+    let listed = ok(&b, &["list"]);
+    let titles: Vec<&str> = listed["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|doc| doc["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(titles, vec!["task-1", "task-1-1"]);
+    let warnings = listed["warnings"].to_string();
+    assert!(warnings.contains(".tandem/tasks/task-1-1.md"), "{warnings}");
+    assert!(warnings.contains("held from sync"), "{warnings}");
+    // A read that validates the whole board works too.
+    let shown = ok(&b, &["show", "task-1"]);
+    assert_eq!(shown["data"]["children"][0]["parentId"], "task-1");
+    assert!(shown["warnings"].to_string().contains("task-1-1.md"));
+
+    // Unrelated mutations succeed and report the held file.
+    let created = add_task(&b, "Other");
+    assert_eq!(created["data"]["id"], "task-2");
+    assert!(created["data"]["sync"]["held"][0]["path"]
+        .as_str()
+        .unwrap()
+        .ends_with("tasks/task-1-1.md"));
+    ok(&b, &["update", "task-1", "--title", "Parent, renamed"]);
+
+    // The held record itself is refused, and nothing it holds is rewritten.
+    for args in [
+        vec!["update", "task-1-1", "--title", "Nope"],
+        vec!["complete", "task-1-1"],
+        vec!["accord", "claim", "task-1-1", "--assignee", "me"],
+    ] {
+        let refused = fails(&b, &args);
+        assert!(
+            refused.contains("tandem sync resolve task-1-1 --keep remote"),
+            "{args:?}: {refused}"
+        );
+    }
+    assert_eq!(fs::read_to_string(&child).unwrap(), invalid);
+
+    // The invalid file never reaches the shared branch.
+    ok(&b, &["sync"]);
+    assert_eq!(
+        git(&world.remote, &["show", "tandem:tasks/task-1-1.md"]),
+        shared.trim()
+    );
+    ok(&a, &["sync"]);
+    assert_eq!(title(&a, "task-1"), "Parent, renamed");
+    assert_eq!(title(&a, "task-2"), "Other");
+    assert_eq!(
+        fs::read_to_string(a.join(".tandem/tasks/task-1-1.md")).unwrap(),
+        shared
+    );
+}
+
+#[test]
+fn sync_status_lists_validation_holds_like_sync_does() {
+    let (_world, _a, b, child, _shared) = held_subtask("held-status");
+    let synced = ok(&b, &["sync"]);
+    let from_sync = held_entries(&synced, "/data/sync/held");
+    assert_eq!(from_sync.len(), 1);
+    assert!(from_sync[0].0.ends_with("tasks/task-1-1.md"));
+    assert!(from_sync[0]
+        .1
+        .starts_with("would make the shared board invalid:"));
+    assert_eq!(from_sync[0].2.as_deref(), Some("task-1-1"));
+
+    let status = ok(&b, &["sync", "status"]);
+    assert_eq!(held_entries(&status, "/data/held"), from_sync);
+
+    let text = String::from_utf8_lossy(&tandem(&b, &["sync", "status"]).stdout).to_string();
+    assert!(
+        text.contains("Held edit: .tandem/tasks/task-1-1.md: would make the shared board invalid:"),
+        "{text}"
+    );
+    assert!(
+        text.contains("resolve: tandem sync resolve task-1-1 --keep remote"),
+        "{text}"
+    );
+    assert!(child.exists());
+}
+
+#[test]
+fn sync_resolve_keep_remote_restores_a_validation_held_record() {
+    let (_world, a, b, child, shared) = held_subtask("held-resolve");
+    let invalid = fs::read_to_string(&child).unwrap();
+
+    // Only the shared version can repair it; the others fail clearly.
+    for keep in ["local", "edited"] {
+        let refused = fails(&b, &["sync", "resolve", "task-1-1", "--keep", keep]);
+        assert!(refused.contains("--keep remote"), "{refused}");
+    }
+    let unknown = fails(&b, &["sync", "resolve", "task-1", "--keep", "remote"]);
+    assert!(
+        unknown.contains("no open sync conflict for task-1"),
+        "{unknown}"
+    );
+    assert_eq!(fs::read_to_string(&child).unwrap(), invalid);
+
+    let resolved = ok(&b, &["sync", "resolve", "task-1-1", "--keep", "remote"]);
+    assert_eq!(resolved["data"]["sync"]["status"], "synced");
+    assert_eq!(fs::read_to_string(&child).unwrap(), shared);
+    assert!(ok(&b, &["list"])["warnings"].as_array().unwrap().is_empty());
+    assert!(ok(&b, &["sync", "status"])["data"]["held"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    ok(&b, &["update", "task-1-1", "--title", "Child, edited"]);
+    ok(&a, &["sync"]);
+    assert_eq!(title(&a, "task-1-1"), "Child, edited");
+}
+
+#[test]
+fn a_held_parent_is_read_as_its_shared_version_so_its_children_stay_valid() {
+    let (_world, a, b) = World::two_machines("held-parent");
+    add_task(&a, "Parent");
+    ok(
+        &a,
+        &[
+            "add",
+            "task",
+            "Child",
+            "--parent",
+            "task-1",
+            "--acceptance",
+            "done",
+        ],
+    );
+    add_task(&a, "Elsewhere");
+    ok(&b, &["sync"]);
+    // An Epic cannot have a parent, so this edit is invalid for the Parent.
+    let parent = b.join(".tandem/tasks/task-1.md");
+    let shared = fs::read_to_string(&parent).unwrap();
+    fs::write(
+        &parent,
+        shared.replace(
+            "type: task\n",
+            "type: task\nkind: epic\nparentId: \"task-2\"\n",
+        ),
+    )
+    .unwrap();
+    let invalid = fs::read_to_string(&parent).unwrap();
+
+    let listed = ok(&b, &["list"]);
+    assert_eq!(listed["data"].as_array().unwrap().len(), 3);
+    assert!(listed["warnings"].to_string().contains("tasks/task-1.md"));
+    let shown = ok(&b, &["show", "task-1-1"]);
+    assert_eq!(shown["data"]["parentId"], "task-1");
+    assert_eq!(shown["data"]["role"], "subtask");
+
+    ok(&b, &["update", "task-2", "--title", "Elsewhere, renamed"]);
+    let sibling = ok(
+        &b,
+        &[
+            "add",
+            "task",
+            "Second child",
+            "--parent",
+            "task-1",
+            "--acceptance",
+            "done",
+        ],
+    );
+    assert!(sibling["data"]["id"]
+        .as_str()
+        .unwrap()
+        .starts_with("task-1-"));
+    let refused = fails(&b, &["update", "task-1", "--title", "Nope"]);
+    assert!(
+        refused.contains("tandem sync resolve task-1 --keep remote"),
+        "{refused}"
+    );
+    assert_eq!(fs::read_to_string(&parent).unwrap(), invalid);
+
+    ok(&b, &["sync", "resolve", "task-1", "--keep", "remote"]);
+    assert_eq!(fs::read_to_string(&parent).unwrap(), shared);
+    ok(&a, &["sync"]);
+    assert_eq!(title(&a, "task-2"), "Elsewhere, renamed");
+}
+
+#[test]
+fn a_held_new_record_is_skipped_and_resolve_removes_it() {
+    let (world, a, b, child, shared) = held_subtask("held-new");
+    // Repair the first hold, then add a record that was never shared and
+    // that would make the board invalid: a Subtask cannot have children.
+    ok(&b, &["sync", "resolve", "task-1-1", "--keep", "remote"]);
+    assert_eq!(fs::read_to_string(&child).unwrap(), shared);
+    let fresh = b.join(".tandem/tasks/task-9.md");
+    fs::write(
+        &fresh,
+        "---\nid: task-9\nuid: 6b0b9f0e-1d2c-4f55-9a53-0d6f4a0a7e11\ntype: task\ntitle: \"Grandchild\"\nstate: todo\nparentId: \"task-1-1\"\naccord:\n  status: \"ready\"\n  acceptance: [\"done\"]\ncreatedAt: \"2026-01-01T00:00:00Z\"\nupdatedAt: \"2026-01-01T00:00:00Z\"\n---\n",
+    )
+    .unwrap();
+
+    let listed = ok(&b, &["list"]);
+    let listed_ids: Vec<&str> = listed["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|doc| doc["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(listed_ids, vec!["task-1", "task-1-1"]);
+    assert!(listed["warnings"].to_string().contains("tasks/task-9.md"));
+    add_task(&b, "Other");
+    let refused = fails(&b, &["update", "task-9", "--title", "Nope"]);
+    assert!(
+        refused.contains("tandem sync resolve task-9 --keep remote"),
+        "{refused}"
+    );
+
+    ok(&b, &["sync", "resolve", "task-9", "--keep", "remote"]);
+    assert!(!fresh.exists());
+    ok(&b, &["sync"]);
+    ok(&a, &["sync"]);
+    assert_eq!(ids(&a), vec!["task-1", "task-1-1", "task-2"]);
+    assert!(
+        git(&world.remote, &["ls-tree", "-r", "--name-only", "tandem"])
+            .lines()
+            .all(|path| path != "tasks/task-9.md")
+    );
+}
+
 fn legacy_board(repo: &Path) {
     let board = repo.join(".tandem");
     fs::create_dir_all(board.join("tasks")).unwrap();

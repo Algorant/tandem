@@ -24,7 +24,7 @@ fn sync_json(report: &Report) -> serde_json::Value {
         "message": message,
         "renamed": renamed,
         "conflicts": report.conflicts.iter().map(|c| serde_json::json!({"id": c.id, "reason": c.reason})).collect::<Vec<_>>(),
-        "held": report.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason})).collect::<Vec<_>>(),
+        "held": report.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason, "id": h.id})).collect::<Vec<_>>(),
     })
 }
 
@@ -93,6 +93,7 @@ fn open_write_for(id: &str) -> Result<(TandemProject, String), CliError> {
     let project = app::project::open_for_write()?;
     let id = project.current_id(id)?;
     refuse_conflicted(&project, &id)?;
+    project.refuse_held(&id)?;
     Ok((project, id))
 }
 
@@ -914,7 +915,7 @@ fn sync_command(args: SyncArgs, json: bool) -> Result<super::StartupRequest, Cli
                         "lastFetch": last_fetch,
                         "lastError": status.last_error,
                         "conflicts": status.conflicts.iter().map(|c| serde_json::json!({"id": c.id, "reason": c.reason})).collect::<Vec<_>>(),
-                        "held": status.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason})).collect::<Vec<_>>(),
+                        "held": status.held.iter().map(|h| serde_json::json!({"path": h.path, "reason": h.reason, "id": h.id})).collect::<Vec<_>>(),
                     },"warnings":[]})
                 );
             } else if !status.git {
@@ -947,6 +948,9 @@ fn sync_command(args: SyncArgs, json: bool) -> Result<super::StartupRequest, Cli
                 }
                 for held in &status.held {
                     println!("Held edit: {}: {}", held.path, held.reason);
+                    if let Some(id) = &held.id {
+                        println!("  resolve: tandem sync resolve {id} --keep remote");
+                    }
                 }
             }
         }

@@ -245,7 +245,7 @@ pub(crate) fn update(
     }
 
     updates.insert("updatedAt".to_string(), now);
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(project, &doc.path)?;
     let patched = patch_frontmatter_content(&content, &updates, &removes)?;
     let patched = if let Some(body) = apply_body {
         replace_markdown_body(&patched, body)?
@@ -449,7 +449,7 @@ pub(crate) fn withdraw(
     reason: String,
 ) -> Result<WithdrawOutcome, Error> {
     let doc = active_decision(project, id)?;
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(project, &doc.path)?;
     let now = current_timestamp();
     let updates = BTreeMap::from([
         ("status".to_string(), "withdrawn".to_string()),

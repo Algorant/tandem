@@ -74,7 +74,7 @@ pub(crate) fn transition(
     validate_state(workspace, "validation")?;
     accord::validate_review_criterion(doc.id(), &accord::acceptance(&doc), &criterion)
         .map_err(Error::user)?;
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::from([
         ("state".to_string(), "validation".to_string()),

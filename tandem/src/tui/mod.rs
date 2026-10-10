@@ -2755,6 +2755,7 @@ tone = "success"
         let tandem_dir = root.join(".tandem");
         let workspace = TandemProject {
             git: None,
+            held: Default::default(),
             root: PathBuf::new(),
             data_dir: PathBuf::new(),
             tasks_dir: tandem_dir.join("board"),
@@ -2887,6 +2888,7 @@ tone = "success"
         TuiApp {
             workspace: TandemProject {
                 git: None,
+                held: Default::default(),
                 root: PathBuf::new(),
                 data_dir: PathBuf::new(),
                 tasks_dir: PathBuf::from(".tandem/tasks"),
@@ -4089,6 +4091,7 @@ tone = "success"
         .unwrap();
         let workspace = TandemProject {
             git: None,
+            held: Default::default(),
             root,
             data_dir: data_dir.clone(),
             tasks_dir: data_dir.join("board"),

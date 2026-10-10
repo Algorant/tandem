@@ -386,7 +386,7 @@ pub(crate) fn move_to_state(
         });
     }
 
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::new();
     updates.insert("state".to_string(), state.to_string());
@@ -632,7 +632,7 @@ pub(crate) fn update(
     }
 
     updates.insert("updatedAt".to_string(), current_timestamp());
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let patched = patch_frontmatter_content(&content, &updates, &clear_fields)?;
     let patched = match accord_updates {
         Some(accord) => patch_accord_content(&patched, &accord)?,
@@ -985,7 +985,7 @@ pub(crate) fn complete(
         .collect::<Vec<_>>();
     let has_completion_warnings = !warnings.is_empty();
     warnings.extend(workspace_deprecation_warnings(workspace)?);
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     // Protocol 0.3.0 (D16/D39): completing a delivered Task atomically accepts
     // the Accord and archives it; there is no accepted-but-active state.
@@ -1081,7 +1081,7 @@ pub(crate) fn cancel(
         )));
     }
 
-    let (content, signature) = read_file_snapshot(&doc.path)?;
+    let (content, signature) = read_file_snapshot(workspace, &doc.path)?;
     let now = current_timestamp();
     let mut updates = BTreeMap::new();
     updates.insert("updatedAt".to_string(), now.clone());
