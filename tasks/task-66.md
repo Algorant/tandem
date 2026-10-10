@@ -11,9 +11,12 @@ tags: ["docs", "accord", "review"]
 accord:
   status: "ready"
   acceptance: ["docs/cli/index.md documents exactly the 0.16.2 clap command tree (verified against `tandem --help` and each subcommand's `--help`), with no `move`, `log`, `decision`, `papercut`, `upgrade`, `accord ready|accept`, or Task `update --status`, and with sections for `review`, `assignment`, `link`, and `accord resume|release`.", "The docs state the actual lifecycle: deliver requires --summary and non-empty --evidence and leaves state unchanged; validation is reached only through `tandem review <id> --criterion <exact acceptance criterion> --note`; `complete` accepts a delivered Accord and archives; completing an undelivered Task warns but succeeds, and the docs say so.", "docs/guides/agents-and-adapters.md, docs/guides/decisions.md, and docs/concepts/index.md contain no removed commands and no claim that delivery moves work to validation or that review.status is stored.", "The 'Locked v0' CLI command lists in AGENTS.md and tandem/README.md match the current CLI and protocol version, or are explicitly marked historical.", "A repository-wide search of docs/, AGENTS.md, README.md, and tandem/README.md for `tandem move`, `tandem log`, `tandem decision`, `accord accept`, and Task `--status` finds no live instruction.", "task-52 is resolved as fixed by this Task."]
-  updatedAt: "2026-10-10T13:43:38Z"
+  validation: ["$ just site-build", "Manual: rg for `tandem move`, `tandem log`, `tandem decision`, `accord accept`, and Task `--status` across docs/, AGENTS.md, README.md, tandem/README.md finds no live instruction."]
+  updatedAt: "2026-10-10T14:10:00Z"
 createdAt: "2026-10-10T13:43:38Z"
-updatedAt: "2026-10-10T13:52:27Z"
+updatedAt: "2026-10-10T14:10:00Z"
+blockers: ["task-61", "task-62"]
+effort: "medium"
 ---
 
 ## Description
