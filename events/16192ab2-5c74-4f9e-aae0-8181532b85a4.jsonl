@@ -3,3 +3,4 @@
 {"ts":"2026-10-03T03:11:29Z","event":"task.created","id":"task-63","summary":"Concurrent add can return its provisional task-new ID after a parallel sync already numbered it","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":3}
 {"ts":"2026-10-05T03:52:19Z","event":"task.created","id":"task-64","summary":"Refused mutations must not leave a written record","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":4}
 {"ts":"2026-10-06T19:04:49Z","event":"task.created","id":"task-65","summary":"tandem migrate: no supported way to drop an unsynced local record when the shared board is already upgraded","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":5}
+{"ts":"2026-10-10T13:43:38Z","event":"task.created","id":"task-66","summary":"Docs and agent guidance disagree with the 0.16.2 CLI lifecycle (move, update --status, deliver, review, complete)","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":6}
