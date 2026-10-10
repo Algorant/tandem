@@ -18,3 +18,4 @@
 {"ts":"2026-10-10T14:33:27Z","event":"accord.delivered","id":"task-66","summary":"Accord deliver for task-66","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":18}
 {"ts":"2026-10-10T14:33:29Z","event":"accord.rework","id":"task-66","summary":"Accord rework for task-66","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":19}
 {"ts":"2026-10-10T14:33:37Z","event":"task.created","id":"task-67","summary":"Residual stale doc claims after task-66: review-status UI text, install tag pins, decision date field","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":20}
+{"ts":"2026-10-10T14:34:02Z","event":"task.completed","id":"task-52","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":21}
