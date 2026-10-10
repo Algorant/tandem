@@ -3,18 +3,20 @@ id: task-61
 uid: 2b525ff9-c1f8-4995-8b86-e3e23d5bac5c
 type: task
 title: "update --clear parent on a subtask bypasses the role-change guard and writes an invalid board"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "small"
 relatedFiles: ["tandem/src/app/tasks.rs", "tandem/tests/cli_behavior.rs"]
 tags: ["protocol", "validation"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["`tandem update <subtask> --clear parent` fails before writing, with the same canonical-role/IDs-are-immutable error as `--parent`, and the record file is unchanged.", "Clearing the parent on a root Task, and valid same-role reparenting, behave as before.", "A regression test covers clear-parent on a subtask (refused, board still readable) and on a root Task."]
+  claimedAt: "2026-10-10T14:09:46Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-03T03:11:26Z"
+  updatedAt: "2026-10-10T14:09:46Z"
 createdAt: "2026-10-03T03:11:26Z"
-updatedAt: "2026-10-03T03:11:26Z"
+updatedAt: "2026-10-10T14:09:46Z"
+assignee: "worker-task-61-ed95abf3"
 ---
 
 ## Description
