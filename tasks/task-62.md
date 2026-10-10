@@ -3,18 +3,20 @@ id: task-62
 uid: 838c6f00-4180-4205-b18a-6154027f96a6
 type: task
 title: "A validation-invalid local edit blocks every command and has no supported repair"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/project/sync.rs", "tandem/src/cli/commands.rs", "tandem/tests/sync_behavior.rs"]
 tags: ["protocol", "validation"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["With one validation-invalid record held on a Git-backed board, reads list the other records with a warning that names the held file, and unrelated mutations still succeed (task-49-10 parity).", "`tandem sync status` lists validation-held edits with their reason, matching what `tandem sync` reports.", "A supported native command (e.g. `sync resolve <id> --keep remote`) restores a validation-held record to the shared version without hand-editing `.tandem/`.", "Regression tests in tandem/tests/sync_behavior.rs cover the three behaviors above."]
+  claimedAt: "2026-10-10T14:09:47Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-03T03:11:28Z"
+  updatedAt: "2026-10-10T14:09:47Z"
 createdAt: "2026-10-03T03:11:28Z"
-updatedAt: "2026-10-03T03:11:28Z"
+updatedAt: "2026-10-10T14:09:47Z"
+assignee: "worker-task-62-b417d4a2"
 ---
 
 ## Description
