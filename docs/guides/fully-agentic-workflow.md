@@ -10,7 +10,7 @@ The workflow is repeatable:
 2. **Plan the delegation.** Pi reads the task, its related context, and the active workspace rules. It divides the outcome into independently reviewable Tasks. A worker may use first-class Subtasks as its sequential checklist, but Subtasks are not separate delegation roots.
 3. **Start workers.** Shep asks Herdr to create an isolated workspace for each delegated Task and starts a Codex Worker there. Workers can run one after another when a later task depends on an earlier result, or in parallel when the tasks are independent.
 4. **Work in isolation.** Each Codex Worker changes only its assigned checkout. Herdr retains the session and workspace so progress, files, and the final handoff stay connected to the Task.
-5. **Deliver evidence.** A Worker reports a concise summary, changed files, validation commands and results, deliverables, risks, and blockers. Shep records the delivery against the accord and moves the Task to `validation`.
+5. **Deliver evidence.** A Worker reports a concise summary, changed files, validation commands and results, deliverables, risks, and blockers. Shep records the delivery against the accord with `tandem accord deliver`; the Task stays `in-progress` until it is completed or escalated with `tandem review`.
 6. **Validate and continue.** Pi inspects the handoff and the diff, then runs any independent checks. It accepts objective work when the criteria and evidence are satisfied. If the result needs changes, it sends focused rework. If the next Task depends on this one, Pi starts it only after validation.
 7. **Close the loop.** Accepted work is integrated by the project owner or orchestrator and completed into Tandem Logs. The log preserves what changed and the evidence used to validate it.
 
@@ -54,7 +54,7 @@ A Worker saying “done” is not validation. A useful delivery gives the orches
 - **Risks:** known limitations, compatibility concerns, or follow-up work.
 - **Blockers:** unresolved conditions that prevent completion.
 
-Tandem keeps workflow state, accord status, and review status separate. Delivery records the Worker’s evidence; validation records the orchestrator’s judgment. A claimed accord is not acceptance, and automated checks do not replace review of the scope and diff.
+Tandem keeps workflow state, accord status, and validation requests separate. Delivery records the Worker’s evidence; validation records the orchestrator’s judgment. A claimed accord is not acceptance, and automated checks do not replace review of the scope and diff.
 
 ## A practical operating rule
 

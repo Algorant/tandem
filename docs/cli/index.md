@@ -5,11 +5,12 @@ description: Complete reference for the tandem command-line interface.
 
 # CLI Reference
 
-The `tandem` binary manages Tandem workspaces from the command line. This page is
-an implementation-facing reference for the v0 command surface. It documents
-syntax, defaults, filters, state and accord transitions, output modes, and
-failure behavior. Commands discover the nearest `.tandem/` workspace from the
-current directory; v0 has no workspace-path override.
+The `tandem` binary manages Tandem workspaces from the command line. This page
+documents the command tree of the current release: syntax, defaults, filters,
+the task lifecycle, output modes, and failure behavior. Commands discover the
+nearest `.tandem/` workspace from the current directory; there is no
+workspace-path override. `tandem --help` and `tandem <command> --help` print the
+authoritative flag lists.
 
 For installation and a complete first workflow, see the [Quickstart](/quick-start/).
 The install command below is enough to get the binary, while the reference that
@@ -36,332 +37,244 @@ From a local checkout, use `cargo install --path tandem --locked`.
 ## Command index
 
 - Workspace: [`init`](#tandem-init), [`sync`](#tandem-sync), [`migrate`](#tandem-migrate)
-- Board documents: [`list`](#tandem-list), [`show`](#tandem-show), [`add`](#tandem-add), [`move`](#tandem-move), [`update`](#tandem-update), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel), [`search`](#tandem-search)
-- Papercuts: [`papercut` kind](#papercuts)
-- History: [`log`](#tandem-log)
-- Work agreements: [`accord`](#tandem-accord)
+- Records: [`add`](#tandem-add), [`show`](#tandem-show), [`assignment`](#tandem-assignment), [`list`](#tandem-list), [`search`](#tandem-search), [`update`](#tandem-update), [`link`](#tandem-link)
+- Task lifecycle: [lifecycle overview](#task-lifecycle), [`accord`](#tandem-accord), [`review`](#tandem-review), [`complete`](#tandem-complete), [`cancel`](#tandem-cancel)
 - Coordination rules: [`rules`](#tandem-rules)
-- Decisions: [`decision`](#tandem-decision)
-- Terminal UI: [`tui`](#tandem-tui)
-- Local browser UI: [`web`](#tandem-web)
-- Version: [`version`](#tandem-version), [`--version`](#tandem---version)
+- Interfaces: [`tui`](#tandem-tui), [`web`](#tandem-web)
+- Kinds: [papercuts](#papercuts)
 
-## `tandem` v0 command reference
+The complete tree has these leaves: `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; and `web`. There are no short flags other than the global `-j`, `-h`, and `-V`.
 
-This section is the implementation-facing CLI reference for v0. Syntax examples use canonical command names and long flags only. V0 commands auto-discover the `.tandem/` workspace from the current directory; an explicit workspace-path override is not part of the locked v0 surface.
+Removed commands: there is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready` or `accord accept`, and no Task `update --status`; they fail with a usage error. Use the lifecycle commands below, `list|search --scope archived` for completed history, and `add decision` / `list --type decision` / `update <decision-id> --status` for decisions.
 
-### Global CLI conventions
+## Global conventions
 
-- Human-readable output is the default.
-- Compact tables are used for list/search commands.
-- Labeled detail blocks are used for show/log/decision detail commands.
-- All read commands support `--json` and return this envelope:
+- `-j`/`--json` is global and may appear before or after the subcommand. `-V`/`--version` prints `tandem <version>`; `-h`/`--help` works without a workspace.
+- Human output is the default. Results go to stdout; warnings and errors go to stderr. Mutations print a one-line result and a `Sync:` line.
+- With `--json`, every command writes one envelope to stdout and nothing else:
 
 ```json
-{
-  "ok": true,
-  "data": {},
-  "warnings": []
-}
+{ "ok": true, "data": {}, "warnings": [] }
 ```
 
-- JSON read failures should return non-zero and may use the same envelope shape with `ok: false` and an error object in `data`.
-- Mutation commands are human-readable in v0; structured mutation output is not required.
-- Empty/no-match read behavior:
-  - human-readable list/search commands print an explicit empty message and exit `0`.
-  - JSON read commands return empty arrays/count objects inside the normal `{ "ok": true, ... }` envelope and exit `0`.
-  - missing requested IDs are errors, not no-match results.
-- Exit behavior:
-  - success exits `0`.
-  - usage/argument errors exit `2`.
-  - runtime, data, validation, missing-workspace, missing-document, parse, write, and event-append failures exit `1` in the current CLI implementation.
-  - warnings do not make a command fail unless paired with a structural error.
-- Error wording prefixes recoverable categories where possible: `Parse failure`, `Validation failed`, `Write conflict`, `Write failure`, and `Event append failure`. Event append failures note that the file mutation may already be on disk and needs inspection/repair.
-
-### `tandem init`
-
-- Purpose: create a new Tandem workspace in the current project.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem init [--title <title>] [--force]
-```
-
-- Required inputs: none.
-- Optional inputs:
-  - `--title <title>`: explicit workspace title override; when omitted, the title is derived from the current directory basename with `Tandem Workspace` as a fallback.
-  - `--force`: overwrite existing Tandem workspace files after user intent is explicit.
-- Human output shape: labeled summary of created paths and default states.
-- Exit/error notes:
-  - fails if a workspace already exists and `--force` is not present.
-  - fails on file creation or write errors.
-
-### `tandem list`
-
-- Purpose: list active task and decision documents from the board.
-- Kind: read.
-- Syntax:
-
-```text
-tandem list [--state <state>] [--type <type>] [--kind <kind>] [--priority <priority>] [--tag <tag>] [--assignee <name>] [--parent <id>] [--accord <status>] [--review <status>] [--json]
-```
-
-- Required inputs: none.
-- Optional inputs:
-  - filters: `--state`, `--type`, `--kind`, `--priority`, `--tag`, `--assignee`, `--parent`, `--accord`, `--review`.
-  - `--kind <epic|research|papercut>`: one value, validated; selects Tasks whose `kind` matches exactly. A standard Task (no kind) is never matched. An invalid value fails with `Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`. Tags are never read as kinds.
-  - `--parent <id>` selects documents whose `parentId` matches exactly, whether the parent is a task or another Tandem document type.
-  - `--json`: emit structured output.
-- Human output shape: compact table grouped or sorted by state. Resolve hierarchy from documents: direct Epic children use `epic-task`, children of Tasks use `subtask`, and valid non-task targets use generic `parent`. Never classify from ID shape.
-
-```text
-ID      STATE        TYPE  KIND  RELATION  PARENT      TITLE                ASSIGNEE
-task-7  in-progress  task  epic  -         -           Launch docs epic     pi
-task-8  validation   task  -     epic-task task-7      Add decision view    pi
-task-9  todo         task  -     parent    decision-2  Apply chosen policy  pi
-```
-
-- `--json` data shape:
+- A failure with `--json` returns the same stream with `ok: false`:
 
 ```json
-{
-  "ok": true,
-  "data": {
-    "items": [
-      {
-        "id": "task-8",
-        "type": "task",
-        "title": "Add decision view",
-        "state": "validation",
-        "priority": "high",
-        "assignee": "pi",
-        "parentId": "task-7",
-        "parentRelationship": "epic-task",
-        "tags": ["tui"],
-        "accord": { "status": "delivered" },
-        "review": { "status": "pending" }
-      }
-    ],
-    "counts": {
-      "total": 1,
-      "byState": { "validation": 1 }
-    }
-  },
-  "warnings": []
-}
+{ "ok": false, "error": { "code": "io", "message": "document not found: nope", "details": {} } }
 ```
 
-- Exit/error notes:
-  - fails on missing workspace, invalid filter value, or parse/structure errors.
+- Exit codes: `0` success; `1` operational failure (missing workspace or document, validation, parse, write); `2` usage failure (unknown command or flag, missing required input). Warnings never change the exit code.
+- A list or search with no matches prints nothing and exits `0`; JSON returns `"data": []`. A missing requested ID is an error.
+- Every mutation's JSON `data` includes `id` (the record's final ID) and `sync`: `{ "status": "synced|pending|local-only|not-git", "message": null, "renamed": {}, "conflicts": [], "held": [] }`. See [`tandem sync`](#tandem-sync). Lifecycle mutations also report `event` (accord commands) and `recordWritten`.
+- Human prose values (titles, bodies, notes) may start with a hyphen; IDs, enums, and numbers are strict.
 
-### `tandem show`
+## Task lifecycle
 
-- Purpose: show one active or completed document by ID.
-- Kind: read.
-- Syntax:
+Three signals stay separate: workflow `state` (`todo`, `in-progress`, `validation`), `accord.status` (`ready`, `claimed`, `delivered`, `rework`, `blocked`, and the terminal `accepted` or `failed`), and the archive outcome of a completed record. Review status is not stored.
 
-```text
-tandem show <id> [--json]
-```
+No command sets `state` directly and `update` never edits state, assignee, or Accord status. State changes only through:
 
-- Required inputs:
-  - `<id>`: task or decision ID.
-- Optional inputs:
-  - `--json`: emit structured output.
-- Human output shape: labeled detail block with metadata, body, accord/review data, references, and path. A direct child of an Epic uses Task-of-Epic language; a Subtask uses `Subtask of`; other valid parent targets use `Parent`. Showing an Epic exposes direct `Tasks`; showing a Task exposes direct `Subtasks`; Subtasks and non-task documents expose no child collection.
-- `--json` data shape includes `document.parentId` plus computed `data.parentRelationship: "epic-task" | "subtask" | "parent"` when the document has a resolved parent. A computed `data.tasks` array is emitted for an Epic, `data.subtasks` for a Task, and neither for a Subtask or non-task document:
+| Command | Effect |
+| --- | --- |
+| `accord claim <id> --assignee <name>` | Accord → `claimed`; state `todo` → `in-progress`; sets the assignee. |
+| `accord deliver <id> --summary <text> --evidence <text>` | Accord → `delivered`. Needs `--summary` and at least one non-empty `--evidence`. **State is unchanged**: delivered work stays `in-progress`. |
+| `review <id> --criterion <text> --note <text>` | The only route to `validation`. `--criterion` must be one of the Task's acceptance criteria, verbatim. Does not change the Accord. |
+| `accord rework <id> --note <text>` | Needs a `delivered` (or already `rework`) Accord. Accord → `rework`; state returns to `in-progress`. |
+| `accord release <id> --note <text>` | Accord → `ready`; state → `todo`; clears the assignee. |
+| `complete <id>` | Accepts a delivered Accord and archives the Task to Logs in one step. |
+| `cancel <id> --note <text>` | Archives the Task as canceled. |
 
-```json
-{
-  "ok": true,
-  "data": {
-    "document": {
-      "id": "task-7",
-      "type": "task",
-      "kind": "epic",
-      "title": "Launch docs epic",
-      "state": "in-progress",
-      "priority": "high",
-      "tags": ["tui"],
-      "accord": { "status": "claimed" },
-      "review": { "status": "not-ready" }
-    },
-    "tasks": [
-      {
-        "id": "task-8",
-        "title": "Add decision view",
-        "state": "validation",
-        "location": "board"
-      }
-    ],
-    "body": "## Description\nCoordinate docs launch.",
-    "path": ".tandem/board/task-7.md",
-    "location": "board"
-  },
-  "warnings": []
-}
-```
+There is no `accord accept`: acceptance happens in `complete`. `validation` is an exceptional human escalation, not a step every Task passes through; an agent normally goes `claim` → `deliver` → `complete` (or `rework`).
 
-- Exit/error notes:
-  - fails when the ID is not found in active board documents or completed logs.
-
-### `tandem add`
-
-- Purpose: create a new task in an active state.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem add --title <title> [--state <state>] [--kind <epic|research|papercut>] [--description <text>] [--priority <priority>] [--effort <effort>] [--tag <tag>] [--assignee <name>] [--due-date <date>] [--parent <id>] [--blocker <id>] [--reference <ref>] [--related-file <path>] [--json]
-```
-
-- Required inputs:
-  - `--title <title>`.
-- Optional inputs:
-  - `--state <state>` defaults to `todo`.
-  - `--kind <epic|research|papercut>`: set the Task kind while preserving `type: task` and the task ID namespace; omit it for a standard Task. `--kind epic` and `--parent` cannot be combined because Epics cannot have parents. `--kind research` may sit anywhere. `--kind papercut` needs only a title, so `--acceptance` is optional for it, defaults to `--priority low` unless a priority is given, and may be a root Task or a direct child of an Epic but never a Subtask. Every other Task needs at least one `--acceptance <text>`. See [Papercuts](#papercuts).
-  - `--parent <id>`: create a normal task linked through canonical `parentId`. A resolved Epic parent creates a global-ID Task with `epic-task`; a resolved Task parent creates a leaf `task-N-M` Subtask with `subtask`; a decision/custom parent creates a global-ID Task with generic `parent`. Attaching beneath a Subtask is an error. Global Epic/Task allocation and per-Task Subtask suffix allocation both scan active board documents and completed logs and reserve without overwriting.
-  - metadata: `--description`, `--priority`, `--effort`, repeated `--tag`, `--assignee`, `--due-date`, repeated `--blocker`, repeated `--reference`, repeated `--related-file`. `--effort` records the project's effort value without changing workflow state. `--reference <ref>` accepts a document ID or an absolute `http(s)` URL; URL references are opaque loose links and are never fetched or warned about, while an unresolved document ID warns. Repository paths belong in `--related-file`, not `--reference`.
-  - `--subtask <title>` is a deprecated inline-checklist authoring path and returns usage guidance to create another task with `--parent` instead. Existing inline `subtasks` metadata remains readable for compatibility.
-- Human output shape: labeled created-task summary with ID, state, title, and file path. Epic-parent creation uses Task-of-Epic language, Task-parent creation uses `Created subtask`/`Subtask of`, and non-task parents retain `Created task`/generic `Parent`.
-- JSON output shape: `--json` emits the standard success envelope with the created document summary, including `parentId` and computed `parentRelationship` when present, path, and warnings.
-- Warnings: a `--kind research` or `--kind papercut` Task placed under any `--parent` is allowed but warns (JSON `warnings` array and `Warning:` text on stderr): `a <kind> Task under <parent> is allowed but not recommended; prefer a root Task plus `tandem link add <id> relates-to <parent>``, where `<id>` is the new Task's ID.
-- Exit/error notes:
-  - fails on invalid state, unsupported kind (`Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`), missing acceptance on a non-papercut (`add requires at least one --acceptance <text>; only --kind papercut may omit it`), a papercut under a Task (`Validation failed: a papercut under <task-id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`), invalid referenced parent/blocker, a parented Epic, attachment beneath a Subtask, a role/ID mismatch, or failed write. Direct Epic Tasks never receive hierarchical IDs.
-
-### `tandem move`
-
-- Purpose: move an active task to another active state.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem move <id> --state <state>
-```
-
-- Required inputs:
-  - `<id>`: task ID.
-  - `--state <state>`: target active state.
-- Human output shape: one-line status transition plus any synchronized accord transition and path.
-- State/accord synchronization:
-  - moving a task from `todo` to `in-progress` claims an existing `accord.status: ready` and prints `Accord: ready -> claimed`.
-  - moving to `validation` is preferred for delivered work; existing `state: review` files are tolerated as a legacy alias.
-  - ambiguous or destructive accord changes are left to explicit `tandem accord ...` commands.
-- Exit/error notes:
-  - fails if the task is not active, the ID resolves to a non-task document, the state is unknown, structural validation fails, or the write fails.
-
-### `tandem update`
-
-- Purpose: replace the complete Markdown body or edit workflow-orthogonal metadata on an active Task or Decision without changing lifecycle state.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem update <task-id> [--title <title>] [--body <markdown>] [--kind <epic|research|papercut>] [--priority <critical|high|medium|low>] [--effort <effort>] [--due-date <date>] [--parent <id>] [--tag <tag>] [--blocker <id>] [--reference <id>] [--related-file <path>] [--clear <field>]
-tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--decider <name>] [--supersedes <decision-id>] [--tag <tag>] [--reference <ref>] [--related-file <path>] [--clear <field>]
-```
-
-- Required inputs:
-  - `<id>`: active Task or Decision ID. The command resolves the document's actual `type` and validates fields against it; type is never inferred from the ID prefix.
-- Optional inputs:
-  - exact body replacement: `--body <markdown>` replaces all text after the closing frontmatter delimiter. Multiline, Unicode, and leading-dash values are valid; omission means no body edit. A Decision body is removed with `--clear body`, and Decision `--body` values must be non-empty.
-  - scalar replacements: `--title` for both types. Tasks additionally accept `--kind`, `--priority`, `--effort`, and `--due-date`; Decisions additionally accept `--status`.
-  - `--parent <id>`: attach or reparent the task by replacing `parentId` after validating the prospective role graph. An Epic target requires the document to remain a global-ID Task with `epic-task`; a Task target would require a matching `task-N-M` Subtask with `subtask`; a decision/custom target requires a global-ID Task with generic `parent`. Reject a parented Epic, a Subtask target, every role/ID mismatch, and any role-changing or ID-invalidating reparenting. The immutable ID is never renamed.
-  - repeated list metadata: present repeated `--tag`, `--reference`, and `--related-file` replace the full list for both types; Tasks also accept `--blocker`, and Decisions also accept `--decider` and `--supersedes`. Absent lists are unchanged.
-  - `--clear <field>`: remove a supported list or optional scalar. For Decisions the supported names are `body`, `tags`/`tag`, `references`, `relatedFiles`/`related-file`, `deciders`, and `supersedes`; unknown, immutable (`title`, `id`, `type`, timestamps), and lifecycle (`status`) clears fail. A field may be set or cleared, never both in one request.
-- Unsupported by design:
-  - no `--state`; use `tandem move <id> --state <state>` for workflow transitions.
-  - no update-time `--description`; that flag remains an add-time convenience that creates a Description section. Use `--body` to replace the exact complete Markdown body. Inline `--subtask` authoring is deprecated in favor of a separate task with `--parent`.
-  - no accord/review metadata editing via `update`; use `tandem accord ...` for accord lifecycle changes and review/validation flows for `review:` metadata. Decision `status` is ADR record metadata, not Task workflow state or Accord status.
-  - completed logs are not updated.
-- Validation:
-  - kind, when set, must be `epic`, `research`, or `papercut`; an Epic must have no `parentId`.
-  - a papercut may never be a Subtask: `--parent <task-id>` on a papercut, or `--kind papercut` on a Subtask, fails with `Validation failed: papercut <id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`.
-  - only a papercut may have no acceptance criterion: `--clear acceptance` on any other Task fails with `<id> cannot clear acceptance; an active task requires at least one criterion (only a papercut may have none)`, and changing a papercut without acceptance to another kind requires `--acceptance` in the same call (`<id> requires at least one acceptance criterion unless it is a papercut; add --acceptance <text>`).
-  - priority must be one of `critical`, `high`, `medium`, or `low`.
-  - a research or papercut Task that ends up under a parent through `--parent` or `--kind` succeeds but warns with the same recommendation as `add`: prefer a root Task plus `tandem link add <id> relates-to <parent>`.
-  - decision `status` must be exactly `proposed`, `accepted`, `rejected`, `deprecated`, or `superseded`; padded values with leading or trailing whitespace are rejected rather than normalized.
-  - parent and blockers must resolve to existing documents. The prospective graph must keep Epics root-only, Subtasks childless, Epics/Tasks global-ID, and Subtasks `task-N-M` beneath the matching Task; document-ID references warn when unresolved, while absolute `http(s)` URL references are opaque loose links that never warn; related files remain path metadata and are never treated as document references.
-  - flags that do not apply to the resolved document type are rejected before any write.
-- Decision timestamps: entering `accepted` or `rejected` writes `decidedAt`; leaving a terminal status keeps the historical `decidedAt`; repeating an unchanged status is a no-op. Every real change writes `updatedAt`.
-- Human output shape: warnings first on stderr, then changed metadata fields; a body replacement reports only `body: changed` and never echoes body content. If every requested value already exists byte-for-byte, the command prints a clear no-op and does not update `updatedAt` or append an event.
-- Mutation notes: raw-source patches preserve unrelated/unknown frontmatter; metadata-only updates preserve the Markdown body, while `--body` replaces it exactly. Real changes update `updatedAt` and append `task.updated` or `decision.updated`; event summaries name `body` without copying body content.
-
-### `tandem complete`
-
-- Purpose: complete an active task, archive it to logs, and append an audit event.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem complete <id> --summary <text> [--file-changed <path>] [--validation <text>] [--reviewer <name>]
-```
-
-- Required inputs:
-  - `<id>`: task ID.
-  - `--summary <text>`: completion summary.
-- Optional inputs:
-  - repeated `--file-changed <path>`.
-  - `--validation <text>`: human-readable validation result summary.
-  - `--reviewer <name>`.
-- Human output shape: policy warnings first on stderr, then the completion result line on stdout. Archived records carry `archivedAt` plus minimal `resolution: { outcome, note, reviewer }`; read commands still tolerate earlier flat completion fields.
-- Behavior:
-  - completes any active Task whose hierarchy, blockers, and structure are valid;
-  - warns when the document's own Accord is neither delivered nor accepted, with the narrow child-based Epic exception below;
-  - child-based Epic exception: a grouping Epic (`kind: epic`) with at least one resolved descendant Task/Subtask closes without the delivery warning when every descendant is archived with an explicit canonical `resolution.outcome: completed`. Eligibility only suppresses that warning: for an otherwise-undelivered eligible Epic, no synthetic delivery or acceptance is added and no child evidence is copied, while normal archive behavior and ordinary delivered-parent acceptance remain. Empty Epics, active descendants, and absent, legacy-only, unknown, canceled, or failed descendant outcomes retain the warning; an explicitly delivered or accepted Epic is already warning-free;
-  - archive outcome (`resolution.outcome`: `completed`, `canceled`, or `failed`) is distinct from Accord delivery status; a `completion.outcome` value without `resolution.outcome` is not positive completion evidence.
-
-Example warning output (stderr warnings, then the stdout summary):
+Completing a Task whose own Accord is neither `delivered` nor `accepted` is allowed by design. It prints a warning and still completes:
 
 ```text
 Warning: task-7 has accord.status=ready; complete normally follows a delivered Accord.
-Completed task-7 (record written; metadata persisted (batched for host boundary))
+Completed task-7 (record written; saved locally (no Git remote to sync with))
 ```
 
-- Exit/error notes:
-  - warns but does not fail when the Accord is neither delivered nor accepted, unless the child-based Epic exception applies.
-  - fails when the ID is missing, the document is not completable, the document is already completed, active descendants remain, blockers remain unresolved, structure validation fails, or the move/write fails.
+Expect this warning when closing work that was never delivered, such as a Task finished without an Accord, a research Task, or an Epic (see [`complete`](#tandem-complete) for the Epic exception).
+
+Technical capability is not authority: confirm that the assignment or workspace policy authorizes the actor before `review`, `complete`, `cancel`, or `accord fail`.
+
+### `tandem init`
+
+- Purpose: create a Tandem workspace (`.tandem/` with `tandem.md`, `tasks/`, `decisions/`, `rules/`, `logs/`, and `events/`) in the current directory.
+- Syntax: `tandem init [--title <title>]`. `--title` sets the workspace title; otherwise it is derived from the directory name.
+- Fails with `Tandem workspace already exists at <path>.` when a workspace is present. There is no `--force`.
+
+### `tandem add`
+
+- Purpose: create a Task or a Decision. The title is a positional argument.
+- Syntax:
+
+```text
+tandem add task <TITLE> --acceptance <text> [--acceptance <text>...] [--body <markdown>] [--kind <epic|research|papercut>] [--priority <priority>] [--effort <effort>] [--tag <tag>...] [--due-date <date>] [--parent <id>] [--blocker <id>...] [--reference <ref>...] [--related-file <path>...] [--constraint <text>...] [--validation <text>...] [--json]
+tandem add decision <TITLE> [--body <markdown>] [--decider <name>...] [--supersedes <decision-id>...] [--reference <ref>...] [--tag <tag>...] [--json]
+```
+
+- A new Task is created in `todo` with an Accord at `ready`. There is no `--state`, `--description`, or `--assignee`; the assignee is set by `accord claim`.
+- `--acceptance <text>` (repeatable) is required for every Task except `--kind papercut`. `--constraint` and `--validation` record the Accord's constraints and planned validations; a validation beginning with `$ ` is a runnable command (see [`assignment`](#tandem-assignment)).
+- `--kind <epic|research|papercut>` sets the Task kind while keeping `type: task`. `--kind epic` and `--parent` cannot be combined. A papercut defaults to `low` priority, may be a root Task or a direct child of an Epic, and is never a Subtask. See [Papercuts](#papercuts).
+- `--parent <id>` links through canonical `parentId`. An Epic parent creates a global-ID Task (`epic-task`); a Task parent creates a leaf `task-N-M` Subtask (`subtask`); a decision parent creates a global-ID Task with generic `parent`. Attaching beneath a Subtask is an error. Epic/Task IDs are allocated globally and Subtask suffixes per Task, scanning the Board and Logs and never reusing an ID.
+- `--reference <ref>` accepts a document ID or an absolute `http(s)` URL. URLs are opaque and never fetched or warned about; an unresolved document ID warns. Repository paths belong in `--related-file`.
+- A Decision is created with `status: proposed`. Change its status, deciders, and other metadata with `tandem update <decision-id>`; Decisions have no workflow `state`.
+- Output: `Created task` (or `Created decision`) with `ID:`, `Title:`, and `Sync:` lines. `--json` returns `{ "id": "task-8", "sync": {...} }`.
+- Warnings: a `--kind research` or `--kind papercut` Task under any `--parent` is allowed but warns: ``a <kind> Task under <parent> is allowed but not recommended; prefer a root Task plus `tandem link add <id> relates-to <parent>` ``.
+- Errors: missing acceptance (`add requires at least one --acceptance <text>; only --kind papercut may omit it`, exit 2), an invalid kind (`Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`), a parented Epic, attachment beneath a Subtask, a papercut under a Task, or an unresolved parent or blocker.
+
+### `tandem show`
+
+- Purpose: show one active or archived record by ID.
+- Syntax: `tandem show <id> [--json]`.
+- Human output: labeled lines (`ID`, `Type`, `Title`, `Location` (`board` or `logs`), then `State`, `Accord`, `Assignee`, links, and so on where present).
+- `--json` `data` is one flat object: `id`, `type`, `title`, `location`, `state`, `kind`, `role`, `priority`, `effort`, `dueDate`, `assignee`, `tags`, `blockers`, `references`, `relatedFiles`, `parentId`, `parentRelationship` (`epic-task`, `subtask`, `parent`, or `null`), `parent`, `children`, `links`, `incomingLinks`, `accord`, `accordStatus`, `attemptCount`, `reworkCount`, `discardedCount`, `resolution`, `completedAt`, `decision` (for Decisions), `validation` (set by `review`), `body`, `createdAt`, and `updatedAt`.
+- Hierarchy is resolved from documents, never from ID shape. An Epic exposes its direct Tasks and a Task its direct Subtasks through `children`.
+- Fails when the ID is in neither the Board nor Logs.
+
+### `tandem assignment`
+
+- Purpose: return the complete current definition of a Task for a delegated worker.
+- Syntax: `tandem assignment <task-id> [--json]`. The root must be a Task, not a Subtask (`assignment root must be a Task: task-1-1 is subtask`).
+- `--json` `data`: `definitionToken` (an opaque freshness token), `dependencyReadiness` (`{ allClear, issues }`), `milestones` (the Task's direct Subtasks), and `root` (`id`, `title`, `type`, `role`, `kind`, `state`, `accordStatus`, `acceptance`, `constraints`, `dependencies`, `ownedScope`, `plannedValidation`, `body`, `ready`, `location`, `resolutionOutcome`, `attemptCount`, `reworkCount`, `discardedCount`).
+- Each `plannedValidation` item is `{ "kind": "command" | "manual", "text": "..." }`. A validation beginning with `$ ` is a runnable command; its prefix is stripped. Tandem never runs it.
+
+### `tandem list`
+
+- Purpose: list active records. `--scope archived|all` includes Logs.
+- Syntax:
+
+```text
+tandem list [--scope <active|archived|all>] [--type <type>] [--state <state>] [--kind <epic|research|papercut>] [--priority <priority>] [--effort <effort>] [--tag <tag>] [--assignee <name>] [--parent <id>] [--accord <status>] [--decision-status <status>] [--resolution <outcome>] [--link <type>] [--linked-to <id>] [--limit <count>] [--json]
+```
+
+- `--scope` defaults to `active`. There is no `--review` filter. `--type decision` lists Decisions and `--scope archived` lists completed and canceled Tasks.
+- `--kind` takes one value and matches Tasks of exactly that kind; a standard Task is never matched, and tags are never read as kinds. An invalid value fails with `Validation failed: invalid kind `<value>`; expected one of: epic, research, papercut`.
+- `--parent <id>` selects documents whose `parentId` matches exactly. `--link <type>` selects records with a stored or derived-inverse link of that type, and `--linked-to <id>` selects records linked to that record.
+- Human output: one tab-separated line per record, `<id>	<title>`.
+- `--json`: `data` is an array of `{ "id", "title" }`.
+
+```json
+{ "ok": true, "data": [{ "id": "task-4", "title": "T4" }], "warnings": [] }
+```
+
+### `tandem search`
+
+- Purpose: search active records, and with `--scope` the Logs.
+- Syntax: `tandem search <query> [--scope <active|archived|all>] [--type <type>] [--state <state>] [--kind <epic|research|papercut>] [--tag <tag>] [--parent <id>] [--limit <count>] [--json]`.
+- Human output: `<id>	<title>	<snippet>` per match. `--json`: `data` is an array of `{ "id", "title", "snippet" }`.
+
+### `tandem update`
+
+- Purpose: edit metadata or replace the Markdown body of an active Task or Decision without changing lifecycle state.
+- Syntax:
+
+```text
+tandem update <task-id> [--title <title>] [--body <markdown>] [--kind <epic|research|papercut>] [--priority <critical|high|medium|low>] [--effort <effort>] [--due-date <date>] [--parent <id>] [--tag <tag>...] [--blocker <id>...] [--reference <ref>...] [--related-file <path>...] [--acceptance <text>...] [--constraint <text>...] [--validation <text>...] [--clear <field>...] [--json]
+tandem update <decision-id> [--title <title>] [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--decider <name>...] [--supersedes <decision-id>...] [--tag <tag>...] [--reference <ref>...] [--related-file <path>...] [--clear <field>...] [--json]
+```
+
+- `<id>` is an active Task or Decision. The command resolves the document's actual `type` and rejects flags that do not apply before writing; type is never inferred from the ID prefix. `--status` exists only for Decisions: on a Task it fails with `update flags not valid for task documents: --status`.
+- There is no `--state`, `--assignee`, or `--description`. Workflow changes use the [lifecycle commands](#task-lifecycle). Archived records are not updated.
+- `--body` replaces everything after the frontmatter exactly; omission leaves the body alone. A Decision body is removed with `--clear body`, and a Decision `--body` must be non-empty.
+- Repeated list flags (`--tag`, `--reference`, `--related-file`, `--blocker`, `--acceptance`, `--constraint`, `--validation`, `--decider`, `--supersedes`) replace the complete list; absent lists are unchanged. `--clear <field>` removes a list or optional scalar (for example `tags`, `blocker`, `due-date`, `parent`, `constraint`, `validation`). A field may be set or cleared, never both in one request. Identity fields and, for Decisions, `status` cannot be cleared.
+- `--parent <id>` attaches or reparents after validating the prospective role graph: an Epic target needs a global-ID Task, a Task target needs a matching `task-N-M` Subtask, and a decision target needs a global-ID Task. It rejects a parented Epic, a Subtask target, and every role or ID mismatch. IDs are immutable and never renamed.
+- Clearing a parent that would change a Subtask into a Task is refused before any write: `update <subtask> --clear parent` fails with `Validation failed: reparenting <id> would change its canonical role from subtask to task; IDs are immutable`.
+- Validation:
+  - an Epic must have no `parentId`; a papercut may never be a Subtask (`Validation failed: papercut <id> cannot be a Subtask; a papercut must be a root Task or a direct child of an Epic`);
+  - only a papercut may have no acceptance: `--clear acceptance` on any other Task fails with `<id> cannot clear acceptance; an active task requires at least one criterion (only a papercut may have none)`, and re-kinding a papercut without acceptance requires `--acceptance` in the same call;
+  - priority must be `critical`, `high`, `medium`, or `low`; Decision `status` must be exactly one of its five values, with no padding;
+  - parent and blockers must resolve; unresolved document-ID references warn, while absolute `http(s)` URLs never do;
+  - a research or papercut Task that ends up under a parent succeeds but warns, as for `add`.
+- Decision timestamps: entering `accepted` or `rejected` writes `decidedAt`; leaving a terminal status keeps it; repeating an unchanged status is a no-op. Every real change writes `updatedAt`.
+- Output: `Updated <id>: <fields>` (a body change reports only `body` and never echoes content), or `No changes for <id>` when every value already matches. Unrelated and unknown frontmatter and the body are preserved.
+- A record held from sync cannot be updated until it is restored; see [`tandem sync`](#tandem-sync).
+
+### `tandem link`
+
+- Purpose: add or remove typed links between records.
+- Syntax: `tandem link add <id> <type> <target>` and `tandem link remove <id> <type> <target>`, where `<type>` is `relates-to`, `duplicates`, `fixed-by`, `fixes`, or `supersedes`.
+- Links are stored on `<id>`; the target shows the derived inverse (`fixed-by` ↔ `fixes`) in `show`. `list --link <type> --linked-to <id>` filters on them. `complete <id> --fixed-by <target>` records a `fixed-by` link while completing. `links` and `incomingLinks` appear in `show --json`.
+- Output: `Linked <id> <type> <target>` or the matching removal line, followed by sync status.
+
+### `tandem accord`
+
+- Purpose: manage the work agreement attached to a Task. Every active Task has an Accord, created at `ready` with the Task's acceptance criteria.
+- Syntax:
+
+```text
+tandem accord claim   <id> --assignee <name>
+tandem accord deliver <id> --summary <text> --evidence <text> [--evidence <text>...] [--file-changed <path>...]
+tandem accord rework  <id> --note <text>
+tandem accord block   <id> --note <text>
+tandem accord resume  <id>
+tandem accord release <id> --note <text> [--disposition <reassign|discarded>]
+tandem accord fail    <id> --note <text>
+```
+
+- All subcommands accept `--json`. `ready` is a stored status but not a command; a Task starts at `ready`. There is no `accept` (see [`complete`](#tandem-complete)) and the note flag is `--note` for `block`, `release`, `fail`, and `rework` (not `--reason`).
+- `claim` sets the Accord to `claimed`, sets the top-level `assignee`, and moves `todo` to `in-progress`; claiming an already accepted Accord is rejected.
+- `deliver` requires `--summary` and at least one `--evidence` containing non-whitespace text; without it the command exits 2 with `accord deliver requires at least one non-empty --evidence <text>`. It sets `accord.status: delivered` and records the summary, evidence, and changed files. **It does not change `state`**: delivered work stays `in-progress`.
+- `rework` requires status `delivered` (or an existing `rework`); otherwise it fails with `accord rework requires current accord.status=delivered; current status is <status>`. A successful rework sets `rework` and returns the Task to `in-progress`. Record post-delivery corrections with `rework` so `reworkCount` stays accurate.
+- `block` records a blocker without changing `state`; `resume` returns a `blocked` Accord to `claimed`.
+- `release` returns the Task to the claimable pool: Accord `ready`, state `todo`, assignee cleared. `--disposition` defaults to `reassign`; `discarded` marks the attempt as abandoned. Disposition is event data on `accord.released`, not an Accord status. `attemptCount`, `reworkCount`, and `discardedCount` are derived from events and appear in `show --json` and `assignment --json`.
+- `fail` atomically archives the Task to Logs with outcome `failed`.
+- Output: `Accord <id>: <status> (record written; <sync message>)`. `--json` `data`: `{ "id", "event" (such as `accord.claimed`), "status", "recordWritten", "sync" }`.
+- Errors: a missing or archived Task, a transition invalid from the current status, or missing required input.
+
+### `tandem review`
+
+- Purpose: escalate a Task to human validation. It is the only command that moves a Task to `state: validation`; delivering does not.
+- Syntax: `tandem review <id> --criterion <text> --note <text> [--reviewer <name>] [--json]`. `review` has no subcommands.
+- `--criterion` must exactly match one of the Task's unresolved acceptance criteria. A non-matching value fails with `Review failed: <id> has no acceptance criterion "<value>"; expected one of: "crit one", "crit two"` and exit `1`.
+- Review does not change the Accord (a delivered Accord stays `delivered`). It records `validation.criterion`, `validation.note`, `validation.requestedAt`, and optional `validation.reviewer` on the Task and appends a `review.requested` event; there is no stored review status. Subtasks cannot be reviewed. `complete` accepts the delivered work and `accord rework` returns it to `in-progress`.
+- Output: `Validation requested for <id> (record written; <sync message>)`. `--json` `data`: `{ "id", "state": "validation", "recordWritten", "sync" }`.
+
+### `tandem complete`
+
+- Purpose: complete an active Task, accept its delivered Accord, archive it to Logs, and append an audit event.
+- Syntax: `tandem complete <id> [--note <text>] [--reviewer <name>] [--fixed-by <id>] [--json]`. There is no `--summary`, `--file-changed`, or `--validation`; delivery evidence is recorded by `accord deliver`.
+- `--fixed-by <id>` resolves the Task as fixed by another record and stores a `fixed-by` link. Archived records carry `archivedAt` and a minimal `resolution: { outcome, note, reviewer }`.
+- A delivered Accord becomes `accepted` in the same atomic step. Any active Task whose hierarchy, blockers, and structure are valid can be completed.
+- Warning, not failure: when the Task's own Accord is neither `delivered` nor `accepted`, the command warns `Warning: <id> has accord.status=<status>; complete normally follows a delivered Accord.` and still completes. This is deliberate; no Accord state is invented.
+- Epic exception: a grouping Epic (`kind: epic`) with at least one resolved descendant, where every descendant is archived with an explicit `resolution.outcome: completed`, completes without that warning. Eligibility only suppresses the warning: no delivery or acceptance is synthesized and no child evidence is copied. Empty Epics, active descendants, and absent, legacy, canceled, or failed descendant outcomes keep the warning.
+- Output: `Completed <id> (record written; <sync message>)`; `--json` `data`: `{ "id", "recordWritten", "sync" }`.
+- Fails when the ID is missing or already archived, active descendants remain (`cannot complete <id> while it has active descendants: <ids>`), blockers are unresolved, or structure validation fails.
 
 ### `tandem cancel`
 
 - Purpose: archive an active Task as canceled while retaining its ID, body, metadata, references, and audit history.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem cancel <id> --reason <text>
-```
-
-- Required inputs:
-  - `<id>`: active Task ID.
-  - `--reason <text>`: non-empty human explanation.
-- Behavior:
-  - rejects non-Tasks, archived-only IDs, duplicate Log destinations, invalid hierarchy, and any active descendant;
-  - does not cascade and does not require resolved blockers or accepted review/accord;
-  - preserves raw body/frontmatter, removes active `state`, updates `updatedAt`, sets compatible archive timestamp `completedAt`, and writes `completion.outcome: canceled` plus `completion.summary: "Canceled: <reason>"`;
-  - emits `task.canceled`; a canceled blocker is terminal/resolved, but canceled work is excluded from successful-completion progress;
-  - retains the ID in Logs, so existing allocation rules prevent reuse.
-- Human output shape: canceled ID, reason, Board-to-Logs path, and event name.
-- JSON/Log/TUI reads expose `canceled`; legacy Logs without `completion.outcome` default to `completed`.
-- Out of scope: permanent deletion, cascades, same-ID recreation, a dedicated recreate command, and a TUI cancellation action. TUI read/render compatibility is required.
+- Syntax: `tandem cancel <id> --note <text> [--json]`. `--note` is required (there is no `--reason`).
+- Rejects non-Tasks, archived IDs, invalid hierarchy, and any active descendant. It does not cascade and does not require resolved blockers or an accepted Accord.
+- The record keeps its raw body and frontmatter, drops active `state`, and gains the canceled resolution and `archivedAt`. A canceled blocker is resolved, but canceled work is excluded from successful-completion progress. The ID stays in Logs and is never reused.
+- Output: `Canceled <id> (record written; <sync message>)`.
+- Out of scope: permanent deletion, cascades, same-ID recreation, and a TUI cancellation action.
 
 ### `tandem sync`
 
 - Purpose: synchronize the board with the repository's `tandem` branch now. Tandem already syncs after every change, before reads older than 60 seconds, and in the background of the TUI and web view, so this is rarely needed.
-- Kind: mutation (board and `tandem` branch only; never the source branch, index, or working tree).
+- Kind: mutation of the board and `tandem` branch only; never the source branch, index, or working tree.
 - Syntax:
 
 ```text
 tandem sync
 tandem sync status
-tandem sync resolve <id> --keep local|remote|edited
+tandem sync resolve <id> --keep <local|remote|edited>
 ```
 
-- `tandem sync` fetches, merges record by record, numbers records that still have temporary `<prefix>-new-<hex>` IDs, and pushes without force. Offline, local changes stay saved and the result is `pending`.
-- `tandem sync status` works without network access. It reports the remote, whether local changes are waiting, the last fetch, the last problem, open conflicts, and held edits (local files that cannot be published, such as unparsable Markdown or a changed `uid`).
+- `tandem sync` fetches, merges record by record, numbers records that still have temporary `<prefix>-new-<hex>` IDs, and pushes without force. Offline, local changes stay saved and the result is `pending`. Without a remote the result is `local-only`.
+- `tandem sync status` needs no network. It reports the remote, whether local changes are waiting, the last fetch, the last problem, open conflicts, and held edits. Its holds are computed locally only: a hold that exists because of a change on the remote you have not yet fetched appears only in `tandem sync`.
 - `tandem sync resolve` settles a conflict: `local` keeps this machine's version, `remote` keeps the shared version, and `edited` keeps the file as you edited it in `.tandem/`. Changes to a conflicted record are refused until it is resolved.
-- JSON: `{"ok":true,"data":{"sync":{"status":"synced|pending|local-only|not-git","message":null,"renamed":{},"conflicts":[],"held":[]}},"warnings":[]}`. Every mutation includes the same `data.sync` object and reports the record's final ID.
+
+**Held edits.** A local change that cannot be published is held back and never overwrites the shared board. Held changes include unparsable files, a missing or changed `uid`, an `id` that does not match the file name, a changed `protocolVersion` or `workspaceId`, and a record that parses but would make the shared board invalid (for example an unresolved `parentId`). For a validation hold on a Git board with a remote:
+
+- Reads use the shared version of the record with a warning naming the file (`Warning: reading the shared version of task-1: its local edit .tandem/tasks/task-1.md is held from sync: would make the shared board invalid: <message>`). A held record that was never shared is skipped (`Warning: skipped task-9: its new local record ... is held from sync: ...`) and `show` reports it as not found.
+- Mutations of other records still work and report the hold: `Sync: saved locally; pending sync (some changes are held; see `tandem sync status`)` plus a `held:` line.
+- Mutating the held record is refused: `<id> has a local edit held from sync (<reason>). Restore the shared version with `tandem sync resolve <id> --keep remote` before changing it.`
+- `tandem sync status` prints `Held edit: <path>: would make the shared board invalid: <message>` followed by `  resolve: tandem sync resolve <id> --keep remote`.
+- `tandem sync resolve <id> --keep remote` repairs a validation hold when no conflict exists for that ID: it restores the shared version, or removes a record that was never shared. `--keep local` and `--keep edited` fail clearly, because an unpublishable version cannot be kept.
+
+JSON: `tandem sync status --json` returns `data` with `remote`, `git`, `pending`, `published`, `lastFetch`, `lastError`, `conflicts`, and `held`; each `held` entry is `{ "path", "reason", "id" }`. Mutations and `tandem sync --json` return `data.sync` with `status` (`synced`, `pending`, `local-only`, or `not-git`), `message`, `renamed`, `conflicts`, and `held`.
 
 ### `tandem migrate`
 
@@ -383,183 +296,6 @@ tandem migrate --adopt [--dry-run]
 - Errors: `this board is already at protocol 0.5.0; nothing to migrate`; `tandem migrate converts protocol 0.3.0 and 0.4.0 boards; found \`<version>\``. Ordinary commands on a 0.4.0 board fail with `This board uses protocol 0.4.0; this Tandem version requires 0.5.0. Run \`tandem migrate\` to upgrade it. Every machine that shares this board must install this Tandem version before the board is migrated and synced, because older versions cannot read the new kinds or protocol version.`
 - See [Upgrading to independent sync](/guides/upgrading-to-independent-sync/) for the 0.3.0 step.
 
-### `tandem log`
-
-#### `tandem log list`
-
-- Purpose: list archived completed and canceled Log documents.
-- Kind: read.
-- Syntax:
-
-```text
-tandem log list [--limit <count>] [--json]
-```
-
-- Required inputs: none.
-- Optional inputs:
-  - `--limit <count>`: maximum rows to show.
-  - `--json`: emit structured output.
-- Human output shape: compact table sorted by most recent archive timestamp.
-
-```text
-ID      ARCHIVED             OUTCOME    TITLE                    SUMMARY
-task-7  2026-06-26 15:00     completed  Implement theme loader   Theme loader complete
-```
-
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "items": [
-      {
-        "id": "task-7",
-        "type": "task",
-        "title": "Implement theme loader",
-        "completedAt": "2026-06-26T15:00:00Z",
-        "outcome": "completed",
-        "summary": "Theme loader complete",
-        "accordStatus": "accepted",
-        "validationStatus": "passed"
-      }
-    ],
-    "count": 1
-  },
-  "warnings": []
-}
-```
-
-#### `tandem log show`
-
-- Purpose: show one completed or canceled Log document.
-- Kind: read.
-- Syntax:
-
-```text
-tandem log show <id> [--json]
-```
-
-- Required inputs:
-  - `<id>`: archived Task ID.
-- Optional inputs:
-  - `--json`: emit structured output.
-- Human output shape: labeled completion detail block with body, completion metadata, accord evidence, validation, files changed, and timeline where available.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "document": {
-      "id": "task-7",
-      "type": "task",
-      "title": "Implement theme loader",
-      "completedAt": "2026-06-26T15:00:00Z"
-    },
-    "completion": {
-      "outcome": "completed",
-      "summary": "Theme loader complete",
-      "filesChanged": ["src/tui/theme.rs"],
-      "validation": { "status": "passed", "summary": "cargo test passed" },
-      "reviewer": "Algorant"
-    },
-    "accord": { "status": "accepted" },
-    "body": "## Description\nBuild the theme loader.",
-    "events": [
-      { "ts": "2026-06-26T15:00:00Z", "event": "task.completed", "id": "task-7", "summary": "Theme loader complete" }
-    ]
-  },
-  "warnings": []
-}
-```
-
-#### `tandem log search`
-
-- Purpose: search completed and canceled Logs only.
-- Kind: read.
-- Syntax:
-
-```text
-tandem log search <query> [--json]
-```
-
-- Required inputs:
-  - `<query>`.
-- Optional inputs:
-  - `--json`: emit structured output.
-- Human output shape: compact search table with matching context.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "query": "theme",
-    "results": [
-      {
-        "id": "task-7",
-        "title": "Implement theme loader",
-        "completedAt": "2026-06-26T15:00:00Z",
-        "match": "Summary: Theme loader complete"
-      }
-    ]
-  },
-  "warnings": []
-}
-```
-
-### `tandem search`
-
-- Purpose: search active documents and completed logs.
-- Kind: read.
-- Syntax:
-
-```text
-tandem search <query> [--state <state>] [--type <type>] [--kind <kind>] [--parent <id>] [--json]
-```
-
-- Required inputs:
-  - `<query>`.
-- Optional inputs:
-  - `--state <state>` filters active board results.
-  - `--type <type>` filters by document type.
-  - `--kind <epic|research|papercut>` filters to Tasks of that kind (one value, validated like `list --kind`).
-  - `--parent <id>` filters active and completed results to documents with that parent, including generic non-task parent targets.
-  - `--json`: emit structured output.
-- Human output shape: compact table with location (`board` or `logs`), type, optional kind marker, resolved `RELATION` (`epic-task`, `subtask`, or generic `parent`), parent ID, and match snippet.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "query": "theme",
-    "results": [
-      {
-        "id": "task-8",
-        "type": "task",
-        "title": "Add theme preview",
-        "location": "board",
-        "state": "in-progress",
-        "parentId": "task-7",
-        "parentRelationship": "epic-task",
-        "snippet": "Add theme preview to the docs launch."
-      },
-      {
-        "id": "task-2",
-        "type": "task",
-        "title": "Choose theme colors",
-        "location": "logs",
-        "completedAt": "2026-06-25T18:00:00Z",
-        "snippet": "Summary: Theme palette chosen."
-      }
-    ]
-  },
-  "warnings": []
-}
-```
-
 ### Papercuts
 
 A papercut is a Task with `kind: papercut`: small, non-blocking friction that caused confusion, avoidable retries, unnecessary effort, or a workaround worth preserving. There is no `papercut` command; use `add task`, `update`, `list --kind papercut`, and `search --kind papercut`.
@@ -578,306 +314,33 @@ tandem search "ambiguous" --kind papercut
 - `show --json` and `assignment <task-id> --json` report `kind` (`data.root.kind` for an assignment; `null` for a standard Task).
 - Use a blocking lifecycle when work cannot continue, and a normal Task when the fix needs planning.
 
-### `tandem accord`
-
-- Purpose: manage the work agreement attached to a task.
-- The six mutating actions are `claim`, `deliver`, `accept`, `rework`, `block`,
-  and `fail`. `ready` is a legacy status that remains readable, but is not an
-  action accepted by the current CLI. Use `claim` to start an accord.
-
-- Kind: mutation.
-
-Subcommands:
-
-```text
-tandem accord ready <id> [--assignee <name>] [--deliverable <spec>] [--validation <command>] [--constraint <text>]
-tandem accord claim <id> --assignee <name>
-tandem accord deliver <id> --summary <text> [--evidence <text>] [--file-changed <path>]
-tandem accord accept <id> [--reviewer <name>] [--note <text>]
-tandem accord rework <id> --note <text>
-tandem accord block <id> --reason <text>
-tandem accord fail <id> --reason <text>
-```
-
-- Required inputs:
-  - all subcommands require `<id>`.
-  - `claim` requires `--assignee`.
-  - `deliver` requires `--summary`.
-  - `rework` requires `--note`.
-  - `block` and `fail` require `--reason`.
-- Optional inputs:
-  - `ready` may include repeated `--deliverable`, repeated `--validation`, repeated `--constraint`, and `--assignee`.
-  - `deliver` may include repeated `--evidence` and repeated `--file-changed`.
-  - `accept` may include `--reviewer` and `--note`.
-- Human output shape: labeled status transition plus any synchronized workflow-state transition or state/review warnings. The current implementation writes `accord.claimedAt` on claim, `accord.deliveredAt` on deliver, and repeated `--validation` values under `accord.validation.commands`; it still reads earlier `accord.validations` values.
-- State synchronization is conservative: `claim` moves `todo` to `in-progress`; `deliver` and `accept` move compatible `todo`, `in-progress`, or legacy `review` tasks to `validation`; `rework` moves compatible `validation`/legacy `review` tasks back to `in-progress`; `block` and `fail` remain cross-cutting signals and do not automatically move workflow state.
-
-Examples:
-
-```text
-tandem accord ready task-7 --assignee pi --deliverable file:src/tui/theme.rs:Theme loader --validation "cargo test"
-tandem accord deliver task-7 --summary "Theme loader implemented" --evidence "cargo test passed" --file-changed src/tui/theme.rs
-tandem accord rework task-7 --note "Please add no-color fallback."
-```
-
-- Exit/error notes:
-  - fails if the task is missing, the target is not an active task, existing task/accord/review structure is invalid, the requested accord transition is invalid, required inputs are missing, or the write fails.
-
 ### `tandem rules`
 
-#### `tandem rules list`
-
-- Purpose: list project rules.
-- Kind: read.
+- Purpose: list and mutate the project rules stored in `.tandem/rules/`. A rule has a category (`always`, `never`, `prefer`, `context`), an ID such as `always-3`, optional `source`, and text.
 - Syntax:
 
 ```text
-tandem rules list [--category <category>] [--json]
+tandem rules list [<category>] [--json]
+tandem rules add <category> <text> [--source <id>] [--json]
+tandem rules edit <id> <text> [--source <id>] [--clear <field>] [--json]
+tandem rules delete <id> [--json]
 ```
 
-- Required inputs: none.
-- Optional inputs:
-  - `--category <always|never|prefer|context>`.
-  - `--json`: emit structured output.
-- Human output shape: grouped rules by category.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "rules": {
-      "always": [
-        { "id": 1, "rule": "Run tests before completing tasks.", "source": "decision-1" }
-      ],
-      "never": [],
-      "prefer": [],
-      "context": []
-    },
-    "counts": { "always": 1, "never": 0, "prefer": 0, "context": 0, "total": 1 }
-  },
-  "warnings": []
-}
-```
-
-#### Rule mutations
-
-- Purpose: add, edit, and delete project rules.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem rules add --category <category> --rule <text> [--source <id>]
-tandem rules edit --category <category> --id <rule-id> --rule <text> [--source <id>]
-tandem rules delete --category <category> --id <rule-id>
-```
-
-- Human output shape: one-line success plus category and rule ID.
+- `category` and `text` are positional, and `edit`/`delete` take the composite rule ID. Reclassifying a rule is delete-and-add. `--clear source` removes the source.
+- Human output: `list` prints `<id>	<text>` per rule; mutations print `Created rule <id>`, `Updated rule <id>`, or `Deleted rule <id>`. `--json` `list` returns `data` as an array of rules.
 - Examples:
 
 ```text
-tandem rules add --category always --rule "Run tests before completing tasks." --source decision-1
-tandem rules edit --category always --id 1 --rule "Run tests before completing task changes."
-tandem rules delete --category always --id 1
+tandem rules add always "Run tests before completing tasks." --source decision-1
+tandem rules edit always-1 "Run tests before completing task changes."
+tandem rules delete always-1
 ```
-
-- Exit/error notes:
-  - fails on invalid category, missing rule ID, missing rule text, unresolved required source if treated as structural, or write failure.
-
-### `tandem decision`
-
-#### `tandem decision list`
-
-- Purpose: list decision documents.
-- Kind: read.
-- Syntax:
-
-```text
-tandem decision list [--json]
-```
-
-- Required inputs: none.
-- Optional inputs:
-  - `--json`: emit structured output.
-- Human output shape: compact table with ID, ADR status, date, title, references, and first-line summary. `status` is decision metadata, not task workflow `state`.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "items": [
-      {
-        "id": "decision-1",
-        "type": "decision",
-        "title": "Use styled-basic Markdown in v0",
-        "status": "accepted",
-        "date": "2026-06-26",
-        "deciders": ["Algorant"],
-        "context": "The TUI needs a deterministic v0 Markdown scope.",
-        "consequences": ["Advanced Markdown blocks remain deferred."],
-        "alternatives": ["Add a full Markdown renderer immediately."],
-        "supersedes": ["decision-0"],
-        "references": ["task-7"],
-        "summary": "Record the v0 rendering scope."
-      }
-    ],
-    "count": 1
-  },
-  "warnings": []
-}
-```
-
-#### `tandem decision show`
-
-- Purpose: show one decision document.
-- Kind: read.
-- Syntax:
-
-```text
-tandem decision show <id> [--json]
-```
-
-- Required inputs:
-  - `<id>`: decision ID.
-- Optional inputs:
-  - `--json`: emit structured output.
-- Human output shape: labeled detail block with metadata, references, body, and path.
-- `--json` data shape:
-
-```json
-{
-  "ok": true,
-  "data": {
-    "decision": {
-      "id": "decision-1",
-      "type": "decision",
-      "title": "Use styled-basic Markdown in v0",
-      "status": "accepted",
-      "date": "2026-06-26",
-      "deciders": ["Algorant"],
-      "context": "The TUI needs a deterministic v0 Markdown scope.",
-      "consequences": ["Advanced Markdown blocks remain deferred."],
-      "alternatives": ["Add a full Markdown renderer immediately."],
-      "supersedes": ["decision-0"],
-      "references": ["task-7"]
-    },
-    "body": "## Decision\nUse styled-basic Markdown rendering for v0.",
-    "path": ".tandem/board/decision-1.md"
-  },
-  "warnings": []
-}
-```
-
-#### `tandem decision add`
-
-- Purpose: create an ADR-compatible `decision` document.
-- Kind: mutation.
-- Syntax:
-
-```text
-tandem decision add --title <title> [--body <markdown>] [--status <proposed|accepted|rejected|deprecated|superseded>] [--date <date>] [--decider <name>] [--context <text>] [--consequence <text>] [--alternative <text>] [--supersedes <decision-id>] [--superseded-by <decision-id>] [--reference <ref>] [--tag <tag>]
-```
-
-- Required inputs:
-  - `--title <title>`.
-- Optional inputs:
-  - `--body <markdown>`: recommended ADR-compatible sections are `Status`, `Context`, `Decision`, `Consequences`, `Supersession`, and `References`.
-  - `--status <status>` ADR status; defaults to `proposed` when omitted.
-  - `--date <date>` ADR decision date; defaults to the current UTC date when omitted.
-  - repeated `--decider <name>`.
-  - `--context <text>`.
-  - repeated `--consequence <text>`.
-  - repeated `--alternative <text>`.
-  - repeated `--supersedes <decision-id>`.
-  - repeated `--superseded-by <decision-id>`.
-  - repeated `--reference <ref>`: a related task, log, or decision ID, or an absolute `http(s)` URL. Include superseded/superseding decision IDs here when they should be visible to current CLI/TUI search; repository paths belong in `relatedFiles` metadata, not `references`. The current decision CLI has no `--related-file` option, and adding one is out of scope.
-  - repeated `--tag <tag>`: use tags such as `adr`, `architecture`, or product area names for filtering.
-- Human output shape: warnings first, then labeled created-decision summary with ID, status, date, title, and path.
-- Example:
-
-```text
-body=$(cat <<'MD'
-## Status
-
-Accepted.
-
-## Context
-
-The TUI needs a minimal Markdown renderer for v0.
-
-## Decision
-
-Use styled-basic Markdown rendering first.
-
-## Consequences
-
-This keeps the MVP small while preserving room for richer rendering later.
-
-## Supersession
-
-- Supersedes: none
-- Superseded by: none
-MD
-)
-tandem decision add --title "Use styled-basic Markdown in v0" --status accepted --date 2026-06-26 --decider Algorant --context "The TUI needs a deterministic v0 Markdown scope." --consequence "Advanced Markdown blocks remain deferred." --alternative "Add a full Markdown renderer immediately." --reference task-7 --tag adr --body "$body"
-```
-
-- Exit/error notes:
-  - fails on missing title, invalid ADR status, empty metadata flag values, invalid references that are structural errors, or failed write.
-  - unresolved document-ID `references` warn in v0 related-reference semantics; absolute `http(s)` URL references are opaque loose links and never warn. Unresolved `supersedes` or `supersededBy` targets also warn because those fields accept decision IDs only.
-  - decision documents do not receive a workflow `state`; ADR `status` remains separate from task state filters and board movement.
-
-### `tandem decision update`
-
-Removed in protocol 0.3.0. Use the common [`tandem update`](#tandem-update)
-command, which resolves the document type and accepts `--status`, `--decider`,
-`--supersedes`, `--reference`, `--related-file`, `--tag`, `--body`, `--title`,
-and `--clear`. Example: `tandem update decision-1 --status accepted`.
-
-### `tandem decision withdraw`
-
-Preserve a decision record while marking it withdrawn with a reason.
-
-```text
-tandem decision withdraw <decision-id> --reason <text>
-```
-
-`--reason` is required and must not be empty. This is a human-readable mutation
-with no `--json` mode. Example:
-`tandem decision withdraw decision-1 --reason "Superseded by decision-2"`.
 
 ### `tandem tui`
 
 - Purpose: launch the interactive terminal UI.
-- Kind: interactive.
-- Syntax:
-
-```text
-tandem tui
-```
-
-- Required inputs: none.
-- Optional inputs: none in v0.
-- Human output shape: enters the TUI; startup errors are plain terminal errors.
-- Current implementation slice:
-  - launches a Ratatui/crossterm alternate-screen app from the existing `tandem tui` command.
-  - renders top-level Board, Logs, Rules, and Decisions tabs in the target Validation workflow; legacy Review-queue code may exist only as transitional implementation detail while task-25/task-30 remove it.
-  - renders the Board view from `.tandem/board` using configured states plus an `unfiled` bucket for active documents without a state; Board states are shown as count tabs and the selected state uses the full Board list area instead of simultaneous narrow columns. The default State Board resolves the strict Epic → Task → Subtask graph from one locked board-plus-logs snapshot, collapses valid descendants beneath roots, and uses `Enter`/mouse as the single row activation path for hierarchy expansion and inline previews. Structural hierarchy failures replace both Board arrangements with a persistent actionable diagnostic panel and disable graph-sensitive TUI mutations until reload succeeds.
-  - keeps Board keyboard and mouse navigation local to state subviews/items/detail scrolling, sparse one-line rows, reload, help, and safe quit.
-  - supports first Board mutations: `a` starts a quick-add title prompt and creates a basic task in the selected/default configured state; `m` opens an explicit configured-state picker for the selected task. Both flows use raw-source write helpers, reload after success, and surface write/validation errors in the status line.
-  - renders selected-task Board details with a dedicated read-only Accord section: semantic status styling, assignee/timestamps, deliverables, validation commands, constraints, summary, evidence, files changed, reviewer/note/reason, and CLI/TUI next-action hints while keeping list rows minimal.
-  - renders Review as a real read-only filtered queue of active items needing attention, with local list/detail focus, selectable rows, inspection detail, reason badges/lines, accord/review/state/priority metadata, blockers, and CLI action hints.
-  - renders the Logs view as a first-class terminal work-history browser: recency-sorted `.tandem/logs/` list, explicit completed/canceled outcome labels, local list/detail focus, selected-log completion/cancellation summary and timestamp, files/validation/reviewer where present, accord/review metadata, Markdown body, raw path, event context, safe per-log load warnings, and `/` search filtering across ID/title/outcome/summary/body/validation/files.
-  - renders Rules as grouped `always`/`never`/`prefer`/`context` lists with keyboard selection, local category navigation, and add/edit/delete prompts that reuse the same raw-source rule mutation behavior as the CLI; Rules view code lives in `src/tui/rules.rs`.
-  - renders Decisions as a selectable active decision list with local list/body focus, selected metadata/body/path detail, and a basic title/body add prompt that writes `decision` documents; Decisions view code lives in `src/tui/decisions.rs`.
-  - loads built-in `default-dark`/`verdigris` semantic palettes, discovers user themes from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, lets user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml` select a named built-in or user theme, lets `.tandem/theme.toml` override that selection per workspace, and applies the active palette to Board, Logs, Rules, and Decisions headers, tabs, borders, selection, status lines, priority badges, accord badges, review badges, and detail/Markdown basics.
-  - applies user/workspace theme selection and overrides using the documented simple TOML-style keys; invalid or unknown keys become status-line warnings while the active fallback palette remains in use.
-  - enables crossterm mouse capture for basic view tabs, Board state tabs/list rows, detail focus, and wheel interactions; drag/drop remains absent.
-  - keeps CLI command behavior unchanged outside the TUI entry point.
-- Exit/error notes:
-  - fails on missing workspace, parse/structure errors that prevent startup, or non-interactive terminal limitations.
-  - v0 does not include a separate TUI executable.
+- Syntax: `tandem tui`. It takes no options and needs an interactive terminal and a workspace.
+- Top-level views are Board, Logs, Rules, and Decisions (`1`–`4`). Delivered and validation work is handled through Board states and the Validation actions, not a separate view. See the [TUI guide](/tui/) for navigation, actions, themes, and mouse support.
 
 ### `tandem web`
 
@@ -898,22 +361,3 @@ The server binds only to `127.0.0.1`, serves one discovered workspace, embeds
 all browser assets in the binary, and exposes no mutations or remote-bind
 option. See the [Web guide](/web/) for available views, refresh behavior,
 security boundaries, appearance, accessibility, and deferred capabilities.
-
-### `tandem version`
-
-- Purpose: print the installed Tandem version.
-- Kind: read.
-- Syntax:
-
-```text
-tandem version
-```
-
-It prints `tandem <version>` and exits `0`. It does not require a Tandem
-workspace. Example: `tandem version`.
-
-### `tandem --version`
-
-`--version` is the global spelling of the same version query. It accepts no
-value or additional argument, does not require a workspace, and prints the
-same `tandem <version>` line. Example: `tandem --version`.

@@ -60,7 +60,7 @@ cargo run -- add task "Implement next CLI slice" --acceptance "works"
 cargo run -- list
 cargo run -- accord claim task-1 --assignee pi
 cargo run -- accord deliver task-1 --summary done --evidence "cargo test"
-cargo run -- complete task-1
+cargo run -- complete task-1 --note "verified"
 cargo run -- rules add always "Run tests before completing tasks."
 cargo run -- tui
 ```
@@ -84,9 +84,9 @@ task-10       Epic: root `type: task`, `kind: epic`; global ID
 Create the same structure with normal `add` commands and always consume the returned IDs:
 
 ```text
-tandem add --title "Coordinate the release" --kind epic
-tandem add --title "Write release notes" --parent task-10
-tandem add --title "Check upgrade notes" --parent task-11
+tandem add task "Coordinate the release" --kind epic --acceptance "Release shipped"
+tandem add task "Write release notes" --parent task-10 --acceptance "Notes published"
+tandem add task "Check upgrade notes" --parent task-11 --acceptance "Upgrade notes verified"
 ```
 
 Epics and Tasks—including standalone, generic-parent, and direct Epic Tasks—allocate the next global `task-N` across active Board documents and completed Logs. Only a Subtask directly beneath a Task allocates the next `<Task ID>-M` suffix. Completed suffixes are not reused. `tandem show` exposes `tasks` for an Epic, `subtasks` for a Task, and no child collection for a Subtask.
@@ -277,20 +277,19 @@ Verdigris maps these roles to burnt copper (`#c96f3d`), ready sand (`#e6bf86`), 
 - Mouse support should use a hit-map style model, be enabled by default, and exclude drag/drop in v0.
 
 
-## Locked v0 CLI/TUI decisions
+## Locked CLI/TUI decisions (current)
 
-- v0 commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `papercut`, `accord`, `rules`, `decision`, `tui`.
-- `tandem papercut`: `add`, `list`, `show`, `resolve`; Papercuts stay outside Board, Logs, hierarchy, Accord, review, and completion. The TUI utility inbox is read-only.
-- `tandem log`: `list`, `show`, `search`.
-- `tandem rules`: `list`, `add`, `edit`, `delete`.
-- `tandem accord`: `claim`, `deliver`, `accept`, `rework`, `block`, `fail`. Existing persisted `accord.status: ready` remains readable but cannot be set through an accord action.
-- Human-readable output by default: compact tables for list/search and labeled detail blocks for show/log/decision.
-- All read commands support `--json` using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
-- V0 CLI uses canonical command names and long flags only; no short aliases.
-- First implementation language: Rust inside `tandem/`.
-- `tandem decision`: `list`, `show`, `add`.
-- First TUI MVP: board mutations immediately; Board, Logs, Rules, Decisions views; Board Validation workflow, theme, and mouse support included.
-- Validation queue: Board state/subview for delivered work awaiting accept/rework/complete in v0.
+These summarize the current implementation (protocol `0.5.0`, `decision-9`). `tandem --help` and `../protocol/README.md` are authoritative; if this list disagrees with either, it is stale.
+
+- Commands (30 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; `web`.
+- There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status`. Completed history uses `list|search --scope archived|all`; Decisions use `add decision`, `list --type decision`, and `update <decision-id> --status`.
+- Lifecycle: no command sets `state` directly. `accord deliver` requires `--summary` and non-empty `--evidence` and leaves `state` unchanged; `review <id> --criterion <exact acceptance criterion> --note <text>` is the only route to `validation`; `complete` accepts a delivered Accord and archives, warning but succeeding for an undelivered Task.
+- `tandem accord`: `claim`, `deliver`, `rework`, `block`, `resume`, `release`, `fail`. Persisted `accord.status: ready` is the initial status and cannot be set through an accord action.
+- Human-readable output by default (tab-separated lines for list/search, labeled detail blocks for show); `--json` returns `{ "ok", "data", "warnings" }` envelopes for every command.
+- Only the global `-j`, `-h`, and `-V` short flags exist; everything else is long-form.
+- Implementation language: Rust (clap-derived) inside `tandem/`.
+- TUI: `tandem tui`; board mutations, theme, and mouse support included; Board, Logs, Rules, and Decisions views.
+- Validation queue: Board state/subview for work escalated with `tandem review`, awaiting complete or rework.
 - Keymaps: fixed defaults in v0; custom keymap config later.
 - Markdown rendering: styled basics in v0.
 - Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badges load from user config and workspace `.tandem/config.toml`.

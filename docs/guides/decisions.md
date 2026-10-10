@@ -6,7 +6,7 @@ Use Tandem `decision` documents for durable project, product, and architecture c
 
 ## Frontmatter pattern
 
-Required v0 fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body. `references` accepts document IDs and absolute `http(s)` URLs: a document ID resolves against the workspace and warns when unresolved, while an absolute URL is an opaque loose link that Tandem never fetches, never rewrites, and never warns about. Repository paths belong in `relatedFiles` path metadata, not `references`; `tandem update <decision-id> --related-file <path>` stores them, and `relatedFiles` is never validated or treated as a document reference.
+Required fields are `id`, `type: decision`, and `title`. The CLI writes those fields plus timestamps, `references`, `tags`, and the Markdown body. `references` accepts document IDs and absolute `http(s)` URLs: a document ID resolves against the workspace and warns when unresolved, while an absolute URL is an opaque loose link that Tandem never fetches, never rewrites, and never warns about. Repository paths belong in `relatedFiles` path metadata, not `references`; `tandem update <decision-id> --related-file <path>` stores them, and `relatedFiles` is never validated or treated as a document reference.
 
 Optional ADR-friendly metadata may be preserved by tools and edited in Markdown when needed:
 
@@ -86,14 +86,13 @@ Agents and humans use the same decision surface. Supersession links stay visible
 MD
 )
 
-tandem decision add \
-  --title "Use Tandem decisions for ADRs" \
+tandem add decision "Use Tandem decisions for ADRs" \
   --body "$body" \
   --reference task-87 \
   --tag adr
 
-tandem decision list
-tandem decision show decision-12 --json
+tandem list --type decision
+tandem show decision-12 --json
 ```
 
 ## Updating a decision
@@ -117,12 +116,12 @@ Entering `accepted` or `rejected` writes `decidedAt`. Leaving that status keeps 
 
 The Decisions view should not invent decision lifecycle columns. Status and supersession are record metadata/body content, not Board workflow state.
 
-## Pi agent pattern
+## Agent pattern
 
-Use the Pi tool, not raw `.tandem` edits, for normal creation:
+Use the `tandem` CLI, not raw `.tandem` edits, for normal creation:
 
-```text
-tandem_decision action=add title="Use Tandem decisions for ADRs" references=["task-87"] tags=["adr"] body="## Status\n\nAccepted.\n\n## Context\n..."
+```sh
+tandem add decision "Use Tandem decisions for ADRs" --reference task-87 --tag adr --body "$body"
 ```
 
-Use `tandem_search` or `tandem_decision action=show` to inspect existing decisions before creating a replacement. Do not model decisions as tasks, `state` values, accord statuses, or a separate `adr` type.
+Use `tandem search` or `tandem show <decision-id> --json` to inspect existing decisions before creating a replacement. Do not model decisions as tasks, `state` values, accord statuses, or a separate `adr` type.

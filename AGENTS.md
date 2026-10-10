@@ -27,53 +27,47 @@ Current direction is intentionally simple:
 - The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
 - The Rust architecture is implemented as `protocol`, `project`, `app`, `cli`, and `tui` modules in one binary crate. `project::TandemProject` owns concrete `.tandem/` discovery and filesystem safety; shared `app` operations coordinate protocol rules and project I/O; CLI and TUI are peer interfaces. `main.rs` and `tui/mod.rs` are wiring roots, not protocol or persistence owners.
-- The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, `clap`, schemas, fixtures, CI, or other structure in v0.
+- The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, schemas, fixtures, CI, or other structure in v0.
 - `extensions/` is the scoped home for future agent/editor integrations. It currently holds no integration: the `pi-tandem` adapter was retired (`decision-10`), and the `tandem` CLI with `--json` is the integration surface. Integration code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
 - Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
 
-## Locked v0 decisions
+## Locked decisions (current)
+
+These summarize the current implementation: protocol `0.5.0` (`decision-9`) and the clap-derived `tandem` CLI. `protocol/README.md` is normative and `tandem --help` prints the authoritative command tree; if this list disagrees with either, they win and this file is stale.
 
 Protocol:
 
-- Canonical workflow field: `state` / `states`.
-- Default active states: `todo`, `in-progress`, `validation`; legacy `review` reads remain tolerated.
-- Current protocol version: `0.2.0`. Discovered `0.1.0` projects are upgrade-only until an explicit `tandem upgrade`; ordinary operations must not upgrade implicitly.
-- Default task identity: `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form.
-- First-class document types: `task` and `decision`; decision documents are ADR-compatible durable records and do not need a lifecycle field in v0.
-- First-class creation supports only `task` and `decision`; legacy custom-type declarations/documents are preserved as deprecated read-only content after upgrade.
-- Hierarchy roles are derived from resolved documents, never ID shape: an Epic is `type: task` plus `kind: epic`; a Task is a normal task that is root-level, has a generic non-task parent, or is directly parented by an Epic; a Subtask is a normal task directly parented by a Task. Direct Epic children use relationship `epic-task`, Task children use `subtask`, and decision/custom-document parents use generic `parent`.
-- Work agreement object: `accord`.
-- Canonical accord statuses: `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`.
-- Rules: structured objects with stable IDs, e.g. `{ id, rule, source? }`.
-- References: `parentId`, blockers, and related references may point to any Tandem document by ID.
-- Role-specific IDs are strict: Epics and Tasks allocate the next global `task-N` across active board documents and completed logs; Subtasks allocate the next `task-N-M` suffix beneath their Task across board and logs without reuse. Resolved documents define roles, while the role constrains valid ID shape. Direct Epic Tasks with hierarchical IDs and Subtasks with global IDs are invalid; there is no decision-4 compatibility exception.
-- Completion: `tandem complete` warns about missing review/accord acceptance but allows completion in v0. `tandem cancel` archives reasoned cancellation with `completion.outcome: canceled`, rejects active descendants, and does not require blockers/review/accord acceptance.
-- Events: tracked per-actor `.tandem/events/<actor_id>.jsonl` logs store minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `summary`, `actor`, and `seq`; legacy `.tandem/events.jsonl` remains readable during transition. Automatic actor UUIDs live in ignored `.tandem/actor-id` per independent checkout or linked worktree; Tandem owns this identity, and integrations must not generate, copy, parse, or globally inject it.
-- Completed logs: archived markdown docs in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
-- Validation/lint: built-in structural validation only in v0; unresolved `parentId`/`blockers` are errors, while unresolved related `references`/rule sources and completion-policy issues are warnings. Epics with `parentId`, children beneath Subtasks, and reparenting that would create either condition are structural errors; Subtasks cannot have children.
-- Brainfile migration/import: no v0 requirement and no required command.
+- Canonical workflow field: `state` / `states`. Active states are exactly `todo`, `in-progress`, and `validation`.
+- Current protocol version: `0.5.0`. A `0.3.0` or `0.4.0` board is converted once by `tandem migrate`; ordinary commands on an older board fail with the required version and never upgrade implicitly. There is no `tandem upgrade`.
+- Board layout: `.tandem/tandem.md`, `tasks/`, `decisions/`, `rules/`, `logs/`, and per-actor `events/`. Every record has a permanent `uid`. In Git the board is the main worktree's ignored `.tandem/` and syncs through the repository's `tandem` branch, independent of source commits; Tandem syncs it itself.
+- First-class document types are `task` and `decision`; Decisions are ADR-compatible durable records with a `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`) and no workflow `state`. Only `task` and `decision` can be created.
+- Default task identity: `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form. IDs are immutable.
+- Hierarchy roles are derived from resolved documents, never ID shape: an Epic is `type: task` plus `kind: epic` and is root-only; a Task is a normal task that is root-level, has a generic non-task parent, or is directly parented by an Epic; a Subtask is a normal task directly parented by a Task and cannot have children. Direct Epic children use relationship `epic-task`, Task children use `subtask`, and decision parents use generic `parent`. Role-specific IDs are strict: a role/ID mismatch is a structural error, and reparenting that would change a role (such as clearing a Subtask's parent) is refused before writing.
+- Task `kind` is `epic`, `research`, or `papercut`; tags are never kinds. A papercut needs only a title, defaults to low priority, and is never a Subtask.
+- Work agreement object: `accord`. Accord statuses: `ready`, `claimed`, `delivered`, `rework`, `blocked`, and terminal `accepted` or `failed`. Typed `links` (`relates-to`, `duplicates`, `fixed-by`/`fixes`, `supersedes`) are separate from hierarchy and loose `references`.
+- Rules: Markdown records with composite IDs such as `always-12`, a category, optional `source`, and the rule text as the body.
+- References: `parentId` and blockers must resolve (errors); related `references` may point to any Tandem document by ID or an absolute `http(s)` URL (unresolved IDs warn).
+- Lifecycle: no command sets `state` directly. `accord claim|rework|release`, `review`, `complete`, and `cancel` change it. `accord deliver` requires `--summary` and non-empty `--evidence`, sets `accord.status: delivered`, and leaves `state` unchanged. `tandem review <id> --criterion <exact acceptance criterion> --note <text>` is the only route to `validation`; review status is not stored. `tandem complete` accepts a delivered Accord and archives atomically, and completing an undelivered Task warns but succeeds. `tandem cancel` archives with `resolution.outcome: canceled` and rejects active descendants.
+- Events: per-actor `.tandem/events/<actor-id>.jsonl` ledgers hold minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `actor`, and `seq`. Actor identity is checkout-local (`<git-dir>/tandem-actor-id`, or `.tandem/actor-id` outside Git); Tandem owns it and integrations must not generate, copy, parse, or globally inject it.
+- Completed logs: archived records in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
+- Sync: a local record that parses but would make the shared board invalid is a held edit; reads use the shared version with a warning, and `tandem sync resolve <id> --keep remote` repairs it.
+- Validation/lint: built-in structural validation only; unresolved `parentId`/`blockers` are errors, unresolved related references and rule sources are warnings.
+- Brainfile migration/import is not a requirement and has no command.
 
 CLI/TUI:
 
-- v0 CLI commands: `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `log`, `search`, `accord`, `review`, `rules`, `decision`, `tui`.
-- v0 `tandem log`: `list`, `show`, `search` only.
-- v0 `tandem rules`: `list`, `add`, `edit`, `delete`.
-- `tandem accord`: `claim`, `deliver`, `accept`, `rework`, `block`, `fail`; persisted `ready` remains readable but is not a command action.
-- CLI output: human-readable by default using compact tables for list/search and labeled detail blocks for show/log/decision; `--json` envelope objects for all read commands.
-- V0 CLI alias policy: canonical command names and long flags only; no short aliases.
-- `tandem decision`: `list`, `show`, `add`.
-- First CLI implementation language: Rust, inside `tandem/`.
-- TUI invocation: `tandem tui` only in v0.
-- First TUI MVP: includes board mutations immediately.
-- TUI top-level views: Board, Logs, Rules, Decisions; validation/review work is presented through Board state and validation flows.
-- Theme and mouse support are part of the first TUI MVP.
-- Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded from v0.
+- CLI commands (30 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; `web`. There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status` (Decision `update --status` exists).
+- Completed history is read with `list|search --scope archived|all` and `show`; Decisions with `list --type decision`.
+- Global flags: `-j/--json`, `-h/--help`, `-V/--version`. Other flags are long-form only. Mutations are human-readable by default; every command supports `--json` with `{ "ok", "data", "warnings" }` envelopes.
+- The CLI is Rust (clap-derived) inside `tandem/`.
+- TUI invocation: `tandem tui`. Board mutations are part of the TUI.
+- TUI top-level views: Board, Logs, Rules, Decisions; validation work is presented through the Board Validation state and actions.
+- Theme and mouse support are included. Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded.
 - Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badge opt-ins load from user config and workspace `.tandem/config.toml`.
-- V0 keybindings are fixed defaults; custom keymap config is deferred.
-- V0 Markdown rendering is styled basics.
-- V0 Review queue is a simple filtered list, not hard-coded workflow sections.
-- Deferred from v0: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.
+- Keybindings are fixed defaults; custom keymap config is deferred.
+- Markdown rendering is styled basics.
+- Deferred: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.
 
 
 ## Repository layout
@@ -159,9 +153,9 @@ Protocol:
 - Start from Brainfile's live protocol and command shape, then adapt it into Tandem vocabulary and v3 improvements.
 - Use Markdown files with YAML frontmatter.
 - Keep one active work document per file.
-- Keep active work in `.tandem/board/`.
+- Keep active work in `.tandem/tasks/` and `.tandem/decisions/`.
 - Keep completed work in `.tandem/logs/`.
-- Use per-actor `.tandem/events/<actor_id>.jsonl` logs for append-only lifecycle history; readers should aggregate those logs plus legacy `.tandem/events.jsonl` if present.
+- Use per-actor `.tandem/events/<actor_id>.jsonl` logs for append-only lifecycle history; readers aggregate those logs.
 - Treat completion as an action/archive transition, not a persistent `done` column.
 - Keep human workflow state, accord state, and review state separate.
 - Preserve unknown fields and minimize file rewrites.
@@ -249,7 +243,7 @@ resolved rather than silently picking one. Do not infer which rule wins.
 
 When recording durable decisions:
 
-- Use `tandem_decision` / `tandem decision add` to create first-class `type: decision` documents.
+- Use `tandem add decision` to create first-class `type: decision` documents.
 - Do not model decisions as task lifecycle states, accord statuses, completed logs, or a separate `adr` document type.
 - For ADR-compatible records, include body sections such as Status, Context, Decision, Consequences, and Supersession; optional status/supersession metadata is decision record metadata, not workflow `state`.
 

@@ -13,7 +13,7 @@ Tandem keeps work, agreements, expectations, and history visible in one local wo
 
 ## The active task lifecycle
 
-A task starts in `todo`, moves to `in-progress` when someone starts or claims it, and moves to `validation` when work is delivered. A reviewer or orchestrator can accept the delivery and complete the task, request rework, block it, or record a failure. Completion archives the task in Logs instead of leaving a permanent `done` state on the active Board.
+A task starts in `todo` and moves to `in-progress` when someone claims it. Delivering work records evidence on the accord and leaves the task `in-progress`; it moves to `validation` only when a reviewer escalates it with `tandem review`. A reviewer or orchestrator can complete the task (which accepts a delivered accord), request rework, block it, or record a failure. Completion archives the task in Logs instead of leaving a permanent `done` state on the active Board.
 
 This lifecycle keeps current work separate from completed history while making review explicit. The [CLI Reference](/cli/) documents each command, and the [TUI](/tui/) provides the same workflow through an interactive interface.
 
@@ -41,7 +41,7 @@ An accord is the explicit work agreement for a Task. It makes responsibility and
 - **Use:** move an accord through `ready`, `claimed`, `delivered`, `accepted`, `rework`, `blocked`, or `failed` as the work changes.
 - **Why it matters:** a worker can deliver evidence, while a human or orchestrator retains the decision to accept, request rework, or complete the Task.
 
-Claiming a `todo` Task moves it to `in-progress`; delivering moves it to `validation`. See [Agents and adapters](/guides/agents-and-adapters/) for the framework-neutral accord contract.
+Claiming a `todo` Task moves it to `in-progress`; delivering requires a summary and evidence and does not change the Task's state. `tandem complete` accepts a delivered accord and archives the Task. See [Agents and adapters](/guides/agents-and-adapters/) for the framework-neutral accord contract.
 
 ## Rules
 
@@ -79,12 +79,12 @@ tandem list --kind papercut
 
 Logs are completed or canceled Task documents stored in `.tandem/logs/`. They preserve the Task body, summary, validation notes, changed files, accord metadata, and event context. Cancellation records a reason and remains auditable rather than deleting the file.
 
-Events are append-only lifecycle records. Per-actor event files live in `.tandem/events/`; the legacy `.tandem/events.jsonl` file remains readable during transition. Together, Logs and events answer “what changed?”, “why was it accepted?”, and “what evidence did we have?”
+Events are append-only lifecycle records. Each actor has its own ledger in `.tandem/events/`. Together, Logs and events answer “what changed?”, “why was it accepted?”, and “what evidence did we have?”
 
 ```sh
-tandem log list
-tandem log show task-1
-tandem search "validation"
+tandem list --scope archived
+tandem show task-1
+tandem search "validation" --scope all
 ```
 
 ## Workspace files
@@ -93,11 +93,12 @@ A Tandem workspace is a repository with a `.tandem/` directory:
 
 ```text
 .tandem/
-├── tandem.md        # workspace config and rules
-├── board/           # active tasks and decisions
+├── tandem.md        # workspace config
+├── tasks/           # active tasks
+├── decisions/       # decisions
+├── rules/           # coordination rules
 ├── logs/            # completed task history
-├── events/          # per-actor lifecycle event logs
-└── events.jsonl     # legacy global event log
+└── events/          # per-actor lifecycle event logs
 ```
 
 Active tasks and decisions are Markdown files with YAML frontmatter. The files are the source of truth; the CLI and TUI provide safe, structured operations over them.
@@ -107,8 +108,8 @@ Active tasks and decisions are Markdown files with YAML frontmatter. The files a
 1. Read the Board with `tandem tui` or `tandem list`.
 2. Add or inspect a Task.
 3. Start and claim it.
-4. Deliver a summary, evidence, validation, and changed files through the accord.
-5. Validate the result.
-6. Accept and complete it into Logs, or request rework and continue.
+4. Deliver a summary and evidence through the accord (`tandem accord deliver`).
+5. Optionally escalate for human validation (`tandem review`).
+6. Complete it into Logs (`tandem complete` accepts the delivery), or request rework and continue.
 
 For integration-specific guidance, see the [Workflows](/guides/) guides.

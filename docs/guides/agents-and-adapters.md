@@ -59,13 +59,13 @@ A `prefer` rule cannot override an applicable `always` or `never` rule. If appli
 
 ## Use lifecycle operations with authority
 
-Tandem keeps three signals separate:
+Tandem keeps these signals separate:
 
-- workflow `state` says where active work is;
+- workflow `state` says where active work is (`todo`, `in-progress`, `validation`);
 - `accord.status` records the work agreement and delivery outcome;
-- `review.status` records review judgment.
+- the archive outcome (`completed`, `canceled`, or `failed`) records how finished work ended.
 
-Use explicit Tandem operations for each signal. Common synchronization can move claimed work to `in-progress`, delivered work to `validation`, and rework to `in-progress`. Consume the actual result instead of predicting or reconstructing it.
+Review status is not stored. No command sets `state` directly. Claiming moves `todo` work to `in-progress`; `accord rework` and `accord release` move work back to `in-progress` and `todo`; and `tandem review <id> --criterion <exact acceptance criterion> --note <text>` is the only route to `validation`. `accord deliver` requires `--summary` and at least one non-empty `--evidence`, sets `accord.status: delivered`, and leaves `state` unchanged. `tandem complete` accepts a delivered Accord and archives the Task in one step; completing a Task that was never delivered warns but succeeds. Consume the actual result instead of predicting or reconstructing it.
 
 Technical capability is not authority. The fact that a command can complete a task, or that completion warnings are non-blocking, does not authorize an actor to use it. Before a lifecycle mutation, confirm that the assignment, responsible caller, or applicable workspace policy authorizes that actor and transition.
 
