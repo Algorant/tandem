@@ -2,6 +2,21 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.16.3
+
+Tandem v0.16.3 fixes two ways a board could get stuck and brings the CLI reference up to date. It needs no migration and keeps protocol 0.5.0.
+
+### Fixed
+
+- `update <subtask> --clear parent` is refused before writing, like any other reparenting that would change a record's role. Previously it wrote a Subtask without a parent, which made the board invalid.
+- A local record that parses but would make the shared board invalid no longer blocks every command. On a board synced to a remote, reads use the shared version of that record and warn with the file name; a record that was never shared is skipped. Other records can still be added and updated, and changing the held record is refused with a repair hint.
+- `tandem sync status` now lists these held edits with their reason and a `resolve:` line, matching `tandem sync`. JSON `held` entries carry `{path, reason, id}`.
+- `tandem sync resolve <id> --keep remote` repairs a held record: it restores the shared version, or removes a record that was never shared. `--keep local` and `--keep edited` refuse a held record.
+
+### Changed
+
+- The CLI reference, concepts, and guides now describe the current commands and lifecycle: `accord deliver` requires evidence and leaves the Task in progress, `review` with an exact acceptance criterion is the only route to validation, and `complete` accepts a delivered Accord. Removed commands such as `move`, `log`, and `accord accept` are no longer documented.
+
 ## 0.16.2
 
 Tandem v0.16.2 splits every TUI Board tab into Standard, Research, and Papercuts sections. It needs no migration and keeps protocol 0.5.0.
