@@ -23,13 +23,13 @@
     "@astrojs/starlight": "^0.41.11",
     "astro": "^7.3.2",
     "astro-expressive-code": "^0.44.2",
-    "sharp": "^0.35.4"
+    "sharp": "^0.35.5"
   },
   "overrides": {
     "js-yaml": "4.3.2",
     "nanoid": "3.3.18",
     "postcss": "8.5.23",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "svgo": "4.1.0"
   }
 }
