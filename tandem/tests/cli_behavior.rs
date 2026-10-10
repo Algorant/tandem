@@ -196,3 +196,116 @@ fn show_json_returns_the_full_record_body_and_location() {
 
     std::fs::remove_dir_all(&root).unwrap();
 }
+
+fn clear_parent_workspace(name: &str) -> std::path::PathBuf {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let dir = std::env::temp_dir().join(format!(
+        "tandem-cli-clear-parent-{name}-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let init = bin()
+        .current_dir(&dir)
+        .args(["init", "--title", "clear parent"])
+        .output()
+        .unwrap();
+    assert!(init.status.success());
+    dir
+}
+
+fn clear_parent_run(dir: &std::path::Path, args: &[&str]) -> std::process::Output {
+    bin().current_dir(dir).args(args).output().unwrap()
+}
+
+fn clear_parent_add(dir: &std::path::Path, args: &[&str]) -> String {
+    let mut argv = vec!["--json", "add", "task"];
+    argv.extend(args);
+    let output = clear_parent_run(dir, &argv);
+    assert!(
+        output.status.success(),
+        "{argv:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    value["data"]["id"].as_str().unwrap().to_string()
+}
+
+fn clear_parent_record(dir: &std::path::Path, id: &str) -> std::path::PathBuf {
+    let board = dir.join(".tandem").join("tasks");
+    std::fs::read_dir(&board)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| {
+            std::fs::read_to_string(path)
+                .unwrap()
+                .lines()
+                .any(|line| line.trim() == format!("id: {id}"))
+        })
+        .unwrap_or_else(|| panic!("no board record for {id}"))
+}
+
+#[test]
+fn update_clear_parent_on_a_subtask_is_refused_without_writing() {
+    let dir = clear_parent_workspace("subtask");
+    let parent = clear_parent_add(&dir, &["Parent", "--acceptance", "ok"]);
+    let subtask = clear_parent_add(&dir, &["Child", "--parent", &parent, "--acceptance", "ok"]);
+    assert_eq!(subtask, format!("{parent}-1"));
+    let record = clear_parent_record(&dir, &subtask);
+    let before = std::fs::read_to_string(&record).unwrap();
+
+    let output = clear_parent_run(&dir, &["update", &subtask, "--clear", "parent"]);
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("would change its canonical role from subtask to task")
+            && stderr.contains("IDs are immutable"),
+        "{stderr}"
+    );
+    assert_eq!(std::fs::read_to_string(&record).unwrap(), before);
+
+    // The board stays readable and still accepts valid updates.
+    assert!(clear_parent_run(&dir, &["show", &subtask]).status.success());
+    assert!(
+        clear_parent_run(&dir, &["update", &subtask, "--priority", "high"])
+            .status
+            .success()
+    );
+    assert!(clear_parent_run(&dir, &["list"]).status.success());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn update_clear_parent_on_root_task_and_epic_task_still_works() {
+    let dir = clear_parent_workspace("task");
+    let root_task = clear_parent_add(&dir, &["Root", "--acceptance", "ok"]);
+    let before = std::fs::read_to_string(clear_parent_record(&dir, &root_task)).unwrap();
+    let noop = clear_parent_run(&dir, &["update", &root_task, "--clear", "parent"]);
+    assert!(noop.status.success());
+    assert_eq!(
+        std::fs::read_to_string(clear_parent_record(&dir, &root_task)).unwrap(),
+        before
+    );
+
+    let epic = clear_parent_add(&dir, &["Epic", "--kind", "epic", "--acceptance", "ok"]);
+    let child = clear_parent_add(&dir, &["Child", "--parent", &epic, "--acceptance", "ok"]);
+    assert!(!child.contains('-') || child.matches('-').count() == 1);
+    let record = clear_parent_record(&dir, &child);
+    assert!(std::fs::read_to_string(&record)
+        .unwrap()
+        .contains("parentId:"));
+    let cleared = clear_parent_run(&dir, &["update", &child, "--clear", "parent"]);
+    assert!(
+        cleared.status.success(),
+        "{}",
+        String::from_utf8_lossy(&cleared.stderr)
+    );
+    assert!(!std::fs::read_to_string(&record)
+        .unwrap()
+        .contains("parentId:"));
+    assert!(clear_parent_run(&dir, &["show", &child]).status.success());
+    std::fs::remove_dir_all(&dir).unwrap();
+}

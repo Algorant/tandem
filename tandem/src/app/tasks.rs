@@ -467,6 +467,12 @@ pub(crate) fn update(
             .fields
             .insert("parentId".to_string(), parent.to_string());
     }
+    // The write path removes a cleared field after applying updates, so a clear
+    // wins over --parent; the prospective document must match what is written.
+    let clears_parent = options.clear.iter().any(|field| field == "parent");
+    if clears_parent {
+        prospective.fields.remove("parentId");
+    }
     let prospective_hierarchy = hierarchy.with_replacement(prospective.clone());
     let prospective_role = prospective_hierarchy
         .task_role(&prospective)?
@@ -477,7 +483,7 @@ pub(crate) fn update(
             doc.id()
         ))));
     }
-    if options.parent.is_some() && old_role != prospective_role {
+    if (options.parent.is_some() || clears_parent) && old_role != prospective_role {
         return Err(Error::user(format!(
             "Validation failed: reparenting {} would change its canonical role from {} to {}; IDs are immutable",
             doc.id(),
@@ -486,7 +492,7 @@ pub(crate) fn update(
         )));
     }
     prospective_hierarchy.validate_all_task_hierarchies()?;
-    let parent_relationship = if options.parent.is_some() {
+    let parent_relationship = if options.parent.is_some() && !clears_parent {
         prospective_hierarchy.relationship(&prospective)?
     } else {
         None
@@ -501,7 +507,6 @@ pub(crate) fn update(
             warnings.push(format!("reference not found: {reference}"));
         }
     }
-    let clears_parent = options.clear.iter().any(|field| field == "parent");
     if (options.kind.is_some() || options.parent.is_some()) && !clears_parent {
         warnings.extend(nested_kind_warning(
             doc.id(),
