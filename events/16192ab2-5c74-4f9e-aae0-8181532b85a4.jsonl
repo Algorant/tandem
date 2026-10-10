@@ -21,3 +21,4 @@
 {"ts":"2026-10-10T14:34:02Z","event":"task.completed","id":"task-52","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":21}
 {"ts":"2026-10-10T14:34:06Z","event":"accord.delivered","id":"task-66","summary":"Accord deliver for task-66","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":22}
 {"ts":"2026-10-10T14:34:07Z","event":"task.completed","id":"task-66","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":23}
+{"ts":"2026-10-10T14:46:15Z","event":"task.created","id":"task-68","summary":"just release needs cargo-dist on PATH, but nothing provisions it","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":24}
