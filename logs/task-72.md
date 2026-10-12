@@ -3,7 +3,6 @@ id: task-72
 uid: 2906d301-e968-4665-bf36-68ae974376b0
 type: task
 title: "Orchestrator mode: TUI workspace switcher"
-state: "todo"
 priority: "medium"
 effort: "medium"
 blockers: ["task-71"]
@@ -23,7 +22,11 @@ accord:
   note: "discarded: Authorized by Algorant/Herdra after verified reuse transfer. Fresh task-73 checkpoint b0d144edd2cd30d73a17a1c77ef1ca5f8fd02c61 is clean and its entire source tree exactly matches old 4f6d5e7; /tmp/tandem-task72-reuse.bundle independently preserves old commits with prerequisite main 1bfc31c. This legacy permanent-list Worker is throwaway, superseded by fresh ephemeral-session implementation; no merge/acceptance."
   updatedAt: "2026-10-12T17:35:33Z"
 createdAt: "2026-10-12T15:51:21Z"
-updatedAt: "2026-10-12T17:35:33Z"
+updatedAt: "2026-10-12T17:35:48Z"
+archivedAt: "2026-10-12T17:35:48Z"
+resolution:
+  outcome: "canceled"
+  note: "Superseded by task-73's ephemeral TUI session-working-set direction approved by Algorant. Old Worker discarded only after parent verified clean checkpoint b0d144e is tree-identical to source 4f6d5e7 and retained /tmp/tandem-task72-reuse.bundle verifies independently. Legacy implementation was not merged/shipped/accepted."
 ---
 ## Superseded legacy attempt pending safe transfer
 
