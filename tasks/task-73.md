@@ -16,9 +16,9 @@ accord:
   validation: ["just dev-check"]
   updatedAt: "2026-10-12T15:51:22Z"
 createdAt: "2026-10-12T15:51:22Z"
-updatedAt: "2026-10-12T15:51:22Z"
+updatedAt: "2026-10-12T16:16:24Z"
 ---
 
 ## Description
 
-Approved task-70 follow-up. Keep ordinary tandem web single-workspace. Add an explicit opt-in flag for serving the hand-written workspace list, with a header selector and per-board URLs (/w/<alias>/...). Resolve only configured aliases; never accept arbitrary filesystem paths from a request. Preserve read-only, loopback binding, exact Host validation and CSP. Print the served list at startup; define a bounded active-workspace sync policy rather than fetching every listed board continuously. No all-workspaces overview in this slice. Backlog only; do not start.
+Approved task-70 follow-up. Keep ordinary tandem web single-workspace. Add an explicit opt-in flag for serving the hand-written workspace list, with a header selector and per-board URLs (/w/<alias>/...). Resolve only configured aliases; never accept arbitrary filesystem paths from a request. Preserve read-only, loopback binding, exact Host validation and CSP. Print the served list at startup; define a bounded active-workspace sync policy rather than fetching every listed board continuously. No all-workspaces overview in this slice. Kickoff approved by Algorant via Herdra: implement in order 71 → 75. Visual Tasks remain delivered for Algorant's review, with actual screenshots in Sideshow. Keep docs overhaul task-76 paused.
