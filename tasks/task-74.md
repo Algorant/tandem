@@ -16,9 +16,9 @@ accord:
   validation: ["just dev-check"]
   updatedAt: "2026-10-12T15:51:24Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T15:51:24Z"
+updatedAt: "2026-10-12T16:16:25Z"
 ---
 
 ## Description
 
-Approved task-70 follow-up. Add a shared app-layer local BoardSummary query and an all-workspaces TUI view, one row per configured board: todo/in-progress/validation, blocked or attention, last local change, sync status and per-entry errors. Define counts consistently with existing protocol/app meanings (avoid conflating delivered with validation). Sort by attention then local activity; Enter opens the chosen board through the switcher. Local reads only, no network fetch; refresh slowly or on demand, not on the active-board 250 ms loop. Do not add a second protocol parser or silently omit broken entries. Backlog only; do not start.
+Approved task-70 follow-up. Add a shared app-layer local BoardSummary query and an all-workspaces TUI view, one row per configured board: todo/in-progress/validation, blocked or attention, last local change, sync status and per-entry errors. Define counts consistently with existing protocol/app meanings (avoid conflating delivered with validation). Sort by attention then local activity; Enter opens the chosen board through the switcher. Local reads only, no network fetch; refresh slowly or on demand, not on the active-board 250 ms loop. Do not add a second protocol parser or silently omit broken entries. Kickoff approved by Algorant via Herdra: implement in order 71 → 75. Visual Tasks remain delivered for Algorant's review, with actual screenshots in Sideshow. Keep docs overhaul task-76 paused.
