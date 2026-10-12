@@ -11,13 +11,14 @@ references: ["task-70"]
 relatedFiles: ["tandem/src/web.rs", "tandem/src/web/app.js", "tandem/src/web/api.js", "tandem/src/web/index.html"]
 tags: ["ui", "orchestrator"]
 accord:
-  status: "ready"
+  status: "blocked"
   acceptance: ["Without the opt-in flag tandem web retains its current single-workspace behaviour; with it a selector switches among explicitly configured boards.", "Per-board URLs preserve selected workspace identity and unknown aliases return 404; client input cannot open an unlisted filesystem path.", "Read-only methods, loopback binding, Host checks and CSP remain enforced across every workspace route.", "The served list is visible at startup and background sync does not unconditionally run for every configured board."]
   validation: ["$ just dev-check"]
   constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
-  updatedAt: "2026-10-12T17:18:03Z"
+  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
+  updatedAt: "2026-10-12T17:18:04Z"
 createdAt: "2026-10-12T15:51:22Z"
-updatedAt: "2026-10-12T17:18:03Z"
+updatedAt: "2026-10-12T17:18:04Z"
 ---
 ## Frozen by Algorant via Herdra
 
