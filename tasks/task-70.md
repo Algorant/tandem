@@ -4,15 +4,17 @@ uid: fca842a6-08c8-42c2-857e-fda75e99c656
 type: task
 kind: "research"
 title: "Orchestrator mode: switch the TUI and web view between several Tandem workspaces"
-state: todo
+state: "in-progress"
 priority: "medium"
 tags: ["tui", "ui"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Sideshow mockups of the TUI switcher popup, the TUI with a switched workspace, any all-workspaces overview, and the web view's equivalent.", "A short findings note answers the five questions (configuration, switcher, overview, web view, architecture cost) with a recommendation for each.", "Proposed follow-up implementation Tasks, each with scope and acceptance criteria, are listed for Algorant to approve."]
-  updatedAt: "2026-10-12T14:05:13Z"
+  claimedAt: "2026-10-12T14:09:34Z"
+  updatedAt: "2026-10-12T14:09:34Z"
 createdAt: "2026-10-12T14:05:13Z"
-updatedAt: "2026-10-12T14:05:13Z"
+updatedAt: "2026-10-12T14:09:34Z"
+assignee: "tandem-ceph"
 ---
 
 ## Description
