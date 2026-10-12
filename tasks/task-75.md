@@ -13,10 +13,10 @@ tags: ["ui", "orchestrator"]
 accord:
   status: "ready"
   acceptance: ["In opt-in multi-workspace mode an /all page lists configured boards, summaries, attention and errors and links to their individual views.", "The overview reuses BoardSummary rather than implementing different counting semantics or parsing records in the frontend.", "Polling uses bounded local summaries and does not fetch or fully reload all boards each cycle.", "Single-workspace defaults and the configured-board allowlist remain unchanged."]
-  validation: ["just dev-check"]
-  updatedAt: "2026-10-12T15:51:25Z"
+  validation: ["$ just dev-check"]
+  updatedAt: "2026-10-12T16:29:19Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-10-12T16:16:26Z"
+updatedAt: "2026-10-12T16:29:19Z"
 ---
 
 ## Description
