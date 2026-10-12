@@ -91,3 +91,4 @@
 {"ts":"2026-10-12T17:47:29Z","event":"accord.delivered","id":"task-73","summary":"Accord deliver for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":91}
 {"ts":"2026-10-12T17:47:30Z","event":"accord.rework","id":"task-73","summary":"Accord rework for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":92}
 {"ts":"2026-10-12T17:59:04Z","event":"task.created","id":"task-78","summary":"TUI archive validation rejects logs produced by complete without --note","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":93}
+{"ts":"2026-10-12T17:59:57Z","event":"task.updated","id":"task-78","summary":"Updated task-78 metadata: constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":94}
