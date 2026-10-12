@@ -854,3 +854,8 @@ body {
 			transform 160ms ease;
 	}
 }
+
+/* Light theme: the mark's second strand switches from cream to dark so it reads on the light background. */
+:root[data-theme='light'] .td-hero-mark .td-mark-b {
+	stroke: #504945;
+}

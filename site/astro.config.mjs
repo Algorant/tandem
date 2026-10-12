@@ -30,7 +30,8 @@ export default defineConfig({
       titleDelimiter: '·',
       favicon: '/favicon.svg',
       logo: {
-        src: './src/assets/tandem-mark.svg',
+        dark: './src/assets/tandem-mark.svg',
+        light: './src/assets/tandem-mark-light.svg',
         alt: 'Tandem linked work mark',
       },
       social: [

@@ -17,25 +17,19 @@ hero:
         <title id="td-hero-mark-title">Two linked Tandem work loops</title>
         <defs>
           <radialGradient id="tdHeroGlow" cx="50%" cy="45%" r="58%">
-            <stop offset="0" stop-color="#8ec07c" stop-opacity="0.28"/>
-            <stop offset="0.7" stop-color="#83a598" stop-opacity="0.08"/>
+            <stop offset="0" stop-color="#8ec07c" stop-opacity="0.22"/>
+            <stop offset="0.7" stop-color="#83a598" stop-opacity="0.06"/>
             <stop offset="1" stop-color="#1d2021" stop-opacity="0"/>
           </radialGradient>
-          <linearGradient id="tdHeroLoopA" x1="35" x2="220" y1="78" y2="174" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#d5e7d0"/>
-            <stop offset="0.52" stop-color="#8ec07c"/>
-            <stop offset="1" stop-color="#83a598"/>
-          </linearGradient>
-          <linearGradient id="tdHeroLoopB" x1="55" x2="208" y1="188" y2="64" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#e6bf86"/>
-            <stop offset="1" stop-color="#c7e5df"/>
-          </linearGradient>
+          <mask id="tdHeroGap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="116">
+            <rect x="-10" y="-10" width="116" height="116" fill="#fff"/>
+            <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" fill="none" stroke="#000" stroke-width="13.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </mask>
         </defs>
         <circle cx="130" cy="130" r="116" fill="url(#tdHeroGlow)"/>
-        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M84 162c-29 0-53-20-53-45s24-45 53-45c20 0 34 8 52 25l18 18c16 16 27 24 43 24 18 0 32-10 32-24s-14-24-32-24c-12 0-22 5-33 15" stroke="url(#tdHeroLoopA)" stroke-width="19"/>
-          <path d="M176 98c29 0 53 20 53 45s-24 45-53 45c-20 0-34-8-52-25l-18-18c-16-16-27-24-43-24-18 0-32 10-32 24s14 24 32 24c12 0 22-5 33-15" stroke="url(#tdHeroLoopB)" stroke-width="19" opacity="0.96"/>
-          <path d="M112 130h36" stroke="#fbf1c7" stroke-width="11" opacity="0.9"/>
+        <g transform="translate(10 10) scale(2.5)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+          <path class="td-mark-a" d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" stroke="#689d6a" mask="url(#tdHeroGap)"/>
+          <path class="td-mark-b" d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" stroke="#ebdbb2"/>
         </g>
       </svg>
 ---
