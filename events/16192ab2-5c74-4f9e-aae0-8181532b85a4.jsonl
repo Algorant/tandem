@@ -83,3 +83,4 @@
 {"ts":"2026-10-12T17:32:34Z","event":"accord.blocked","id":"task-74","summary":"Accord block for task-74","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":83}
 {"ts":"2026-10-12T17:32:35Z","event":"accord.blocked","id":"task-75","summary":"Accord block for task-75","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":84}
 {"ts":"2026-10-12T17:32:36Z","event":"accord.blocked","id":"task-72","summary":"Accord block for task-72","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":85}
+{"ts":"2026-10-12T17:32:38Z","event":"task.updated","id":"task-76","summary":"Updated task-76 metadata: blockers, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":86}
