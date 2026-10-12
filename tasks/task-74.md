@@ -8,7 +8,7 @@ priority: "medium"
 effort: "large"
 blockers: ["task-73"]
 references: ["task-70", "task-73"]
-relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/app/dto.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/bindings.rs", "tandem/README.md"]
+relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/app/dto.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/bindings.rs", "tandem/README.md", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/board/mod.rs"]
 tags: ["tui", "orchestrator"]
 accord:
   status: "claimed"
@@ -18,7 +18,7 @@ accord:
   constraints: ["Separate root-Task Worker, explicitly Luna/high, only after task-73 is accepted/integrated; plan first.", "Local snapshots only; no inactive-board remote polling, Herdr topology mirroring, live agent-status inference or web work.", "Replace provisional picker counting with one shared query; no competing roster/parser/state system.", "Actual visual delivery in Sideshow B_I5vQctbo0 awaits Algorant's look before merge/completion; no push/release. Temporary checks only."]
   updatedAt: "2026-10-12T18:31:05Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T18:31:05Z"
+updatedAt: "2026-10-12T18:33:13Z"
 assignee: "worker-task-74-bf0456b4"
 ---
 ## Approved replacement scope
