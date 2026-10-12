@@ -33,3 +33,4 @@
 {"ts":"2026-10-12T15:51:24Z","event":"task.created","id":"task-74","summary":"Orchestrator mode: BoardSummary query and TUI overview","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":33}
 {"ts":"2026-10-12T15:51:25Z","event":"task.created","id":"task-75","summary":"Orchestrator mode: web all-workspaces overview","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":34}
 {"ts":"2026-10-12T15:51:52Z","event":"task.created","id":"task-76","summary":"Docs and site overhaul: approved seven-page shape, paused","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":35}
+{"ts":"2026-10-12T15:52:01Z","event":"accord.blocked","id":"task-76","summary":"Accord block for task-76","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":36}
