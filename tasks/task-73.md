@@ -6,8 +6,8 @@ title: "Orchestrator mode: ephemeral TUI working set and full-board switching"
 state: "in-progress"
 priority: "medium"
 effort: "large"
-blockers: ["task-71"]
-references: ["task-70", "task-71", "task-72"]
+blockers: ["task-71", "task-78"]
+references: ["task-70", "task-71", "task-72", "task-78"]
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/project/mod.rs", "tandem/src/project/workspaces.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/input.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/board/mod.rs", "tandem/src/app/background_sync.rs", "tandem/src/web.rs", "tandem/Cargo.toml", "tandem/Cargo.lock", "scripts/dev.sh", "justfile", "tandem/README.md"]
 tags: ["tui", "orchestrator", "keyboard"]
 accord:
@@ -23,7 +23,7 @@ accord:
   note: "Reviewed 49bcc73; session-only replacement and preserved switching are on direction. Please correct these bounded issues before actual capture: (1) New 'Cannot add board', bad CLI-seed, and current-removal-refused statuses trail long footer hints; priority_footer_status only knows old switch/sync errors. Show add/remove feedback/errors inside the chooser or lead the footer so they are readable at 80–110 columns while it remains open. Don't reset away add-success/duplicate feedback by immediately calling sta"
   updatedAt: "2026-10-12T17:47:30Z"
 createdAt: "2026-10-12T15:51:22Z"
-updatedAt: "2026-10-12T17:47:30Z"
+updatedAt: "2026-10-12T18:00:36Z"
 assignee: "worker-task-73-0c96df57"
 ---
 ## Approved direction

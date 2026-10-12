@@ -93,3 +93,4 @@
 {"ts":"2026-10-12T17:59:04Z","event":"task.created","id":"task-78","summary":"TUI archive validation rejects logs produced by complete without --note","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":93}
 {"ts":"2026-10-12T17:59:57Z","event":"task.updated","id":"task-78","summary":"Updated task-78 metadata: constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":94}
 {"ts":"2026-10-12T18:00:02Z","event":"accord.claimed","id":"task-78","summary":"Accord claim for task-78","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":95}
+{"ts":"2026-10-12T18:00:36Z","event":"task.updated","id":"task-73","summary":"Updated task-73 metadata: blockers, references","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":96}
