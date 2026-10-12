@@ -11,13 +11,14 @@ references: ["task-70"]
 relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs"]
 tags: ["tui", "orchestrator"]
 accord:
-  status: "ready"
+  status: "blocked"
   acceptance: ["A shared BoardSummary query returns local per-workspace counts, attention, last change, sync state and explicit per-entry errors with documented counting semantics.", "The TUI overview displays configured workspaces sorted by attention and supports opening a selected board.", "Overview refresh is bounded and local-only, without triggering remote sync or full-board loads every active-board tick.", "A missing or invalid workspace is represented as an error row rather than aborting the overview."]
   validation: ["$ just dev-check"]
   constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
-  updatedAt: "2026-10-12T17:18:06Z"
+  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
+  updatedAt: "2026-10-12T17:18:07Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T17:18:06Z"
+updatedAt: "2026-10-12T17:18:07Z"
 ---
 ## Frozen by Algorant via Herdra
 
