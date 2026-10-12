@@ -2,6 +2,26 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.0
+
+Tandem v0.17.0 adds a session working set for watching several local boards and switching between their full TUIs. It needs no migration and keeps protocol 0.5.0.
+
+### Added
+
+- Press `w` for session boards, `Ctrl-A` to add an existing board by path, and `Ctrl-D` to remove an inactive entry. The set lives in memory, survives board switches, and is forgotten on exit. Repeat `tandem tui --add-workspace <path>` to seed extra boards for one invocation; no permanent workspace-list file or automatic project discovery is required.
+- Selecting a board opens its full existing TUI, including Board, Logs, Rules, Decisions, normal actions and its theme. Symlinks and linked worktrees resolve to the same board entry. Invalid targets leave the current board usable, and old-board sync retirement/final publication runs off the input loop.
+- The chooser shows local Task-state counts and bounded in-progress work with assignees as recorded. Delivered work needing triage, explicit Validation and blocked Accords stay distinct. Snapshots refresh on open and about every five seconds while visible; read errors are inline, and closing the chooser stops further summary polling. These are local board records, not live agent/process status or remote-board freshness. Long titles retain attention and assignee information at narrow widths.
+
+### Changed
+
+- External-dependency guidance now makes the existing boundary explicit: `blockers` resolve within one workspace; outside dependencies belong in the Task body, optionally with a URL reference, plus manual `accord block`/`resume`. References do not enforce readiness, and external completion never resumes a Task automatically.
+- The site has the new Tandem mark and favicon, refreshed hero and social card, and a light-theme logo variant.
+- The repository README includes machine-readable project-description metadata for agent integrations.
+
+### Fixed
+
+- A Task completed without optional `--note` no longer fails TUI archive validation. `resolution.note` and `resolution.reviewer` are optional; required archive timestamps and outcomes remain validated. Existing archived records need no edits.
+
 ## 0.16.3
 
 Tandem v0.16.3 fixes two ways a board could get stuck and brings the CLI reference up to date. It needs no migration and keeps protocol 0.5.0.
