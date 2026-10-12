@@ -13,12 +13,12 @@ tags: ["docs"]
 accord:
   status: "blocked"
   acceptance: ["The public site retains the approved seven-page revision-3 shape and incorporates Herdra's approved style guide.", "Content accurately explains the latest shipped features and how to use orchestrator mode, opt-in multi-workspace web, Pi /task project routing and agent setup, without claiming integration commands are Tandem CLI commands.", "Workspace layout, lifecycle/review claims, installation/version guidance and Decision examples from tasks 51/67 are verified and corrected across docs and READMEs.", "Real product captures, Excalidraw diagrams and teaser presentation are rendered and reviewed in the existing Sideshow session with before/after comparisons.", "Site build and link checks pass; final integration and deployment occur only after Algorant's approval."]
-  validation: ["just site-build", "cd site && bun run check:links"]
+  validation: ["$ just site-build", "$ cd site && bun run check:links"]
   constraints: ["Paused until Herdra task-19 and Tandem orchestrator-mode tasks 71–75 are complete; no implementation starts from this backlog filing.", "Keep docs-overhaul clean at 6f959a8 and unpushed while parked."]
   note: "Paused by Algorant via Herdra: resume after Herdra task-19 style guide and orchestrator mode tasks 71–75, with owner direction. Approved revision-3 seven-page branch remains parked unchanged and unpushed."
-  updatedAt: "2026-10-12T15:52:01Z"
+  updatedAt: "2026-10-12T16:29:43Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-12T15:52:01Z"
+updatedAt: "2026-10-12T16:29:43Z"
 ---
 
 ## Description

@@ -60,3 +60,4 @@
 {"ts":"2026-10-12T16:29:19Z","event":"task.updated","id":"task-75","summary":"Updated task-75 metadata: validation","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":60}
 {"ts":"2026-10-12T16:29:32Z","event":"accord.claimed","id":"task-72","summary":"Accord claim for task-72","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":61}
 {"ts":"2026-10-12T16:29:42Z","event":"task.created","id":"task-77","summary":"Explain runnable $ validation syntax in add/update CLI help","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":62}
+{"ts":"2026-10-12T16:29:43Z","event":"task.updated","id":"task-76","summary":"Updated task-76 metadata: validation","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":63}
