@@ -8,7 +8,7 @@ priority: "medium"
 effort: "medium"
 blockers: ["task-71"]
 references: ["task-70"]
-relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs", "tandem/src/app/background_sync.rs", "tandem/src/tui/pickers.rs", "tandem/src/project/workspaces.rs", "scripts/dev.sh", "justfile", "tandem/README.md"]
+relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs", "tandem/src/app/background_sync.rs", "tandem/src/tui/pickers.rs", "tandem/src/project/workspaces.rs", "scripts/dev.sh", "justfile", "tandem/README.md", "tandem/src/tui/input.rs", "tandem/src/tui/bindings.rs"]
 tags: ["tui", "orchestrator", "keyboard"]
 accord:
   status: "claimed"
@@ -17,7 +17,7 @@ accord:
   validation: ["$ just dev-check"]
   updatedAt: "2026-10-12T16:29:32Z"
 createdAt: "2026-10-12T15:51:21Z"
-updatedAt: "2026-10-12T16:29:32Z"
+updatedAt: "2026-10-12T16:30:53Z"
 assignee: "worker-task-72-94e1e002"
 ---
 
