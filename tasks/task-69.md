@@ -4,19 +4,21 @@ uid: 10aea0ea-acfb-4e18-b718-0cc7bbdf0231
 type: task
 kind: "papercut"
 title: "blockers accept only board IDs, so dependencies outside the board can only go in prose"
-state: todo
+state: "in-progress"
 priority: "low"
 references: ["task-42", "decision-11"]
 tags: ["protocol"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A decision is recorded on whether `blockers` accept an external reference (another workspace's Task or free text) or external dependencies stay in prose plus `accord block`.", "The chosen answer is documented in protocol/README.md and the user docs."]
+  claimedAt: "2026-10-12T16:18:19Z"
   validation: ["just site-build", "cd site && bun run check:links"]
-  updatedAt: "2026-10-12T16:18:04Z"
+  updatedAt: "2026-10-12T16:18:19Z"
 createdAt: "2026-10-12T12:35:08Z"
-updatedAt: "2026-10-12T16:18:04Z"
+updatedAt: "2026-10-12T16:18:19Z"
 effort: "small"
 relatedFiles: ["protocol/README.md", "docs/cli/index.md"]
+assignee: "worker-task-69-33474114"
 ---
 ## Approved implementation
 
