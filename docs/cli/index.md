@@ -222,6 +222,26 @@ tandem accord fail    <id> --note <text>
 - Output: `Accord <id>: <status> (record written; <sync message>)`. `--json` `data`: `{ "id", "event" (such as `accord.claimed`), "status", "recordWritten", "sync" }`.
 - Errors: a missing or archived Task, a transition invalid from the current status, or missing required input.
 
+#### Dependencies outside the workspace
+
+`--blocker` takes document IDs that resolve in the same workspace (on the Board or in Logs). It does not accept free text, URLs, or IDs from another workspace; `--blocker other:task-1` fails with `Validation failed: blocker document not found: other:task-1`. For a dependency outside the workspace, describe it in the Task body, optionally add an absolute `http(s)` URL as a `--reference`, and mark the Accord blocked:
+
+```text
+tandem update task-6 --body "Waits on the next release of an upstream SDK." --reference https://example.com/sdk/issues/42
+tandem accord claim task-6 --assignee agent-a
+tandem accord block task-6 --note "waiting on upstream SDK release"
+# later, once the dependency is done:
+tandem accord resume task-6
+```
+
+Keep these distinctions in mind:
+
+- Only `blockers` affect derived assignment readiness (`assignment --json` `ready` and `dependencyReadiness`). `references` are loose context and are never prerequisites.
+- A blocked Accord is separate from `state` and `blockers`. `block` changes only `accord.status` and its note; `state`, `blockers`, and assignment readiness stay as they were, so a blocked Task can still report `ready: true`. Check `accordStatus` and the note, not readiness alone. A blocked Accord does not stop `complete`, which still succeeds with a warning that the Accord was not delivered.
+- `block` does not require a prior `claim`, but claim, then block, then resume is the recommended sequence so the assignee stays recorded while the work waits.
+- `resume` returns the Accord to `claimed` and clears the block note, so keep the lasting explanation in the Task body.
+- Tandem never checks the external condition and never unblocks automatically. When it is met, run `accord resume` yourself.
+
 ### `tandem review`
 
 - Purpose: escalate a Task to human validation. It is the only command that moves a Task to `state: validation`; delivering does not.
