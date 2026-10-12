@@ -1,3 +1,7 @@
+---
+description: Local-first CLI, TUI and protocol for planning and delegating work between humans and agents, stored as Markdown in the repository.
+---
+
 # Tandem
 
 [placeholder for tandem image]
