@@ -73,3 +73,4 @@
 {"ts":"2026-10-12T17:18:04Z","event":"accord.blocked","id":"task-73","summary":"Accord block for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":73}
 {"ts":"2026-10-12T17:18:06Z","event":"task.updated","id":"task-74","summary":"Updated task-74 metadata: constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":74}
 {"ts":"2026-10-12T17:18:07Z","event":"accord.blocked","id":"task-74","summary":"Accord block for task-74","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":75}
+{"ts":"2026-10-12T17:18:09Z","event":"task.updated","id":"task-75","summary":"Updated task-75 metadata: constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":76}
