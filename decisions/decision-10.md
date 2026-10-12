@@ -3,11 +3,12 @@ id: decision-10
 uid: af79815f-9271-4d06-a106-d4b0996e71e2
 type: decision
 title: "Retire the pi-tandem adapter from the Tandem repository"
-status: "proposed"
+status: "accepted"
 deciders: ["Algorant"]
 references: ["task-58", "task-55"]
 createdAt: "2026-10-01T23:35:47Z"
-updatedAt: "2026-10-01T23:35:47Z"
+updatedAt: "2026-10-12T01:24:55Z"
+decidedAt: "2026-10-12T01:24:55Z"
 ---
 
 ## Status
