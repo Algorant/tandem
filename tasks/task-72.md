@@ -20,10 +20,10 @@ accord:
   summary: "Searchable TUI workspace switcher implemented and independently verified; ready for Algorant's requested visual review. Actual release-TUI ANSI snapshot images published in the existing orchestrator Sideshow session. Worker branch retained at 4f6d5e7, not merged, pushed or completed. Normal just dev is routed to isolated alpha/beta/old fixtures; temporary parent justfile/scripts/dev.sh helper mirrors enable the three-line preview route pending acceptance."
   evidence: ["Sideshow review: http://desktop.tail1cefc.ts.net:8228/session/B_I5vQctbo0, post WVRSpB9l9Mw; bounded MagicDNS check returned HTTP 200. Images render actual Herdr ANSI captures at 110x32, not mockups.", "Parent ran just dev-check and cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings on final Worker code: both passed; git diff --check passed.", "Parent live Herdr verification: w picker/search beta/Enter changed the board title, unique task and theme; historical old remained unavailable and its refusal led the footer at 110 columns, preserving beta.", "Parent post-switch TUI claim set only beta task-1's assignee to parent-review-agent; alpha task-1 remained todo/ready with no assignee, proving mutations retarget correctly.", "Reviewed fresh candidate load/state reset and tracked nonblocking old-sync retirement/final publish; malformed/historical/unsupported candidate paths preserve the current board. Temporary tests removed and Worker checkout clean.", "Release preview: just dev from normal checkout requires no extra setup and uses /tmp/tandem-task72-preview.gLXD4H/config with safe disposable boards; real user workspace list and real boards untouched. Human layout/usability and temporal terminal judgment remain pending."]
   filesChanged: ["justfile", "scripts/dev.sh", "tandem/README.md", "tandem/src/app/background_sync.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/board/mod.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/reload.rs", "tandem/src/web.rs"]
-  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
-  updatedAt: "2026-10-12T17:32:31Z"
+  note: "Legacy attempt superseded; retained solely until task-73 reuse checkpoint is verified, then authorized discard/cancel."
+  updatedAt: "2026-10-12T17:32:36Z"
 createdAt: "2026-10-12T15:51:21Z"
-updatedAt: "2026-10-12T17:32:31Z"
+updatedAt: "2026-10-12T17:32:36Z"
 assignee: "worker-task-72-94e1e002"
 ---
 ## Superseded legacy attempt pending safe transfer
