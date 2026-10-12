@@ -14,10 +14,10 @@ accord:
   acceptance: ["In opt-in multi-workspace mode an /all page lists configured boards, summaries, attention and errors and links to their individual views.", "The overview reuses BoardSummary rather than implementing different counting semantics or parsing records in the frontend.", "Polling uses bounded local summaries and does not fetch or fully reload all boards each cycle.", "Single-workspace defaults and the configured-board allowlist remain unchanged."]
   validation: ["$ just dev-check"]
   constraints: ["Deferred: no implementation, Worker launch, server, web selector or web overview until separately approved."]
-  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
-  updatedAt: "2026-10-12T17:32:30Z"
+  note: "Web orchestration explicitly deferred by Algorant; no work without separate approval."
+  updatedAt: "2026-10-12T17:32:35Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-10-12T17:32:30Z"
+updatedAt: "2026-10-12T17:32:35Z"
 ---
 ## Deferred web orchestration
 
