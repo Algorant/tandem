@@ -2,33 +2,27 @@
 id: task-75
 uid: 197f29a1-27bb-4e18-b5ab-c5ed42e996a9
 type: task
-title: "Orchestrator mode: web all-workspaces overview"
+title: "Deferred: web orchestration over the session roster and BoardSummary"
 state: todo
 priority: "medium"
 effort: "medium"
-blockers: ["task-74"]
-references: ["task-70"]
+references: ["task-70", "task-73", "task-74"]
 relatedFiles: ["tandem/src/web.rs", "tandem/src/web/app.js", "tandem/src/web/api.js", "tandem/src/app/queries.rs"]
 tags: ["ui", "orchestrator"]
 accord:
   status: "blocked"
   acceptance: ["In opt-in multi-workspace mode an /all page lists configured boards, summaries, attention and errors and links to their individual views.", "The overview reuses BoardSummary rather than implementing different counting semantics or parsing records in the frontend.", "Polling uses bounded local summaries and does not fetch or fully reload all boards each cycle.", "Single-workspace defaults and the configured-board allowlist remain unchanged."]
   validation: ["$ just dev-check"]
-  constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
+  constraints: ["Deferred: no implementation, Worker launch, server, web selector or web overview until separately approved."]
   note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
-  updatedAt: "2026-10-12T17:18:10Z"
+  updatedAt: "2026-10-12T17:32:30Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-10-12T17:18:10Z"
+updatedAt: "2026-10-12T17:32:30Z"
 ---
-## Frozen by Algorant via Herdra
+## Deferred web orchestration
 
-Do not implement, merge, push, create implementation Workers, produce mockups, discard, clean up or roll back existing work until Algorant approves revised plumbing/functions. Preserve all commits, checkouts and current preview state. New requirement: no dedicated permanent workspaces.toml; enabled/viewable workspaces must be ad-hoc, ephemeral and easy to change during a session. Discuss session roster, on-demand native Herdr project discovery and a repo picker first; no UI/button design yet. w/W remain tentative subject to conflicts. This direction overrides the earlier permanent-list implementation scope below, which is retained as history, not renewed approval.
+Algorant's revised direction is TUI first. This replaces the earlier immediate web-overview implementation and all stale freeze instructions. No web feature work now; leave this Task parked until a separate explicit go-ahead.
 
-Task-71 already landed as 1bfc31c and is archived accepted; its code is preserved, not rolled back. Task-72's retained unmerged Worker is clean at 4f6d5e7. Main retains temporary justfile/scripts/dev.sh preview helper mirrors; do not restore them while the no-rollback hold applies.
+Future scope may reuse the session roster, open-by-path and BoardSummary interfaces from tasks 73/74 for a closely related web orchestration view. The former task-73 web-selector scope is not being implemented elsewhere now. Revisit opt-in serving, exposure boundaries and exact acceptance before delegation; no mandatory permanent workspace-list file.
 
-## Previous scope (on hold)
-
-
-## Description
-
-Approved task-70 follow-up. Add an /all overview for opt-in multi-workspace web serving, backed by the shared BoardSummary query. Show attention and local activity with navigation to individual boards. Keep per-entry errors visible. Use bounded local summary refresh instead of calling full load_read for every board on each browser poll. Preserve the explicit configured-board allowlist and existing web security boundary. Kickoff approved by Algorant via Herdra: implement in order 71 → 75. Visual Tasks remain delivered for Algorant's review, with actual screenshots in Sideshow. Keep docs overhaul task-76 paused.
+This is explicit product deferral, not a dependency that should hold the TUI implementation or docs forever.
