@@ -80,3 +80,4 @@
 {"ts":"2026-10-12T17:32:30Z","event":"task.updated","id":"task-75","summary":"Updated task-75 metadata: title, references, constraints, body, blockers","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":80}
 {"ts":"2026-10-12T17:32:31Z","event":"task.updated","id":"task-72","summary":"Updated task-72 metadata: references, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":81}
 {"ts":"2026-10-12T17:32:33Z","event":"accord.released","id":"task-73","summary":"Accord release for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":82,"data":{"disposition":"reassign"}}
+{"ts":"2026-10-12T17:32:34Z","event":"accord.blocked","id":"task-74","summary":"Accord block for task-74","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":83}

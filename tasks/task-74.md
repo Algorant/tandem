@@ -15,10 +15,10 @@ accord:
   acceptance: ["One shared app-layer BoardSummary over roster project handles provides local Task-only state counts, current in-progress Task titles/recorded assignees, delivered-needs-triage, explicit Validation, blocked-Accord signals and per-entry errors with clear counting semantics.", "The TUI working-set surface stays compact, labels inactive data local with last-checked times, displays attention only when present and keeps errors inline; it does not claim live agent/process status or remote freshness.", "Summary refresh runs on opening the working-set surface and about every five seconds while visible, without full history/rules loads or remote fetch loops; co-located board writes appear on subsequent local reads.", "Selecting a board from the activity surface uses task-73's existing full-TUI switch boundary and preserves the same editable ephemeral roster.", "Release captures and actual targeted verification are published in Sideshow for Algorant's visual review."]
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Separate root-Task Worker, explicitly Luna/high, only after task-73 is accepted/integrated; plan first.", "Local snapshots only; no inactive-board remote polling, Herdr topology mirroring, live agent-status inference or web work.", "Replace provisional picker counting with one shared query; no competing roster/parser/state system.", "Actual visual delivery in Sideshow B_I5vQctbo0 awaits Algorant's look before merge/completion; no push/release. Temporary checks only."]
-  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
-  updatedAt: "2026-10-12T17:32:29Z"
+  note: "Await task-73 acceptance/integration; approved local BoardSummary/session-activity scope, not frozen redesign."
+  updatedAt: "2026-10-12T17:32:34Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T17:32:29Z"
+updatedAt: "2026-10-12T17:32:34Z"
 ---
 ## Approved replacement scope
 
