@@ -16,9 +16,9 @@ accord:
   validation: ["just dev-check"]
   updatedAt: "2026-10-12T15:51:25Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-10-12T15:51:25Z"
+updatedAt: "2026-10-12T16:16:26Z"
 ---
 
 ## Description
 
-Approved task-70 follow-up. Add an /all overview for opt-in multi-workspace web serving, backed by the shared BoardSummary query. Show attention and local activity with navigation to individual boards. Keep per-entry errors visible. Use bounded local summary refresh instead of calling full load_read for every board on each browser poll. Preserve the explicit configured-board allowlist and existing web security boundary. Backlog only; do not start.
+Approved task-70 follow-up. Add an /all overview for opt-in multi-workspace web serving, backed by the shared BoardSummary query. Show attention and local activity with navigation to individual boards. Keep per-entry errors visible. Use bounded local summary refresh instead of calling full load_read for every board on each browser poll. Preserve the explicit configured-board allowlist and existing web security boundary. Kickoff approved by Algorant via Herdra: implement in order 71 → 75. Visual Tasks remain delivered for Algorant's review, with actual screenshots in Sideshow. Keep docs overhaul task-76 paused.
