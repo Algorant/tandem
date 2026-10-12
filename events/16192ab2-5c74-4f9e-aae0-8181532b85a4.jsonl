@@ -29,3 +29,4 @@
 {"ts":"2026-10-12T14:13:50Z","event":"accord.delivered","id":"task-70","summary":"Accord deliver for task-70","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":29}
 {"ts":"2026-10-12T15:51:19Z","event":"task.created","id":"task-71","summary":"Orchestrator mode: hand-written workspace list and open_at","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":30}
 {"ts":"2026-10-12T15:51:21Z","event":"task.created","id":"task-72","summary":"Orchestrator mode: TUI workspace switcher","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":31}
+{"ts":"2026-10-12T15:51:22Z","event":"task.created","id":"task-73","summary":"Orchestrator mode: opt-in multi-workspace web selector","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":32}
