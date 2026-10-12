@@ -37,3 +37,4 @@
 {"ts":"2026-10-12T15:52:02Z","event":"task.canceled","id":"task-51","summary":"Canceled: Absorbed into docs/site overhaul task-76 by Algorant's direction via Herdra. Acceptance scope is carried there; this is consolidation, not a claim that the fix has shipped.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":37}
 {"ts":"2026-10-12T15:52:03Z","event":"task.canceled","id":"task-67","summary":"Canceled: Absorbed into docs/site overhaul task-76 by Algorant's direction via Herdra. The stale doc/install/UI claims are preserved in its scope and acceptance; no fix is claimed as shipped.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":38}
 {"ts":"2026-10-12T15:52:04Z","event":"task.completed","id":"task-70","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":39}
+{"ts":"2026-10-12T16:16:21Z","event":"task.updated","id":"task-71","summary":"Updated task-71 metadata: body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":40}
