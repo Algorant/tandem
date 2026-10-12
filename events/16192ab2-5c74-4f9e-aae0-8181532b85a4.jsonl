@@ -31,3 +31,4 @@
 {"ts":"2026-10-12T15:51:21Z","event":"task.created","id":"task-72","summary":"Orchestrator mode: TUI workspace switcher","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":31}
 {"ts":"2026-10-12T15:51:22Z","event":"task.created","id":"task-73","summary":"Orchestrator mode: opt-in multi-workspace web selector","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":32}
 {"ts":"2026-10-12T15:51:24Z","event":"task.created","id":"task-74","summary":"Orchestrator mode: BoardSummary query and TUI overview","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":33}
+{"ts":"2026-10-12T15:51:25Z","event":"task.created","id":"task-75","summary":"Orchestrator mode: web all-workspaces overview","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":34}
