@@ -3,11 +3,12 @@ id: decision-11
 uid: 66896990-8580-4e09-8286-d8a04c9c11a7
 type: decision
 title: "Keep blockers workspace-local; record external dependencies as prose and blocked Accords"
-status: "proposed"
+status: "accepted"
 references: ["task-69", "task-70"]
 tags: ["protocol", "accord"]
 createdAt: "2026-10-12T16:17:51Z"
-updatedAt: "2026-10-12T16:17:51Z"
+updatedAt: "2026-10-12T16:18:02Z"
+decidedAt: "2026-10-12T16:18:02Z"
 ---
 
 ## Status
