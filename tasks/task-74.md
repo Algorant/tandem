@@ -2,33 +2,30 @@
 id: task-74
 uid: 73438650-cd27-47f2-a40d-47f690c163b1
 type: task
-title: "Orchestrator mode: BoardSummary query and TUI overview"
+title: "Orchestrator mode: local BoardSummary and session activity overview"
 state: todo
 priority: "medium"
 effort: "large"
 blockers: ["task-73"]
-references: ["task-70"]
-relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs"]
+references: ["task-70", "task-73"]
+relatedFiles: ["tandem/src/app/queries.rs", "tandem/src/app/dto.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/input.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/bindings.rs", "tandem/README.md"]
 tags: ["tui", "orchestrator"]
 accord:
   status: "blocked"
-  acceptance: ["A shared BoardSummary query returns local per-workspace counts, attention, last change, sync state and explicit per-entry errors with documented counting semantics.", "The TUI overview displays configured workspaces sorted by attention and supports opening a selected board.", "Overview refresh is bounded and local-only, without triggering remote sync or full-board loads every active-board tick.", "A missing or invalid workspace is represented as an error row rather than aborting the overview."]
-  validation: ["$ just dev-check"]
-  constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
+  acceptance: ["One shared app-layer BoardSummary over roster project handles provides local Task-only state counts, current in-progress Task titles/recorded assignees, delivered-needs-triage, explicit Validation, blocked-Accord signals and per-entry errors with clear counting semantics.", "The TUI working-set surface stays compact, labels inactive data local with last-checked times, displays attention only when present and keeps errors inline; it does not claim live agent/process status or remote freshness.", "Summary refresh runs on opening the working-set surface and about every five seconds while visible, without full history/rules loads or remote fetch loops; co-located board writes appear on subsequent local reads.", "Selecting a board from the activity surface uses task-73's existing full-TUI switch boundary and preserves the same editable ephemeral roster.", "Release captures and actual targeted verification are published in Sideshow for Algorant's visual review."]
+  validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
+  constraints: ["Separate root-Task Worker, explicitly Luna/high, only after task-73 is accepted/integrated; plan first.", "Local snapshots only; no inactive-board remote polling, Herdr topology mirroring, live agent-status inference or web work.", "Replace provisional picker counting with one shared query; no competing roster/parser/state system.", "Actual visual delivery in Sideshow B_I5vQctbo0 awaits Algorant's look before merge/completion; no push/release. Temporary checks only."]
   note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
-  updatedAt: "2026-10-12T17:18:07Z"
+  updatedAt: "2026-10-12T17:32:29Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T17:18:07Z"
+updatedAt: "2026-10-12T17:32:29Z"
 ---
-## Frozen by Algorant via Herdra
+## Approved replacement scope
 
-Do not implement, merge, push, create implementation Workers, produce mockups, discard, clean up or roll back existing work until Algorant approves revised plumbing/functions. Preserve all commits, checkouts and current preview state. New requirement: no dedicated permanent workspaces.toml; enabled/viewable workspaces must be ad-hoc, ephemeral and easy to change during a session. Discuss session roster, on-demand native Herdr project discovery and a repo picker first; no UI/button design yet. w/W remain tentative subject to conflicts. This direction overrides the earlier permanent-list implementation scope below, which is retained as history, not renewed approval.
+Algorant approved OefksQbYnFo and Herdra signed off the TUI-first plan. All previous freeze instructions and permanent-config scope are superseded. This root Task follows accepted/integrated task-73 and adds shared BoardSummary plus the compact session working-set activity surface; web remains deferred.
 
-Task-71 already landed as 1bfc31c and is archived accepted; its code is preserved, not rolled back. Task-72's retained unmerged Worker is clean at 4f6d5e7. Main retains temporary justfile/scripts/dev.sh preview helper mirrors; do not restore them while the no-rollback hold applies.
+Reuse task-73's in-memory roster/project handles/open-by-path/switch interface. Replace its provisional chooser summary sampling with one app-layer BoardSummary path, reusable by a later closely related web view. Do not add another registry, protocol parser or reduced-board TUI. Detail belongs to each selected board's full existing TUI.
 
-## Previous scope (on hold)
+Show normal Board state counts excluding Decisions; current in-progress Task titles/recorded assignees; separately label delivered awaiting triage versus explicit Validation and blocked Accord. These are board records, never live agent status. Last checked is when the local read completed, not remote sync freshness. Inactive-board data is explicitly local. Local paths do not cover remote-only machines' boards.
 
-
-## Description
-
-Approved task-70 follow-up. Add a shared app-layer local BoardSummary query and an all-workspaces TUI view, one row per configured board: todo/in-progress/validation, blocked or attention, last local change, sync status and per-entry errors. Define counts consistently with existing protocol/app meanings (avoid conflating delivered with validation). Sort by attention then local activity; Enter opens the chosen board through the switcher. Local reads only, no network fetch; refresh slowly or on demand, not on the active-board 250 ms loop. Do not add a second protocol parser or silently omit broken entries. Kickoff approved by Algorant via Herdra: implement in order 71 → 75. Visual Tasks remain delivered for Algorant's review, with actual screenshots in Sideshow. Keep docs overhaul task-76 paused.
+Read on surface open and around every five seconds while visible. Retain per-entry read errors and keep usable boards visible. No remote fetch loop, expensive full load_read of history/rules every tick, Herdr topology mirror or web implementation. Terse visuals follow approved post OefksQbYnFo; key w/W remain subject to conflicts. Parent verifies native/targeted cases and actual release rendering, publishes in B_I5vQctbo0 and holds delivery for Algorant.
