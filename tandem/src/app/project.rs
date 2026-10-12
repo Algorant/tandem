@@ -1,8 +1,10 @@
 //! Application operations for opening, initializing, and upgrading Tandem projects.
 
 use std::env;
+use std::path::Path;
 
 use crate::app::Error;
+use crate::project::workspaces::WorkspaceList;
 use crate::project::{display_path, parse_frontmatter_fields, split_frontmatter, TandemProject};
 use crate::protocol::config::{default_project_config, PROTOCOL_VERSION};
 use crate::protocol::document::normalize_fields;
@@ -19,12 +21,25 @@ pub(crate) struct InitOutcome {
     pub(crate) project: TandemProject,
 }
 
-/// Opens the board. A board that an old checkout replaced with historical
-/// files opens for reading; see [`historical`].
+/// Opens the board for the current directory. A board that an old checkout
+/// replaced with historical files opens for reading; see [`historical`].
 pub(crate) fn open() -> Result<TandemProject, Error> {
-    let project = TandemProject::discover()?;
+    open_at(&env::current_dir()?)
+}
+
+/// Opens the board of an explicitly selected workspace with the same discovery
+/// and protocol checks as [`open`]. The path is a workspace root such as a
+/// resolved entry of the workspace list, or any directory inside it.
+pub(crate) fn open_at(path: &Path) -> Result<TandemProject, Error> {
+    let project = TandemProject::discover_from(path)?;
     ensure_current_protocol(&project)?;
     Ok(project)
+}
+
+/// Loads the hand-written user workspace list. Read-only: nothing here adds,
+/// rewrites, or discovers entries.
+pub(crate) fn workspace_list() -> WorkspaceList {
+    crate::project::workspaces::load()
 }
 
 /// Opens the board for a change. Refuses a historical board.

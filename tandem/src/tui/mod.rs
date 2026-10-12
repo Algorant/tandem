@@ -85,7 +85,9 @@ pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
         return Err(CliError::user(format!("cannot open the TUI: {message}")));
     }
     let background = crate::app::background_sync::BackgroundSync::start(&workspace);
-    let mut app = TuiApp::load(workspace)?;
+    // Read-only: the hand-written list is only checked so a bad entry is
+    // reported; opening the TUI never adds or rewrites entries.
+    let mut app = TuiApp::load_with(workspace, app::project::workspace_list().diagnostics)?;
     let result =
         TerminalSession::enter().and_then(|mut session| app.run(&mut session, &background));
     background.finish();
@@ -232,6 +234,8 @@ struct TuiApp {
     theme: TuiTheme,
     theme_source: String,
     theme_warnings: Vec<String>,
+    /// Diagnostics of the user workspace list, read once at startup.
+    workspace_list_warnings: Vec<String>,
     selected_view: usize,
     selected_item: usize,
     board_filters: BoardFilters,
@@ -266,6 +270,13 @@ struct TuiApp {
 
 impl TuiApp {
     fn load(workspace: TandemProject) -> Result<Self, CliError> {
+        Self::load_with(workspace, Vec::new())
+    }
+
+    fn load_with(
+        workspace: TandemProject,
+        workspace_list_warnings: Vec<String>,
+    ) -> Result<Self, CliError> {
         let mut app = Self {
             workspace,
             title: String::new(),
@@ -282,6 +293,7 @@ impl TuiApp {
             theme: TuiTheme::default_dark(),
             theme_source: String::new(),
             theme_warnings: Vec::new(),
+            workspace_list_warnings,
             selected_view: 0,
             selected_item: 0,
             board_filters: BoardFilters::default(),
@@ -2910,6 +2922,7 @@ tone = "success"
             theme: TuiTheme::default_dark(),
             theme_source: "test".to_string(),
             theme_warnings: Vec::new(),
+            workspace_list_warnings: Vec::new(),
             selected_view: 1,
             selected_item: 0,
             board_filters: BoardFilters::default(),

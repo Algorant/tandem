@@ -1066,11 +1066,11 @@ impl TuiTheme {
 }
 
 pub(super) fn user_theme_dir_from_env() -> Option<PathBuf> {
-    user_config_dir_from_env().map(|dir| dir.join("themes"))
+    crate::project::user_config_dir().map(|dir| dir.join("themes"))
 }
 
 pub(super) fn user_config_path_from_env() -> Option<PathBuf> {
-    user_config_dir_from_env().map(|dir| dir.join("config.toml"))
+    crate::project::user_config_dir().map(|dir| dir.join("config.toml"))
 }
 
 pub(super) fn workspace_theme_path(project: &TandemProject) -> PathBuf {
@@ -1079,17 +1079,6 @@ pub(super) fn workspace_theme_path(project: &TandemProject) -> PathBuf {
 
 pub(super) fn workspace_config_path(project: &TandemProject) -> PathBuf {
     project.data_dir().join("config.toml")
-}
-
-fn user_config_dir_from_env() -> Option<PathBuf> {
-    if let Some(xdg_config_home) = env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty())
-    {
-        return Some(PathBuf::from(xdg_config_home).join("tandem"));
-    }
-
-    env::var_os("HOME")
-        .filter(|value| !value.is_empty())
-        .map(|home| PathBuf::from(home).join(".config").join("tandem"))
 }
 
 fn load_user_themes(dir: &Path) -> UserThemeRegistry {

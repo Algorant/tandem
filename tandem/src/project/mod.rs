@@ -30,6 +30,7 @@ pub(crate) mod rules;
 #[cfg(test)]
 mod rules_contract_tests;
 pub(crate) mod sync;
+pub(crate) mod workspaces;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
     patch_accord_content, patch_frontmatter_content, patch_resolution_content, render_accord_block,
@@ -53,11 +54,21 @@ pub(crate) struct TandemProject {
     pub(crate) held: write::HeldRecords,
 }
 
-impl TandemProject {
-    pub(crate) fn discover() -> Result<Self, CliError> {
-        Self::discover_from(&env::current_dir()?)
+/// The user-level Tandem config directory: `$XDG_CONFIG_HOME/tandem`, or
+/// `~/.config/tandem` when `XDG_CONFIG_HOME` is unset. Machine-local; it never
+/// belongs to a board.
+pub(crate) fn user_config_dir() -> Option<PathBuf> {
+    if let Some(xdg_config_home) = env::var_os("XDG_CONFIG_HOME").filter(|value| !value.is_empty())
+    {
+        return Some(PathBuf::from(xdg_config_home).join("tandem"));
     }
 
+    env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .map(|home| PathBuf::from(home).join(".config").join("tandem"))
+}
+
+impl TandemProject {
     pub(crate) fn discover_from(start: &Path) -> Result<Self, CliError> {
         let git = git::detect(start);
         let mut dir = start.to_path_buf();

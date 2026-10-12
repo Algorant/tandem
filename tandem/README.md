@@ -118,6 +118,26 @@ tandem --version
 
 Integrations should call the installed `tandem` binary (with `--json` for reads), locating it through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
 
+## User workspace list
+
+`$XDG_CONFIG_HOME/tandem/workspaces.toml`, or `~/.config/tandem/workspaces.toml` when `XDG_CONFIG_HOME` is unset, is an optional, hand-written list of the workspaces on this machine. It is machine-local user config: paths never enter a board, and Tandem only reads it. Opening `tandem tui` never adds, rewrites, or discovers entries, and no command manages the list yet; edit the file yourself. A missing file is an empty list.
+
+```toml
+[[workspace]]
+alias = "notes"
+path = "~/Projects/notes"
+
+[[workspace]]
+alias = "site"
+path = "/srv/work/site"
+```
+
+- `alias` (required): letters, digits, `.`, `_` or `-`, starting with a letter or digit. Aliases are unique, compared case-insensitively.
+- `path` (required): an absolute path or one starting with `~/`. It must be the directory that directly contains the workspace's board (`.tandem/tandem.md`), not a subdirectory or a linked worktree. Environment variables are not expanded. The alias resolves to the canonical (symlink-resolved) root, so two entries for the same workspace are duplicates.
+- Any other key is an error, so a typo such as `pth` is reported instead of ignored.
+
+One bad entry never hides the others. Each missing path, non-workspace directory, duplicate alias, duplicate workspace, unknown key, or malformed entry produces a diagnostic naming the file and entry number, and the first valid entry for an alias or workspace wins. A file that is not valid TOML is one diagnostic with its line and column. `tandem tui` reports diagnostics once at startup as runtime warnings in the status line. Opening a listed workspace goes through the same discovery and protocol-version checks as running `tandem` inside it. The shared loader (`project::workspaces`) and `app::project::open_at(path)` are the interface the TUI and web use.
+
 ## Implemented TUI themes and keys
 
 `tandem tui` starts from the built-in `default-dark` palette, discovers user theme files, applies the user's XDG config, applies any workspace theme override, then applies workspace display config:

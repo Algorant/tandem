@@ -256,6 +256,7 @@ impl TuiApp {
         self.load_errors
             .iter()
             .chain(self.theme_warnings.iter())
+            .chain(self.workspace_list_warnings.iter())
             .cloned()
             .collect()
     }
