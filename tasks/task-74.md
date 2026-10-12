@@ -13,10 +13,10 @@ tags: ["tui", "orchestrator"]
 accord:
   status: "ready"
   acceptance: ["A shared BoardSummary query returns local per-workspace counts, attention, last change, sync state and explicit per-entry errors with documented counting semantics.", "The TUI overview displays configured workspaces sorted by attention and supports opening a selected board.", "Overview refresh is bounded and local-only, without triggering remote sync or full-board loads every active-board tick.", "A missing or invalid workspace is represented as an error row rather than aborting the overview."]
-  validation: ["just dev-check"]
-  updatedAt: "2026-10-12T15:51:24Z"
+  validation: ["$ just dev-check"]
+  updatedAt: "2026-10-12T16:29:18Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T16:16:25Z"
+updatedAt: "2026-10-12T16:29:18Z"
 ---
 
 ## Description
