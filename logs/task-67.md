@@ -4,7 +4,6 @@ uid: e9d8dcb5-57f9-4b01-ac2f-c691e6b3a549
 type: task
 kind: "papercut"
 title: "Residual stale doc claims after task-66: review-status UI text, install tag pins, decision date field"
-state: todo
 priority: "low"
 references: ["task-66", "task-51"]
 tags: ["docs"]
@@ -13,7 +12,11 @@ accord:
   acceptance: ["Each listed claim is either verified against the current TUI/web/CLI code and kept, or corrected; install snippets either track the latest release or avoid pinning a version."]
   updatedAt: "2026-10-10T14:33:37Z"
 createdAt: "2026-10-10T14:33:37Z"
-updatedAt: "2026-10-10T14:33:37Z"
+updatedAt: "2026-10-12T15:52:03Z"
+archivedAt: "2026-10-12T15:52:03Z"
+resolution:
+  outcome: "canceled"
+  note: "Absorbed into docs/site overhaul task-76 by Algorant's direction via Herdra. The stale doc/install/UI claims are preserved in its scope and acceptance; no fix is claimed as shipped."
 ---
 
 ## Description
