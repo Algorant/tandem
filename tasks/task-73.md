@@ -13,10 +13,10 @@ tags: ["ui", "orchestrator"]
 accord:
   status: "ready"
   acceptance: ["Without the opt-in flag tandem web retains its current single-workspace behaviour; with it a selector switches among explicitly configured boards.", "Per-board URLs preserve selected workspace identity and unknown aliases return 404; client input cannot open an unlisted filesystem path.", "Read-only methods, loopback binding, Host checks and CSP remain enforced across every workspace route.", "The served list is visible at startup and background sync does not unconditionally run for every configured board."]
-  validation: ["just dev-check"]
-  updatedAt: "2026-10-12T15:51:22Z"
+  validation: ["$ just dev-check"]
+  updatedAt: "2026-10-12T16:29:16Z"
 createdAt: "2026-10-12T15:51:22Z"
-updatedAt: "2026-10-12T16:16:24Z"
+updatedAt: "2026-10-12T16:29:16Z"
 ---
 
 ## Description
