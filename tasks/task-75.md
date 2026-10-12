@@ -11,13 +11,14 @@ references: ["task-70"]
 relatedFiles: ["tandem/src/web.rs", "tandem/src/web/app.js", "tandem/src/web/api.js", "tandem/src/app/queries.rs"]
 tags: ["ui", "orchestrator"]
 accord:
-  status: "ready"
+  status: "blocked"
   acceptance: ["In opt-in multi-workspace mode an /all page lists configured boards, summaries, attention and errors and links to their individual views.", "The overview reuses BoardSummary rather than implementing different counting semantics or parsing records in the frontend.", "Polling uses bounded local summaries and does not fetch or fully reload all boards each cycle.", "Single-workspace defaults and the configured-board allowlist remain unchanged."]
   validation: ["$ just dev-check"]
   constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
-  updatedAt: "2026-10-12T17:18:09Z"
+  note: "Algorant froze orchestrator-mode implementation pending approved ad-hoc ephemeral-workspace plumbing; permanent workspaces.toml is no longer the requirement. Preserve existing work unchanged; no new code/mockups/merges/pushes/discards/rollbacks."
+  updatedAt: "2026-10-12T17:18:10Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-10-12T17:18:09Z"
+updatedAt: "2026-10-12T17:18:10Z"
 ---
 ## Frozen by Algorant via Herdra
 
