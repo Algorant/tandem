@@ -3,9 +3,7 @@
 use super::accord;
 use super::document::{has_metadata, Document};
 use super::hierarchy::{DocumentLocation, TaskRole};
-use super::workflow::{
-    resolution_note, resolution_outcome, RESOLUTION_OUTCOMES, RESOLUTION_OUTCOME_COMPLETED,
-};
+use super::workflow::{resolution_outcome, RESOLUTION_OUTCOMES, RESOLUTION_OUTCOME_COMPLETED};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Severity {
@@ -52,11 +50,6 @@ pub(crate) fn metadata_diagnostics(document: &Document, is_log: bool) -> Vec<Dia
     if is_log && document.doc_type() == "task" {
         if document.field("archivedAt").is_none() {
             diagnostics.push(Diagnostic::error("missing required log field `archivedAt`"));
-        }
-        if resolution_note(document).is_none() {
-            diagnostics.push(Diagnostic::error(
-                "missing required log field `resolution.note`",
-            ));
         }
         let outcome = resolution_outcome(document);
         if !RESOLUTION_OUTCOMES.contains(&outcome) {
