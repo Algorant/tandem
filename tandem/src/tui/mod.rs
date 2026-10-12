@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use yaml_rust2::Yaml;
@@ -70,7 +71,7 @@ use chrome::status_tone_for_message;
 use chrome::{centered_rect, rect_contains};
 use decisions::DecisionsState;
 use editor::{editor_command_from_env, editor_target_for_doc, run_editor_command, EditorTarget};
-use pickers::BoardPicker;
+use pickers::{BoardPicker, WorkspacePicker};
 use reload::{ReloadFingerprint, ReloadOutcome};
 use rules::RulesState;
 use state::*;
@@ -80,17 +81,33 @@ use theme::{default_tag_tone, StatusTone, TuiTheme};
 use validation::ValidationPrompt;
 use workflow_prompt::WorkflowPrompt;
 
-pub(crate) fn run_tui(workspace: TandemProject) -> Result<(), CliError> {
+pub(crate) fn run_tui(workspace: TandemProject, seed_paths: Vec<PathBuf>) -> Result<(), CliError> {
     if let Some(message) = app::project::historical(&workspace) {
         return Err(CliError::user(format!("cannot open the TUI: {message}")));
     }
-    let background = crate::app::background_sync::BackgroundSync::start(&workspace);
-    // Read-only: the hand-written list is only checked so a bad entry is
-    // reported; opening the TUI never adds or rewrites entries.
-    let mut app = TuiApp::load_with(workspace, app::project::workspace_list().diagnostics)?;
+    let mut app = TuiApp::load(workspace)?;
+    for path in seed_paths {
+        if let Err(error) = app
+            .session_roster
+            .lock()
+            .expect("session roster lock")
+            .add_path(&path)
+        {
+            let message = format!("Cannot add board {}: {}", path.display(), error.message);
+            app.status = message.clone();
+            app.workspace_feedback = Some(message);
+        }
+    }
+    let mut background = crate::app::background_sync::BackgroundSync::start(
+        &app.workspace,
+        app.workspace_alias.clone(),
+    );
     let result =
-        TerminalSession::enter().and_then(|mut session| app.run(&mut session, &background));
-    background.finish();
+        TerminalSession::enter().and_then(|mut session| app.run(&mut session, &mut background));
+    app.finish_retiring_syncs();
+    if let Some(note) = background.finish() {
+        eprintln!("{note}");
+    }
     result
 }
 
@@ -234,8 +251,9 @@ struct TuiApp {
     theme: TuiTheme,
     theme_source: String,
     theme_warnings: Vec<String>,
-    /// Diagnostics of the user workspace list, read once at startup.
-    workspace_list_warnings: Vec<String>,
+    /// One app-layer roster shared across replacement board-view state.
+    session_roster: Arc<Mutex<app::project::SessionRoster>>,
+    workspace_alias: String,
     selected_view: usize,
     selected_item: usize,
     board_filters: BoardFilters,
@@ -252,6 +270,7 @@ struct TuiApp {
     log_search_filter: String,
     log_filter_indexes: Option<Vec<usize>>,
     log_search_input: Option<String>,
+    workspace_feedback: Option<String>,
     status: String,
     observed_status: String,
     status_updated_at: Instant,
@@ -259,6 +278,7 @@ struct TuiApp {
     help_scroll: u16,
     help_section: usize,
     board_picker: Option<BoardPicker>,
+    workspace_picker: Option<WorkspacePicker>,
     validation_prompt: Option<ValidationPrompt>,
     workflow_prompt: Option<WorkflowPrompt>,
     rules_view: RulesState,
@@ -266,17 +286,27 @@ struct TuiApp {
     hits: Vec<HitRegion>,
     reload_fingerprint: ReloadFingerprint,
     last_reload_check: Instant,
+    retiring_syncs: Vec<(String, std::thread::JoinHandle<Option<String>>)>,
 }
 
 impl TuiApp {
     fn load(workspace: TandemProject) -> Result<Self, CliError> {
-        Self::load_with(workspace, Vec::new())
+        let session_roster = app::project::SessionRoster::seed(workspace.clone());
+        Self::load_with(workspace, Arc::new(Mutex::new(session_roster)))
     }
 
     fn load_with(
         workspace: TandemProject,
-        workspace_list_warnings: Vec<String>,
+        session_roster: Arc<Mutex<app::project::SessionRoster>>,
     ) -> Result<Self, CliError> {
+        let workspace_alias = session_roster
+            .lock()
+            .expect("session roster lock")
+            .entries()
+            .iter()
+            .find(|entry| entry.project.root() == workspace.root())
+            .map(|entry| entry.alias.clone())
+            .unwrap_or_else(|| "Current".to_string());
         let mut app = Self {
             workspace,
             title: String::new(),
@@ -293,7 +323,8 @@ impl TuiApp {
             theme: TuiTheme::default_dark(),
             theme_source: String::new(),
             theme_warnings: Vec::new(),
-            workspace_list_warnings,
+            session_roster,
+            workspace_alias,
             selected_view: 0,
             selected_item: 0,
             board_filters: BoardFilters::default(),
@@ -310,6 +341,7 @@ impl TuiApp {
             log_search_filter: String::new(),
             log_filter_indexes: None,
             log_search_input: None,
+            workspace_feedback: None,
             status: String::new(),
             observed_status: String::new(),
             status_updated_at: Instant::now(),
@@ -321,9 +353,11 @@ impl TuiApp {
             hits: Vec::new(),
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
+            retiring_syncs: Vec::new(),
             help_scroll: 0,
             help_section: 0,
             board_picker: None,
+            workspace_picker: None,
         };
         app.reload();
         Ok(app)
@@ -332,41 +366,92 @@ impl TuiApp {
     fn run(
         &mut self,
         session: &mut TerminalSession,
-        background: &crate::app::background_sync::BackgroundSync,
+        background: &mut crate::app::background_sync::BackgroundSync,
     ) -> Result<(), CliError> {
-        let mut redraw = true;
-        loop {
-            if let Some(note) = background.take_note() {
-                self.status = note;
-                redraw = true;
-            }
-            redraw |= self.reload_if_changed();
-            redraw |= self.expire_transient_status();
-            if redraw {
-                session.draw_synchronized(|terminal| {
-                    terminal.draw(|frame| self.draw(frame)).map(|_| ())
-                })?;
-                redraw = false;
-            }
-            if event::poll(self.next_wake_timeout())? {
-                redraw = true;
-                match event::read()? {
-                    Event::Key(key) => match self.handle_key(key)? {
-                        KeyAction::Continue => {}
-                        KeyAction::Quit => break,
-                        KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
-                    },
-                    Event::Mouse(mouse) => match self.handle_mouse(mouse) {
-                        KeyAction::Continue => {}
-                        KeyAction::Quit => break,
-                        KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
-                    },
-                    Event::Resize(_, _) => {}
-                    _ => {}
+        let mut retiring: Vec<(String, std::thread::JoinHandle<Option<String>>)> = Vec::new();
+        let mut active_root = self.workspace.root.clone();
+        let mut active_alias = self.workspace_alias.clone();
+        let run_result = (|| -> Result<(), CliError> {
+            let mut redraw = true;
+            loop {
+                if let Some(note) = background.take_note() {
+                    self.status = note;
+                    redraw = true;
+                }
+                let mut remaining = Vec::new();
+                for (alias, job) in retiring.drain(..) {
+                    if job.is_finished() {
+                        match job.join() {
+                            Ok(Some(note)) => {
+                                self.status = note;
+                                redraw = true;
+                            }
+                            Ok(None) => {}
+                            Err(_) => {
+                                self.status =
+                                    format!("Workspace `{alias}` retiring sync worker panicked");
+                                redraw = true;
+                            }
+                        }
+                    } else {
+                        remaining.push((alias, job));
+                    }
+                }
+                retiring = remaining;
+                redraw |= self.reload_if_changed();
+                redraw |= self.expire_transient_status();
+                if redraw {
+                    session.draw_synchronized(|terminal| {
+                        terminal.draw(|frame| self.draw(frame)).map(|_| ())
+                    })?;
+                    redraw = false;
+                }
+                if event::poll(self.next_wake_timeout())? {
+                    redraw = true;
+                    match event::read()? {
+                        Event::Key(key) => match self.handle_key(key)? {
+                            KeyAction::Continue => {}
+                            KeyAction::Quit => break,
+                            KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
+                        },
+                        Event::Mouse(mouse) => match self.handle_mouse(mouse) {
+                            KeyAction::Continue => {}
+                            KeyAction::Quit => break,
+                            KeyAction::OpenEditor => self.open_selected_item_in_editor(session)?,
+                        },
+                        Event::Resize(_, _) => {}
+                        _ => {}
+                    }
+                    if self.workspace.root != active_root {
+                        let next = crate::app::background_sync::BackgroundSync::start(
+                            &self.workspace,
+                            self.workspace_alias.clone(),
+                        );
+                        let old = std::mem::replace(background, next);
+                        retiring.push((active_alias, old.retire()));
+                        active_root = self.workspace.root.clone();
+                        active_alias = self.workspace_alias.clone();
+                        redraw = true;
+                    }
                 }
             }
+            Ok(())
+        })();
+        self.retiring_syncs.extend(retiring);
+        run_result
+    }
+
+    fn finish_retiring_syncs(&mut self) {
+        for (alias, job) in self.retiring_syncs.drain(..) {
+            match job.join() {
+                Ok(Some(note)) => {
+                    self.status = note.clone();
+                    eprintln!("{note}");
+                }
+                Ok(None) => {}
+                Err(_) => eprintln!("Workspace `{alias}` retiring sync worker panicked"),
+            }
         }
-        Ok(())
     }
 
     fn draw(&mut self, frame: &mut Frame<'_>) {
@@ -406,6 +491,9 @@ impl TuiApp {
 
         if self.board_picker.is_some() {
             self.draw_board_picker(frame, area);
+        }
+        if self.workspace_picker.is_some() {
+            self.draw_workspace_picker(frame, area);
         }
 
         if self.validation_prompt.is_some() {
@@ -2922,7 +3010,8 @@ tone = "success"
             theme: TuiTheme::default_dark(),
             theme_source: "test".to_string(),
             theme_warnings: Vec::new(),
-            workspace_list_warnings: Vec::new(),
+            session_roster: Arc::new(Mutex::new(app::project::SessionRoster::empty())),
+            workspace_alias: "Test".into(),
             selected_view: 1,
             selected_item: 0,
             board_filters: BoardFilters::default(),
@@ -2939,6 +3028,7 @@ tone = "success"
             log_search_filter: String::new(),
             log_filter_indexes: None,
             log_search_input: None,
+            workspace_feedback: None,
             status: String::new(),
             observed_status: String::new(),
             status_updated_at: Instant::now(),
@@ -2946,6 +3036,7 @@ tone = "success"
             help_scroll: 0,
             help_section: 0,
             board_picker: None,
+            workspace_picker: None,
             validation_prompt: None,
             workflow_prompt: None,
             rules_view: RulesState::default(),
@@ -2953,6 +3044,7 @@ tone = "success"
             hits: Vec::new(),
             reload_fingerprint: ReloadFingerprint::default(),
             last_reload_check: Instant::now(),
+            retiring_syncs: Vec::new(),
         }
     }
 
@@ -3039,7 +3131,7 @@ tone = "success"
         let mut app = keyboard_test_app();
         assert_eq!(
             app.board_footer_text(),
-            "sort ID ascending · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "ID asc · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic · ? Help"
         );
         assert!(!app.board_footer_text().contains("TODO"));
         assert!(!app.board_footer_text().contains("row"));
@@ -3049,7 +3141,7 @@ tone = "success"
         app.focus = FocusPane::Detail;
         assert_eq!(
             app.board_footer_text(),
-            "sort ID ascending · s Cycle · d List · e Edit · b Epic Board · ? Help"
+            "ID asc · s Cycle · d List · e Edit · b Epic · ? Help"
         );
 
         app.switch_view(TuiView::Logs);
@@ -3243,7 +3335,7 @@ tone = "success"
         assert!(app.status.is_empty());
         assert_eq!(
             app.board_footer_text(),
-            "sort ID ascending · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic Board · ? Help"
+            "ID asc · s Cycle · a Actions · d Detail · e Edit · f Filter · v Validate · b Epic · ? Help"
         );
     }
 
@@ -3286,7 +3378,10 @@ tone = "success"
         app.status = "Logs view active: 0 archived logs loaded.".to_string();
         let line = app.footer_line_for_text(app.logs_footer_text());
 
-        assert_eq!(line_text(&line), app.logs_footer_text());
+        assert_eq!(
+            line_text(&line),
+            "Logs list · Enter detail · / search · ? help · w Session boards · Logs view active: 0 archived logs loaded."
+        );
         assert_eq!(line.spans.len(), 3);
         assert!(line.spans[0].content.contains("Logs list"));
         assert_eq!(line.spans[0].style, app.theme.text_style());
@@ -3359,7 +3454,7 @@ tone = "success"
         assert_eq!(app.board_arrangement, BoardArrangement::Epic);
         assert!(app.status.contains("Press b"));
         assert!(!app.status.contains("Press E"));
-        assert!(app.board_footer_text().contains("b State Board"));
+        assert!(app.board_footer_text().contains("b State"));
     }
 
     #[test]

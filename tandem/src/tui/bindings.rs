@@ -86,6 +86,11 @@ pub(super) const BINDINGS: &[Binding] = &[
     },
     Binding {
         scope: BindingScope::Global,
+        keys: "w",
+        description: "search and switch configured workspaces",
+    },
+    Binding {
+        scope: BindingScope::Global,
         keys: "Esc",
         description: "close or leave the top temporary layer",
     },

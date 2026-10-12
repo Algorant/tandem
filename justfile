@@ -23,17 +23,19 @@ web:
 	cd "$repo_root"
 	exec cargo run --manifest-path tandem/Cargo.toml -- web
 
-# Agent/orchestrator helper: configure the one-command delegated preview slot.
+# Agent/orchestrator helper: configure the one-command delegated preview with a session-only seed.
 [private]
-dev-route manifest workspace:
+dev-route manifest workspace seed_workspace:
 	#!/usr/bin/env bash
 	set -euo pipefail
 	manifest="$(realpath "{{manifest}}")"
 	workspace="$(realpath "{{workspace}}")"
+	seed_workspace="$(realpath "{{seed_workspace}}")"
 	test -f "$manifest"
 	test -f "$workspace/.tandem/tandem.md"
+	test -f "$seed_workspace/.tandem/tandem.md"
 	git_common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
-	printf '%s\n%s\n' "$manifest" "$workspace" > "$git_common_dir/tandem-dev-preview"
+	printf '%s\n%s\n%s\n' "$manifest" "$workspace" "$seed_workspace" > "$git_common_dir/tandem-dev-preview"
 
 # Agent/orchestrator helper: restore `just dev` to its safe sandbox default.
 [private]

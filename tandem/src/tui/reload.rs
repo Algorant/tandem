@@ -256,7 +256,6 @@ impl TuiApp {
         self.load_errors
             .iter()
             .chain(self.theme_warnings.iter())
-            .chain(self.workspace_list_warnings.iter())
             .cloned()
             .collect()
     }
@@ -273,6 +272,7 @@ impl TuiApp {
 
     pub(super) fn input_overlay_active(&self) -> bool {
         self.board_picker.is_some()
+            || self.workspace_picker.is_some()
             || self.validation_prompt.is_some()
             || self.workflow_prompt.is_some()
             || self.log_search_input.is_some()

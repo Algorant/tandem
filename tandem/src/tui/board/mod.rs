@@ -58,6 +58,16 @@ impl BoardSort {
         }
     }
 
+    pub(super) fn footer_label(self) -> &'static str {
+        match self {
+            Self::IdAsc => "ID asc",
+            Self::IdDesc => "ID desc",
+            Self::CreatedDesc => "Created ↓",
+            Self::UpdatedDesc => "Updated ↓",
+            Self::PriorityDesc => "Priority",
+        }
+    }
+
     pub(super) fn compare(self, a: &Document, b: &Document) -> std::cmp::Ordering {
         let id = || crate::protocol::ids::compare_ids(a.id(), b.id());
         match self {

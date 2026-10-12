@@ -3,6 +3,7 @@
 //! This module contains grammar only. Semantic validation remains in protocol
 //! and app modules.
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(name = "tandem", version, about = "Local-first project coordination")]
@@ -33,8 +34,15 @@ pub(crate) enum Command {
     /// Upgrade an older board: move 0.3.0 to the `tandem` branch, or convert 0.4.0 to 0.5.0
     Migrate(MigrateArgs),
     Rules(RulesArgs),
-    Tui,
+    Tui(TuiArgs),
     Web(WebArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct TuiArgs {
+    /// Add an existing board to this TUI session (repeatable; never persisted)
+    #[arg(long = "add-workspace")]
+    pub(crate) add_workspaces: Vec<PathBuf>,
 }
 
 #[derive(Debug, Args)]

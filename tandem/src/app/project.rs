@@ -1,10 +1,9 @@
 //! Application operations for opening, initializing, and upgrading Tandem projects.
 
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::app::Error;
-use crate::project::workspaces::WorkspaceList;
 use crate::project::{display_path, parse_frontmatter_fields, split_frontmatter, TandemProject};
 use crate::protocol::config::{default_project_config, PROTOCOL_VERSION};
 use crate::protocol::document::normalize_fields;
@@ -21,25 +20,115 @@ pub(crate) struct InitOutcome {
     pub(crate) project: TandemProject,
 }
 
+/// One board opened during the current TUI process.
+#[derive(Debug, Clone)]
+pub(crate) struct SessionBoard {
+    pub(crate) alias: String,
+    pub(crate) project: TandemProject,
+}
+
+/// Ephemeral set of board handles shared across in-place TUI switches.
+#[derive(Debug, Clone)]
+pub(crate) struct SessionRoster {
+    entries: Vec<SessionBoard>,
+}
+
+impl SessionRoster {
+    pub(crate) fn empty() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub(crate) fn seed(project: TandemProject) -> Self {
+        let mut roster = Self::empty();
+        roster.insert(project);
+        roster
+    }
+
+    pub(crate) fn entries(&self) -> &[SessionBoard] {
+        &self.entries
+    }
+
+    pub(crate) fn add_path(&mut self, path: &Path) -> Result<(SessionBoard, bool), Error> {
+        let project = open_at(path)?;
+        let root = project.root().to_path_buf();
+        if let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.project.root() == root)
+        {
+            return Ok((self.entries[index].clone(), false));
+        }
+        self.insert(project);
+        Ok((
+            self.entries.last().expect("inserted session board").clone(),
+            true,
+        ))
+    }
+
+    pub(crate) fn remove(&mut self, root: &Path, current: &Path) -> bool {
+        if root == current {
+            return false;
+        }
+        let Some(index) = self
+            .entries
+            .iter()
+            .position(|entry| entry.project.root() == root)
+        else {
+            return false;
+        };
+        self.entries.remove(index);
+        true
+    }
+
+    fn insert(&mut self, project: TandemProject) {
+        let alias = project
+            .root()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("Workspace")
+            .to_string();
+        self.entries.push(SessionBoard { alias, project });
+    }
+}
+
 /// Opens the board for the current directory. A board that an old checkout
 /// replaced with historical files opens for reading; see [`historical`].
 pub(crate) fn open() -> Result<TandemProject, Error> {
     open_at(&env::current_dir()?)
 }
 
-/// Opens the board of an explicitly selected workspace with the same discovery
-/// and protocol checks as [`open`]. The path is a workspace root such as a
-/// resolved entry of the workspace list, or any directory inside it.
+/// Opens the board at a selected path with normal discovery and protocol checks.
+/// Canonicalizing the input before discovery makes symlinks and linked worktrees
+/// resolve to the same board root for session-roster deduplication.
 pub(crate) fn open_at(path: &Path) -> Result<TandemProject, Error> {
-    let project = TandemProject::discover_from(path)?;
+    let expanded = if path == Path::new("~") {
+        Some(PathBuf::from(
+            env::var_os("HOME")
+                .filter(|home| !home.is_empty())
+                .ok_or_else(|| Error::user("cannot resolve `~` because HOME is not set"))?,
+        ))
+    } else if let Ok(relative) = path.strip_prefix("~/") {
+        Some(
+            PathBuf::from(
+                env::var_os("HOME")
+                    .filter(|home| !home.is_empty())
+                    .ok_or_else(|| {
+                        Error::user(format!(
+                            "cannot resolve `{}` because HOME is not set",
+                            path.display()
+                        ))
+                    })?,
+            )
+            .join(relative),
+        )
+    } else {
+        None
+    };
+    let project = TandemProject::discover_from(expanded.as_deref().unwrap_or(path))?;
     ensure_current_protocol(&project)?;
     Ok(project)
-}
-
-/// Loads the hand-written user workspace list. Read-only: nothing here adds,
-/// rewrites, or discovers entries.
-pub(crate) fn workspace_list() -> WorkspaceList {
-    crate::project::workspaces::load()
 }
 
 /// Opens the board for a change. Refuses a historical board.

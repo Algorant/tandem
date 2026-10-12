@@ -37,6 +37,11 @@ impl TuiApp {
             return Ok(KeyAction::Continue);
         }
 
+        if self.workspace_picker.is_some() {
+            self.handle_workspace_picker_key(key);
+            return Ok(KeyAction::Continue);
+        }
+
         if self.show_help {
             match key.code {
                 KeyCode::Char('q') => return Ok(KeyAction::Quit),
@@ -68,6 +73,10 @@ impl TuiApp {
 
         if self.board_picker.is_some() {
             match key.code {
+                KeyCode::Char('w') => {
+                    self.board_picker = None;
+                    self.start_workspace_picker();
+                }
                 KeyCode::Char('q') => return Ok(KeyAction::Quit),
                 KeyCode::Char('?') => self.open_help(),
                 KeyCode::Char(ch) if TuiView::from_digit(ch).is_some() => {
@@ -107,6 +116,7 @@ impl TuiApp {
             KeyCode::Char('r') => {
                 self.reload();
             }
+            KeyCode::Char('w') => self.start_workspace_picker(),
             KeyCode::Char(ch) if TuiView::from_digit(ch).is_some() => {
                 self.switch_view(TuiView::from_digit(ch).unwrap())
             }
@@ -151,6 +161,9 @@ impl TuiApp {
     }
 
     pub(super) fn handle_mouse(&mut self, mouse: MouseEvent) -> KeyAction {
+        if self.workspace_picker.is_some() {
+            return KeyAction::Continue;
+        }
         if self.show_help {
             match mouse.kind {
                 MouseEventKind::ScrollUp => self.help_scroll = self.help_scroll.saturating_sub(3),

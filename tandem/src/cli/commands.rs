@@ -143,7 +143,7 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
         Command::Sync(args) => sync_command(args, json),
         Command::Migrate(args) => migrate(args, json),
         Command::Rules(args) => rules(args, json),
-        Command::Tui => Ok(super::StartupRequest::Tui),
+        Command::Tui(args) => Ok(super::StartupRequest::Tui(args.add_workspaces)),
         Command::Web(args) => Ok(super::StartupRequest::Web(crate::web::Options {
             port: args.port,
             no_open: args.no_open,

@@ -1,13 +1,12 @@
 //! Background board sync while the TUI is open.
 //!
 //! A worker thread publishes local changes shortly after they are saved and
-//! fetches incoming changes periodically. Sync writes board files; the TUI's
-//! existing external-change detection reloads them. Noteworthy outcomes
-//! (pending, conflicts, renumbering) are surfaced as a status message.
+//! fetches incoming changes periodically. Workspace retirement is requested
+//! immediately; joining and its final publish run on a tracked retiring job.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::project::sync::{self, Mode, Outcome, Report};
@@ -15,8 +14,6 @@ use crate::project::TandemProject;
 
 const PUBLISH_INTERVAL: Duration = Duration::from_secs(2);
 const REFRESH_INTERVAL: Duration = Duration::from_secs(30);
-/// After a failed attempt (usually offline), wait this long before trying
-/// again so the board lock stays free for interactive changes.
 const RETRY_INTERVAL: Duration = Duration::from_secs(30);
 
 pub(crate) struct BackgroundSync {
@@ -24,46 +21,73 @@ pub(crate) struct BackgroundSync {
     note: Arc<Mutex<Option<String>>>,
     handle: Option<JoinHandle<()>>,
     workspace: TandemProject,
+    alias: String,
 }
 
 impl BackgroundSync {
     /// Starts syncing when the board is Git-backed; otherwise does nothing.
-    pub(crate) fn start(workspace: &TandemProject) -> Self {
+    pub(crate) fn start(workspace: &TandemProject, alias: impl Into<String>) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let note = Arc::new(Mutex::new(None));
+        let alias = alias.into();
         let handle = workspace.git().is_some().then(|| {
-            let (stop, note, workspace) = (stop.clone(), note.clone(), workspace.clone());
-            std::thread::spawn(move || run(&workspace, &stop, &note))
+            let (stop, note, workspace, alias) =
+                (stop.clone(), note.clone(), workspace.clone(), alias.clone());
+            thread::spawn(move || run(&workspace, &alias, &stop, &note))
         });
         Self {
             stop,
             note,
             handle,
             workspace: workspace.clone(),
+            alias,
         }
     }
 
-    /// A status message for the latest noteworthy sync outcome, once.
     pub(crate) fn take_note(&self) -> Option<String> {
         self.note.lock().ok()?.take()
     }
 
-    /// Stops the worker and publishes any last change before exit.
-    pub(crate) fn finish(mut self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if let Some(handle) = self.handle.take() {
-            let _ = handle.join();
-            let _ = sync::sync(&self.workspace, Mode::Publish);
-        }
+    /// Stop now, then reap the periodic worker and final-publish off the UI loop.
+    pub(crate) fn retire(mut self) -> JoinHandle<Option<String>> {
+        self.stop.store(true, Ordering::Release);
+        let handle = self.handle.take();
+        let workspace = self.workspace;
+        let alias = self.alias;
+        thread::spawn(move || {
+            if let Some(handle) = handle {
+                if handle.join().is_err() {
+                    return Some(format!(
+                        "Workspace `{alias}` sync worker panicked while stopping"
+                    ));
+                }
+            }
+            workspace.git()?;
+            match sync::sync(&workspace, Mode::Publish) {
+                Ok(report) => describe(&report).map(|note| format!("Workspace `{alias}`: {note}")),
+                Err(error) => Some(format!(
+                    "Workspace `{alias}` final publish failed: {}",
+                    error.message
+                )),
+            }
+        })
+    }
+
+    /// Stops and final-publishes the active workspace during shutdown.
+    pub(crate) fn finish(self) -> Option<String> {
+        let alias = self.alias.clone();
+        self.retire()
+            .join()
+            .unwrap_or_else(|_| Some(format!("Workspace `{alias}` shutdown worker panicked")))
     }
 }
 
-fn run(workspace: &TandemProject, stop: &AtomicBool, note: &Mutex<Option<String>>) {
+fn run(workspace: &TandemProject, alias: &str, stop: &AtomicBool, note: &Mutex<Option<String>>) {
     let mut last_refresh: Option<Instant> = None;
     let mut last_message: Option<String> = None;
     let mut last_publish = Instant::now();
     let mut retry_after: Option<Instant> = None;
-    while !stop.load(Ordering::Relaxed) {
+    while !stop.load(Ordering::Acquire) {
         let waiting = retry_after.is_some_and(|at| Instant::now() < at);
         let refresh_due =
             !waiting && last_refresh.is_none_or(|at| at.elapsed() >= REFRESH_INTERVAL);
@@ -75,14 +99,22 @@ fn run(workspace: &TandemProject, stop: &AtomicBool, note: &Mutex<Option<String>
                 } else {
                     Mode::Publish
                 };
-                let report = sync::sync(workspace, mode)
-                    .unwrap_or_else(|error| Report::pending(error.message));
-                retry_after = matches!(report.outcome, Outcome::Pending(_))
-                    .then(|| Instant::now() + RETRY_INTERVAL);
-                let message = describe(&report);
+                let message = match sync::sync(workspace, mode) {
+                    Ok(report) => {
+                        retry_after = matches!(report.outcome, Outcome::Pending(_))
+                            .then(|| Instant::now() + RETRY_INTERVAL);
+                        describe(&report)
+                    }
+                    Err(error) => {
+                        retry_after = Some(Instant::now() + RETRY_INTERVAL);
+                        Some(format!("Sync failed: {}", error.message))
+                    }
+                };
                 if message.is_some() && message != last_message {
                     if let Ok(mut slot) = note.lock() {
-                        slot.clone_from(&message);
+                        *slot = message
+                            .as_ref()
+                            .map(|message| format!("Workspace `{alias}`: {message}"));
                     }
                 }
                 last_message = message;
@@ -92,7 +124,7 @@ fn run(workspace: &TandemProject, stop: &AtomicBool, note: &Mutex<Option<String>
             }
             last_publish = Instant::now();
         }
-        std::thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(100));
     }
 }
 

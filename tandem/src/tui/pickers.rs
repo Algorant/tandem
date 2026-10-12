@@ -2,6 +2,46 @@
 
 use super::*;
 
+#[derive(Debug, Clone)]
+pub(super) struct WorkspacePickerEntry {
+    alias: String,
+    root: Option<std::path::PathBuf>,
+    summary: String,
+    current: bool,
+    valid: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct WorkspacePicker {
+    entries: Vec<WorkspacePickerEntry>,
+    filtered: Vec<usize>,
+    query: String,
+    selected: usize,
+    add_path: Option<String>,
+    feedback: Option<String>,
+}
+
+impl WorkspacePicker {
+    fn apply_filter(&mut self) {
+        let query = self.query.to_lowercase();
+        self.filtered = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                (query.is_empty()
+                    || entry.alias.to_lowercase().contains(&query)
+                    || entry.root.as_ref().is_some_and(|root| {
+                        root.display().to_string().to_lowercase().contains(&query)
+                    })
+                    || entry.summary.to_lowercase().contains(&query))
+                .then_some(index)
+            })
+            .collect();
+        self.selected = self.selected.min(self.filtered.len().saturating_sub(1));
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum PickerKind {
     Filter,
@@ -55,7 +95,268 @@ impl BoardPicker {
     }
 }
 
+fn path_suffix_label(path: &std::path::Path, width: u16) -> String {
+    let value = path.display().to_string();
+    let width = width as usize;
+    if value.chars().count() <= width {
+        return value;
+    }
+    let suffix = value
+        .chars()
+        .rev()
+        .take(width.saturating_sub(1))
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect::<String>();
+    format!("…{suffix}")
+}
+
 impl TuiApp {
+    pub(super) fn start_workspace_picker(&mut self) {
+        if self.text_input_active() || self.rules_prompt_active() || self.decision_prompt_active() {
+            self.status = "Finish the current prompt or editor before switching workspaces.".into();
+            return;
+        }
+        let feedback = self.workspace_feedback.take();
+        self.populate_workspace_picker(feedback);
+    }
+
+    fn populate_workspace_picker(&mut self, feedback: Option<String>) {
+        let current_root = self.workspace.root();
+        let roster_entries = self
+            .session_roster
+            .lock()
+            .expect("session roster lock")
+            .entries()
+            .to_vec();
+        let mut entries = Vec::new();
+        for entry in &roster_entries {
+            let project = &entry.project;
+            let current = project.root() == current_root;
+            let summary = if let Some(message) = app::project::historical(project) {
+                format!("Unavailable: {message}")
+            } else {
+                let mut errors = Vec::new();
+                let docs = project.read_board_documents_tolerant(&mut errors);
+                if !errors.is_empty() {
+                    format!("Unavailable: {}", truncate(&errors.join("; "), 150))
+                } else {
+                    let attention = docs
+                        .iter()
+                        .filter(|doc| {
+                            document_state_label(doc) == "validation"
+                                || accord_status(doc) == Some("blocked")
+                        })
+                        .count();
+                    let task_count = docs.iter().filter(|doc| is_task_doc(doc)).count();
+                    format!(
+                        "{}{} tasks · {} need attention",
+                        if attention > 0 { "! " } else { "" },
+                        task_count,
+                        attention
+                    )
+                }
+            };
+            let valid = !summary.starts_with("Unavailable:");
+            entries.push(WorkspacePickerEntry {
+                alias: entry.alias.clone(),
+                root: Some(project.root().to_path_buf()),
+                summary,
+                current,
+                valid,
+            });
+        }
+        let selected = entries.iter().position(|entry| entry.current).unwrap_or(0);
+        let mut picker = WorkspacePicker {
+            entries,
+            filtered: Vec::new(),
+            query: String::new(),
+            selected,
+            add_path: None,
+            feedback,
+        };
+        picker.apply_filter();
+        self.workspace_picker = Some(picker);
+        self.status = "Session boards: type to search, Enter switch, Ctrl-A add path, Ctrl-D remove inactive, Esc close.".into();
+    }
+
+    pub(super) fn handle_workspace_picker_key(&mut self, key: KeyEvent) {
+        let Some(picker) = self.workspace_picker.as_mut() else {
+            return;
+        };
+        if let Some(path) = picker.add_path.as_mut() {
+            match key.code {
+                KeyCode::Esc => picker.add_path = None,
+                KeyCode::Enter => {
+                    let path = std::path::PathBuf::from(path.trim());
+                    picker.add_path = None;
+                    let result = self
+                        .session_roster
+                        .lock()
+                        .expect("session roster lock")
+                        .add_path(&path);
+                    match result {
+                        Ok((entry, added)) => {
+                            let message = if added {
+                                format!("Added `{}` to this session.", entry.alias)
+                            } else {
+                                format!("Already in this session: `{}`.", entry.alias)
+                            };
+                            self.populate_workspace_picker(Some(message));
+                        }
+                        Err(error) => {
+                            let message = format!("Cannot add board: {}", error.message);
+                            self.populate_workspace_picker(Some(message));
+                        }
+                    }
+                }
+                KeyCode::Backspace => {
+                    path.pop();
+                }
+                KeyCode::Char(ch)
+                    if !key
+                        .modifiers
+                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+                {
+                    path.push(ch)
+                }
+                _ => {}
+            }
+            return;
+        }
+        match key.code {
+            KeyCode::Esc => {
+                self.workspace_picker = None;
+                self.status = "Workspace switch canceled.".into();
+            }
+            KeyCode::Enter => {
+                let target = picker
+                    .filtered
+                    .get(picker.selected)
+                    .and_then(|index| picker.entries.get(*index))
+                    .cloned();
+                self.workspace_picker = None;
+                if let Some(target) = target {
+                    if target.valid {
+                        self.switch_workspace(target);
+                    } else {
+                        let reason = target
+                            .summary
+                            .strip_prefix("Unavailable: ")
+                            .unwrap_or(&target.summary);
+                        self.status = format!("Workspace `{}` unavailable: {reason}", target.alias);
+                    }
+                }
+            }
+            KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                picker.add_path = Some(String::new())
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                let target = picker
+                    .filtered
+                    .get(picker.selected)
+                    .and_then(|index| picker.entries.get(*index))
+                    .cloned();
+                if let Some(target) = target {
+                    if target.current {
+                        self.populate_workspace_picker(Some(
+                            "Cannot remove the current board; switch to another board first."
+                                .into(),
+                        ));
+                    } else if let Some(root) = target.root {
+                        self.session_roster
+                            .lock()
+                            .expect("session roster lock")
+                            .remove(&root, self.workspace.root());
+                        self.populate_workspace_picker(Some(format!(
+                            "Removed `{}` from this session.",
+                            target.alias
+                        )));
+                    }
+                }
+            }
+            KeyCode::Up => picker.selected = picker.selected.saturating_sub(1),
+            KeyCode::Down => {
+                picker.selected = (picker.selected + 1).min(picker.filtered.len().saturating_sub(1))
+            }
+            KeyCode::Backspace => {
+                picker.query.pop();
+                picker.apply_filter();
+            }
+            KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                picker.query.clear();
+                picker.apply_filter();
+            }
+            KeyCode::Char(ch)
+                if !key
+                    .modifiers
+                    .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+            {
+                picker.query.push(ch);
+                picker.apply_filter();
+            }
+            _ => {}
+        }
+    }
+
+    fn switch_workspace(&mut self, target: WorkspacePickerEntry) {
+        if target.current {
+            self.status = format!("Already in workspace `{}`.", target.alias);
+            return;
+        }
+        let Some(root) = target.root.as_deref() else {
+            self.status = target.summary;
+            return;
+        };
+        let candidate_workspace = {
+            let roster = self.session_roster.lock().expect("session roster lock");
+            let Some(board) = roster
+                .entries()
+                .iter()
+                .find(|entry| entry.project.root() == root)
+            else {
+                self.status = format!("Session board `{}` is no longer available.", target.alias);
+                return;
+            };
+            board.project.clone()
+        };
+        if let Some(message) = app::project::historical(&candidate_workspace) {
+            self.status = format!(
+                "Cannot switch to `{}`: cannot open the TUI: {message}",
+                target.alias
+            );
+            return;
+        }
+        let mut candidate =
+            match TuiApp::load_with(candidate_workspace, self.session_roster.clone()) {
+                Ok(candidate) => candidate,
+                Err(error) => {
+                    self.status = format!(
+                        "Cannot load workspace `{}`: {}",
+                        target.alias, error.message
+                    );
+                    return;
+                }
+            };
+        let diagnostics = candidate.load_errors.clone();
+        if !diagnostics.is_empty() {
+            self.status = format!(
+                "Cannot switch to `{}`: {}",
+                target.alias,
+                truncate(&diagnostics.join("; "), 220)
+            );
+            return;
+        }
+        candidate.workspace_alias = target.alias.clone();
+        candidate.status = format!(
+            "Switched to workspace `{}` · {} tasks",
+            target.alias,
+            candidate.docs.iter().filter(|doc| is_task_doc(doc)).count()
+        );
+        *self = candidate;
+    }
+
     pub(super) fn start_filter_picker(&mut self) {
         let mut options = Vec::new();
         let kinds = board_filter_kinds(&self.docs);
@@ -412,6 +713,140 @@ impl TuiApp {
             self.clamp_selection();
         }
         self.status = format!("Board {}.", self.board_filters.summary());
+    }
+
+    pub(super) fn draw_workspace_picker(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let Some(picker) = self.workspace_picker.as_ref() else {
+            return;
+        };
+        let popup = centered_rect(86, 72, area);
+        frame.render_widget(Clear, popup);
+        let inner = Block::default()
+            .borders(Borders::ALL)
+            .title(" Session boards ")
+            .border_style(self.theme.border_style(true))
+            .style(self.theme.panel_style())
+            .inner(popup);
+        frame.render_widget(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Session boards ")
+                .border_style(self.theme.border_style(true))
+                .style(self.theme.panel_style()),
+            popup,
+        );
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        frame.render_widget(
+            Paragraph::new(if let Some(path) = &picker.add_path {
+                format!("Add board path: {path}_")
+            } else {
+                format!(
+                    "Search: {}",
+                    if picker.query.is_empty() {
+                        "<type to filter>"
+                    } else {
+                        &picker.query
+                    }
+                )
+            })
+            .style(self.theme.text_style()),
+            rows[0],
+        );
+        let selected_path = picker
+            .filtered
+            .get(picker.selected)
+            .and_then(|index| picker.entries.get(*index))
+            .and_then(|entry| entry.root.as_deref())
+            .map(|path| path_suffix_label(path, rows[1].width))
+            .unwrap_or_else(|| "<no selected board>".into());
+        frame.render_widget(
+            Paragraph::new(format!("Selected: {selected_path}")).style(self.theme.muted_style()),
+            rows[1],
+        );
+        frame.render_widget(
+            Paragraph::new(
+                picker
+                    .feedback
+                    .as_deref()
+                    .map(|message| truncate(message, rows[2].width as usize))
+                    .unwrap_or_default(),
+            )
+            .style(
+                picker
+                    .feedback
+                    .as_deref()
+                    .map(|message| {
+                        self.theme
+                            .status_style(super::chrome::status_tone_for_message(message))
+                    })
+                    .unwrap_or_else(|| self.theme.muted_style()),
+            ),
+            rows[2],
+        );
+        let items = picker
+            .filtered
+            .iter()
+            .enumerate()
+            .filter_map(|(visible, index)| {
+                picker.entries.get(*index).map(|entry| {
+                    let marker = if entry.current { "●" } else { " " };
+                    ListItem::new(Line::from(vec![
+                        Span::styled(
+                            if visible == picker.selected {
+                                "▸ "
+                            } else {
+                                "  "
+                            },
+                            self.theme.status_style(StatusTone::Accent),
+                        ),
+                        Span::styled(
+                            format!("{marker} {:<18}", truncate(&entry.alias, 18)),
+                            if entry.current {
+                                self.theme.status_style(StatusTone::Accent)
+                            } else if entry.valid {
+                                self.theme.text_style()
+                            } else {
+                                self.theme.status_style(StatusTone::Warning)
+                            },
+                        ),
+                        Span::styled(
+                            truncate(&entry.summary, rows[1].width.saturating_sub(28) as usize),
+                            self.theme.muted_style(),
+                        ),
+                    ]))
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut state = ListState::default();
+        state.select(Some(picker.selected));
+        if items.is_empty() {
+            frame.render_widget(
+                Paragraph::new("No matching session boards").style(self.theme.muted_style()),
+                rows[3],
+            );
+        } else {
+            frame.render_stateful_widget(
+                List::new(items).highlight_style(self.theme.selected_style()),
+                rows[3],
+                &mut state,
+            );
+        }
+        frame.render_widget(
+            Paragraph::new(
+                "↑/↓ select · Enter switch · Ctrl-A add · Ctrl-D remove inactive · Esc close",
+            )
+            .style(self.theme.muted_style()),
+            rows[4],
+        );
     }
 
     pub(super) fn draw_board_picker(&mut self, frame: &mut Frame<'_>, area: Rect) {

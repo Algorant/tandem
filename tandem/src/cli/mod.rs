@@ -9,7 +9,7 @@ use crate::CliError;
 
 pub(crate) enum StartupRequest {
     Exit,
-    Tui,
+    Tui(Vec<std::path::PathBuf>),
     Web(crate::web::Options),
 }
 

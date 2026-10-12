@@ -9,6 +9,7 @@ case "$mode" in tui|project|shell|sandbox|build|check) ;; *) echo "Unknown dev m
 # Only the default TUI uses the explicitly configured delegated preview slot.
 # Invalid/stale routes fail; they never fall back to a different checkout.
 workspace=""
+preview_seed=""
 seeded=false
 if [[ "$mode" == shell && ( ! -t 0 || ! -t 1 ) ]]; then
     echo 'Run just dev-test in a terminal; use just dev-check for automated validation.' >&2
@@ -18,14 +19,16 @@ if [[ "$mode" == tui ]]; then
     route="$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)/tandem-dev-preview"
     if [[ -f "$route" ]]; then
         mapfile -t selection < "$route"
-        if [[ ${#selection[@]} != 2 ]]; then
-            echo "Invalid dev preview route: $route" >&2
+        if [[ ${#selection[@]} != 3 ]]; then
+            echo "Invalid dev preview route: $route (expected manifest, workspace, session seed board)" >&2
             exit 2
         fi
         manifest="${selection[0]}"
         workspace="${selection[1]}"
+        preview_seed="${selection[2]}"
         test -f "$manifest"
         test -f "$workspace/.tandem/tandem.md"
+        test -f "$preview_seed/.tandem/tandem.md"
     fi
 fi
 
@@ -136,5 +139,8 @@ cd "$workspace"
 if [[ "$mode" == shell ]]; then
     echo 'Dev binary is first on PATH. Try: tandem assignment task-2 --json; tandem tui; git log --oneline' >&2
     PATH="$(dirname "$binary"):$PATH" exec "${SHELL:-bash}"
+fi
+if [[ -n "$preview_seed" ]]; then
+    exec "$binary" tui --add-workspace "$preview_seed"
 fi
 exec "$binary" tui

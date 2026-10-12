@@ -30,7 +30,6 @@ pub(crate) mod rules;
 #[cfg(test)]
 mod rules_contract_tests;
 pub(crate) mod sync;
-pub(crate) mod workspaces;
 pub(crate) mod write;
 pub(crate) use frontmatter::{
     patch_accord_content, patch_frontmatter_content, patch_resolution_content, render_accord_block,
@@ -70,8 +69,9 @@ pub(crate) fn user_config_dir() -> Option<PathBuf> {
 
 impl TandemProject {
     pub(crate) fn discover_from(start: &Path) -> Result<Self, CliError> {
-        let git = git::detect(start);
-        let mut dir = start.to_path_buf();
+        let start = fs::canonicalize(start)?;
+        let git = git::detect(&start);
+        let mut dir = start;
         loop {
             let tandem_dir = dir.join(".tandem");
             let config_path = tandem_dir.join("tandem.md");

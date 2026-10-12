@@ -87,7 +87,7 @@ fn main() {
 fn run() -> Result<(), CliError> {
     match cli::run(std::env::args().skip(1).collect())? {
         cli::StartupRequest::Exit => Ok(()),
-        cli::StartupRequest::Tui => tui::run_tui(app::project::open()?),
+        cli::StartupRequest::Tui(seed_paths) => tui::run_tui(app::project::open()?, seed_paths),
         cli::StartupRequest::Web(options) => web::run(app::project::open()?, options),
     }
 }

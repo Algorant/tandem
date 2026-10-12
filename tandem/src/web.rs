@@ -56,9 +56,16 @@ pub(crate) fn run(project: TandemProject, options: Options) -> Result<(), CliErr
     let runtime = tokio::runtime::Runtime::new()
         .map_err(|error| CliError::user(format!("failed to start web runtime: {error}")))?;
     // The read-only web view keeps its board current in the background.
-    let background = crate::app::background_sync::BackgroundSync::start(&project);
+    let alias = project
+        .root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("workspace");
+    let background = crate::app::background_sync::BackgroundSync::start(&project, alias);
     let result = runtime.block_on(serve(project, options));
-    background.finish();
+    if let Some(note) = background.finish() {
+        eprintln!("{note}");
+    }
     result
 }
 

@@ -118,25 +118,11 @@ tandem --version
 
 Integrations should call the installed `tandem` binary (with `--json` for reads), locating it through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
 
-## User workspace list
+## TUI session boards
 
-`$XDG_CONFIG_HOME/tandem/workspaces.toml`, or `~/.config/tandem/workspaces.toml` when `XDG_CONFIG_HOME` is unset, is an optional, hand-written list of the workspaces on this machine. It is machine-local user config: paths never enter a board, and Tandem only reads it. Opening `tandem tui` never adds, rewrites, or discovers entries, and no command manages the list yet; edit the file yourself. A missing file is an empty list.
+The TUI starts with the board discovered from its launch directory. Press `w` to open the session board chooser, `Ctrl-A` to add an existing board by path, and `Ctrl-D` to remove the selected inactive board. Session membership is in memory only and is forgotten when the TUI exits. Paths can name a board root, a directory inside a board, or a linked worktree; symlinks and linked worktrees resolving to the same board reuse one session entry. The current board must be switched away from before it can be removed.
 
-```toml
-[[workspace]]
-alias = "notes"
-path = "~/Projects/notes"
-
-[[workspace]]
-alias = "site"
-path = "/srv/work/site"
-```
-
-- `alias` (required): letters, digits, `.`, `_` or `-`, starting with a letter or digit. Aliases are unique, compared case-insensitively.
-- `path` (required): an absolute path or one starting with `~/`. It must be the directory that directly contains the workspace's board (`.tandem/tandem.md`), not a subdirectory or a linked worktree. Environment variables are not expanded. The alias resolves to the canonical (symlink-resolved) root, so two entries for the same workspace are duplicates.
-- Any other key is an error, so a typo such as `pth` is reported instead of ignored.
-
-One bad entry never hides the others. Each missing path, non-workspace directory, duplicate alias, duplicate workspace, unknown key, or malformed entry produces a diagnostic naming the file and entry number, and the first valid entry for an alias or workspace wins. A file that is not valid TOML is one diagnostic with its line and column. `tandem tui` reports diagnostics once at startup as runtime warnings in the status line. Opening a listed workspace goes through the same discovery and protocol-version checks as running `tandem` inside it. The shared loader (`project::workspaces`) and `app::project::open_at(path)` are the interface the TUI and web use.
+For disposable previews, repeat `tandem tui --add-workspace PATH` to seed additional existing boards for that invocation only. No workspace roster is read from or written to user configuration.
 
 ## Implemented TUI themes and keys
 
@@ -234,7 +220,7 @@ Deferred web work includes all mutations, remote/LAN access and authentication, 
 
 ## TUI interaction
 
-In the TUI, use `1`..`4` to switch Board/Logs/Rules/Decisions, arrows or `j`/`k` to move, `Ctrl-U`/`Ctrl-D` or page keys to page, `e` in Board to edit, `/` in Logs to filter, `?` for the universal key reference, and `q` to quit outside text input. Board uses explicit `f` filter, `m` move, and `v` Validation pickers; its tabs are ALL (default) then each workflow state, every tab is split into STANDARD, RESEARCH, and PAPERCUTS sections driven by the `kind` field, and `f` can also filter by kind. Mouse clicks use the same semantic actions for tabs, rows, panes, pickers, confirmations, previews, and safe footer controls. The wheel targets the pane under the pointer. Overlays consume pointer input. `h/l` stays local. Tab/Shift-Tab changes pane focus only; Enter activates the selected item. Text prompts retain all printable characters, including `?` and `q`; `Ctrl-C` is the emergency quit. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
+In the TUI, press `w` to search and switch among boards in the current session; the current board, task counts, and attention counts are shown. Successful switches load that board's full TUI and theme with clean view state. `1`..`4` switch Board/Logs/Rules/Decisions, arrows or `j`/`k` move, `Ctrl-U`/`Ctrl-D` or page keys page, `e` in Board edits, `/` in Logs filters, `?` opens the universal key reference, and `q` quits outside text input. Board uses explicit `f` filter, `m` move, and `v` Validation pickers; its tabs are ALL (default) then each workflow state, every tab is split into STANDARD, RESEARCH, and PAPERCUTS sections driven by the `kind` field, and `f` can also filter by kind. Mouse clicks use the same semantic actions for tabs, rows, panes, pickers, confirmations, previews, and safe footer controls. The wheel targets the pane under the pointer. Overlays consume pointer input. `h/l` stays local. Tab/Shift-Tab changes pane focus only; Enter activates the selected item. Text prompts retain all printable characters, including `?` and `q`; `Ctrl-C` is the emergency quit. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
 
 `transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
 

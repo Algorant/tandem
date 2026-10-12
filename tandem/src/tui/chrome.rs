@@ -112,7 +112,10 @@ impl TuiApp {
             .borders(Borders::ALL)
             .title(Line::from(vec![
                 Span::raw(" "),
-                Span::styled(self.title.clone(), self.theme.title_style()),
+                Span::styled(
+                    format!("{} · {}", self.workspace_alias, self.title),
+                    self.theme.title_style(),
+                ),
                 Span::raw(" · "),
                 Span::styled(
                     self.view.label(),
@@ -337,6 +340,7 @@ impl TuiApp {
         if self.status.is_empty()
             || self.text_input_active()
             || self.board_picker.is_some()
+            || self.workspace_picker.is_some()
             || self.validation_prompt.is_some()
             || self.workflow_prompt.is_some()
             || self.rules_prompt_active()
@@ -355,8 +359,8 @@ impl TuiApp {
                 .to_string();
         }
         let arrangement_hint = match self.board_arrangement {
-            BoardArrangement::State => "b Epic Board",
-            BoardArrangement::Epic => "b State Board",
+            BoardArrangement::State => "b Epic",
+            BoardArrangement::Epic => "b State",
         };
         let detail_hint = if self.focus == FocusPane::Detail {
             "d List"
@@ -365,11 +369,11 @@ impl TuiApp {
         };
         let commands = if self.focus == FocusPane::Detail {
             format!(
-                "sort {} · s Cycle · {detail_hint} · e Edit · {arrangement_hint} · ? Help",
-                self.board_sort.label()
+                "{} · s Cycle · {detail_hint} · e Edit · {arrangement_hint} · ? Help",
+                self.board_sort.footer_label()
             )
         } else {
-            format!("sort {} · s Cycle · a Actions · {detail_hint} · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help", self.board_sort.label())
+            format!("{} · s Cycle · a Actions · {detail_hint} · e Edit · f Filter · v Validate · {arrangement_hint} · ? Help", self.board_sort.footer_label())
         };
         self.with_status(commands)
     }
@@ -434,16 +438,22 @@ impl TuiApp {
         let hint_style = self.theme.text_style();
         let separator_style = self.theme.muted_style();
         let Some(status) = (!self.status.is_empty()).then_some(self.status.as_str()) else {
-            return Line::from(Span::styled(hints, hint_style));
+            return Line::from(Span::styled(
+                format!("{hints} · w Session boards"),
+                hint_style,
+            ));
         };
         let suffix = format!(" · {status}");
         let Some(base) = hints.strip_suffix(&suffix) else {
-            return Line::from(Span::styled(hints, hint_style));
+            return Line::from(Span::styled(
+                format!("{hints} · w Session boards"),
+                hint_style,
+            ));
         };
-        if let Some(rendered_status) = durable_outcome_footer_status(status) {
-            // Durable-write/checkpoint outcomes lead the footer so the
-            // mutation result remains visible before command hints consume
-            // the narrow terminal width. The full error remains in status.
+        let base = format!("{base} · w Session boards");
+        if let Some(rendered_status) = priority_footer_status(status) {
+            // Durable writes and workspace failures lead so their outcomes
+            // remain visible before command hints consume narrow terminals.
             return Line::from(vec![
                 Span::styled(
                     rendered_status,
@@ -736,18 +746,44 @@ impl TuiApp {
     }
 }
 
-fn durable_outcome_footer_status(status: &str) -> Option<String> {
-    status
-        .to_ascii_lowercase()
-        .contains("record written")
-        .then(|| status.to_string())
+fn priority_footer_status(status: &str) -> Option<String> {
+    let lower = status.to_ascii_lowercase();
+    (lower.contains("record written")
+        || lower.contains("cannot switch to")
+        || lower.contains("cannot load workspace")
+        || lower.contains("cannot add board")
+        || lower.contains("cannot remove the current board")
+        || lower.contains("unavailable:")
+        || lower.contains("sync failed")
+        || lower.contains("publish failed")
+        || lower.contains("sync conflict")
+        || lower.contains("sync held")
+        || lower.contains("sync worker panicked")
+        || lower.contains("shutdown worker panicked")
+        || lower.contains("already in this session")
+        || lower.contains("added `")
+        || lower.contains("removed `"))
+    .then(|| status.to_string())
 }
 
 pub(super) fn status_tone_for_message(message: &str) -> StatusTone {
     let lower = message.to_ascii_lowercase();
-    if lower.contains("error") || lower.contains("failed") || lower.contains("failure") {
+    if lower.contains("error")
+        || lower.contains("failed")
+        || lower.contains("failure")
+        || lower.contains("cannot switch")
+        || lower.contains("cannot add board")
+        || lower.contains("cannot remove the current board")
+        || lower.contains("unavailable:")
+        || lower.contains("historical board")
+        || lower.contains("panicked")
+    {
         StatusTone::Error
-    } else if lower.contains("warning") || lower.contains("canceled") || lower.contains("needs") {
+    } else if lower.contains("warning")
+        || lower.contains("canceled")
+        || lower.contains("needs")
+        || lower.contains("unavailable")
+    {
         StatusTone::Warning
     } else if lower.contains("created")
         || lower.contains("moved")
