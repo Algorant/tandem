@@ -6,9 +6,9 @@ use super::*;
 pub(super) struct WorkspacePickerEntry {
     alias: String,
     root: Option<std::path::PathBuf>,
-    summary: String,
+    summary: Option<app::queries::BoardSummary>,
+    checked_at: Option<Instant>,
     current: bool,
-    valid: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -34,7 +34,13 @@ impl WorkspacePicker {
                     || entry.root.as_ref().is_some_and(|root| {
                         root.display().to_string().to_lowercase().contains(&query)
                     })
-                    || entry.summary.to_lowercase().contains(&query))
+                    || entry
+                        .summary
+                        .as_ref()
+                        .map(board_summary_filter_text)
+                        .unwrap_or_default()
+                        .to_lowercase()
+                        .contains(&query))
                 .then_some(index)
             })
             .collect();
@@ -95,6 +101,88 @@ impl BoardPicker {
     }
 }
 
+pub(super) type WorkspaceSummaryJob =
+    std::thread::JoinHandle<Vec<app::queries::SessionBoardSummary>>;
+
+fn board_summary_filter_text(summary: &app::queries::BoardSummary) -> String {
+    let mut text = format!(
+        "{} {} {} {} {}",
+        summary.todo,
+        summary.in_progress,
+        summary.validation,
+        summary.delivered_needs_triage,
+        summary.blocked
+    );
+    for item in &summary.current_work {
+        text.push_str(&format!(
+            " {} {}",
+            item.title,
+            item.assignee.as_deref().unwrap_or("")
+        ));
+    }
+    text
+}
+
+fn checked_label(elapsed: Duration) -> String {
+    if elapsed.as_secs() < 2 {
+        "checked just now".into()
+    } else {
+        format!("checked {}s ago", elapsed.as_secs())
+    }
+}
+
+fn board_summary_row(summary: Option<&app::queries::BoardSummary>) -> String {
+    let Some(summary) = summary else {
+        return "Reading local Board…".into();
+    };
+    if !summary.errors.is_empty() {
+        return format!("Partial · {} issue(s)", summary.errors.len());
+    }
+    let mut parts = vec![
+        format!("{} todo", summary.todo),
+        format!("{} in progress", summary.in_progress),
+        format!("{} validation", summary.validation),
+    ];
+    if summary.delivered_needs_triage > 0 {
+        parts.push(format!("{} delivered", summary.delivered_needs_triage));
+    }
+    if summary.blocked > 0 {
+        parts.push(format!("{} blocked", summary.blocked));
+    }
+    parts.join(" · ")
+}
+
+fn truncate_to_width(value: &str, width: usize) -> String {
+    if ratatui::text::Line::from(value).width() <= width {
+        return value.to_string();
+    }
+    if width == 0 {
+        return String::new();
+    }
+    let mut truncated = String::new();
+    for character in value.chars() {
+        let mut candidate = truncated.clone();
+        candidate.push(character);
+        if ratatui::text::Line::from(candidate.as_str()).width() > width.saturating_sub(1) {
+            break;
+        }
+        truncated.push(character);
+    }
+    truncated.push('…');
+    truncated
+}
+
+fn current_work_line(item: &app::queries::BoardWorkItem, width: usize) -> String {
+    let prefix = format!("{} ", item.id);
+    let suffix = format!(
+        " · recorded assignee: {}",
+        item.assignee.as_deref().unwrap_or("unassigned")
+    );
+    let fixed_width = ratatui::text::Line::from(format!("{prefix}{suffix}")).width();
+    let title = truncate_to_width(&item.title, width.saturating_sub(fixed_width));
+    format!("{prefix}{title}{suffix}")
+}
+
 fn path_suffix_label(path: &std::path::Path, width: u16) -> String {
     let value = path.display().to_string();
     let width = width as usize;
@@ -113,6 +201,94 @@ fn path_suffix_label(path: &std::path::Path, width: u16) -> String {
 }
 
 impl TuiApp {
+    pub(super) fn refresh_workspace_summaries(&mut self) {
+        if self.workspace_summary_job.is_some() || self.workspace_picker.is_none() {
+            return;
+        }
+        self.workspace_summary_refresh_requested = false;
+        let entries = self
+            .session_roster
+            .lock()
+            .expect("session roster lock")
+            .entries()
+            .to_vec();
+        self.workspace_summary_job = Some(std::thread::spawn(move || {
+            app::queries::session_board_summaries(&entries)
+        }));
+    }
+
+    pub(super) fn finish_workspace_summaries(&mut self) {
+        if let Some(job) = self.workspace_summary_job.take() {
+            let _ = job.join();
+        }
+    }
+
+    pub(super) fn poll_workspace_summaries(&mut self) -> bool {
+        let Some(job) = self.workspace_summary_job.as_ref() else {
+            return false;
+        };
+        if !job.is_finished() {
+            return false;
+        }
+        let job = self
+            .workspace_summary_job
+            .take()
+            .expect("checked summary job");
+        let results = match job.join() {
+            Ok(results) => results,
+            Err(_) => {
+                self.workspace_summary_last_refresh =
+                    (!self.workspace_summary_refresh_requested).then(Instant::now);
+                if let Some(picker) = self.workspace_picker.as_mut() {
+                    let checked_at = Instant::now();
+                    for entry in &mut picker.entries {
+                        let mut summary = entry.summary.take().unwrap_or_default();
+                        summary
+                            .errors
+                            .push("Local Board summary refresh failed".into());
+                        entry.summary = Some(summary);
+                        entry.checked_at = Some(checked_at);
+                    }
+                }
+                return true;
+            }
+        };
+        self.workspace_summary_last_refresh =
+            (!self.workspace_summary_refresh_requested).then(Instant::now);
+        let Some(picker) = self.workspace_picker.as_mut() else {
+            return false;
+        };
+        let checked_at = Instant::now();
+        let selected_root = picker
+            .filtered
+            .get(picker.selected)
+            .and_then(|index| picker.entries.get(*index))
+            .and_then(|entry| entry.root.clone());
+        let mut changed = false;
+        for result in results {
+            if let Some(entry) = picker
+                .entries
+                .iter_mut()
+                .find(|entry| entry.root.as_deref() == Some(result.root.as_path()))
+            {
+                entry.summary = Some(result.summary);
+                entry.checked_at = Some(checked_at);
+                changed = true;
+            }
+        }
+        if changed {
+            picker.apply_filter();
+            if let Some(selected_root) = selected_root {
+                if let Some(filtered_index) = picker.filtered.iter().position(|entry_index| {
+                    picker.entries[*entry_index].root.as_ref() == Some(&selected_root)
+                }) {
+                    picker.selected = filtered_index;
+                }
+            }
+        }
+        changed
+    }
+
     pub(super) fn start_workspace_picker(&mut self) {
         if self.text_input_active() || self.rules_prompt_active() || self.decision_prompt_active() {
             self.status = "Finish the current prompt or editor before switching workspaces.".into();
@@ -130,43 +306,16 @@ impl TuiApp {
             .expect("session roster lock")
             .entries()
             .to_vec();
-        let mut entries = Vec::new();
-        for entry in &roster_entries {
-            let project = &entry.project;
-            let current = project.root() == current_root;
-            let summary = if let Some(message) = app::project::historical(project) {
-                format!("Unavailable: {message}")
-            } else {
-                let mut errors = Vec::new();
-                let docs = project.read_board_documents_tolerant(&mut errors);
-                if !errors.is_empty() {
-                    format!("Unavailable: {}", truncate(&errors.join("; "), 150))
-                } else {
-                    let attention = docs
-                        .iter()
-                        .filter(|doc| {
-                            document_state_label(doc) == "validation"
-                                || accord_status(doc) == Some("blocked")
-                        })
-                        .count();
-                    let task_count = docs.iter().filter(|doc| is_task_doc(doc)).count();
-                    format!(
-                        "{}{} tasks · {} need attention",
-                        if attention > 0 { "! " } else { "" },
-                        task_count,
-                        attention
-                    )
-                }
-            };
-            let valid = !summary.starts_with("Unavailable:");
-            entries.push(WorkspacePickerEntry {
+        let entries = roster_entries
+            .iter()
+            .map(|entry| WorkspacePickerEntry {
                 alias: entry.alias.clone(),
-                root: Some(project.root().to_path_buf()),
-                summary,
-                current,
-                valid,
-            });
-        }
+                root: Some(entry.project.root().to_path_buf()),
+                summary: None,
+                checked_at: None,
+                current: entry.project.root() == current_root,
+            })
+            .collect::<Vec<_>>();
         let selected = entries.iter().position(|entry| entry.current).unwrap_or(0);
         let mut picker = WorkspacePicker {
             entries,
@@ -178,7 +327,10 @@ impl TuiApp {
         };
         picker.apply_filter();
         self.workspace_picker = Some(picker);
+        self.workspace_summary_last_refresh = None;
+        self.workspace_summary_refresh_requested = true;
         self.status = "Session boards: type to search, Enter switch, Ctrl-A add path, Ctrl-D remove inactive, Esc close.".into();
+        self.refresh_workspace_summaries();
     }
 
     pub(super) fn handle_workspace_picker_key(&mut self, key: KeyEvent) {
@@ -238,15 +390,7 @@ impl TuiApp {
                     .cloned();
                 self.workspace_picker = None;
                 if let Some(target) = target {
-                    if target.valid {
-                        self.switch_workspace(target);
-                    } else {
-                        let reason = target
-                            .summary
-                            .strip_prefix("Unavailable: ")
-                            .unwrap_or(&target.summary);
-                        self.status = format!("Workspace `{}` unavailable: {reason}", target.alias);
-                    }
+                    self.switch_workspace(target);
                 }
             }
             KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -306,7 +450,7 @@ impl TuiApp {
             return;
         }
         let Some(root) = target.root.as_deref() else {
-            self.status = target.summary;
+            self.status = format!("Workspace `{}` has no local board path.", target.alias);
             return;
         };
         let candidate_workspace = {
@@ -349,6 +493,9 @@ impl TuiApp {
             return;
         }
         candidate.workspace_alias = target.alias.clone();
+        candidate.workspace_summary_job = self.workspace_summary_job.take();
+        candidate.workspace_summary_last_refresh = self.workspace_summary_last_refresh;
+        candidate.workspace_summary_refresh_requested = self.workspace_summary_refresh_requested;
         candidate.status = format!(
             "Switched to workspace `{}` · {} tasks",
             target.alias,
@@ -719,7 +866,7 @@ impl TuiApp {
         let Some(picker) = self.workspace_picker.as_ref() else {
             return;
         };
-        let popup = centered_rect(86, 72, area);
+        let popup = centered_rect(90, 86, area);
         frame.render_widget(Clear, popup);
         let inner = Block::default()
             .borders(Borders::ALL)
@@ -742,6 +889,7 @@ impl TuiApp {
                 Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Min(1),
+                Constraint::Length(7),
                 Constraint::Length(1),
             ])
             .split(inner);
@@ -812,14 +960,15 @@ impl TuiApp {
                             format!("{marker} {:<18}", truncate(&entry.alias, 18)),
                             if entry.current {
                                 self.theme.status_style(StatusTone::Accent)
-                            } else if entry.valid {
-                                self.theme.text_style()
                             } else {
-                                self.theme.status_style(StatusTone::Warning)
+                                self.theme.text_style()
                             },
                         ),
                         Span::styled(
-                            truncate(&entry.summary, rows[1].width.saturating_sub(28) as usize),
+                            truncate(
+                                &board_summary_row(entry.summary.as_ref()),
+                                rows[1].width.saturating_sub(28) as usize,
+                            ),
                             self.theme.muted_style(),
                         ),
                     ]))
@@ -840,12 +989,85 @@ impl TuiApp {
                 &mut state,
             );
         }
+        let selected = picker
+            .filtered
+            .get(picker.selected)
+            .and_then(|index| picker.entries.get(*index));
+        let mut detail = Vec::new();
+        if let Some(entry) = selected {
+            let local_check = entry.checked_at.map_or_else(
+                || "waiting for local read".to_string(),
+                |checked| checked_label(checked.elapsed()),
+            );
+            detail.push(Line::from(Span::styled(
+                format!("Local snapshot · {local_check}"),
+                self.theme.muted_style(),
+            )));
+            if let Some(summary) = &entry.summary {
+                detail.push(Line::from(format!(
+                    "Tasks: {} todo · {} in progress · {} Validation",
+                    summary.todo, summary.in_progress, summary.validation
+                )));
+                let attention = [
+                    (summary.delivered_needs_triage > 0).then(|| {
+                        format!(
+                            "Delivered · needs triage {}",
+                            summary.delivered_needs_triage
+                        )
+                    }),
+                    (summary.validation > 0).then(|| format!("Validation {}", summary.validation)),
+                    (summary.blocked > 0).then(|| format!("Blocked Accord {}", summary.blocked)),
+                ]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+                if !attention.is_empty() {
+                    detail.push(Line::from(attention.join(" · ")));
+                }
+                if let Some(error) = summary.errors.first() {
+                    let suffix = if summary.errors.len() > 1 {
+                        format!(" (+{} more)", summary.errors.len() - 1)
+                    } else {
+                        String::new()
+                    };
+                    detail.push(Line::styled(
+                        truncate_to_width(
+                            &format!("Read issue: {error}{suffix}"),
+                            rows[4].width as usize,
+                        ),
+                        self.theme.status_style(StatusTone::Warning),
+                    ));
+                }
+                if summary.current_work.is_empty() {
+                    detail.push(Line::from("In progress: none"));
+                } else {
+                    detail.extend(
+                        summary.current_work.iter().take(2).map(|item| {
+                            Line::from(current_work_line(item, rows[4].width as usize))
+                        }),
+                    );
+                }
+                let omitted =
+                    summary.current_work_omitted + summary.current_work.len().saturating_sub(2);
+                if omitted > 0 {
+                    detail.push(Line::from(format!("… +{omitted} current")));
+                }
+            } else {
+                detail.push(Line::from("Reading local Board summary…"));
+            }
+        }
+        frame.render_widget(
+            Paragraph::new(detail)
+                .style(self.theme.text_style())
+                .wrap(Wrap { trim: true }),
+            rows[4],
+        );
         frame.render_widget(
             Paragraph::new(
-                "↑/↓ select · Enter switch · Ctrl-A add · Ctrl-D remove inactive · Esc close",
+                "↑/↓ select · Enter open full TUI · Ctrl-A add · Ctrl-D remove inactive · Esc close",
             )
             .style(self.theme.muted_style()),
-            rows[4],
+            rows[5],
         );
     }
 

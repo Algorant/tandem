@@ -16,6 +16,129 @@ pub(crate) struct Snapshot {
     pub(crate) hierarchy: ProjectHierarchy,
 }
 
+/// Small local-only projection for an ephemeral session roster. It deliberately
+/// reads only active Board Task documents, not history, rules, events, or sync.
+pub(crate) struct SessionBoardSummary {
+    pub(crate) root: std::path::PathBuf,
+    pub(crate) summary: BoardSummary,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BoardSummary {
+    pub(crate) todo: usize,
+    pub(crate) in_progress: usize,
+    pub(crate) validation: usize,
+    pub(crate) delivered_needs_triage: usize,
+    pub(crate) blocked: usize,
+    pub(crate) current_work: Vec<BoardWorkItem>,
+    pub(crate) current_work_omitted: usize,
+    pub(crate) errors: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct BoardWorkItem {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) assignee: Option<String>,
+}
+
+/// Read every retained session handle without opening new boards or syncing.
+pub(crate) fn session_board_summaries(
+    boards: &[crate::app::project::SessionBoard],
+) -> Vec<SessionBoardSummary> {
+    boards
+        .iter()
+        .map(|board| SessionBoardSummary {
+            root: board.project.root().to_path_buf(),
+            summary: board_summary(&board.project),
+        })
+        .collect()
+}
+
+/// Read one session board using native project document reads. State totals are
+/// mutually exclusive exact-state counts over Task documents; attention signals
+/// are separate and may overlap each other and the totals.
+pub(crate) fn board_summary(project: &TandemProject) -> BoardSummary {
+    let mut errors = Vec::new();
+    match crate::app::project::protocol_version(project) {
+        Ok(version) if version != crate::protocol::config::PROTOCOL_VERSION => {
+            errors.push(crate::project::sync::historical_message(&version))
+        }
+        Ok(_) => {}
+        Err(error) => errors.push(format!("Board config unavailable: {}", error.message)),
+    }
+    let config = match project.read_config_yaml() {
+        Ok(config) => config,
+        Err(error) => {
+            errors.push(format!(
+                "Board config settings unavailable: {}",
+                error.message
+            ));
+            None
+        }
+    };
+    let states = workflow_states(config.as_ref());
+    let documents = project.read_board_documents_tolerant(&mut errors);
+    if !project.tasks_dir.is_dir() {
+        errors.push(format!(
+            "Board Task directory is unavailable: {}",
+            crate::project::display_path(&project.tasks_dir)
+        ));
+    }
+    let mut summary = BoardSummary {
+        errors,
+        ..BoardSummary::default()
+    };
+    for document in documents
+        .iter()
+        .filter(|document| document.doc_type() == "task")
+    {
+        for diagnostic in crate::protocol::diagnostic::metadata_diagnostics(document, false)
+            .into_iter()
+            .filter(|diagnostic| {
+                diagnostic.severity == crate::protocol::diagnostic::Severity::Error
+            })
+        {
+            summary
+                .errors
+                .push(format!("{}: {}", document.id(), diagnostic.message));
+        }
+        if let Some(diagnostic) =
+            crate::protocol::diagnostic::workflow_state_diagnostic(document, true, &states)
+        {
+            summary
+                .errors
+                .push(format!("{}: {}", document.id(), diagnostic.message));
+        }
+        match document.field("state") {
+            Some("todo") => summary.todo += 1,
+            Some("in-progress") => summary.in_progress += 1,
+            Some("validation") => summary.validation += 1,
+            _ => {}
+        }
+        let item = || BoardWorkItem {
+            id: document.id().to_string(),
+            title: document.title().to_string(),
+            assignee: document.field("assignee").map(str::to_string),
+        };
+        if document.field("state") == Some("in-progress") {
+            summary.current_work.push(item());
+            if accord_status(document) == Some("delivered") {
+                summary.delivered_needs_triage += 1;
+            }
+        }
+        if accord_status(document) == Some("blocked") {
+            summary.blocked += 1;
+        }
+    }
+    summary.current_work.sort_by(|a, b| a.id.cmp(&b.id));
+    summary.current_work_omitted = summary.current_work.len().saturating_sub(4);
+    summary.current_work.truncate(4);
+    summary.errors.sort();
+    summary.errors.dedup();
+    summary
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Scope {

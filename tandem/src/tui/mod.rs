@@ -71,7 +71,7 @@ use chrome::status_tone_for_message;
 use chrome::{centered_rect, rect_contains};
 use decisions::DecisionsState;
 use editor::{editor_command_from_env, editor_target_for_doc, run_editor_command, EditorTarget};
-use pickers::{BoardPicker, WorkspacePicker};
+use pickers::{BoardPicker, WorkspacePicker, WorkspaceSummaryJob};
 use reload::{ReloadFingerprint, ReloadOutcome};
 use rules::RulesState;
 use state::*;
@@ -104,6 +104,7 @@ pub(crate) fn run_tui(workspace: TandemProject, seed_paths: Vec<PathBuf>) -> Res
     );
     let result =
         TerminalSession::enter().and_then(|mut session| app.run(&mut session, &mut background));
+    app.finish_workspace_summaries();
     app.finish_retiring_syncs();
     if let Some(note) = background.finish() {
         eprintln!("{note}");
@@ -279,6 +280,9 @@ struct TuiApp {
     help_section: usize,
     board_picker: Option<BoardPicker>,
     workspace_picker: Option<WorkspacePicker>,
+    workspace_summary_job: Option<WorkspaceSummaryJob>,
+    workspace_summary_last_refresh: Option<Instant>,
+    workspace_summary_refresh_requested: bool,
     validation_prompt: Option<ValidationPrompt>,
     workflow_prompt: Option<WorkflowPrompt>,
     rules_view: RulesState,
@@ -358,6 +362,9 @@ impl TuiApp {
             help_section: 0,
             board_picker: None,
             workspace_picker: None,
+            workspace_summary_job: None,
+            workspace_summary_last_refresh: None,
+            workspace_summary_refresh_requested: false,
         };
         app.reload();
         Ok(app)
@@ -398,6 +405,14 @@ impl TuiApp {
                     }
                 }
                 retiring = remaining;
+                redraw |= self.poll_workspace_summaries();
+                if self.workspace_picker.is_some()
+                    && self
+                        .workspace_summary_last_refresh
+                        .is_none_or(|last| last.elapsed() >= Duration::from_secs(5))
+                {
+                    self.refresh_workspace_summaries();
+                }
                 redraw |= self.reload_if_changed();
                 redraw |= self.expire_transient_status();
                 if redraw {
@@ -3037,6 +3052,9 @@ tone = "success"
             help_section: 0,
             board_picker: None,
             workspace_picker: None,
+            workspace_summary_job: None,
+            workspace_summary_last_refresh: None,
+            workspace_summary_refresh_requested: false,
             validation_prompt: None,
             workflow_prompt: None,
             rules_view: RulesState::default(),
