@@ -14,10 +14,19 @@ accord:
   status: "ready"
   acceptance: ["A shared BoardSummary query returns local per-workspace counts, attention, last change, sync state and explicit per-entry errors with documented counting semantics.", "The TUI overview displays configured workspaces sorted by attention and supports opening a selected board.", "Overview refresh is bounded and local-only, without triggering remote sync or full-board loads every active-board tick.", "A missing or invalid workspace is represented as an error row rather than aborting the overview."]
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-12T16:29:18Z"
+  constraints: ["Frozen: revised ephemeral-workspace plumbing/functions require Algorant's approval before any further code, mockups, integration or push. Preserve current work; no discards/rollbacks."]
+  updatedAt: "2026-10-12T17:18:06Z"
 createdAt: "2026-10-12T15:51:24Z"
-updatedAt: "2026-10-12T16:29:18Z"
+updatedAt: "2026-10-12T17:18:06Z"
 ---
+## Frozen by Algorant via Herdra
+
+Do not implement, merge, push, create implementation Workers, produce mockups, discard, clean up or roll back existing work until Algorant approves revised plumbing/functions. Preserve all commits, checkouts and current preview state. New requirement: no dedicated permanent workspaces.toml; enabled/viewable workspaces must be ad-hoc, ephemeral and easy to change during a session. Discuss session roster, on-demand native Herdr project discovery and a repo picker first; no UI/button design yet. w/W remain tentative subject to conflicts. This direction overrides the earlier permanent-list implementation scope below, which is retained as history, not renewed approval.
+
+Task-71 already landed as 1bfc31c and is archived accepted; its code is preserved, not rolled back. Task-72's retained unmerged Worker is clean at 4f6d5e7. Main retains temporary justfile/scripts/dev.sh preview helper mirrors; do not restore them while the no-rollback hold applies.
+
+## Previous scope (on hold)
+
 
 ## Description
 
