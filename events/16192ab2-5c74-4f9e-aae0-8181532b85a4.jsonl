@@ -99,3 +99,4 @@
 {"ts":"2026-10-12T18:04:35Z","event":"accord.rework","id":"task-73","summary":"Accord rework for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":99}
 {"ts":"2026-10-12T18:10:44Z","event":"accord.delivered","id":"task-73","summary":"Accord deliver for task-73","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":100}
 {"ts":"2026-10-12T18:29:15Z","event":"task.completed","id":"task-73","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":101}
+{"ts":"2026-10-12T18:30:51Z","event":"accord.released","id":"task-74","summary":"Accord release for task-74","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":102,"data":{"disposition":"reassign"}}
