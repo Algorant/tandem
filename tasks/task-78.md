@@ -4,20 +4,22 @@ uid: 00fe6b0b-b177-4ae7-830a-1ac94adc4f67
 type: task
 kind: "papercut"
 title: "TUI archive validation rejects logs produced by complete without --note"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "small"
 references: ["task-73"]
 relatedFiles: ["tandem/src/protocol/diagnostic.rs", "tandem/src/protocol/workflow.rs", "protocol/README.md", "tandem/src/tui/state.rs"]
 tags: ["protocol", "tui"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["An otherwise valid archived Task produced by native complete without --note is not reported invalid solely because resolution.note is absent; protocol guidance and executable diagnostics agree on optionality.", "A disposable board containing such a log loads in the normal full TUI and through the session switcher, while genuinely invalid archive metadata remains diagnosed."]
+  claimedAt: "2026-10-12T18:00:02Z"
   validation: ["$ just dev-check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Keep resolution.note optional as already accepted by complete/ResolutionRecord; retain genuinely invalid archive diagnostics and existing cancel/block note requirements.", "No archived-record edits, TUI-side bypass or permanent new tests/fixtures; temporary verification only.", "No push/release. Keep task-73's implementation checkout untouched; parent owns its rebase and visual verification."]
-  updatedAt: "2026-10-12T17:59:57Z"
+  updatedAt: "2026-10-12T18:00:02Z"
 createdAt: "2026-10-12T17:59:04Z"
-updatedAt: "2026-10-12T17:59:57Z"
+updatedAt: "2026-10-12T18:00:02Z"
+assignee: "worker-task-78-c497e5c8"
 ---
 
 ## Description
