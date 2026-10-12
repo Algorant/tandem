@@ -4,7 +4,6 @@ uid: eb7996da-f2bf-48ff-b3c3-c24e76495763
 type: task
 kind: papercut
 title: "Workspace docs describe the pre-0.3.0 layout"
-state: todo
 priority: "low"
 relatedFiles: ["docs/workspace/index.md", "protocol/README.md"]
 tags: ["docs"]
@@ -13,7 +12,11 @@ accord:
   acceptance: ["docs/workspace/index.md matches the current protocol layout in protocol/README.md."]
   updatedAt: "2026-09-30T03:41:03Z"
 createdAt: "2026-09-30T03:41:03Z"
-updatedAt: "2026-09-30T03:41:03Z"
+updatedAt: "2026-10-12T15:52:02Z"
+archivedAt: "2026-10-12T15:52:02Z"
+resolution:
+  outcome: "canceled"
+  note: "Absorbed into docs/site overhaul task-76 by Algorant's direction via Herdra. Acceptance scope is carried there; this is consolidation, not a claim that the fix has shipped."
 ---
 
 ## Description
