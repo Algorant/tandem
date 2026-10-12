@@ -3,7 +3,7 @@ id: task-72
 uid: 2906d301-e968-4665-bf36-68ae974376b0
 type: task
 title: "Orchestrator mode: TUI workspace switcher"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 blockers: ["task-71"]
@@ -11,12 +11,14 @@ references: ["task-70"]
 relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/state.rs", "tandem/src/app/background_sync.rs", "tandem/src/tui/pickers.rs", "tandem/src/project/workspaces.rs", "scripts/dev.sh", "justfile", "tandem/README.md"]
 tags: ["tui", "orchestrator", "keyboard"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A keyboard-accessible workspace picker shows configured entries and the current workspace and switches to a selected valid board.", "After switching, board state, theme and mutations use the selected workspace without leaking selection, filters or overlays from the old board.", "Background sync follows the active workspace; the old final publish does not stall input and errors remain visible.", "A missing, invalid or unsupported target leaves the previous board open and usable."]
+  claimedAt: "2026-10-12T16:29:32Z"
   validation: ["$ just dev-check"]
-  updatedAt: "2026-10-12T16:29:15Z"
+  updatedAt: "2026-10-12T16:29:32Z"
 createdAt: "2026-10-12T15:51:21Z"
-updatedAt: "2026-10-12T16:29:15Z"
+updatedAt: "2026-10-12T16:29:32Z"
+assignee: "worker-task-72-94e1e002"
 ---
 
 ## Description
