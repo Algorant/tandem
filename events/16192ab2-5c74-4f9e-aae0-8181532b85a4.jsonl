@@ -45,3 +45,4 @@
 {"ts":"2026-10-12T16:16:42Z","event":"accord.claimed","id":"task-71","summary":"Accord claim for task-71","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":45}
 {"ts":"2026-10-12T16:17:51Z","event":"decision.created","id":"decision-11","summary":"Keep blockers workspace-local; record external dependencies as prose and blocked Accords","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":46}
 {"ts":"2026-10-12T16:18:02Z","event":"decision.updated","id":"decision-11","summary":"Updated decision-11 metadata: status, decidedAt","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":47}
+{"ts":"2026-10-12T16:18:04Z","event":"task.updated","id":"task-69","summary":"Updated task-69 metadata: effort, references, relatedFiles, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":48}
