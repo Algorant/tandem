@@ -47,3 +47,4 @@
 {"ts":"2026-10-12T16:18:02Z","event":"decision.updated","id":"decision-11","summary":"Updated decision-11 metadata: status, decidedAt","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":47}
 {"ts":"2026-10-12T16:18:04Z","event":"task.updated","id":"task-69","summary":"Updated task-69 metadata: effort, references, relatedFiles, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":48}
 {"ts":"2026-10-12T16:18:19Z","event":"accord.claimed","id":"task-69","summary":"Accord claim for task-69","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":49}
+{"ts":"2026-10-12T16:19:39Z","event":"accord.delivered","id":"task-69","summary":"Accord deliver for task-69","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":50}
