@@ -13,10 +13,10 @@ tags: ["tui", "orchestrator", "keyboard"]
 accord:
   status: "ready"
   acceptance: ["A keyboard-accessible workspace picker shows configured entries and the current workspace and switches to a selected valid board.", "After switching, board state, theme and mutations use the selected workspace without leaking selection, filters or overlays from the old board.", "Background sync follows the active workspace; the old final publish does not stall input and errors remain visible.", "A missing, invalid or unsupported target leaves the previous board open and usable."]
-  validation: ["just dev-check"]
-  updatedAt: "2026-10-12T15:51:21Z"
+  validation: ["$ just dev-check"]
+  updatedAt: "2026-10-12T16:29:15Z"
 createdAt: "2026-10-12T15:51:21Z"
-updatedAt: "2026-10-12T16:28:49Z"
+updatedAt: "2026-10-12T16:29:15Z"
 ---
 
 ## Description
