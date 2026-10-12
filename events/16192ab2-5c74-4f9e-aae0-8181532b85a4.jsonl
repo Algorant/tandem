@@ -23,3 +23,4 @@
 {"ts":"2026-10-10T14:34:07Z","event":"task.completed","id":"task-66","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":23}
 {"ts":"2026-10-10T14:46:15Z","event":"task.created","id":"task-68","summary":"just release needs cargo-dist on PATH, but nothing provisions it","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":24}
 {"ts":"2026-10-12T01:24:55Z","event":"decision.updated","id":"decision-10","summary":"Updated decision-10 metadata: status, decidedAt","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":25}
+{"ts":"2026-10-12T12:35:08Z","event":"task.created","id":"task-69","summary":"blockers accept only board IDs, so dependencies outside the board can only go in prose","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":26}
