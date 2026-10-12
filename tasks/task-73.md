@@ -9,7 +9,7 @@ effort: "large"
 blockers: ["task-71"]
 references: ["task-70", "task-71", "task-72"]
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/project/mod.rs", "tandem/src/project/workspaces.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/input.rs", "tandem/src/tui/pickers.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/chrome.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/board/mod.rs", "tandem/src/app/background_sync.rs", "tandem/src/web.rs", "tandem/Cargo.toml", "tandem/Cargo.lock", "scripts/dev.sh", "justfile", "tandem/README.md"]
-tags: ["ui", "orchestrator"]
+tags: ["tui", "orchestrator", "keyboard"]
 accord:
   status: "claimed"
   acceptance: ["The TUI owns one in-memory session working set seeded with the launch-directory board; it is retained across switches and lost at exit, with no permanent roster file read, write or fallback.", "The chooser adds existing boards by path using open_at and canonical resolved-board-root dedupe (including linked worktrees), reports invalid paths without changing the current board/set, removes only session membership, and prevents removing the current board.", "Selecting a board switches in place to the complete existing Board/Logs/Rules/Decisions TUI with normal detail/actions/filter/editor support; candidate refusal and prompt safety preserve the current usable board.", "Mutations and ongoing background sync follow the active board; old final publishes retire off the input loop with tracked, alias-qualified errors and no leaked per-board view state.", "The obsolete TOML workspace loader/startup wiring/docs and unused TOML dependency are removed, while open_at, canonical-path handling and shared theme-config path behaviour remain.", "Release preview uses disposable boards and a session-only seed; actual TUI captures and verification evidence are published for Algorant's review."]
@@ -18,7 +18,7 @@ accord:
   constraints: ["Fresh root-Task Worker only, explicitly openai-codex/gpt-6-luna / high; report plan before editing.", "Reuse checkpoint must be committed and parent-verified before disposal of task-72's old Worker; stop for owner direction at that boundary.", "No permanent workspaces.toml, config-file fallback, auto-add registry, Herdr topology mirroring, remote polling of inactive boards or web feature implementation.", "No real-board or user-config mutations for validation; temporary checks only, removed before ready delivery.", "Visible delivery goes to Sideshow B_I5vQctbo0 and awaits Algorant's look before integration/completion; no push/release. Docs-overhaul remains paused."]
   updatedAt: "2026-10-12T17:33:03Z"
 createdAt: "2026-10-12T15:51:22Z"
-updatedAt: "2026-10-12T17:33:03Z"
+updatedAt: "2026-10-12T17:33:33Z"
 assignee: "worker-task-73-0c96df57"
 ---
 ## Approved direction
