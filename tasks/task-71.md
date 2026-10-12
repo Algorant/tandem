@@ -3,19 +3,21 @@ id: task-71
 uid: 6f12d249-3227-4df5-8bf9-57201794b23a
 type: task
 title: "Orchestrator mode: hand-written workspace list and open_at"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "small"
 references: ["task-70"]
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/project/mod.rs", "tandem/src/tui/theme.rs"]
 tags: ["config", "orchestrator"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A hand-written user-level workspace list resolves aliases to canonical workspace roots through a shared loader usable by TUI and web.", "open_at(path) opens an explicitly selected board with the same protocol checks as the current entry point.", "Opening tandem tui does not add, rewrite or auto-discover workspace-list entries; invalid entries are reported clearly."]
+  claimedAt: "2026-10-12T16:16:42Z"
   validation: ["just dev-check"]
-  updatedAt: "2026-10-12T15:51:19Z"
+  updatedAt: "2026-10-12T16:16:42Z"
 createdAt: "2026-10-12T15:51:19Z"
-updatedAt: "2026-10-12T16:16:21Z"
+updatedAt: "2026-10-12T16:16:42Z"
+assignee: "worker-task-71-6f297b47"
 ---
 
 ## Description
