@@ -4,22 +4,22 @@ uid: 36a8474a-8588-4f23-8009-4f9e3c56a7b7
 type: task
 kind: "papercut"
 title: "Web action-button labels wrap outside their button bounds"
-state: "in-progress"
+state: "todo"
 priority: "low"
 effort: "small"
 references: ["task-75", "task-81"]
 relatedFiles: ["tandem/src/web/app.css"]
 tags: ["ui", "web", "plan-first"]
 accord:
-  status: "claimed"
+  status: "ready"
   acceptance: ["Refresh view and Apply filters labels stay readable inside their button bounds at 900px, 1280px and 1920px viewport widths without layout overlap."]
   claimedAt: "2026-10-13T15:47:18Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Herdra explicitly authorized this small fix; plan before editing. CSS only in app.css, no JS/HTML/Rust behavior change or deferred task-75 redesign.", "Verify actual browser layout at 900/1280/1920px, preferably both themes, on disposable boards; no injected capture-only CSS workaround.", "Temporary checks only; no permanent tests/fixtures. No push/release/deploy; parent integrates verified technical fix then task-81 recaptures."]
-  updatedAt: "2026-10-13T15:47:18Z"
+  note: "discarded: Herdra explicitly authorized canceling task-82 as an Obscura capture false positive, not a product CSS bug. Parent inspected actual paired screenshots; unchanged Chromium fits Refresh/Apply labels at 900/1280/1920 in both themes. No source edits; clean checkout independently confirmed. Owned temporary servers/drivers/board cleaned and ports 18782/9515 closed; seven evidence PNGs preserved and published in docs session J0qH-JN7PqI post MdEg0IfN_cs. Discard only this disposable no-source attempt; parent then cancels Task with permanent rendering-gap note."
+  updatedAt: "2026-10-13T16:15:02Z"
 createdAt: "2026-10-13T15:35:10Z"
-updatedAt: "2026-10-13T16:12:11Z"
-assignee: "worker-task-82-e7773445"
+updatedAt: "2026-10-13T16:15:02Z"
 ---
 ## Investigation outcome — direction pending
 
