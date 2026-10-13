@@ -3,7 +3,7 @@ id: task-81
 uid: 800443c6-c745-41db-9216-f70642139032
 type: task
 title: "Docs visuals: public Excalidraw diagrams and 0.17.0 captures"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-76", "task-73", "task-74"]
@@ -21,8 +21,12 @@ accord:
   filesChanged: ["site/public/images/source-and-tandem-sync.png", "site/public/images/shared-board.png", "site/public/images/task-lifecycle.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
   updatedAt: "2026-10-13T16:59:31Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-13T16:59:31Z"
+updatedAt: "2026-10-13T17:00:18Z"
 assignee: "worker-task-81-c628664a"
+validation.criterion: "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten."
+validation.note: "Herdra explicitly passed final D4 af0a878 geometry/readability and already accepted all captures. He is presenting postSPXFbM9ETWU (includes full12-asset set and390px D4) to Algorant now. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI. Parent verified exact2 vertical bidirectional arrows/no crossings, native/390px pixels, source/PNG hashes and site/996links; unchanged teaser and accepted captures. Hold integration, Task completion and exact Worker checkout cleanup until Algorant accepts. No push/deploy/release."
+validation.requestedAt: "2026-10-13T17:00:18Z"
+validation.reviewer: "Algorant"
 ---
 
 ## Description
