@@ -6,7 +6,7 @@ title: "Streamline release checks and remove release friction"
 state: "in-progress"
 tags: ["config", "release"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Current release cycle documented step-by-step with time/effort per step", "Concrete list of shorten/remove/automate candidates with rationale and risk", "Recommended streamlined release flow with next actions", "Strict release-equivalent clippy runs in dev-check; relevant site/build/link/high-audit checks happen before publication.", "just release obtains/executes cargo-dist at the existing dist-workspace.toml pin without manual global setup or an unnamed fallback; required setup errors are clear up front.", "The matching AUR workflow is verified again, with accurate success/failure reporting and nonblocking downstream failure after verified GitHub publication; stale read-only claims are removed."]
   claimedAt: "2026-10-13T13:54:57Z"
   deliveredAt: "2026-10-13T14:11:15Z"
@@ -15,9 +15,10 @@ accord:
   summary: "Implemented and committed the approved release-friction changes as deaa015. Added strict clippy to dev-check; moved the existing docs build/link/high-audit checks before publication; provisioned cargo-dist through mise at the dist-workspace.toml pin with clear preflight diagnostics; restored matching AUR verification with bounded downstream failure reporting; and updated the maintained release guide with measured versus estimated effort. No real tag, push, GitHub Release, or AUR publication was performed."
   evidence: ["Current release cycle documented step-by-step with time/effort per step; bounded candidates and recommended flow recorded.: tandem/RELEASE.md now distinguishes timings explicitly reported in /tmp/tandem-release-0.17.0.log from operator estimates, does not claim an end-to-end timing total, lists bounded shorten/remove/automate choices with rationale and risk, and gives the recommended next actions.", "Strict release-equivalent clippy runs in dev-check; site/build/link/high-audit checks happen before publication.: scripts/dev.sh runs `cargo clippy --all-targets --all-features -- -D warnings` in check mode. justfile runs site build, `bun run check:links`, and `bun audit --audit-level=high` before `git tag` and `git push`; all required local validations passed.", "just release uses pinned cargo-dist with clear setup errors, and matching AUR verification reports outcomes without invalidating verified GitHub publication.: justfile reads the sole version from dist-workspace.toml, verifies/provisions it with `mise x aqua:axodotdev/cargo-dist@<pin>`, and names the pinned version in missing/setup diagnostics. After published GitHub assets/notes pass validation, it matches and waits for the AUR workflow (5-minute discovery plus 5-minute completion bound), reports success or failure/timeout, and exits successfully on downstream AUR failure. Disposable stub runs verified success and nonblocking failure paths."]
   filesChanged: ["justfile", "scripts/dev.sh", "tandem/RELEASE.md"]
-  updatedAt: "2026-10-13T14:11:15Z"
+  note: "Parent inspected code and independently ran all native/site/link/audit checks: passed. Before accepting the maintained release guide, make two narrow executable-instruction corrections within your owned RELEASE.md: remove `cargo run -- version` (no version subcommand exists; --version is already listed), and replace the old source-install command combining --git with --path/stale 0.10.1 with a currently verified valid Cargo git/package form or unpinned maintainer placeholder that is explicitly substituted."
+  updatedAt: "2026-10-13T14:11:17Z"
 createdAt: "2026-09-09T15:32:04Z"
-updatedAt: "2026-10-13T14:11:15Z"
+updatedAt: "2026-10-13T14:11:17Z"
 references: ["task-1", "task-31", "task-59", "task-68", "task-80"]
 relatedFiles: ["justfile", "scripts/dev.sh", "scripts/release_checks.sh", "tandem/RELEASE.md", "dist-workspace.toml"]
 effort: "medium"
