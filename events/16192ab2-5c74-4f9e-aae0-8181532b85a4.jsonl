@@ -120,3 +120,4 @@
 {"ts":"2026-10-13T13:27:42Z","event":"task.canceled","id":"task-5","summary":"Canceled: Superseded by task-75's reimagined web view.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":120}
 {"ts":"2026-10-13T13:46:56Z","event":"task.created","id":"task-81","summary":"Docs visuals: public Excalidraw diagrams and 0.17.0 captures","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":121}
 {"ts":"2026-10-13T13:46:57Z","event":"task.updated","id":"task-53","summary":"Updated task-53 metadata: title, effort, tags, blockers, references, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":122}
+{"ts":"2026-10-13T13:46:58Z","event":"task.created","id":"task-53-1","summary":"Rules prototype: toy project and end-to-end Sideshow mockups","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":123}
