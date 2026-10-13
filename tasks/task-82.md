@@ -18,14 +18,11 @@ accord:
   constraints: ["Herdra explicitly authorized this small fix; plan before editing. CSS only in app.css, no JS/HTML/Rust behavior change or deferred task-75 redesign.", "Verify actual browser layout at 900/1280/1920px, preferably both themes, on disposable boards; no injected capture-only CSS workaround.", "Temporary checks only; no permanent tests/fixtures. No push/release/deploy; parent integrates verified technical fix then task-81 recaptures."]
   updatedAt: "2026-10-13T15:47:18Z"
 createdAt: "2026-10-13T15:35:10Z"
-updatedAt: "2026-10-13T15:47:18Z"
+updatedAt: "2026-10-13T16:12:11Z"
 assignee: "worker-task-82-e7773445"
 ---
+## Investigation outcome — direction pending
 
-## Description
+Herdra authorized a CSS-only fix after task-81's image showed button-label wrapping. Plan-first/read-only Worker reproduced the pixel issue in Obscura at 1280px, but genuine installed Chromium with native WebDriver sizes at 900/1280/1920 and explicit CDP light/dark media paints both labels on one line inside their boxes, on the same unchanged app build/data. Refresh text 98.72×17 fits button124.72×40.80; Apply text92.47×17 fits button118.47×40.80. Obscura's rectangle APIs were misleading for painted text. Parent inspected paired PNGs: /tmp/pi-codemode-6ccacd6a7a768d37.png and /tmp/task82-chrome-{light,dark}-{900,1280,1920}.png.
 
-Observed in native Obscura captures of released Tandem 0.17.0 during task-81: Refresh view and Apply filters wrap/overflow the fixed button bounds at tested 900/1280/1920 widths. Authentic web-read-only PNG retained rather than patched browser CSS or product code in the asset-only Task. Capture only, unstarted; do not start deferred task-75's web reimagining or broaden task-81 to fix this.
-
-## Authorized narrow fix
-
-Herdra reviewed task-81 and explicitly asked to fix this first, CSS only, then recapture rather than document a known product bug. Existing stylesheet is tandem/src/web/app.css. Inspect actual computed layout/label bounds before proposing the smallest CSS rule change; retain existing responsiveness/button behavior. New root Worker is Luna/high and plan-first. Parent independently verifies native browser pixels/bounds and integrates this technical fix; task-81 web capture then uses that real updated build. No web orchestration/plugin/source changes.
+No source edits. Evidence published in existing docs session J0qH-JN7PqI; propose closing this false-positive product papercut and using genuine Chromium for task-81 public web recapture, not an engine-specific CSS workaround. Await Herdra direction before cleanup/cancel or task-81 web gate release. Task-75 remains deferred/unstarted.
