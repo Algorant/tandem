@@ -4,16 +4,18 @@ uid: 86b15909-5258-4de2-a53a-4aa121650aa9
 type: task
 kind: "papercut"
 title: "just release needs cargo-dist on PATH, but nothing provisions it"
-state: todo
+state: "in-progress"
 priority: "low"
 references: ["task-27"]
 tags: ["config"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["`just release` on a fresh machine gets cargo-dist at the version pinned in dist-workspace.toml without a manual install (e.g. a project mise.toml pin or a mise x wrapper in the recipe), or fails up front with a clear message naming the required version."]
-  updatedAt: "2026-10-10T14:46:15Z"
+  claimedAt: "2026-10-13T14:15:14Z"
+  updatedAt: "2026-10-13T14:15:14Z"
 createdAt: "2026-10-10T14:46:15Z"
-updatedAt: "2026-10-10T14:46:15Z"
+updatedAt: "2026-10-13T14:15:14Z"
+assignee: "tandem-ceph"
 ---
 
 ## Description
