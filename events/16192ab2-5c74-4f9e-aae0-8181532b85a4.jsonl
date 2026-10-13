@@ -128,3 +128,4 @@
 {"ts":"2026-10-13T13:54:46Z","event":"task.updated","id":"task-50","summary":"Updated task-50 metadata: effort, tags, relatedFiles, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":128}
 {"ts":"2026-10-13T13:54:47Z","event":"task.updated","id":"task-64","summary":"Updated task-64 metadata: effort, tags, blockers, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":129}
 {"ts":"2026-10-13T13:54:48Z","event":"task.updated","id":"task-63","summary":"Updated task-63 metadata: priority, effort, blockers, references, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":130}
+{"ts":"2026-10-13T13:54:50Z","event":"task.updated","id":"task-77","summary":"Updated task-77 metadata: references, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":131}
