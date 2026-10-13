@@ -3,21 +3,21 @@ id: task-76
 uid: 5f373353-a0d5-4373-87fc-5c533f439c89
 type: task
 title: "Docs and site overhaul: refreshed 0.17.0 seven-page plan"
-state: todo
+state: "todo"
 priority: "medium"
 effort: "large"
 references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75"]
 relatedFiles: ["plan/docs-overhaul.md", "docs/", "site/", "README.md", "tandem/README.md", "protocol/README.md", "docs/concepts/index.md", "docs/cli/index.md"]
 tags: ["docs"]
 accord:
-  status: "blocked"
+  status: "ready"
   acceptance: ["The public site retains the approved seven-page shape, starts with minimal reader-facing prose and incorporates Herdra's approved style guide when available.", "Content accurately explains shipped 0.17.0 session boards, add/remove paths, full-TUI switching, chooser activity, active-board sync versus inactive local snapshots, and agent setup; optional Pi /task routing is not presented as a Tandem CLI command. Web stays single-workspace/read-only.", "Workspace layout, lifecycle/review claims, installation/version guidance and Decision examples from tasks 51/67 are verified and corrected across docs and READMEs.", "Real 0.17.0 product captures, authorized Excalidraw diagram exports and existing teaser presentation are legible and reviewed in the existing docs Sideshow session with main-versus-branch comparisons.", "Site build and link checks pass; public pages contain no placeholders; final integration/deployment occurs only after Algorant's approval.", "A dedicated board-storage/sidecar-sync section within the seven-page shape accurately explains source Git versus the Tandem-managed tandem branch, multi-machine use, pending, true conflicts and held edits, with the required Excalidraw diagram and real sync-status/TUI-conflict captures."]
   validation: ["$ just site-build", "$ cd site && bun run check:links"]
   constraints: ["Planning resumed; no prose/assets/implementation Workers until Herdra approves the refreshed plan and Excalidraw export/use path.", "Interim writing: minimal, for the real reader, no narrator voice or padding; apply Herdra task-19 style guide when available.", "Preserve rebased docs-overhaul scaffold at 57381c9; no push or deployment without approval.", "Only shipped 0.17.0 features: manual ephemeral session set and local summaries; no permanent workspaces.toml, Herdr auto-discovery or multi-workspace web."]
-  note: "Paused by Algorant via Herdra: resume after Herdra task-19 style guide and orchestrator mode tasks 71–75, with owner direction. Approved revision-3 seven-page branch remains parked unchanged and unpushed."
-  updatedAt: "2026-10-13T13:16:37Z"
+  note: "Algorant restarted planning via Herdra after 0.17.0 landed. Refreshed plan awaits sign-off; no page writing or implementation Worker yet. Rebased scaffold onto main; Excalidraw export/use decision surfaced."
+  updatedAt: "2026-10-13T13:16:39Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-13T13:16:37Z"
+updatedAt: "2026-10-13T13:16:39Z"
 ---
 ## Restart: planning for 0.17.0
 
