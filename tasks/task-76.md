@@ -6,7 +6,7 @@ title: "Docs and site overhaul: refreshed 0.17.0 seven-page plan"
 state: "todo"
 priority: "medium"
 effort: "large"
-references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75"]
+references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75", "task-81", "task-27", "task-50", "task-63"]
 relatedFiles: ["plan/docs-overhaul.md", "docs/", "site/", "README.md", "tandem/README.md", "protocol/README.md", "docs/concepts/index.md", "docs/cli/index.md"]
 tags: ["docs"]
 accord:
@@ -17,7 +17,8 @@ accord:
   note: "Algorant restarted planning via Herdra after 0.17.0 landed. Refreshed plan awaits sign-off; no page writing or implementation Worker yet. Rebased scaffold onto main; Excalidraw export/use decision surfaced."
   updatedAt: "2026-10-13T13:16:39Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-13T13:16:39Z"
+updatedAt: "2026-10-13T13:54:52Z"
+blockers: ["task-81", "task-50", "task-63"]
 ---
 ## Restart: planning for 0.17.0
 
@@ -61,3 +62,9 @@ Verify against released tandem 0.17.0 --help/native output and protocol 0.5.0. R
 Task-51: current tasks/decisions/rules/logs/per-actor-events layout.
 Task-67: lifecycle/review wording, supported badge/config claims, current installer/version guidance and real Decision metadata.
 Dedicated storage/sync section: automatic publish/refresh, fresh clone/shared worktrees, offline pending/local-only/safety copy, compatible merges versus true conflicts, and unpublishable held edits. Distinguish conflict resolution local/remote/edited from validation-hold keep-remote repair; unaffected records continue. Include required Excalidraw and real status/TUI conflict captures. Do not revive stale sysup/~/.dotfiles/checkpoint rollout instructions.
+
+## Approved execution/order
+
+Herdra approved the refreshed seven-page plan and visuals/content split. task-81 owns visual production first; its Worker must show its plan before artifacts. Existing EA/vault PNGs are expressly authorized for site/Sideshow use, with editable source/PNG kept together in vault and public-reader labels (no private paths/hosts/names). No exporter/tool/substitute.
+
+Content Worker waits for reviewed visual assets and verified event/CLI fixes (tasks 50 and 63). Release batch 27 owns tandem/RELEASE.md; coordinate that guide before any overlapping README maintenance. Rebase/import the scaffold after those fixes so docs do not overwrite them. Visual review goes to J0qH-JN7PqI for Herdra before integration/Algorant. No deployment; old-URL handling remains pre-deployment decision.
