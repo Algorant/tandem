@@ -8,12 +8,16 @@ state: "in-progress"
 priority: "low"
 tags: ["config", "validation"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["`just dev-check` fails on the same clippy lints that the `just release` gate rejects."]
   claimedAt: "2026-10-13T14:15:10Z"
-  updatedAt: "2026-10-13T14:15:10Z"
+  deliveredAt: "2026-10-13T14:15:11Z"
+  summary: "Covered by task-27: dev-check now runs the exact strict release clippy flags before sandbox checks."
+  evidence: ["Verified/covered by accepted task-27 delivery on main bd46f7d.", "scripts/dev.sh check mode invokes cargo clippy --all-targets --all-features -- -D warnings, matching the release gate.", "Parent independently ran just dev-check on the accepted delivery; strict clippy and native/Git-backed checks passed."]
+  filesChanged: ["scripts/dev.sh"]
+  updatedAt: "2026-10-13T14:15:11Z"
 createdAt: "2026-10-01T23:46:59Z"
-updatedAt: "2026-10-13T14:15:10Z"
+updatedAt: "2026-10-13T14:15:11Z"
 assignee: "tandem-ceph"
 ---
 
