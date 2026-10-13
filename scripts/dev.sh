@@ -100,6 +100,8 @@ smoke() {
 if [[ "$mode" == check ]]; then
     echo 'Running the full native/CLI test suite...' >&2
     cargo test --manifest-path "$manifest"
+    echo 'Running strict release-equivalent clippy...' >&2
+    cargo clippy --manifest-path "$manifest" --all-targets --all-features -- -D warnings
     "$repo_root/scripts/tests/test_dev.sh"
 fi
 build

@@ -96,11 +96,7 @@ site-build: _check-docs-node
 	bun install --frozen-lockfile
 	bun run build
 
-# Validate a prepared VERSION, tag it, publish it, and verify the GitHub Release.
-#
-# TEMPORARY: the AUR verification step is skipped while the AUR is read-only and
-# rejects package updates. Restore `wait_for_workflow aur "Update tandem-bin AUR
-# package"` below once the AUR accepts pushes again.
+# Validate a prepared VERSION, tag it, publish it, and verify GitHub plus downstream AUR workflows.
 # Usage: just release 0.6.5
 # Before running, add one meaningful ## VERSION section to RELEASES.md.
 release VERSION:
@@ -123,6 +119,24 @@ release VERSION:
 		git status --short
 		exit 2
 	fi
+	# Resolve cargo-dist from the repository's sole version authority before doing release work.
+	if ! dist_version="$(awk -F'"' '$1 ~ /^[[:space:]]*cargo-dist-version = / { print $2; count++ } END { if (count != 1) exit 1 }' dist-workspace.toml)" || [[ ! "$dist_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+		echo "Could not read one valid cargo-dist-version from dist-workspace.toml." >&2
+		exit 2
+	fi
+	if ! command -v mise >/dev/null 2>&1; then
+		echo "mise is required to provision pinned cargo-dist ${dist_version}; install mise, then retry." >&2
+		exit 2
+	fi
+	dist_cmd=(mise x "aqua:axodotdev/cargo-dist@${dist_version}" -- dist)
+	if ! dist_version_output="$("${dist_cmd[@]}" --version)"; then
+		echo "Unable to provision/run cargo-dist ${dist_version} through mise; check mise and its aqua backend, then retry." >&2
+		exit 2
+	fi
+	if [[ "$dist_version_output" != "cargo-dist ${dist_version}" ]]; then
+		echo "Expected cargo-dist ${dist_version} from dist-workspace.toml, got: ${dist_version_output}" >&2
+		exit 2
+	fi
 	tag="tandem-v${version}"
 	if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
 		echo "Tag ${tag} already exists" >&2
@@ -136,7 +150,7 @@ release VERSION:
 	trap 'rm -f "$notes_file" "$manifest_file" "$release_file" "$runs_file"' EXIT
 	scripts/release_checks.sh notes "$version" "$notes_file"
 	scripts/release_checks.sh cargo "$version"
-	dist manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
+	"${dist_cmd[@]}" manifest --tag "$tag" --artifacts=global --output-format=json --allow-dirty > "$manifest_file"
 	scripts/release_checks.sh manifest "$notes_file" "$manifest_file"
 
 	cd tandem
@@ -151,6 +165,7 @@ release VERSION:
 	cd ../site
 	bun install --frozen-lockfile
 	bun run build
+	bun run check:links
 	bun audit --audit-level=high
 	cd ..
 	bun build --no-bundle tandem/src/web/app.js tandem/src/web/api.js tandem/src/web/ui.js --outdir /tmp/tandem-web-syntax-check
@@ -165,34 +180,55 @@ release VERSION:
 	wait_for_workflow() {
 		local role="$1"
 		local workflow="$2"
+		local max_attempts="$3"
+		local watch_attempts="$4"
 		local selection=""
 		local run_id=""
-		for _ in {1..180}; do
-			gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,headSha,event,createdAt,updatedAt > "$runs_file"
+		local run_status=""
+		for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+			gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,headSha,event,createdAt,updatedAt > "$runs_file" || return $?
 			selection="$(scripts/release_checks.sh select-run "$role" "$runs_file" "$tag" "$release_commit" "$release_run_completed_at")"
 			if [[ -n "$selection" ]]; then
 				run_id="$(jq -r .databaseId <<<"$selection")"
 				echo "Waiting for $workflow run $run_id for $tag"
-				gh run watch "$run_id" --repo "$repo" --exit-status
+				if [[ -n "$watch_attempts" ]]; then
+					for ((watch_attempt = 1; watch_attempt <= watch_attempts; watch_attempt++)); do
+						run_status="$(gh run view "$run_id" --repo "$repo" --json status,conclusion)" || return $?
+						if [[ "$(jq -r .status <<<"$run_status")" == completed ]]; then
+							if [[ "$(jq -r .conclusion <<<"$run_status")" != success ]]; then
+								echo "$workflow run $run_id completed with conclusion $(jq -r .conclusion <<<"$run_status")." >&2
+								return 1
+							fi
+							break
+						fi
+						sleep 10
+					done
+					if [[ "$(jq -r .status <<<"$run_status")" != completed ]]; then
+						echo "Timed out waiting for $workflow run $run_id after $((watch_attempts * 10)) seconds" >&2
+						return 124
+					fi
+				else
+					gh run watch "$run_id" --repo "$repo" --exit-status || return $?
+				fi
 				if [[ "$role" == "release" ]]; then
 					release_run_completed_at="$(gh run view "$run_id" --repo "$repo" --json updatedAt --jq .updatedAt)"
 				fi
-				return
+				return 0
 			fi
 			sleep 10
 		done
-		echo "Timed out waiting for $workflow to start for $tag" >&2
-		exit 1
+		echo "Timed out waiting for $workflow to start for $tag after $((max_attempts * 10)) seconds" >&2
+		return 124
 	}
-	wait_for_workflow release "Release"
+	wait_for_workflow release "Release" 180 ""
 
 	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
 	scripts/release_checks.sh published "$notes_file" "$release_file"
-	# TEMPORARY: AUR is read-only and cannot accept package updates, so waiting on
-	# the tandem-bin workflow would fail or hang for 30 minutes after the release
-	# has already published and verified successfully. Tandem rule 6 requires that
-	# an AUR failure not block the release lifecycle at this point. Restore the
-	# line below when the AUR is writable again.
-	# wait_for_workflow aur "Update tandem-bin AUR package"
+	echo "GitHub Release $tag and required assets/notes verified."
+	if wait_for_workflow aur "Update tandem-bin AUR package" 30 30; then
+		echo "AUR workflow verified for $tag."
+	else
+		aur_status=$?
+		echo "WARNING: matching AUR workflow verification did not succeed (exit $aur_status); GitHub Release $tag remains verified. Record a downstream tandem-bin packaging follow-up." >&2
+	fi
 	echo "Release $tag and GitHub assets/notes verified."
-	echo "SKIPPED: tandem-bin AUR verification (AUR read-only). Record the AUR outcome as a downstream packaging issue."

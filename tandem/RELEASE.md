@@ -10,66 +10,34 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 
 1. While preparing a release, update `tandem/Cargo.toml` to `X.Y.Z` and add exactly one meaningful `## X.Y.Z` section to root `RELEASES.md`. Group user-facing notes by product surface when useful, use a dedicated `Fixed` section for fixes, and mention only shipped behavior or current user-facing limitations. Do not add installation instructions or a required rolling Unreleased section.
 2. Commit the prepared version and release notes. Keep detailed task, commit, and completed-log history in Tandem; use `RELEASES.md` only for concise curated release history. A larger future release may be drafted there ahead of time.
-3. Run `just release X.Y.Z` from a clean local `main` checkout. It rejects a missing, duplicate, or empty matching release section; a requested version that disagrees with `Cargo.toml`; and a cargo-dist announcement body that omits the curated notes before it creates the tag.
-4. `just release` then runs the repository validation suite, pushes `main` and `tandem-vX.Y.Z`, waits for the Release workflow, and checks the published non-draft/non-prerelease GitHub Release body and assets. **Temporary:** verification of the `Update tandem-bin AUR package` workflow is currently skipped because the AUR is read-only and rejects package updates. Per Tandem rule 6, an AUR publication failure does not block a release once the tagged GitHub Release, curated notes, required assets, checksums, and primary installer are published and verified; record the AUR outcome as a downstream packaging issue. Restore the AUR wait in `justfile` when the AUR accepts pushes again.
-5. Smoke-test the primary installer command after automated publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
+3. Run `just release X.Y.Z` from a clean local `main` checkout. It reads the cargo-dist version from `dist-workspace.toml`, provisions and invokes that version through mise, then rejects a missing, duplicate, or empty matching release section; a requested version that disagrees with `Cargo.toml`; and a cargo-dist announcement body that omits the curated notes before publication.
+4. The recipe runs the existing Rust formatting, release-profile tests/builds, dist-profile build, strict clippy, and version checks, followed by the site build, built-site link check, high-severity Bun audit, web JavaScript syntax check, and `git diff --check`. All these gates complete before creating/pushing the annotated tag and `main`.
+5. After pushing, the recipe waits for the matching Release workflow, then verifies the GitHub Release is non-draft/non-prerelease and includes curated notes and required nonempty assets. Only after that verification it waits for the matching `Update tandem-bin AUR package` workflow. The AUR wait is bounded; success is reported, while a failed or timed-out AUR run is explicitly reported as a downstream packaging follow-up and does not undo verified GitHub publication.
+6. Smoke-test the primary installer after publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
 
-### Release workflow performance audit
+### Release cycle effort and friction audit
 
-The release recipe was measured on a Linux checkout with a warm Cargo registry and
-cold target profiles. Run each command from the repository root, record elapsed
-wall time, and sum the stages; this avoids publishing or creating a tag:
+The 0.17.0 transcript at `/tmp/tandem-release-0.17.0.log` records command-reported stage durations, not a complete end-to-end wall-clock ledger. The table separates those observations from planning estimates; machine, cache, network, and workflow queue affect actual effort.
 
-```sh
-python3 - <<'PY'
-import subprocess, time
-commands = [
-    ("cargo fmt", "cd tandem && cargo fmt --check"),
-    ("cargo tests", "cd tandem && cargo test --release"),
-    ("release build", "cd tandem && cargo build --release"),
-    ("dist build", "cd tandem && cargo build --profile dist"),
-    ("clippy", "cd tandem && cargo clippy --all-targets --all-features -- -D warnings"),
-]
-for name, command in commands:
-    started = time.monotonic()
-    subprocess.run(command, shell=True, check=True)
-    print(f"{name}: {time.monotonic() - started:.1f}s")
-PY
-```
+| Step | 0.17.0 evidence / current effort | Shorten, remove, or automate? | Rationale and risk |
+| --- | --- | --- | --- |
+| Prepare version and curated notes; commit on `main` | Operator effort estimate: 10–30 min, varies with release content; transcript does not time it. | Keep manual. | Human curation is intentional; automating notes risks inaccurate or noisy public history. |
+| Format and optimized-profile tests | Transcript: test-profile compilation reported 13.90s; tests reported 3.85s (about 18s combined command work, excluding startup/other overhead). | Keep both. | Tests remain necessary; release-profile testing lets later release build reuse compilation. |
+| Release and dist builds; strict clippy; version check | Transcript reports release build 0.06s, dist build 10.67s, clippy check 4.02s, and version command's debug build 6.35s. | Keep all existing native/dist checks; run dev-check clippy early too. | These cover distinct release/profile and lint behavior. Removing one risks late failures; early clippy shortens feedback, not total release work. |
+| Site build, links, and high audit | Transcript: site build reported 1.56s and audit 0.23s; no standalone link-check duration recorded. | Keep; run before any publication. | These gates catch preventable post-tag failures. The log does not support claiming an end-to-end time saving. |
+| Web syntax check and diff check | Transcript reports JavaScript bundling in 2ms; diff check has no timing. | Keep. | Very low cost; catches syntax and whitespace errors. |
+| Publish and verify GitHub Release | Transcript shows repeated 3-second Actions status refreshes; no total wait recorded. Current discovery bound is 30 min, then `gh run watch` waits for completion. | Keep matching-run and asset verification. | Network/queue latency is variable; weakening identity or asset checks risks validating the wrong release. |
+| Verify AUR downstream workflow | 0.17.0 record identifies successful matching workflow 38305322702, despite the stale skip message. Current wait is bounded to 5 min to find a run plus 5 min to observe completion. | Restore the check; report failure/timeout without failing a verified GitHub release. | A missing/misselected workflow can otherwise appear successful; the bounded wait avoids indefinite delay while surfacing follow-up. |
 
-Observed timings on 2026-08-22 (the machine and dependency cache affect absolute
-values):
+Recommended flow: run `$ just dev-check` for tests, strict release-equivalent clippy, and the Git-backed smoke check while developing; prepare/commit version and release notes; run `just release X.Y.Z`, which provisions the pinned cargo-dist and performs every local gate before tag/push; verify GitHub publication, then observe/report the matching AUR workflow. Do not rerun or hand-install cargo-dist at a different version.
 
-| Stage | Before | After |
-| --- | ---: | ---: |
-| Formatting | 0.7s | 0.7s |
-| Tests | 38.1s (`cargo test`) | 52.8s (`cargo test --release`) |
-| Release build | 63.1s | 0.1s |
-| Dist build | 46.4s | 40.1s |
-| Clippy | 19.3s | 20.6s |
-| **Measured cargo stages** | **167.6s** | **114.1s** |
+Concrete bounded candidates and risks:
 
-The dominant avoidable cost was compiling the full dependency graph twice: first
-for debug tests and then for the release binary. Testing in the release profile
-keeps the validation while allowing the required release build to reuse the
-compiled artifacts. Release validation explicitly enables `debug-assertions` and
-`overflow-checks`; the inherited `dist` profile explicitly disables both, so the
-shipped artifact remains unchanged. The cold target-profile rerun was 114.1s
-after the change; a warm rerun was 1.5s versus 1.5s for already-built profile
-stages. The networked tag, GitHub Actions, and publication waits are not included
-here.
-
-Deferred opportunities are intentionally not part of this small change:
-
-- Parallelize independent site/JavaScript checks with Cargo checks. Benefit is
-  bounded by the slowest branch; risk is higher log interleaving and resource
-  contention; cost is medium.
-- Add a first-class release benchmark command that persists stage data across
-  hosts and cold registry caches. Benefit is better trend data; risk is noisy
-  measurements and maintenance; cost is medium.
-- Replace polling for remote workflow startup with an event/API wait. Benefit is
-  less idle network time; risk is missing or selecting the wrong run; cost is
-  medium/high.
+- **Move clippy into dev-check (implemented):** catches release-gate lints at Worker delivery. Adds the strict lint check to development validation but does not remove any release check.
+- **Move existing docs build/link/audit gates before publication (implemented):** reduces risk of discovering a broken release after tagging; no claim of reduced total compute time.
+- **Consume the existing cargo-dist pin via mise (implemented):** removes manual global `dist` setup while preserving one version authority. If mise or provisioning is unavailable, fail before release work with a direct setup diagnostic; no fallback installer or global configuration change.
+- **Restore AUR verification with a bounded downstream report (implemented):** removes stale skip/read-only instructions. Risk: up to 10 minutes of additional wait; a failure after verified GitHub publication is an explicit packaging follow-up, not release failure.
+- **Do not parallelize checks or add a benchmark/polling framework:** uncertain wall-clock benefit, extra log/resource contention, and additional maintenance are not justified by this single transcript.
 
 ### Current capabilities
 
@@ -128,10 +96,10 @@ Integrations resolve `tandem` in this order:
 1. `TANDEM_BIN`
 2. `tandem` on `$PATH`
 
-After the release tag exists, install from git with:
+After the release tag exists, replace `X.Y.Z` with the exact pushed release version and install the `tandem` package from git:
 
 ```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.10.1 --path tandem --locked
+cargo install --git git@github.com:Algorant/tandem.git --tag tandem-vX.Y.Z tandem --locked
 tandem --version
 ```
 
@@ -153,12 +121,11 @@ TANDEM_BIN="$PWD/tandem/target/release/tandem"
 ```text
 cd tandem
 cargo fmt --check
-cargo test
+cargo test --release
 cargo build --release
 cargo build --profile dist
 cargo clippy --all-targets --all-features -- -D warnings
 cargo run -- --version
-cargo run -- version
 cd ../site
 bun install --frozen-lockfile
 bun run build
@@ -170,10 +137,10 @@ node --check tandem/src/web/api.js
 node --check tandem/src/web/ui.js
 git diff --check
 
-# `just release X.Y.Z` performs these checks before reporting success:
-# - cargo-dist's generated announcement body contains the matching RELEASES.md section
-# - the published GitHub Release is not draft/prerelease and has that section plus all expected assets
-# - the Update tandem-bin AUR package workflow succeeds
+# `just release X.Y.Z` performs the native, docs, and syntax gates before publication,
+# then verifies the generated announcement and published GitHub assets/notes.
+# It also verifies the matching AUR workflow when available; downstream AUR failure
+# or timeout is reported without invalidating a verified GitHub Release.
 #
 # For an independent post-publication inspection, substitute the actual tag:
 tag=tandem-vX.Y.Z
@@ -194,4 +161,4 @@ The pushed `tandem-vX.Y.Z` tag triggers `.github/workflows/release.yml`, which u
 
 If a release workflow fails before creating a GitHub Release, fix the release configuration, delete the failed remote tag, and rerun `just release X.Y.Z` from the corrected commit. Do not delete or reuse a tag if a GitHub Release or published artifacts were created; publish a follow-up patch version instead.
 
-After the Release workflow succeeds, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for the x86_64-only initial `tandem-bin` package, and pushes the AUR Git remote. While the AUR is read-only this workflow is expected to fail, and `just release` no longer waits on it or treats it as a release failure; for recovery details see `../docs/packaging/aur-tandem-bin.md`.
+After the Release workflow succeeds and the GitHub assets/notes have been verified, `.github/workflows/aur-tandem-bin.yml` downloads `tandem-x86_64-unknown-linux-gnu.tar.xz` and `sha256.sum`, regenerates `PKGBUILD`/`.SRCINFO` for the x86_64-only initial `tandem-bin` package, and pushes the AUR Git remote. `just release` verifies the matching workflow with bounded waiting; a failed or missing downstream AUR update is reported for follow-up without invalidating the verified GitHub Release. For recovery details see `../docs/packaging/aur-tandem-bin.md`.
