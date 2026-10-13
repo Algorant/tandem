@@ -4,20 +4,22 @@ uid: 36a8474a-8588-4f23-8009-4f9e3c56a7b7
 type: task
 kind: "papercut"
 title: "Web action-button labels wrap outside their button bounds"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "small"
 references: ["task-75", "task-81"]
 relatedFiles: ["tandem/src/web/app.css"]
 tags: ["ui", "web", "plan-first"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Refresh view and Apply filters labels stay readable inside their button bounds at 900px, 1280px and 1920px viewport widths without layout overlap."]
+  claimedAt: "2026-10-13T15:47:18Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Herdra explicitly authorized this small fix; plan before editing. CSS only in app.css, no JS/HTML/Rust behavior change or deferred task-75 redesign.", "Verify actual browser layout at 900/1280/1920px, preferably both themes, on disposable boards; no injected capture-only CSS workaround.", "Temporary checks only; no permanent tests/fixtures. No push/release/deploy; parent integrates verified technical fix then task-81 recaptures."]
-  updatedAt: "2026-10-13T15:47:13Z"
+  updatedAt: "2026-10-13T15:47:18Z"
 createdAt: "2026-10-13T15:35:10Z"
-updatedAt: "2026-10-13T15:47:13Z"
+updatedAt: "2026-10-13T15:47:18Z"
+assignee: "worker-task-82-e7773445"
 ---
 
 ## Description
