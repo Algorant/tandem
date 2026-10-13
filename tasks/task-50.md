@@ -4,19 +4,21 @@ uid: ef34cbd8-c699-4582-a2af-2ae1ed59bd51
 type: task
 kind: papercut
 title: "Event envelope in code contradicts protocol spec (summary vs data)"
-state: todo
+state: "in-progress"
 priority: "low"
 relatedFiles: ["protocol/README.md", "protocol/plan/spec.md", "tandem/src/protocol/event.rs", "tandem/src/project/events.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/accord.rs", "tandem/src/app/rules.rs", "tandem/src/app/links.rs", "tandem/src/app/review.rs"]
 tags: ["protocol", "events"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The protocol spec and the executable event envelope agree on whether `summary` and `data` are required, with a test asserting the chosen contract."]
+  claimedAt: "2026-10-13T13:55:03Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Plan first, Lua/high; new writes must follow agreed normative contract, not simply rewrite docs to match the bug.", "No history/archived-ledger edits or fabricated full-body event payloads. Preserve legitimate existing history; concrete reader transition belongs in plan.", "No protocol version bump, source push/release or general event framework without separate approval. Temporary checks only."]
-  updatedAt: "2026-10-13T13:54:46Z"
+  updatedAt: "2026-10-13T13:55:03Z"
 createdAt: "2026-09-30T03:41:03Z"
-updatedAt: "2026-10-13T13:54:46Z"
+updatedAt: "2026-10-13T13:55:03Z"
 effort: "medium"
+assignee: "worker-task-50-aab3bafd"
 ---
 ## Approved batch B, before task-64
 
