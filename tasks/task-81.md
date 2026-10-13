@@ -3,14 +3,14 @@ id: task-81
 uid: 800443c6-c745-41db-9216-f70642139032
 type: task
 title: "Docs visuals: public Excalidraw diagrams and 0.17.0 captures"
-state: "validation"
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-76", "task-73", "task-74"]
 relatedFiles: ["site/public/images/"]
 tags: ["docs", "ui"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Public Excalidraw D1 shared-board/how-it-works, D3 Task lifecycle and D4 source-versus-tandem/two-machine/conflict-versus-held diagrams are readable, accurate for protocol 0.5.0 and have editable sources retained in the authorized vault.", "Actual 0.17.0 Board, session chooser/activity/add-remove/full-TUI switch, sync-status pending/conflict/held examples, TUI conflict and single-workspace read-only web captures are produced on safe disposable replicas, without private data or synthetic output.", "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten.", "Parent receives exact artifact/source paths, native capture observations and preview surfaces for review in the existing docs Sideshow session; no public-page writing or integration is performed by the Worker."]
   claimedAt: "2026-10-13T13:47:07Z"
   deliveredAt: "2026-10-13T16:40:16Z"
@@ -19,14 +19,11 @@ accord:
   summary: "Final12-asset set posted for Algorant at Herdra direction. Captures/D1/D3 previously accepted and unchanged. D4 now symmetric: both machines connect to main and tandem and feed local When-you-sync band; conflict wording until you resolve it. Parent inspected native/390px image, verified EA vault/source PNG hashes, exact one-file revision, clean f8281fd and native site/996-link checks. Hold integration/acceptance/cleanup for Algorant."
   evidence: ["Final review: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI new post2QgnioNb-rI; HTTP200. All12 public assets published; no deployment or integration.", "Parent verified diff38d5c0e..f8281fd touches only source-and-tandem-sync.png. D1/D3 and all Herdra-accepted captures byte-unchanged. Both machine panels have same arrows to main and tandem, each feeds local outcomes band. Conflict text: unpublished until you resolve it; caption names tandem sync resolve.", "Parent read native EA scenes and hashes via authorized Obsidian API; D4 vault/site SHA256 e788f5c8f41fcdea718405dae0faad0800b4386039b7f1f3895a00ee18c7b164, pairs preserved. No human source overwrite, raw hand-written scenes or exporter introduced.", "Parent independently ran just site-build, site check:links and diff-check: passed,996links/21HTML. Native/390px D4 images inspected. Existing i18n/404 warnings remain. No prose/layout/Rust/teaser changes.", "Native Chromium web and authentic renderedANSI terminal captures retained with review-only provenance and no public banners. Source/archive pairs and raw /tmp/tandem-task81-captures evidence retained. Task82 false-positive cancellation permanent; no CSSworkaround.", "Explicit outcome: Task remains delivered, now validation for Algorant visual acceptance; no integration/Tandem completion/checkout cleanup/push/release/deploy before his acceptance. Worker clean at f8281fd retained."]
   filesChanged: ["site/public/images/shared-board.png", "site/public/images/task-lifecycle.png", "site/public/images/source-and-tandem-sync.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
-  updatedAt: "2026-10-13T16:40:16Z"
+  note: "Herdra rejected latest D4 geometry and supplies this EXACT replacement layout. This precise named layout correction is the only remaining scope; all accepted D1/D3/captures stay byte-unchanged. Do not improvise more arrows or auto-bind center-to-center diagonals."
+  updatedAt: "2026-10-13T16:42:14Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-13T16:40:17Z"
+updatedAt: "2026-10-13T16:42:14Z"
 assignee: "worker-task-81-c628664a"
-validation.criterion: "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten."
-validation.note: "Herdra accepted all captures and D1/D3; his named final D4 symmetry/manual-resolution corrections independently checked and final set published as new post2QgnioNb-rI in J0qH-JN7PqI. Await Algorant's visual judgment/acceptance; hold integration and cleanup. Wide terminal captures have full-size access; D4 native/390px previews checked, sources/pairs retained, unchanged teaser. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI"
-validation.requestedAt: "2026-10-13T16:40:17Z"
-validation.reviewer: "Algorant"
 ---
 
 ## Description
