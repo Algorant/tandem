@@ -117,3 +117,4 @@
 {"ts":"2026-10-13T13:16:39Z","event":"accord.released","id":"task-76","summary":"Accord release for task-76","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":117,"data":{"disposition":"reassign"}}
 {"ts":"2026-10-13T13:27:40Z","event":"task.updated","id":"task-42","summary":"Updated task-42 metadata: title, acceptance, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":118}
 {"ts":"2026-10-13T13:27:41Z","event":"task.updated","id":"task-75","summary":"Updated task-75 metadata: title, effort, references, acceptance, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":119}
+{"ts":"2026-10-13T13:27:42Z","event":"task.canceled","id":"task-5","summary":"Canceled: Superseded by task-75's reimagined web view.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":120}

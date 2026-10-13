@@ -3,7 +3,6 @@ id: task-5
 uid: e89905a7-24ee-4213-9bf2-057a3732dd90
 type: task
 title: "Conduct a collaborative full-product review of the Tandem web interface"
-state: todo
 priority: "high"
 effort: "large"
 tags: ["ui", "web", "review"]
@@ -11,7 +10,11 @@ accord:
   status: ready
   acceptance: ["A prioritized review record with reproducible findings and bounded follow-up Tasks", "Every view, control, state, empty state, detail panel, responsive layout, and primary workflow is audited with realistic project data", "Defects, polish, product decisions, and parity gaps are distinguished and recorded precisely"]
 createdAt: "2026-08-31T20:53:48Z"
-updatedAt: "2026-08-31T20:53:48Z"
+updatedAt: "2026-10-13T13:27:42Z"
+archivedAt: "2026-10-13T13:27:42Z"
+resolution:
+  outcome: "canceled"
+  note: "Superseded by task-75's reimagined web view."
 ---
 
 ## Description
