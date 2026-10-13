@@ -4,7 +4,6 @@ uid: dfcdecf2-b07b-4ac2-8375-3935f8f5d97b
 type: task
 kind: "papercut"
 title: "tandem migrate: no supported way to drop an unsynced local record when the shared board is already upgraded"
-state: todo
 priority: "low"
 tags: ["migrate", "sync"]
 accord:
@@ -12,7 +11,11 @@ accord:
   acceptance: ["A user can discard or set aside unsynced local board records through a supported Tandem command or flag (e.g. `tandem migrate --discard-local` or a sync subcommand). The command keeps a recoverable copy, and the error message names it."]
   updatedAt: "2026-10-06T19:04:48Z"
 createdAt: "2026-10-06T19:04:48Z"
-updatedAt: "2026-10-06T19:04:48Z"
+updatedAt: "2026-10-13T13:54:51Z"
+archivedAt: "2026-10-13T13:54:51Z"
+resolution:
+  outcome: "canceled"
+  note: "Pre-0.5 boards are unsupported; every live board is on 0.17. tandem migrate covers current upgrade paths."
 ---
 
 ## Description
