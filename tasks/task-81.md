@@ -10,7 +10,7 @@ references: ["task-76", "task-73", "task-74"]
 relatedFiles: ["site/public/images/"]
 tags: ["docs", "ui"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Public Excalidraw D1 shared-board/how-it-works, D3 Task lifecycle and D4 source-versus-tandem/two-machine/conflict-versus-held diagrams are readable, accurate for protocol 0.5.0 and have editable sources retained in the authorized vault.", "Actual 0.17.0 Board, session chooser/activity/add-remove/full-TUI switch, sync-status pending/conflict/held examples, TUI conflict and single-workspace read-only web captures are produced on safe disposable replicas, without private data or synthetic output.", "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten.", "Parent receives exact artifact/source paths, native capture observations and preview surfaces for review in the existing docs Sideshow session; no public-page writing or integration is performed by the Worker."]
   claimedAt: "2026-10-13T13:47:07Z"
   deliveredAt: "2026-10-13T15:41:29Z"
@@ -19,9 +19,10 @@ accord:
   summary: "Three public Excalidraw diagrams and nine authentic 0.17.0 captures independently checked and published in existing docs Sideshow session for Herdra review. D3 optional review/direct completion/rework states and D4 one-remote/two-branch/conflict/held semantics corrected. Vault editable source/PNG pairs retained and hashes match repo exports. Retained clean at 6c05a43; not integrated/pushed/deployed."
   evidence: ["Herdra review: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI, new post mSwns4EyeLE; MagicDNS HTTP 200. Full three-diagram/nine-capture set, proposed placement and known risks shown.", "Parent read all 12 PNGs and 390px diagram previews; public labels and short example project names verified. D1 one shared board, D3 direct complete plus optional review with delivered Accord and separate rework state, D4 same remote with source/main and tandem branches, conflict unpublished and invalid edit held locally.", "Parent used Obsidian/EA getSceneFromFile and vault readBinary through authorized APIs; all three editable .excalidraw.md/PNG pairs present and PNG SHA256 equals site/public/images copies. No hand-written scenes or new exporter/tool.", "Parent independently ran just site-build, site check:links and git diff --check: passed; 996 links/21 HTML files, existing i18n/404 warnings only.", "Eight raw authentic terminal ANSI inputs retained at /tmp/tandem-task81-captures; public PNGs label rendered ANSI, not native desktop screenshots. Native browser PNG captures current 0.17.0 loopback read-only web. Conflict reproduced by incompatible native record edits on disposable clones, no source Git markers; held edit used invalid local parent reference.", "Known web button wrapping at 900/1280/1920 retained truthfully, captured as unstarted task-82; no product CSS changed. D4 dense at mobile width is a reviewer judgment, not hidden. No page/layout/Rust/teaser edits or integration."]
   filesChanged: ["site/public/images/shared-board.png", "site/public/images/task-lifecycle.png", "site/public/images/source-and-tandem-sync.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
-  updatedAt: "2026-10-13T15:41:29Z"
+  note: "Herdra reviewed the set and explicitly requests this named D4 restructuring/capture correction before Algorant sees it; continuing this precise reviewer revision, not a new mechanism. D1/D3 good—leave them unchanged. D4: each machine ONE panel containing its source checkout and local .tandem; shared remote on RIGHT with main/source and tandem/board history. Outcomes must be under a 'when you sync' band fed FROM A MACHINE, not remote: compatible edits combine+publish; same-record conflict stays local/unpubli"
+  updatedAt: "2026-10-13T15:47:20Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-13T15:41:29Z"
+updatedAt: "2026-10-13T15:47:20Z"
 assignee: "worker-task-81-c628664a"
 ---
 
