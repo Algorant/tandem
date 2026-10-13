@@ -4,16 +4,18 @@ uid: f3fe8776-241c-46f2-bf61-b66f1a64a3db
 type: task
 kind: "papercut"
 title: "Remove obsolete AUR read-only skip from release verification"
-state: todo
+state: "in-progress"
 priority: "low"
 relatedFiles: ["justfile", "tandem/RELEASE.md"]
 tags: ["config", "release"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Release recipe verifies the matching AUR workflow again and no longer claims AUR is read-only when publication succeeds.", "Release checklist removes obsolete read-only/skip instructions while preserving the rule that downstream AUR failure does not invalidate a verified GitHub release."]
-  updatedAt: "2026-10-12T20:40:49Z"
+  claimedAt: "2026-10-13T14:15:20Z"
+  updatedAt: "2026-10-13T14:15:20Z"
 createdAt: "2026-10-12T20:40:49Z"
-updatedAt: "2026-10-12T20:40:49Z"
+updatedAt: "2026-10-13T14:15:20Z"
+assignee: "tandem-ceph"
 ---
 
 ## Description
