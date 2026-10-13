@@ -131,3 +131,4 @@
 {"ts":"2026-10-13T13:54:50Z","event":"task.updated","id":"task-77","summary":"Updated task-77 metadata: references, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":131}
 {"ts":"2026-10-13T13:54:51Z","event":"task.canceled","id":"task-65","summary":"Canceled: Pre-0.5 boards are unsupported; every live board is on 0.17. tandem migrate covers current upgrade paths.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":132}
 {"ts":"2026-10-13T13:54:52Z","event":"task.updated","id":"task-76","summary":"Updated task-76 metadata: blockers, references, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":133}
+{"ts":"2026-10-13T13:54:57Z","event":"accord.claimed","id":"task-27","summary":"Accord claim for task-27","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":134}
