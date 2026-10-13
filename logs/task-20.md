@@ -3,7 +3,6 @@ id: task-20
 uid: a1bb61df-21fd-4ab7-96fa-e7f89a288d68
 type: task
 title: "Explore and implement rule on/off toggles across protocol, context, and TUI"
-state: todo
 references: ["task-4", "task-12", "task-32"]
 tags: ["rules"]
 accord:
@@ -12,7 +11,11 @@ accord:
   constraints: ["Rule-storage work task-4 and legacy detection task-12 are completed baseline, not pending implementation dependencies.", "Keep disabled rules distinct from inactive legacy embedded rules. Task-32 owns visibility of the latter; do not duplicate or absorb that focused fix.", "Outside the approved papercut cleanup implementation wave: retain as future exploration/implementation, with adapter changes requiring a separate explicit handoff."]
   updatedAt: "2026-09-11T14:24:35Z"
 createdAt: "2026-09-06T12:49:04Z"
-updatedAt: "2026-09-11T14:24:35Z"
+updatedAt: "2026-10-13T13:47:01Z"
+archivedAt: "2026-10-13T13:47:01Z"
+resolution:
+  outcome: "canceled"
+  note: "Absorbed into task-53's consolidated rules work: starter set, categories, toggles and agent visibility. Mockup first; no implementation yet."
 ---
 
 ## Description
