@@ -125,3 +125,4 @@
 {"ts":"2026-10-13T13:47:01Z","event":"task.canceled","id":"task-20","summary":"Canceled: Absorbed into task-53's consolidated rules work: starter set, categories, toggles and agent visibility. Mockup first; no implementation yet.","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":125}
 {"ts":"2026-10-13T13:47:07Z","event":"accord.claimed","id":"task-81","summary":"Accord claim for task-81","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":126}
 {"ts":"2026-10-13T13:54:44Z","event":"task.updated","id":"task-27","summary":"Updated task-27 metadata: title, priority, effort, tags, references, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":127}
+{"ts":"2026-10-13T13:54:46Z","event":"task.updated","id":"task-50","summary":"Updated task-50 metadata: effort, tags, relatedFiles, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":128}
