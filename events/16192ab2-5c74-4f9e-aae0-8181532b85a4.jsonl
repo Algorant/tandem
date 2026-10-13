@@ -126,3 +126,4 @@
 {"ts":"2026-10-13T13:47:07Z","event":"accord.claimed","id":"task-81","summary":"Accord claim for task-81","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":126}
 {"ts":"2026-10-13T13:54:44Z","event":"task.updated","id":"task-27","summary":"Updated task-27 metadata: title, priority, effort, tags, references, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":127}
 {"ts":"2026-10-13T13:54:46Z","event":"task.updated","id":"task-50","summary":"Updated task-50 metadata: effort, tags, relatedFiles, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":128}
+{"ts":"2026-10-13T13:54:47Z","event":"task.updated","id":"task-64","summary":"Updated task-64 metadata: effort, tags, blockers, relatedFiles, acceptance, constraints, validation, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":129}
