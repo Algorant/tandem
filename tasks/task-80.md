@@ -9,12 +9,16 @@ priority: "low"
 relatedFiles: ["justfile", "tandem/RELEASE.md"]
 tags: ["config", "release"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Release recipe verifies the matching AUR workflow again and no longer claims AUR is read-only when publication succeeds.", "Release checklist removes obsolete read-only/skip instructions while preserving the rule that downstream AUR failure does not invalidate a verified GitHub release."]
   claimedAt: "2026-10-13T14:15:20Z"
-  updatedAt: "2026-10-13T14:15:20Z"
+  deliveredAt: "2026-10-13T14:15:22Z"
+  summary: "Covered by task-27: matching AUR verification restored after GitHub assets/notes validation; failure/missing/timeout reported nonblocking, stale read-only skip removed."
+  evidence: ["Verified/covered by accepted task-27 delivery on main bd46f7d.", "Reviewed selector uses release SHA and completion window; AUR discovery/completion each bounded to five minutes and unsuccessful downstream status prints a warning without invalidating verified GitHub release.", "Temporary isolated stub runs covered success, failed conclusion, missing matching run and in-progress timeout; parent existing workflow-selection tests and script/native/site checks passed. No tag/push/release/AUR publication occurred."]
+  filesChanged: ["justfile", "tandem/RELEASE.md"]
+  updatedAt: "2026-10-13T14:15:22Z"
 createdAt: "2026-10-12T20:40:49Z"
-updatedAt: "2026-10-13T14:15:20Z"
+updatedAt: "2026-10-13T14:15:22Z"
 assignee: "tandem-ceph"
 ---
 
