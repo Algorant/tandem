@@ -4,7 +4,6 @@ uid: 36a8474a-8588-4f23-8009-4f9e3c56a7b7
 type: task
 kind: "papercut"
 title: "Web action-button labels wrap outside their button bounds"
-state: "todo"
 priority: "low"
 effort: "small"
 references: ["task-75", "task-81"]
@@ -19,7 +18,11 @@ accord:
   note: "discarded: Herdra explicitly authorized canceling task-82 as an Obscura capture false positive, not a product CSS bug. Parent inspected actual paired screenshots; unchanged Chromium fits Refresh/Apply labels at 900/1280/1920 in both themes. No source edits; clean checkout independently confirmed. Owned temporary servers/drivers/board cleaned and ports 18782/9515 closed; seven evidence PNGs preserved and published in docs session J0qH-JN7PqI post MdEg0IfN_cs. Discard only this disposable no-source attempt; parent then cancels Task with permanent rendering-gap note."
   updatedAt: "2026-10-13T16:15:02Z"
 createdAt: "2026-10-13T15:35:10Z"
-updatedAt: "2026-10-13T16:15:02Z"
+updatedAt: "2026-10-13T16:15:15Z"
+archivedAt: "2026-10-13T16:15:15Z"
+resolution:
+  outcome: "canceled"
+  note: "Canceled by Herdra direction: Obscura capture false positive, no product CSS change. Obscura's Rust-browser PNG at 1280px painted Refresh view/Apply filters over two lines beyond their buttons, while its reported text rectangles misleadingly matched button bounds. Genuine installed Chromium on the SAME unchanged Tandem build/data at 900/1280/1920 CSS px, explicitly light and dark, paints both labels on one line fully inside. Parent inspected paired native PNGs. Refresh text98.72×17 fits button124.72×40.80; Apply92.47×17 fits button118.47×40.80. Do not chase this again as a Tandem CSS bug without reproduction in a real production browser: it is an observed Obscura rendering gap. Task-81 public web image will use genuine Chromium, no injected CSS. Evidence: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI post MdEg0IfN_cs; six /tmp/task82-chrome-{light,dark}-{900,1280,1920}.png and /tmp/pi-codemode-6ccacd6a7a768d37.png retained. Worker attempted read-only investigation only, no source edits. Owned servers/driver/disposable board cleaned, ports closed, clean checkout verified; exact attempt discarded and presentation/worktree removed through owning worker_discard/Worktrunk lifecycle."
 ---
 ## Investigation outcome — direction pending
 
