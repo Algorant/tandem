@@ -4,7 +4,6 @@ uid: 49829e7d-bd9b-49cf-a941-0ea494dddf1d
 type: task
 kind: "papercut"
 title: "Explain runnable $ validation syntax in add/update CLI help"
-state: todo
 priority: "low"
 relatedFiles: ["tandem/src/cli", "docs/cli/index.md", "protocol/assignment.md"]
 tags: ["config", "delegation"]
@@ -14,8 +13,12 @@ accord:
   constraints: ["Folded into task-63's approved CLI batch; no independent Worker."]
   updatedAt: "2026-10-13T13:54:50Z"
 createdAt: "2026-10-12T16:29:42Z"
-updatedAt: "2026-10-13T13:54:50Z"
+updatedAt: "2026-10-14T02:27:05Z"
 references: ["task-63"]
+archivedAt: "2026-10-14T02:27:05Z"
+resolution:
+  outcome: "canceled"
+  note: "Absorbed into completed task-63; both acceptance criteria independently verified from97d3e9d delivery. Built-release tandem add task --help and update --help state '$ <command>' runnable vs unprefixed manual; docs/cli/index.md includes quoted --validation '$ just dev-check' example. Parent native assignment check confirmed command/manual classification unchanged. No independent Worker/work or permanent tests; capture retained until verified as requested. Task63 integrated/completed and exact Worker cleaned via owning lifecycle; no push/release."
 ---
 
 ## Description
