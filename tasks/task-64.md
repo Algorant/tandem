@@ -16,7 +16,7 @@ accord:
   constraints: ["Herdra approved option (1): predictable refusals/preflight only; no commit-and-compensation for late write/fsync failure.", "Late operational write/fsync failure: not observed; revisit if seen. Do not file a separate Task for that caveat.", "Root Worker is Luna/high, plan first, after task-50. Temporary checks only; no new general transaction/journal framework or push/release."]
   updatedAt: "2026-10-14T01:54:09Z"
 createdAt: "2026-10-05T03:52:19Z"
-updatedAt: "2026-10-14T01:54:09Z"
+updatedAt: "2026-10-14T01:58:46Z"
 blockers: ["task-50"]
 effort: "medium"
 relatedFiles: ["tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/accord.rs", "tandem/src/app/rules.rs", "tandem/src/app/links.rs", "tandem/src/app/review.rs", "tandem/src/app/support.rs", "tandem/src/app/project.rs", "tandem/src/project/events.rs", "tandem/src/project/write.rs"]
@@ -29,3 +29,7 @@ Algorant/Herdra chose option (1). Put every detectable refusal/preflight check b
 Audit add/update/accord/complete/cancel/rules/link and init/migrate boundaries. Reproduce deterministic existing event preflight failure, then move those checks/required preparation before record changes. Verify affected record, ledger, index and board refs unchanged for refused operations. Work against task-50's finalized event API; don't touch CLI/sync mapping unless a concrete need is escalated.
 
 Scope limitation openly approved: late operational write/fsync failure is not observed; revisit if seen. No guarantee covering arbitrary disk/power-loss or remote/source publication rollback is requested in this Task, and no commit-and-compensation or general transaction/journal framework is authorized. No separate Task for that limitation. Fresh Luna/high Worker with plan before code; temporary checks removed before ready.
+
+## Concrete plan approved
+
+Read-only /tmp/task64-preflight-plan.md reproduces malformed Git-local actor UUID refusal after native add created task-2, while ledger/pending ref stayed unchanged. Approved narrow actor-ledger preparation guard holding the existing ledger lock through record mutation+append, consistent HierarchyLock→event lock ordering, contiguous sequences for operations with multiple events. IDs for new records still come from existing create_record authority; preparation must not invent/preallocate a separate ID path (bind returned ID for append). Semantic checks/payload validation before preparation; first record/archive/delete only after actor/ledger checks. Include review; init/migrate untouched absent concrete failure. No generic transaction/journal or late-fsync guarantee. Temporary exact record/ledger/index/board-ref refusal and concurrency checks; native suite/fmt/strictclippy. Parent explicitly approves same retained Worker; no second-plan gate.
