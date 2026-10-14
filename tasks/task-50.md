@@ -9,7 +9,7 @@ priority: "low"
 relatedFiles: ["protocol/README.md", "protocol/plan/spec.md", "tandem/src/protocol/event.rs", "tandem/src/project/events.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/accord.rs", "tandem/src/app/rules.rs", "tandem/src/app/links.rs", "tandem/src/app/review.rs"]
 tags: ["protocol", "events"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["The protocol spec and the executable event envelope agree on whether `summary` and `data` are required, with a test asserting the chosen contract."]
   claimedAt: "2026-10-13T13:55:03Z"
   deliveredAt: "2026-10-14T01:50:48Z"
@@ -18,9 +18,10 @@ accord:
   summary: "Structured event envelope and caller/reader contract independently verified at d49be5e. Newwrites require ts/event/id/actor/seq/data, omit summary; legitimate summary-only and summary+data history remains readable without rewrite. Parent native checks and release TUI Logs data-label render pass; accept technical fix without further human review. No push/release."
   evidence: ["Parent reviewed full11-file diff198insertions/152deletions: requireddata object/no serializedsummary; existing actor/lock/sequence authority and release disposition/link payloads retained; no framework/version/prose/history changes.", "Parent independently ran just dev-check,fmt,strictclippy anddiffcheck: all passed. 337unit tests and76integration tests in existing project suites passed; no new permanent test functions/fixtures, existing contract tests updated.", "Parent disposable native CLI check copied genuine256-record ledger unchanged; SHA2564bcd1ba3f9a01f413b9b97dcd55bdceb820691c1a8eeed3b7795ed9aaf139e89 identical after newadd/update/claim/deliver/review/complete. Six newevents have EXACT ts/event/id/actor/seq/data keys, objectdata, contiguousseq; correct title/changed-fields metadata.", "Existing reader tests verify all3 history shapes and reject malformedJSON/missingboth/nonobjectdata; modified existing append test verifies byte-identical mixedsummary+data prefix andnextseq. Worker genuine62202byte mixed-history append smoke verifiedseq258, fixture removed.", "Parent releaseTUI pane wC:pE on disposableboard: Logs1 archive, real Eventtimeline with task.created Auditcheck and task.updated Updated:tags, lifecycle eventtypes visible; no parse warnings or summaryfield failure. ANSI evidence /tmp/task50-parent-timeline.ansi retained. Parent pane/helper/fixture cleaned; real board/history untouched.", "No acknowledged blocker; context1 authorizes parent completion of approved verifiable technical work. worker_finish integrates/accepts/cleans exactsource only; no push/deploy/release. task64 may start after integration against finalized append_event(project,event,id,data)."]
   filesChanged: ["tandem/src/protocol/event.rs", "tandem/src/project/events.rs", "tandem/src/project/mod.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/app/accord.rs", "tandem/src/app/decisions.rs", "tandem/src/app/rules.rs", "tandem/src/app/links.rs", "tandem/src/app/review.rs", "tandem/src/tui/logs.rs"]
-  updatedAt: "2026-10-14T01:50:48Z"
+  note: "Independent parent review and native checks PASSED; source d49be5e accepted technically, no code correction requested. worker_finish refused BEFORE any integration because I had updated Task body to record approved recovered plan while you implemented; your captured assignment scope predates that equivalent durable note. This feedback refreshes assignment. Re-read current task-50 and submit a fresh READY report on SAME clean d49be5e with current scope/evidence; do not edit code, add payloads, or request pla"
+  updatedAt: "2026-10-14T01:51:35Z"
 createdAt: "2026-09-30T03:41:03Z"
-updatedAt: "2026-10-14T01:50:48Z"
+updatedAt: "2026-10-14T01:51:35Z"
 effort: "medium"
 assignee: "worker-task-50-aab3bafd"
 ---
