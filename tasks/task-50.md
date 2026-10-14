@@ -16,14 +16,16 @@ accord:
   constraints: ["Plan first, Lua/high; new writes must follow agreed normative contract, not simply rewrite docs to match the bug.", "No history/archived-ledger edits or fabricated full-body event payloads. Preserve legitimate existing history; concrete reader transition belongs in plan.", "No protocol version bump, source push/release or general event framework without separate approval. Temporary checks only."]
   updatedAt: "2026-10-13T13:55:03Z"
 createdAt: "2026-09-30T03:41:03Z"
-updatedAt: "2026-10-13T13:55:03Z"
+updatedAt: "2026-10-14T01:39:30Z"
 effort: "medium"
 assignee: "worker-task-50-aab3bafd"
 ---
 ## Approved batch B, before task-64
 
-Current 0.17 code really requires summary and makes data optional, while normative README/spec requires ts/event/id/actor/seq plus event-specific structured data and no required free-text summary. Align the executable contract, writers/readers and normative text. Proposed new-write envelope has required ts/event/id/actor/seq/data; summary is not required. Keep audit payload minimal; no full Markdown bodies.
+Current 0.17 code requires summary and makes data optional; normative README/spec requires ts/event/id/actor/seq/data, without required free-text summary. Align executable envelope, writers/readers/app callers and Logs display; minimal structured audit payloads, no full Markdown bodies. Existing actor/sequence ownership unchanged.
 
-Existing audit history includes summary-only lines and must not be rewritten or silently lost. Your plan must state the exact reader transition and preservation checks before implementation; don't invent a speculative compatibility layer. Preserve current actor/sequence ownership and allocation. Own event protocol/project writer/reader and necessary app callers; task-64 starts only after this lands so event-boundary edits do not overlap. Docs prose waits for this verified contract.
+## Concrete plan approved 2026-10-14
 
-Fresh Luna/high Worker, plan first. Temporary no-summary/new-data/old-prefix/history and event-kind checks; native suite/fmt/strict clippy. Escalate any larger-than-request machinery before approval. No push/release.
+Parent recovered the actual revised plan from the exact retained session after worker_report failed on second-plan guard (captured as ~/.pi task-437). Implementation is explicitly approved; no further plan gate. New writes require data and omit summary. Read-only historical compatibility must preserve summary-only AND legitimate summary+data records (current link/release writers emit both), plus new data-only records; no synthesized payload/history rewrite. Temporary genuine-ledger byte/prefix/read-count/next-sequence/new-shape checks, mixed-history regression, native suite/fmt/strictclippy. Logs renders preserved summary when present, otherwise concise event/data label. Only existing event names/callers; no decision.withdrawn addition, global-ledger transition framework or version bump. Current obsolete global-ledger exclusion remains.
+
+Owned scope: protocol event type, project writer/reader, necessary app support/tasks/accord/decisions/rules/review/links callers and TUI Logs projection. Normative text already correct; do not rewrite it to match bug. No source overlaps: task64 waits until this is verified/integrated, then task63. Temporary added checks removed before delivery; no permanent new fixtures/tests. Parent approval sent to same worker-task-50-aab3bafd and working state independently confirmed. No push/release.
