@@ -4,13 +4,12 @@ uid: 701b0825-d104-4961-9bdb-804d826d3524
 type: task
 kind: "papercut"
 title: "Concurrent add can return its provisional task-new ID after a parallel sync already numbered it"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/project/mod.rs", "docs/cli/index.md", "protocol/assignment.md"]
 tags: ["protocol"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Two concurrent `tandem add` calls on a Git-backed board each return their final published `task-N` ID in `data.id` whenever `sync.status` is `synced`.", "After a successful save, failure of existing final-ID resolution must retain command success and the known ID, with a clear warning naming the resolution problem; no full-UID refinement or new registry.", "tandem add task --help and tandem update --help explain that `$ <command>` creates a runnable command validation and unprefixed text is a manual check.", "Relevant user documentation includes one command validation example using the required `$ ` prefix."]
   claimedAt: "2026-10-14T02:12:29Z"
   deliveredAt: "2026-10-14T02:26:39Z"
@@ -19,12 +18,15 @@ accord:
   summary: "Concurrent synced add-task response IDs and task77 validation help/docs independently verified at97d3e9d. Existing resolver only; post-save lookup error/unmatched provisional retains success+knownID+clearwarning. Parent6 concurrentAdds/titlechecks, assignmentclassification, native suite/site/help pass; temporary native tests exercise both warningbranches andwere removed. Ready technicalacceptance, no newUIDscope or push/release."
   evidence: ["Parent full3-file diff review: onlytask-add response mapping through initiatingrenames then existingcurrent_id forSynced; Result caught into saved-and-synced warning+knownID, helperreturnsString, JSONoktrue/humanNormalexit preserved. Pending/localonly/notgit unchanged; no UID/refinement/registry/preflightownership.", "Parent independently ran justdev-check,fmt,strictclippy,diffcheck,sitebuild and996linkcheck/21HTML: allpassed337unit+76integration nativeproject checks. Sourceclean97d3e9d; no permanenttests/fixtures.", "Parent nativeGit-backed/bare-remote3concurrentpairs: all6 syncedIDsnumbered; showidtitle matchedOWNprocess title. Three emptyrename-mapresponses nowreturnedfinalIDs. Evidence /tmp/task63-parent-verified-evidence.json. Temporaryrepos/helperremoved.", "Worker temporary nativeunit tests induced current_id Err via syntheticUID-prefixcollision andOkunmatchedprovisional; both retainedknownID, existingappwarning andclear saved-and-synced/resolutionwarning. Tests/fixturesremoved; Parent verified sourcebyte-identical97d3e9d. This is faultinjection, NOT practical observedcollision; no extra machinery.", "Parent built-releaseaddtask/updatehelp both state $<command> runnable vsunprefixedmanual. docscli example --validation '$ just dev-check' correct. Parent nativeassignment withquoted$ andmanualtext returned plannedValidation [{kind:command,text:justdev-check},{kind:manual,text:Inspectrendering}], no semanticchange.", "Task77 criteria fullyverified fromthisdelivery; parentwillcancel77asabsorbed aftertask63completion. Context1 authorizes parenttechnicalacceptance; worker_finishowns integration/lifecycle/checkoutcleanup. No push/release/deploy."]
   filesChanged: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "docs/cli/index.md"]
-  updatedAt: "2026-10-14T02:26:39Z"
+  updatedAt: "2026-10-14T02:27:03Z"
 createdAt: "2026-10-03T03:11:29Z"
-updatedAt: "2026-10-14T02:26:39Z"
+updatedAt: "2026-10-14T02:27:03Z"
 blockers: ["task-64"]
 references: ["task-77"]
 assignee: "worker-task-63-fdc87a3a"
+archivedAt: "2026-10-14T02:27:03Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
