@@ -2,69 +2,40 @@
 id: task-76
 uid: 5f373353-a0d5-4373-87fc-5c533f439c89
 type: task
-title: "Docs and site overhaul: refreshed 0.17.0 seven-page plan"
+title: "Docs and site overhaul: write the approved seven pages"
 state: "todo"
 priority: "medium"
 effort: "large"
 references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75", "task-81", "task-27", "task-50", "task-63"]
-relatedFiles: ["plan/docs-overhaul.md", "docs/", "site/", "README.md", "tandem/README.md", "protocol/README.md", "docs/concepts/index.md", "docs/cli/index.md"]
+relatedFiles: ["docs/", "site/", "README.md", "tandem/README.md", "protocol/README.md", "plan/docs-overhaul.md"]
 tags: ["docs"]
 accord:
   status: "ready"
   acceptance: ["The public site retains the approved seven-page shape, starts with minimal reader-facing prose and incorporates Herdra's approved style guide when available.", "Content accurately explains shipped 0.17.0 session boards, add/remove paths, full-TUI switching, chooser activity, active-board sync versus inactive local snapshots, and agent setup; optional Pi /task routing is not presented as a Tandem CLI command. Web stays single-workspace/read-only.", "Workspace layout, lifecycle/review claims, installation/version guidance and Decision examples from tasks 51/67 are verified and corrected across docs and READMEs.", "Real 0.17.0 product captures, authorized Excalidraw diagram exports and existing teaser presentation are legible and reviewed in the existing docs Sideshow session with main-versus-branch comparisons.", "Site build and link checks pass; public pages contain no placeholders; final integration/deployment occurs only after Algorant's approval.", "A dedicated board-storage/sidecar-sync section within the seven-page shape accurately explains source Git versus the Tandem-managed tandem branch, multi-machine use, pending, true conflicts and held edits, with the required Excalidraw diagram and real sync-status/TUI-conflict captures."]
   validation: ["$ just site-build", "$ cd site && bun run check:links"]
-  constraints: ["Planning resumed; no prose/assets/implementation Workers until Herdra approves the refreshed plan and Excalidraw export/use path.", "Interim writing: minimal, for the real reader, no narrator voice or padding; apply Herdra task-19 style guide when available.", "Preserve rebased docs-overhaul scaffold at 57381c9; no push or deployment without approval.", "Only shipped 0.17.0 features: manual ephemeral session set and local summaries; no permanent workspaces.toml, Herdr auto-discovery or multi-workspace web."]
+  constraints: ["Plan first; Luna/high. Herdra approves this docs writing plan before implementation.", "Currentmain integrated fixes+acceptedvisuals is source; old docs-overhaul57381c9 is preserved reference, not allowed to overwrite currentCLI docs or maintained releaseguide.", "Minimal real-reader prose, seven pages, approved sparse chrome; no narrator/padding/future claims. Apply approved styleguide ifavailable.", "Reuse accepted diagrams/captures/logo/teaser unchanged; no vault/exporter/product/CLI/protocol semantic change.", "Rendered pages and old-URL handling choices go to Herdra in J0qH-JN7PqI before Algorant; no URL decision silently encoded.", "Hold integration/push/deploy until Algorant docs acceptance. Then approved release0.17.1 through maintained gates."]
   note: "Algorant restarted planning via Herdra after 0.17.0 landed. Refreshed plan awaits sign-off; no page writing or implementation Worker yet. Rebased scaffold onto main; Excalidraw export/use decision surfaced."
-  updatedAt: "2026-10-13T13:16:39Z"
+  updatedAt: "2026-10-14T04:00:49Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-13T13:54:52Z"
+updatedAt: "2026-10-14T04:00:49Z"
 blockers: ["task-81", "task-50", "task-63"]
 ---
-## Restart: planning for 0.17.0
+## Current authorization — Algorant via Herdra
 
-Algorant restarted task-76 via Herdra. Planning is unpaused; no page writing, asset creation, implementation Worker launch, push or deployment until Herdra approves the refreshed plan. Until Herdra task-19 style guide lands, use minimal reader-facing prose: no narrator voice, padding or speculative features. Incorporate the guide when available.
+Visuals task81 accepted as-is (combined Work and Review WITH current labels, D4, ninecaptures), integrated main20a2538. Fixes27/59/68/80,50,64,63(+77) integrated; no sourcepush yet. Start ONE Luna/high content/layout Worker now on currentmain. PLAN FIRST; HERDRA approves the plan, not parent alone. Rendered pages go to Herdra in Sideshow J0qH-JN7PqI BEFORE Algorant. Bring old-URL handling choices/map with rendered review; do not silently implement redirects or decide removal. NO push/deploy/integration until Algorant docs acceptance. Approved release0.17.1 follows accepted docs through newrelease gates, not before.
 
-Rebased, not restarted: docs-overhaul moved from 6f959a8 to 57381c9 on current main 1f8b59a, preserving all four scaffold/revision commits with no conflicts. Dedicated checkout: /home/algorant/Projects/worktrees/tandem/docs-overhaul. Branch is clean and unpushed; main remains clean at the released 0.17.0 commit. Rebase preserves main's external-dependency clarification, optional archive notes, README routing description, and shipped TUI work.
+## Seven-page shape and real-reader content
 
-## Refreshed seven-page plan (awaiting sign-off)
+1 Home: one-line purpose, existing encoded teaser/poster, minimal install link. 2 Quickstart /quick-start/: install+verify, native init→claim→deliver→complete→Logs workedTask with real short textoutput. 3 Concepts /concepts/: Task/Accord/lifecycle/Decision/Rules basics, combinedwork/review image, dedicated sourceGit versus literal tandem-branch storage/sync section with D4. 4 Agents /agents/: tool-neutral short AGENTS.md snippet/example; optional Pi routing metadata clearly integration-specific, NOT TandemCLI. 5 TUI and web /tui/: shipped ephemeralmanual working set (w/Ctrl-A/Ctrl-D inactive removal/fullTUI selection), local activity/recordedassignees, activeboard ongoingsync vs inactive localsnapshots; single-workspace read-onlyweb. 6 CLI /cli/: compactcommand/keyflag/JSONreference, repeatable --add-workspace, preserve verified runnable '$ ' guidance. 7 Configuration /reference/configuration/: supportedtheme/badge settings and precedence; no persistent roster.
 
-1. Home: one-line purpose, existing teaser, primary install link, minimal shared-board explanation.
-2. Quickstart: install and verify; one real Task from init through claim/deliver/complete to Logs, with verified 0.17.0 commands/output.
-3. Concepts: Task/Accord lifecycle, Decisions/Rules, and a dedicated Board storage and sync section explaining source Git versus the Tandem-managed tandem branch, two-machine use, pending, conflicts and held edits.
-4. Agents: short tool-neutral AGENTS.md snippet and example request; optional Pi task-routing description note clearly attributed to that integration, not a Tandem CLI command.
-5. TUI and web: current Board and editable session working set (w, Ctrl-A add, Ctrl-D remove inactive, full-TUI switching), chooser activity/recorded assignees, active-board sync versus inactive local snapshots; only current single-workspace read-only web.
-6. CLI: compact command/key-flag reference, repeatable --add-workspace, JSON envelope and links to the storage/sync explanation rather than duplicated prose.
-7. Configuration: compact supported theme/badge settings and precedence; no permanent workspace roster file.
+Write minimal for actualreader, no tour/narrator/padding/speculativefuture features. Herdra task19 remains unstarted (read2026-10-14); apply known taste: startsmall, fewer shortpages, plainnames, smallheadings/tightspacing/noanchor icons/pagination, linkconfigs/projects instead ofexplaining everything. Any publishedapproved guide later supersedes interimstyle.
 
-Changes from revision 3: retain the seven-page shape and minimal chrome; replace outdated orchestration/web expectations with actually shipped 0.17.0 behavior; expand the one-line sync explanation into a dedicated Concepts section; keep delivered needing triage distinct from explicit Validation and blocked Accord; explain that compatible board edits merge automatically, while true conflicts still require resolution. Source Git independence is not a promise of zero board conflicts. Fold stale scope from tasks 51/67 into the rewrite, including README/maintainer guide claims where applicable.
+## Source/scaffold/assets
 
-## Visuals
+Worker checkout must start currentmain with integrated fixes+11visual assets. Historical approved scaffold is clean docs-overhaul57381c9 at /home/algorant/Projects/worktrees/tandem/docs-overhaul, fourcommits0f86813/44d228d/324801e/57381c9. READ-ONLY reference until planapproval; propose minimal import/adaptation, do not overwrite currentCLI validation docs or task27 tandem/RELEASE.md. Oldscaffold plan/docs-overhaul.md is historical0.16.3 audit, notcurrentbrief. Preserve rootREADME routingdescription metadata and alreadyapproved logo. README/main-area claims may be trimmed/corrected, notbroad protocol semantic rewrite. Maintainer docs leavepublicsite/search but keep maintained releaseguide correct.
 
-Excalidraw: retain the short shared-board/how-it-works diagram (D1) and lifecycle diagram (D3); add the required sidecar-sync diagram (D4), covering source versus tandem histories, two machines, a true conflict and a held edit. Keep it legible with short labels; no Mermaid/SVG substitute or hand-written Excalidraw scene.
+Assets unchanged: site/public/images/work-and-review.png, source-and-tandem-sync.png, nineactual0.17captures; no old shared-board/task-lifecycle PNGreferences. Editable EA sources+PNGpairs in authorized vault alreadyverified; no newdiagram/exporttool or vaultedits. Terminalprovenance stays reviewnotes only; web isgenuineChromium, no CSSmasking. Existing site/public/media/tandem-teaser.mp4+poster retained, original fframes source read-only. Use relevantcapture budget; no placeholders/privatehosts/paths/names. NoHerdrdiscovery/permanentworkspaces.toml/multiworkspaceweb. Newstructured eventcontract requiredts/event/id/actor/seq/data, no newsummary, legitimatehistory retained. Resolverpostsave problems preserve successwithwarning; don't claimoldpublishedbinary contains unreleasedfixes. Plan versionwording for upcoming0.17.1 without claiming itreleased beforepublication.
 
-Actual 0.17.0 captures on disposable Git boards: Board (C3); session chooser/activity and add/remove/full-TUI transition; sync status showing useful pending/conflict/held distinctions; conflict surfaced in the TUI; current read-only web (C10). Quickstart uses real text output, not screenshot tiles. Existing encoded teaser/poster are retained; original fframes source stays read-only.
+## Required plan/review/verification
 
-Export gate: the current Excalidraw skill explicitly permits vault drawings and in-memory PNG agent self-checks, not site/share exports. Before any asset Worker, obtain an approved Excalidraw export/use path from Herdra/the Excalidraw owner. Do not add an extension/exporter or silently reuse self-check PNGs for public assets. PNG exports, if approved, avoid unresolved SVG-font handling; inspect light-page readability without inventing a second palette.
-
-## Proposed Worker split
-
-After plan and export gate approval:
-- One standalone root Task for visuals: only approved diagram/capture assets under site/public/images (editable drawings via the authorized vault workflow). No prose/style/code implementation, no external repository code edits. Release captures use disposable replicas; no permanent test fixtures.
-- One root Task-76 Worker for all seven pages, README corrections and site layout/config, seeded from the rebased scaffold. Keep coupled content/layout in one Worker; integrate/review visual assets first to avoid parallel asset-reference churn.
-Both are isolated, explicit Luna/high, plan-first. Do not create an Epic or independently delegate checklist Subtasks. File the visuals Task only after sign-off. Parent verifies actual assets/rendering and the completed site; final visible acceptance remains Algorant's.
-
-## Checks and review
-
-Verify against released tandem 0.17.0 --help/native output and protocol 0.5.0. Runnable site build/link checks, responsive dark/light renders, image legibility/alt text and no placeholders in public pages. Capture normal main versus branch side by side and publish each meaningful revision as a new post in existing Sideshow session J0qH-JN7PqI, with page map/cut list and bounded MagicDNS check. No deployment without approval. Resolve old-URL handling before deployment.
-
-## Absorbed requirements
-
-Task-51: current tasks/decisions/rules/logs/per-actor-events layout.
-Task-67: lifecycle/review wording, supported badge/config claims, current installer/version guidance and real Decision metadata.
-Dedicated storage/sync section: automatic publish/refresh, fresh clone/shared worktrees, offline pending/local-only/safety copy, compatible merges versus true conflicts, and unpublishable held edits. Distinguish conflict resolution local/remote/edited from validation-hold keep-remote repair; unaffected records continue. Include required Excalidraw and real status/TUI conflict captures. Do not revive stale sysup/~/.dotfiles/checkpoint rollout instructions.
-
-## Approved execution/order
-
-Herdra approved the refreshed seven-page plan and visuals/content split. task-81 owns visual production first; its Worker must show its plan before artifacts. Existing EA/vault PNGs are expressly authorized for site/Sideshow use, with editable source/PNG kept together in vault and public-reader labels (no private paths/hosts/names). No exporter/tool/substitute.
-
-Content Worker waits for reviewed visual assets and verified event/CLI fixes (tasks 50 and 63). Release batch 27 owns tandem/RELEASE.md; coordinate that guide before any overlapping README maintenance. Rebase/import the scaffold after those fixes so docs do not overwrite them. Visual review goes to J0qH-JN7PqI for Herdra before integration/Algorant. No deployment; old-URL handling remains pre-deployment decision.
+Concrete pageoutline and approximatecontentbudget, assetplacement/caption budget, exactfiles and scaffoldimportmethod, cuts/maintainer relocation, Quickstartcommands+verification, versionclaims, oldURLinventory/options tobringwith renders. No implementation until Herdraapproval. Native '$ just site-build' and '$ cd site && bun run check:links'; check installedbun audit highseverity, light/dark desktop+mobile renderedpages, actuallinks/alt/media, no placeholders. Verify usercommands againstcurrentnative build/protocol0.5.0 on disposableboards. Everymeaningfulreview revision NEW post in SAME J0qH-JN7PqI with MAIN-vs-BRANCH renderedcomparisons, outline/cutlist and boundedMagicDNSHTTPcheck. Parent independently verifies actualpages then Herdrareview then Algorant acceptance. Do not push/deploy or startrelease beforeacceptance.
