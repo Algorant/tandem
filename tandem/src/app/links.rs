@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::Serialize;
 
-use crate::app::support::{append_event_with_data, current_timestamp, require_nonempty};
+use crate::app::support::{append_event, current_timestamp, require_nonempty};
 use crate::app::Error;
 use crate::project::frontmatter::patch_links_content;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
@@ -43,15 +43,7 @@ pub(crate) fn add(
     validate_target(&hierarchy, source, link_type, target)?;
     let changed = links::insert(&mut stored, link_type, target);
     if changed {
-        write_links(
-            project,
-            source,
-            &stored,
-            TASK_LINKED,
-            link_type,
-            target,
-            "Linked",
-        )?;
+        write_links(project, source, &stored, TASK_LINKED, link_type, target)?;
     }
     Ok(LinkOutcome {
         id: source.id().to_string(),
@@ -80,15 +72,7 @@ pub(crate) fn remove(
             source.id()
         )));
     }
-    write_links(
-        project,
-        source,
-        &stored,
-        TASK_UNLINKED,
-        link_type,
-        target,
-        "Unlinked",
-    )?;
+    write_links(project, source, &stored, TASK_UNLINKED, link_type, target)?;
     Ok(LinkOutcome {
         id: source.id().to_string(),
         link_type: link_type.to_string(),
@@ -175,7 +159,6 @@ fn write_links(
     event: &str,
     link_type: &str,
     target: &str,
-    verb: &str,
 ) -> Result<(), Error> {
     let (content, signature) = read_file_snapshot(project, &source.path)?;
     let patched = patch_links_content(&content, stored)?;
@@ -184,12 +167,11 @@ fn write_links(
     let patched = patch_frontmatter_content(&patched, &updates, &[])?;
     ensure_file_unchanged(&source.path, &signature)?;
     write_atomic(&source.path, &patched)?;
-    append_event_with_data(
+    append_event(
         project,
         event,
         source.id(),
-        &format!("{verb} {} {link_type} {target}", source.id()),
-        Some(&serde_json::json!({"type": link_type, "target": target})),
+        &serde_json::json!({"type": link_type, "target": target}),
     )
 }
 

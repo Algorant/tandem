@@ -327,7 +327,12 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             lines.join("\n")
         },
     )?;
-    append_event(workspace, "task.created", &created.id, &title)?;
+    append_event(
+        workspace,
+        "task.created",
+        &created.id,
+        &serde_json::json!({"title": title}),
+    )?;
 
     Ok(AddOutcome {
         id: created.id,
@@ -410,15 +415,10 @@ pub(crate) fn move_to_state(
         workspace,
         "task.moved",
         &doc_id,
-        &format!("Moved {doc_id} from {previous_state} to {state}"),
+        &serde_json::json!({"from": previous_state, "to": state}),
     )?;
     if let Some(event_name) = synced_accord_event {
-        append_event(
-            workspace,
-            event_name,
-            &doc_id,
-            &format!("Synchronized accord claim for {doc_id} after move"),
-        )?;
+        append_event(workspace, event_name, &doc_id, &serde_json::json!({}))?;
     }
 
     Ok(MoveTaskOutcome {
@@ -649,15 +649,9 @@ pub(crate) fn update(
         workspace,
         "task.updated",
         &doc_id,
-        &format!(
-            "Updated {} metadata: {}",
-            doc_id,
-            changes
-                .iter()
-                .map(|change| change.field.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
+        &serde_json::json!({
+            "fields": changes.iter().map(|change| change.field.as_str()).collect::<Vec<_>>()
+        }),
     )?;
 
     Ok(UpdateOutcome {
@@ -1030,7 +1024,6 @@ pub(crate) fn complete(
             reviewer: options.reviewer,
         },
     )?;
-    let summary = "Completed".to_string();
     let log_path = project::write::archive_board_document(
         workspace,
         &doc.path,
@@ -1038,7 +1031,12 @@ pub(crate) fn complete(
         &patched,
         "completed",
     )?;
-    append_event(workspace, "task.completed", doc.id(), &summary)?;
+    append_event(
+        workspace,
+        "task.completed",
+        doc.id(),
+        &serde_json::json!({}),
+    )?;
     drop(_hierarchy_lock);
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
@@ -1106,11 +1104,15 @@ pub(crate) fn cancel(
             ..ResolutionRecord::default()
         },
     )?;
-    let summary = format!("Canceled: {reason}");
     let log_path = project::write::archive_board_document(
         workspace, &doc.path, &signature, &patched, "canceled",
     )?;
-    append_event(workspace, "task.canceled", doc.id(), &summary)?;
+    append_event(
+        workspace,
+        "task.canceled",
+        doc.id(),
+        &serde_json::json!({"reason": reason}),
+    )?;
     drop(_hierarchy_lock);
 
     Ok(CancelOutcome {

@@ -132,7 +132,12 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
             lines.join("\n")
         },
     )?;
-    append_event(project, "decision.created", &created.id, &title)?;
+    append_event(
+        project,
+        "decision.created",
+        &created.id,
+        &serde_json::json!({"title": title}),
+    )?;
     Ok(AddOutcome {
         id: created.id,
         title,
@@ -258,15 +263,9 @@ pub(crate) fn update(
         project,
         "decision.updated",
         &doc_id,
-        &format!(
-            "Updated {} metadata: {}",
-            doc_id,
-            changes
-                .iter()
-                .map(|change| change.field.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
+        &serde_json::json!({
+            "fields": changes.iter().map(|change| change.field.as_str()).collect::<Vec<_>>()
+        }),
     )?;
     Ok(UpdateOutcome {
         id: doc_id,
@@ -462,9 +461,9 @@ pub(crate) fn withdraw(
     write_atomic(&doc.path, &patched)?;
     append_event(
         project,
-        "decision.withdrawn",
+        "decision.updated",
         doc.id(),
-        &format!("Withdrew decision {}: {reason}", doc.id()),
+        &serde_json::json!({"fields": ["status", "withdrawalReason"]}),
     )?;
     Ok(WithdrawOutcome {
         id: doc.id().to_string(),

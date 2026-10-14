@@ -93,7 +93,7 @@ pub(crate) fn transition(
         workspace,
         "review.requested",
         doc.id(),
-        &format!("Requested validation for {}", doc.id()),
+        &serde_json::json!({"criterion": criterion}),
     )?;
     drop(_lock);
     Ok(ReviewOutcome {

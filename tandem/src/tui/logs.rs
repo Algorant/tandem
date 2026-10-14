@@ -58,7 +58,7 @@ pub(super) fn load_log_events(project: &TandemProject) -> (LogEventsById, Vec<St
         events.entry(event.id).or_default().push(LogEvent {
             ts: event.ts,
             event: event.event,
-            summary: event.summary,
+            summary: event_summary(event.summary.as_deref(), event.data.as_ref()),
             disposition: event
                 .data
                 .as_ref()
@@ -518,6 +518,53 @@ fn push_array_detail_lines(
             Span::styled(item, theme.text_style()),
         ]));
     }
+}
+
+fn event_summary(summary: Option<&str>, data: Option<&serde_json::Value>) -> String {
+    if let Some(summary) = summary {
+        return summary.to_string();
+    }
+    let Some(data) = data else {
+        return "-".to_string();
+    };
+    if let Some(title) = data.get("title").and_then(serde_json::Value::as_str) {
+        return title.to_string();
+    }
+    if let Some(fields) = data.get("fields").and_then(serde_json::Value::as_array) {
+        let fields = fields
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        if !fields.is_empty() {
+            return format!("Updated: {fields}");
+        }
+    }
+    if let Some((from, to)) = data
+        .get("from")
+        .and_then(serde_json::Value::as_str)
+        .zip(data.get("to").and_then(serde_json::Value::as_str))
+    {
+        return format!("{from} → {to}");
+    }
+    if let Some((action, rule_id)) = data
+        .get("action")
+        .and_then(serde_json::Value::as_str)
+        .zip(data.get("ruleId").and_then(serde_json::Value::as_str))
+    {
+        return format!("{action} {rule_id}");
+    }
+    if let Some((link_type, target)) = data
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .zip(data.get("target").and_then(serde_json::Value::as_str))
+    {
+        return format!("{link_type} {target}");
+    }
+    data.get("reason")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("-")
+        .to_string()
 }
 
 fn append_event_lines(lines: &mut Vec<Line<'static>>, events: &[LogEvent], theme: &TuiTheme) {

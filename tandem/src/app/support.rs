@@ -54,23 +54,12 @@ pub(crate) fn append_event(
     project: &TandemProject,
     event_name: &str,
     id: &str,
-    summary: &str,
+    data: &serde_json::Value,
 ) -> Result<(), Error> {
-    append_event_with_data(project, event_name, id, summary, None)
-}
-
-pub(crate) fn append_event_with_data(
-    project: &TandemProject,
-    event_name: &str,
-    id: &str,
-    summary: &str,
-    data: Option<&serde_json::Value>,
-) -> Result<(), Error> {
-    Ok(project::events::append_event_with_data(
+    Ok(project::events::append_event(
         project,
         event_name,
         id,
-        summary,
         &current_timestamp(),
         data,
     )?)

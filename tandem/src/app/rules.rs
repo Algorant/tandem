@@ -62,7 +62,7 @@ pub(crate) fn add(
         project,
         "rules.updated",
         "rules",
-        &format!("Added rule {id}"),
+        &serde_json::json!({"action": "add", "ruleId": id}),
     )?;
     Ok(MutationOutcome {
         category: category.to_string(),
@@ -106,7 +106,7 @@ pub(crate) fn edit(
         project,
         "rules.updated",
         "rules",
-        &format!("Edited rule {id}"),
+        &serde_json::json!({"action": "edit", "ruleId": id}),
     )?;
     Ok(MutationOutcome {
         category,
@@ -129,7 +129,7 @@ pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome,
         project,
         "rules.updated",
         "rules",
-        &format!("Deleted rule {id}"),
+        &serde_json::json!({"action": "delete", "ruleId": id}),
     )?;
     Ok(DeleteOutcome {
         category,

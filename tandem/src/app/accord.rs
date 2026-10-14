@@ -6,9 +6,8 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::app::support::{
-    append_event, append_event_with_data, current_timestamp,
-    hierarchy_from_project as hierarchy_from_workspace, require_nonempty, validate_state,
-    validate_task_document_against_hierarchy,
+    append_event, current_timestamp, hierarchy_from_project as hierarchy_from_workspace,
+    require_nonempty, validate_state, validate_task_document_against_hierarchy,
 };
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
@@ -317,7 +316,7 @@ fn apply_validation_action(
                 workspace,
                 "validation.accepted",
                 doc.id(),
-                &format!("Accepted sign-off for {}", doc.id()),
+                &serde_json::json!({}),
             )?;
             drop(_hierarchy_lock);
             Ok(ValidationActionOutcome {
@@ -357,7 +356,7 @@ fn apply_validation_action(
                 workspace,
                 "validation.rework",
                 doc.id(),
-                &format!("Requested rework for {}", doc.id()),
+                &serde_json::json!({}),
             )?;
             drop(_hierarchy_lock);
             Ok(ValidationActionOutcome {
@@ -514,7 +513,7 @@ pub(crate) fn transition(
             workspace,
             accord::event_name(action),
             doc.id(),
-            &format!("Accord {action} for {}", doc.id()),
+            &serde_json::json!({}),
         )?;
         drop(_hierarchy_lock);
         return Ok(AccordTransitionOutcome {
@@ -531,18 +530,14 @@ pub(crate) fn transition(
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
     let event_name = accord::event_name(action).to_string();
-    let event_data = (action == "release").then(|| {
+    let event_data = if action == "release" {
         serde_json::json!({
             "disposition": options.disposition.as_deref().unwrap_or("reassign")
         })
-    });
-    append_event_with_data(
-        workspace,
-        &event_name,
-        doc.id(),
-        &format!("Accord {action} for {}", doc.id()),
-        event_data.as_ref(),
-    )?;
+    } else {
+        serde_json::json!({})
+    };
+    append_event(workspace, &event_name, doc.id(), &event_data)?;
     drop(_hierarchy_lock);
 
     Ok(AccordTransitionOutcome {

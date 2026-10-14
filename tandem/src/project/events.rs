@@ -16,26 +16,14 @@ pub(crate) fn append_event(
     project: &TandemProject,
     event_name: &str,
     id: &str,
-    summary: &str,
     timestamp: &str,
-) -> Result<(), CliError> {
-    append_event_with_data(project, event_name, id, summary, timestamp, None)
-}
-
-pub(crate) fn append_event_with_data(
-    project: &TandemProject,
-    event_name: &str,
-    id: &str,
-    summary: &str,
-    timestamp: &str,
-    data: Option<&serde_json::Value>,
+    data: &serde_json::Value,
 ) -> Result<(), CliError> {
     debug_assert!(event::is_known_name(event_name));
     append_event_for_actor(
         project,
         event_name,
         id,
-        summary,
         timestamp,
         &actor_id(project)?,
         data,
@@ -46,11 +34,15 @@ fn append_event_for_actor(
     project: &TandemProject,
     event_name: &str,
     id: &str,
-    summary: &str,
     timestamp: &str,
     actor: &str,
-    data: Option<&serde_json::Value>,
+    data: &serde_json::Value,
 ) -> Result<(), CliError> {
+    if !data.is_object() {
+        return Err(CliError::user(
+            "Event append failure: structured event data must be a JSON object",
+        ));
+    }
     let path = project.actor_events_path(actor);
     fs::create_dir_all(project.events_dir())?;
     let file = OpenOptions::new()
@@ -70,7 +62,6 @@ fn append_event_for_actor(
             ts: timestamp,
             event: event_name,
             id,
-            summary,
             actor,
             seq,
             data,
@@ -194,19 +185,14 @@ fn next_sequence(content: &str, actor: &str) -> Result<u64, CliError> {
 
 fn canonical_json_line(event: CanonicalEventEnvelope<'_>) -> String {
     debug_assert_eq!(CanonicalEventEnvelope::required_fields().len(), 6);
-    let data = event
-        .data
-        .map(|value| format!(",\"data\":{value}"))
-        .unwrap_or_default();
     format!(
-        "{{\"ts\":{},\"event\":{},\"id\":{},\"summary\":{},\"actor\":{},\"seq\":{}{}}}\n",
+        "{{\"ts\":{},\"event\":{},\"id\":{},\"actor\":{},\"seq\":{},\"data\":{}}}\n",
         json_string(event.ts),
         json_string(event.event),
         json_string(event.id),
-        json_string(event.summary),
         json_string(event.actor),
         event.seq,
-        data,
+        event.data,
     )
 }
 
@@ -321,18 +307,20 @@ mod tests {
         let (project, root) = project();
         let path = project.actor_events_path("tester");
         fs::create_dir_all(project.events_dir()).unwrap();
-        fs::write(&path, "{\"ts\":\"old\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"old\",\"actor\":\"tester\",\"seq\":4}\n").unwrap();
+        let old_prefix = "{\"ts\":\"old\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"old\",\"actor\":\"tester\",\"seq\":4}\n";
+        let mixed_legacy = "{\"ts\":\"mixed\",\"event\":\"task.linked\",\"id\":\"task-1\",\"summary\":\"linked\",\"actor\":\"tester\",\"seq\":5,\"data\":{\"type\":\"relates-to\",\"target\":\"task-2\"}}\n";
+        fs::write(&path, format!("{old_prefix}{mixed_legacy}")).unwrap();
+        let preserved_prefix = fs::read(&path).unwrap();
         append_event_for_actor(
             &project,
             "task.updated",
             "task-1",
-            "next",
             "now",
             "tester",
-            None,
+            &serde_json::json!({"fields": ["tags"]}),
         )
         .unwrap();
-        let line = fs::read_to_string(path)
+        let line = fs::read_to_string(&path)
             .unwrap()
             .lines()
             .last()
@@ -344,15 +332,24 @@ mod tests {
             Some("task.updated".to_string())
         );
         assert_eq!(extract_json_string(&line, "id"), Some("task-1".to_string()));
-        assert_eq!(
-            extract_json_string(&line, "summary"),
-            Some("next".to_string())
-        );
+        assert!(serde_json::from_str::<serde_json::Value>(&line)
+            .unwrap()
+            .get("summary")
+            .is_none());
         assert_eq!(
             extract_json_string(&line, "actor"),
             Some("tester".to_string())
         );
-        assert_eq!(extract_json_u64(&line, "seq"), Some(5));
+        assert_eq!(extract_json_u64(&line, "seq"), Some(6));
+        let content = fs::read(path).unwrap();
+        assert_eq!(
+            &content[..preserved_prefix.len()],
+            preserved_prefix.as_slice()
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&line).unwrap()["data"]["fields"][0],
+            "tags"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -363,20 +360,18 @@ mod tests {
             &project,
             "task.updated",
             "task-1",
-            "mentioned \"actor\":\"other\" and \"seq\":999",
             "now",
             "tester",
-            None,
+            &serde_json::json!({"note": "mentioned \"actor\":\"other\" and \"seq\":999"}),
         )
         .unwrap();
         append_event_for_actor(
             &project,
             "task.updated",
             "task-1",
-            "next",
             "later",
             "tester",
-            None,
+            &serde_json::json!({}),
         )
         .unwrap();
         let content = fs::read_to_string(project.actor_events_path("tester")).unwrap();
@@ -405,10 +400,9 @@ mod tests {
                         &project,
                         "task.updated",
                         "task-1",
-                        &format!("{index}"),
                         "now",
                         "concurrent",
-                        None,
+                        &serde_json::json!({"index": index}),
                     )
                     .unwrap();
                 })

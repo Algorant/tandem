@@ -3,22 +3,21 @@
 //! Project code owns actor-log discovery, sequence allocation, and JSONL
 //! append. This module only defines what an event means.
 
-/// Required v0.2 per-actor audit fields. Project code supplies the actor and
+/// Required per-actor audit fields. Project code supplies the actor and
 /// per-actor sequence after resolving its concrete event log.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct CanonicalEventEnvelope<'a> {
     pub(crate) ts: &'a str,
     pub(crate) event: &'a str,
     pub(crate) id: &'a str,
-    pub(crate) summary: &'a str,
     pub(crate) actor: &'a str,
     pub(crate) seq: u64,
-    pub(crate) data: Option<&'a serde_json::Value>,
+    pub(crate) data: &'a serde_json::Value,
 }
 
 impl CanonicalEventEnvelope<'_> {
     pub(crate) fn required_fields() -> [&'static str; 6] {
-        ["ts", "event", "id", "summary", "actor", "seq"]
+        ["ts", "event", "id", "actor", "seq", "data"]
     }
 }
 
@@ -69,21 +68,21 @@ mod tests {
 
     #[test]
     fn canonical_actor_identity_requires_all_v02_envelope_fields() {
+        let data = serde_json::json!({"title": "Task"});
         let event = CanonicalEventEnvelope {
             ts: "2026-07-26T00:00:00Z",
             event: TASK_CREATED,
             id: "task-1",
-            summary: "Created task-1",
             actor: "pi",
             seq: 4,
-            data: None,
+            data: &data,
         };
         assert_eq!(
             CanonicalEventEnvelope::required_fields(),
-            ["ts", "event", "id", "summary", "actor", "seq"]
+            ["ts", "event", "id", "actor", "seq", "data"]
         );
         assert_eq!(format!("{}:{}", event.actor, event.seq), "pi:4");
         assert!(event.ts.contains('T') && is_known_name(event.event));
-        assert!(!event.id.is_empty() && !event.summary.is_empty());
+        assert!(!event.id.is_empty() && event.data.is_object());
     }
 }

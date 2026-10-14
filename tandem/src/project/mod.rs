@@ -695,7 +695,7 @@ pub(crate) struct ProjectEvent {
     pub(crate) id: String,
     pub(crate) ts: String,
     pub(crate) event: String,
-    pub(crate) summary: String,
+    pub(crate) summary: Option<String>,
     pub(crate) actor: Option<String>,
     pub(crate) seq: Option<u64>,
     pub(crate) data: Option<serde_json::Value>,
@@ -703,21 +703,50 @@ pub(crate) struct ProjectEvent {
 
 impl ProjectEvent {
     fn parse_canonical(line: &str, expected_actor: &str) -> Result<Self, &'static str> {
-        let required = |key| extract_json_string(line, key).filter(|value| !value.is_empty());
-        let id = required("id").ok_or("missing required id")?;
-        let event = required("event").ok_or("missing required event")?;
-        let ts = required("ts").ok_or("missing required ts")?;
-        let summary = required("summary").ok_or("missing required summary")?;
-        let actor = required("actor").ok_or("missing required actor")?;
+        let value: serde_json::Value = serde_json::from_str(line).map_err(|_| "invalid JSON")?;
+        let object = value.as_object().ok_or("event must be a JSON object")?;
+        let required = |key: &str| {
+            object
+                .get(key)
+                .and_then(serde_json::Value::as_str)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .ok_or("missing or invalid required string field")
+        };
+        let id = required("id")?;
+        let event = required("event")?;
+        let ts = required("ts")?;
+        let actor = required("actor")?;
         if actor != expected_actor {
             return Err("actor does not match filename");
         }
-        let seq = extract_json_u64(line, "seq")
+        let seq = object
+            .get("seq")
+            .and_then(serde_json::Value::as_u64)
             .filter(|seq| *seq > 0)
-            .ok_or("missing required seq")?;
-        let data = serde_json::from_str::<serde_json::Value>(line)
-            .ok()
-            .and_then(|value| value.get("data").cloned());
+            .ok_or("missing or invalid required seq")?;
+        let summary = object
+            .get("summary")
+            .map(|value| {
+                value
+                    .as_str()
+                    .filter(|summary| !summary.is_empty())
+                    .map(str::to_string)
+                    .ok_or("invalid summary")
+            })
+            .transpose()?;
+        let data = object
+            .get("data")
+            .map(|value| {
+                value
+                    .as_object()
+                    .map(|_| value.clone())
+                    .ok_or("invalid structured data")
+            })
+            .transpose()?;
+        if summary.is_none() && data.is_none() {
+            return Err("missing required data");
+        }
         Ok(Self {
             id,
             event,
@@ -1289,12 +1318,22 @@ mod tests {
         );
         fs::create_dir_all(project.events_dir()).unwrap();
         fs::write(&project.events_path, "{\"ts\":\"old\",\"event\":\"task.created\",\"id\":\"task-1\",\"summary\":\"legacy\"}\n").unwrap();
-        fs::write(project.actor_events_path("actor-1"), "{\"ts\":\"new\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"actor\",\"actor\":\"actor-1\",\"seq\":1}\n").unwrap();
+        fs::write(
+            project.actor_events_path("actor-1"),
+            "{\"ts\":\"old\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"summary-only\",\"actor\":\"actor-1\",\"seq\":1}\n{\"ts\":\"mixed\",\"event\":\"task.linked\",\"id\":\"task-1\",\"summary\":\"summary-and-data\",\"actor\":\"actor-1\",\"seq\":2,\"data\":{\"type\":\"relates-to\",\"target\":\"task-2\"}}\n{\"ts\":\"new\",\"event\":\"task.updated\",\"id\":\"task-1\",\"actor\":\"actor-1\",\"seq\":3,\"data\":{\"fields\":[\"tags\"]}}\n",
+        )
+        .unwrap();
         let mut warnings = Vec::new();
         let events = project.read_events_tolerant(&mut warnings);
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].summary.as_deref(), Some("summary-only"));
+        assert_eq!(events[0].data, None);
+        assert_eq!(events[1].summary.as_deref(), Some("summary-and-data"));
+        assert_eq!(events[1].data.as_ref().unwrap()["target"], "task-2");
+        assert_eq!(events[2].summary, None);
+        assert_eq!(events[2].data.as_ref().unwrap()["fields"][0], "tags");
         assert_eq!(events[0].actor.as_deref(), Some("actor-1"));
-        assert_eq!(events[0].seq, Some(1));
+        assert_eq!(events[2].seq, Some(3));
         assert!(warnings.is_empty());
         fs::remove_dir_all(root).unwrap();
     }
@@ -1313,7 +1352,7 @@ mod tests {
         fs::create_dir_all(project.events_dir()).unwrap();
         fs::write(
             project.actor_events_path("actor-1"),
-            "{\"ts\":\"now\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"ok\",\"actor\":\"actor-1\",\"seq\":1}\n{\"id\":\"task-1\",\"actor\":\"wrong\",\"seq\":1}\n{\"ts\":\"later\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"duplicate\",\"actor\":\"actor-1\",\"seq\":1}\n",
+            "{\"ts\":\"now\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"ok\",\"actor\":\"actor-1\",\"seq\":1}\n{\"id\":\"task-1\",\"actor\":\"wrong\",\"seq\":1}\n{\"ts\":\"later\",\"event\":\"task.updated\",\"id\":\"task-1\",\"summary\":\"duplicate\",\"actor\":\"actor-1\",\"seq\":1}\n{broken json}\n{\"ts\":\"later\",\"event\":\"task.updated\",\"id\":\"task-1\",\"actor\":\"actor-1\",\"seq\":2}\n{\"ts\":\"later\",\"event\":\"task.updated\",\"id\":\"task-1\",\"actor\":\"actor-1\",\"seq\":2,\"data\":\"not-object\"}\n",
         )
         .unwrap();
         let mut warnings = Vec::new();
