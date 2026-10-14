@@ -10,14 +10,18 @@ effort: "medium"
 relatedFiles: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/project/mod.rs", "docs/cli/index.md", "protocol/assignment.md"]
 tags: ["protocol"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Two concurrent `tandem add` calls on a Git-backed board each return their final published `task-N` ID in `data.id` whenever `sync.status` is `synced`.", "After a successful save, failure of existing final-ID resolution must retain command success and the known ID, with a clear warning naming the resolution problem; no full-UID refinement or new registry.", "tandem add task --help and tandem update --help explain that `$ <command>` creates a runnable command validation and unprefixed text is a manual check.", "Relevant user documentation includes one command validation example using the required `$ ` prefix."]
   claimedAt: "2026-10-14T02:12:29Z"
+  deliveredAt: "2026-10-14T02:23:59Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Fresh Luna/high Worker, plan before code, after task-64; no new ID registry or speculative resolver fallback.", "Fold task-77 help/docs into this CLI-owned outcome. Coordinate docs/cli/index.md before task-76 content Worker.", "Do not introduce another post-save refusal while fixing final-ID response identity. Temporary tests only; no push/release."]
-  updatedAt: "2026-10-14T02:18:29Z"
+  summary: "Synced `add task` responses now map through the existing `current_id` resolver after applying the initiating sync report's renames. Lookup errors or unresolved provisional IDs retain the known ID and add a save-success warning. Added validation semantics to add/update help and a quoted runnable command example to the CLI reference. Committed as `97d3e9d`."
+  evidence: ["Synced concurrent add responses identify their own final published records.: Three native concurrent pairs produced six synced responses. Each `data.id` was a numbered `task-N`; showing each ID returned the exact title belonging to that process. Empty-rename-map responses returned `task-1`, `task-4`, and `task-5` correctly.", "A post-save final-ID lookup problem preserves command success and states the problem.: For synced task adds, both `current_id` error and unresolved provisional return paths append a clear warning and retain the report-mapped ID; neither propagates an error. Existing outcome warnings are preserved in JSON and human output. The error branch was inspected but not forced at runtime.", "Validation help/docs explain runnable commands versus manual checks.: Built-release help shows the requested distinction for both add task and update. `docs/cli/index.md` now includes `--validation '$ just dev-check'` and states unprefixed text is a manual check; assignment semantics were unchanged."]
+  filesChanged: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "docs/cli/index.md"]
+  updatedAt: "2026-10-14T02:23:59Z"
 createdAt: "2026-10-03T03:11:29Z"
-updatedAt: "2026-10-14T02:18:29Z"
+updatedAt: "2026-10-14T02:23:59Z"
 blockers: ["task-64"]
 references: ["task-77"]
 assignee: "worker-task-63-fdc87a3a"
