@@ -3,7 +3,7 @@ id: task-76
 uid: 5f373353-a0d5-4373-87fc-5c533f439c89
 type: task
 title: "Docs and site overhaul: write the approved seven pages"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "large"
 references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75", "task-81", "task-27", "task-50", "task-63"]
@@ -21,9 +21,13 @@ accord:
   filesChanged: ["README.md", "docs/agents/index.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/extensions/index.md", "docs/guides/agents-and-adapters.md", "docs/guides/decisions.md", "docs/guides/docs-site.md", "docs/guides/fully-agentic-workflow.md", "docs/guides/human-in-the-loop.md", "docs/guides/index.md", "docs/guides/theme-tester.md", "docs/guides/upgrading-to-independent-sync.md", "docs/index.md", "docs/packaging/aur-tandem-bin.md", "docs/quick-start/index.md", "docs/reference/configuration.md", "docs/reference/index.md", "docs/skills/index.md", "docs/tui/index.md", "docs/web/index.md", "docs/workspace/index.md", "site/README.md", "site/astro.config.mjs", "site/maintainers/docs-site.md", "site/maintainers/theme-tester.md", "site/public/images/web-read-only.png", "site/public/media/tandem-teaser-poster.jpg", "site/public/media/tandem-teaser.mp4", "site/src/styles/verdigris.css", "tandem/AUR.md", "tandem/README.md", "tandem/RELEASE.md"]
   updatedAt: "2026-10-14T05:00:37Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-14T05:00:37Z"
+updatedAt: "2026-10-14T05:01:21Z"
 blockers: ["task-81", "task-50", "task-63"]
 assignee: "worker-task-76-3e423e88"
+validation.criterion: "The public site retains the approved seven-page shape, starts with minimal reader-facing prose and incorporates Herdra's approved style guide when available."
+validation.note: "Herdra explicitly passed revision5 pages, copy-button clearance, consistent captures and implemented decision12 redirects; he is presenting post1O3cZrg8emA to Algorant now. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI. Parent native/browser/content checks passed; cleanbb9c3b2 retained with preview resources. Human docs/taste acceptance remains required. Hold integration, completion/cleanup, source push, deployment and release83 until Algorant accepts. No further source change requested."
+validation.requestedAt: "2026-10-14T05:01:21Z"
+validation.reviewer: "Algorant"
 ---
 ## Current authorization — Algorant via Herdra
 
