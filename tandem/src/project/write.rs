@@ -244,12 +244,10 @@ pub(crate) struct CreatedDocument {
     pub(crate) path: PathBuf,
 }
 
-pub(crate) fn archive_board_document(
+pub(crate) fn preflight_archive_board_document(
     project: &TandemProject,
     board_path: &Path,
     snapshot: &FileSnapshot,
-    content: &str,
-    action: &str,
 ) -> Result<PathBuf, CliError> {
     let file_name = board_path.file_name().map(PathBuf::from).ok_or_else(|| {
         CliError::user(format!(
@@ -265,6 +263,17 @@ pub(crate) fn archive_board_document(
         )));
     }
     ensure_file_unchanged(board_path, snapshot)?;
+    Ok(log_path)
+}
+
+pub(crate) fn archive_board_document(
+    project: &TandemProject,
+    board_path: &Path,
+    snapshot: &FileSnapshot,
+    content: &str,
+    action: &str,
+) -> Result<PathBuf, CliError> {
+    let log_path = preflight_archive_board_document(project, board_path, snapshot)?;
     write_atomic(&log_path, content)?;
     if let Err(error) = fs::remove_file(board_path) {
         let rollback = fs::remove_file(&log_path);

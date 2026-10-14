@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde::Serialize;
 
-use crate::app::support::{append_event, current_timestamp, require_nonempty};
+use crate::app::support::{current_timestamp, prepare_event, require_nonempty};
 use crate::app::Error;
 use crate::project::frontmatter::patch_links_content;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot, HierarchyLock};
@@ -166,13 +166,15 @@ fn write_links(
     updates.insert("updatedAt".to_string(), current_timestamp());
     let patched = patch_frontmatter_content(&patched, &updates, &[])?;
     ensure_file_unchanged(&source.path, &signature)?;
-    write_atomic(&source.path, &patched)?;
-    append_event(
+    let prepared_events = prepare_event(
         project,
         event,
-        source.id(),
-        &serde_json::json!({"type": link_type, "target": target}),
-    )
+        serde_json::json!({"type": link_type, "target": target}),
+    )?;
+    ensure_file_unchanged(&source.path, &signature)?;
+    write_atomic(&source.path, &patched)?;
+    prepared_events.append_for_id(source.id())?;
+    Ok(())
 }
 
 /// One stored outgoing link with the target's identity.

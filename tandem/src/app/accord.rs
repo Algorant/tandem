@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::app::support::{
-    append_event, current_timestamp, hierarchy_from_project as hierarchy_from_workspace,
+    current_timestamp, hierarchy_from_project as hierarchy_from_workspace, prepare_event,
     require_nonempty, validate_state, validate_task_document_against_hierarchy,
 };
 use crate::app::Error;
@@ -305,6 +305,9 @@ fn apply_validation_action(
                     reviewer: Some(actor.to_string()),
                 },
             )?;
+            project::write::preflight_archive_board_document(workspace, &doc.path, &signature)?;
+            let prepared_events =
+                prepare_event(workspace, "validation.accepted", serde_json::json!({}))?;
             project::write::archive_board_document(
                 workspace,
                 &doc.path,
@@ -312,12 +315,7 @@ fn apply_validation_action(
                 &patched,
                 "completed",
             )?;
-            append_event(
-                workspace,
-                "validation.accepted",
-                doc.id(),
-                &serde_json::json!({}),
-            )?;
+            prepared_events.append_for_id(doc.id())?;
             drop(_hierarchy_lock);
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
@@ -351,13 +349,11 @@ fn apply_validation_action(
             )?;
             let patched = append_feedback_entry(&patched, &now, actor, &feedback)?;
             ensure_file_unchanged(&doc.path, &signature)?;
+            let prepared_events =
+                prepare_event(workspace, "validation.rework", serde_json::json!({}))?;
+            ensure_file_unchanged(&doc.path, &signature)?;
             write_atomic(&doc.path, &patched)?;
-            append_event(
-                workspace,
-                "validation.rework",
-                doc.id(),
-                &serde_json::json!({}),
-            )?;
+            prepared_events.append_for_id(doc.id())?;
             drop(_hierarchy_lock);
             Ok(ValidationActionOutcome {
                 id: doc.id().to_string(),
@@ -506,15 +502,13 @@ pub(crate) fn transition(
                 reviewer: options.reviewer.clone(),
             },
         )?;
+        project::write::preflight_archive_board_document(workspace, &doc.path, &signature)?;
+        let prepared_events =
+            prepare_event(workspace, accord::event_name(action), serde_json::json!({}))?;
         let log_path = project::write::archive_board_document(
             workspace, &doc.path, &signature, &patched, "failed",
         )?;
-        append_event(
-            workspace,
-            accord::event_name(action),
-            doc.id(),
-            &serde_json::json!({}),
-        )?;
+        prepared_events.append_for_id(doc.id())?;
         drop(_hierarchy_lock);
         return Ok(AccordTransitionOutcome {
             id: doc.id().to_string(),
@@ -527,8 +521,6 @@ pub(crate) fn transition(
         });
     }
 
-    ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
     let event_name = accord::event_name(action).to_string();
     let event_data = if action == "release" {
         serde_json::json!({
@@ -537,7 +529,11 @@ pub(crate) fn transition(
     } else {
         serde_json::json!({})
     };
-    append_event(workspace, &event_name, doc.id(), &event_data)?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    let prepared_events = prepare_event(workspace, &event_name, event_data)?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    prepared_events.append_for_id(doc.id())?;
     drop(_hierarchy_lock);
 
     Ok(AccordTransitionOutcome {

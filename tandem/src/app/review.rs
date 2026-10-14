@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 
 use crate::app::support::{
-    append_event, current_timestamp, hierarchy_from_project, validate_state,
+    current_timestamp, hierarchy_from_project, prepare_event, validate_state,
     validate_task_document_against_hierarchy,
 };
 use crate::app::Error;
@@ -88,13 +88,14 @@ pub(crate) fn transition(
     }
     let patched = patch_frontmatter_content(&content, &updates, &["review", "validation.state"])?;
     ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
+    let prepared_events = prepare_event(
         workspace,
         "review.requested",
-        doc.id(),
-        &serde_json::json!({"criterion": criterion}),
+        serde_json::json!({"criterion": criterion}),
     )?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    prepared_events.append_for_id(doc.id())?;
     drop(_lock);
     Ok(ReviewOutcome {
         id: doc.id().to_string(),

@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    append_event, create_record, current_timestamp, reference_target_exists,
+    create_record, current_timestamp, prepare_event, reference_target_exists,
 };
 use crate::app::tasks::UpdateChange;
 use crate::app::Error;
@@ -93,6 +93,11 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
             .map(|document| document.id()),
         "decision",
     );
+    let prepared_events = prepare_event(
+        project,
+        "decision.created",
+        serde_json::json!({"title": title}),
+    )?;
     let created = create_record(
         project,
         &project.decisions_dir(),
@@ -132,12 +137,7 @@ pub(crate) fn add(project: &TandemProject, options: AddOptions) -> Result<AddOut
             lines.join("\n")
         },
     )?;
-    append_event(
-        project,
-        "decision.created",
-        &created.id,
-        &serde_json::json!({"title": title}),
-    )?;
+    prepared_events.append_for_id(&created.id)?;
     Ok(AddOutcome {
         id: created.id,
         title,
@@ -258,15 +258,16 @@ pub(crate) fn update(
         patched
     };
     ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
+    let prepared_events = prepare_event(
         project,
         "decision.updated",
-        &doc_id,
-        &serde_json::json!({
+        serde_json::json!({
             "fields": changes.iter().map(|change| change.field.as_str()).collect::<Vec<_>>()
         }),
     )?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    prepared_events.append_for_id(&doc_id)?;
     Ok(UpdateOutcome {
         id: doc_id,
         path,
@@ -458,13 +459,14 @@ pub(crate) fn withdraw(
     ]);
     let patched = patch_frontmatter_content(&content, &updates, &[])?;
     ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
+    let prepared_events = prepare_event(
         project,
         "decision.updated",
-        doc.id(),
-        &serde_json::json!({"fields": ["status", "withdrawalReason"]}),
+        serde_json::json!({"fields": ["status", "withdrawalReason"]}),
     )?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    prepared_events.append_for_id(doc.id())?;
     Ok(WithdrawOutcome {
         id: doc.id().to_string(),
         reason,

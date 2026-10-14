@@ -50,19 +50,26 @@ pub(crate) fn current_timestamp() -> String {
     format_unix_timestamp(seconds)
 }
 
-pub(crate) fn append_event(
+pub(crate) fn prepare_event(
     project: &TandemProject,
     event_name: &str,
-    id: &str,
-    data: &serde_json::Value,
-) -> Result<(), Error> {
-    Ok(project::events::append_event(
-        project,
-        event_name,
-        id,
-        &current_timestamp(),
-        data,
-    )?)
+    data: serde_json::Value,
+) -> Result<project::events::PreparedEvents, Error> {
+    let spec = project::events::EventSpec::new(event_name, data, current_timestamp())?;
+    Ok(project::events::prepare_events(project, vec![spec])?)
+}
+
+pub(crate) fn prepare_events(
+    project: &TandemProject,
+    events: Vec<(&str, serde_json::Value)>,
+) -> Result<project::events::PreparedEvents, Error> {
+    let specs = events
+        .into_iter()
+        .map(|(event_name, data)| {
+            project::events::EventSpec::new(event_name, data, current_timestamp())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(project::events::prepare_events(project, specs)?)
 }
 
 /// Formats Unix seconds as an RFC 3339 UTC timestamp.

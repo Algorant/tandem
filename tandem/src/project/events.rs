@@ -10,71 +10,133 @@ use crate::project::{display_path, extract_json_string, extract_json_u64, Tandem
 use crate::protocol::event::{self, CanonicalEventEnvelope};
 use crate::CliError;
 
-/// Appends a complete canonical envelope to the current writer's ledger.
-/// Legacy global logs are read-only transition input and are never appended.
-pub(crate) fn append_event(
-    project: &TandemProject,
-    event_name: &str,
-    id: &str,
-    timestamp: &str,
-    data: &serde_json::Value,
-) -> Result<(), CliError> {
-    debug_assert!(event::is_known_name(event_name));
-    append_event_for_actor(
-        project,
-        event_name,
-        id,
-        timestamp,
-        &actor_id(project)?,
-        data,
-    )
+/// A validated event payload whose final record ID may not be known yet.
+#[derive(Debug)]
+pub(crate) struct EventSpec {
+    event_name: String,
+    data: serde_json::Value,
+    timestamp: String,
 }
 
-fn append_event_for_actor(
-    project: &TandemProject,
-    event_name: &str,
-    id: &str,
-    timestamp: &str,
-    actor: &str,
-    data: &serde_json::Value,
-) -> Result<(), CliError> {
-    if !data.is_object() {
-        return Err(CliError::user(
-            "Event append failure: structured event data must be a JSON object",
-        ));
+impl EventSpec {
+    pub(crate) fn new(
+        event_name: impl Into<String>,
+        data: serde_json::Value,
+        timestamp: impl Into<String>,
+    ) -> Result<Self, CliError> {
+        let event_name = event_name.into();
+        if !event::is_known_name(&event_name) {
+            return Err(CliError::user(format!(
+                "Event append failure: unknown event `{event_name}`"
+            )));
+        }
+        if !data.is_object() {
+            return Err(CliError::user(
+                "Event append failure: structured event data must be a JSON object",
+            ));
+        }
+        Ok(Self {
+            event_name,
+            data,
+            timestamp: timestamp.into(),
+        })
     }
-    let path = project.actor_events_path(actor);
+}
+
+/// A per-actor ledger lock and contiguous sequence reservation held across an
+/// app mutation and its event append. IDs are bound only after the mutation
+/// when their authoritative allocator returns them.
+pub(crate) struct PreparedEvents {
+    file: fs::File,
+    path: PathBuf,
+    actor: String,
+    events: Vec<(EventSpec, u64)>,
+}
+
+impl PreparedEvents {
+    /// Append all prepared events in order for the affected record.
+    pub(crate) fn append_for_id(self, id: &str) -> Result<(), CliError> {
+        for (spec, seq) in self.events {
+            let line = canonical_json_line(CanonicalEventEnvelope {
+                ts: &spec.timestamp,
+                event: &spec.event_name,
+                id,
+                actor: &self.actor,
+                seq,
+                data: &spec.data,
+            });
+            (&self.file)
+                .write_all(line.as_bytes())
+                .and_then(|_| self.file.sync_data())
+                .map_err(|error| {
+                    CliError::user(format!(
+                        "Event append failure: could not append `{}` for `{id}` to {}: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
+                        spec.event_name,
+                        display_path(&self.path)
+                    ))
+                })?;
+        }
+        let _ = self.file.unlock();
+        Ok(())
+    }
+}
+
+/// Validate actor identity and ledger state, then hold the actor ledger lock
+/// until the prepared events are appended or the guard is dropped.
+pub(crate) fn prepare_events(
+    project: &TandemProject,
+    specs: Vec<EventSpec>,
+) -> Result<PreparedEvents, CliError> {
+    if specs.is_empty() {
+        return Err(CliError::user("Event append failure: no events to prepare"));
+    }
+    let actor = actor_id(project)?;
+    prepare_events_for_actor(project, specs, actor)
+}
+
+fn prepare_events_for_actor(
+    project: &TandemProject,
+    specs: Vec<EventSpec>,
+    actor: String,
+) -> Result<PreparedEvents, CliError> {
+    let first_name = &specs[0].event_name;
+    let path = project.actor_events_path(&actor);
     fs::create_dir_all(project.events_dir())?;
     let file = OpenOptions::new()
         .read(true)
         .append(true)
         .create(true)
         .open(&path)
-        .map_err(|error| append_error(&path, event_name, id, error))?;
+        .map_err(|error| append_error(&path, first_name, "<preflight>", error))?;
     file.lock()
-        .map_err(|error| append_error(&path, event_name, id, error))?;
+        .map_err(|error| append_error(&path, first_name, "<preflight>", error))?;
 
-    let result = (|| {
-        let content = fs::read_to_string(&path)
-            .map_err(|error| append_error(&path, event_name, id, error))?;
-        let seq = next_sequence(&content, actor)?;
-        let line = canonical_json_line(CanonicalEventEnvelope {
-            ts: timestamp,
-            event: event_name,
-            id,
-            actor,
-            seq,
-            data,
-        });
-        (&file).write_all(line.as_bytes()).and_then(|_| file.sync_data()).map_err(|error| {
-            CliError::user(format!(
-                "Event append failure: could not append `{event_name}` for `{id}` to {}: {error}. The file mutation may already be on disk; inspect the workspace and append a repair event if needed.",
-                display_path(&path)
-            ))
+    let content = fs::read_to_string(&path)
+        .map_err(|error| append_error(&path, first_name, "<preflight>", error))?;
+    let next_seq = next_sequence(&content, &actor)?;
+    let events = specs
+        .into_iter()
+        .enumerate()
+        .map(|(offset, spec)| {
+            let offset = u64::try_from(offset).map_err(|_| {
+                CliError::user(format!(
+                    "Event append failure: sequence overflow for actor `{actor}`"
+                ))
+            })?;
+            let seq = next_seq.checked_add(offset).ok_or_else(|| {
+                CliError::user(format!(
+                    "Event append failure: sequence overflow for actor `{actor}`"
+                ))
+            })?;
+            Ok((spec, seq))
         })
-    })();
-    let _ = file.unlock();
-    result
+        .collect::<Result<Vec<_>, CliError>>()?;
+    Ok(PreparedEvents {
+        file,
+        path,
+        actor,
+        events,
+    })
 }
 
 pub(crate) fn actor_id(project: &TandemProject) -> Result<String, CliError> {
@@ -234,6 +296,18 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+
+    fn append_event_for_actor(
+        project: &TandemProject,
+        event_name: &str,
+        id: &str,
+        timestamp: &str,
+        actor: &str,
+        data: &serde_json::Value,
+    ) -> Result<(), CliError> {
+        let spec = EventSpec::new(event_name, data.clone(), timestamp)?;
+        prepare_events_for_actor(project, vec![spec], actor.to_string())?.append_for_id(id)
+    }
 
     fn project() -> (TandemProject, std::path::PathBuf) {
         let root = std::env::temp_dir().join(format!(

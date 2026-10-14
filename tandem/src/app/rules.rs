@@ -4,7 +4,7 @@
 //! composite id, the category stored in the record, optional source, and the
 //! rule text as the body.
 
-use crate::app::support::{append_event, current_timestamp as now_timestamp, document_exists};
+use crate::app::support::{current_timestamp as now_timestamp, document_exists, prepare_event};
 use crate::app::Error;
 use crate::project::rules::{
     delete_rule_file, next_rule_id, parse_rule_id, read_rule_files, write_rule_file, RuleRecord,
@@ -57,13 +57,13 @@ pub(crate) fn add(
         text: rule.to_string(),
         path: project.rules_dir().join(format!("{id}.md")),
     };
-    write_rule_file(&project.rules_dir(), &record).map_err(|e| Error::user(e.message))?;
-    append_event(
+    let prepared_events = prepare_event(
         project,
         "rules.updated",
-        "rules",
-        &serde_json::json!({"action": "add", "ruleId": id}),
+        serde_json::json!({"action": "add", "ruleId": id}),
     )?;
+    write_rule_file(&project.rules_dir(), &record).map_err(|e| Error::user(e.message))?;
+    prepared_events.append_for_id("rules")?;
     Ok(MutationOutcome {
         category: category.to_string(),
         id: parse_rule_id(&record.id).map(|(_, n)| n).unwrap_or(0),
@@ -101,13 +101,13 @@ pub(crate) fn edit(
     record.text = rule.to_string();
     record.source = source;
     record.updated_at = Some(now_timestamp());
-    write_rule_file(&dir, &record).map_err(|e| Error::user(e.message))?;
-    append_event(
+    let prepared_events = prepare_event(
         project,
         "rules.updated",
-        "rules",
-        &serde_json::json!({"action": "edit", "ruleId": id}),
+        serde_json::json!({"action": "edit", "ruleId": id}),
     )?;
+    write_rule_file(&dir, &record).map_err(|e| Error::user(e.message))?;
+    prepared_events.append_for_id("rules")?;
     Ok(MutationOutcome {
         category,
         id: number,
@@ -123,14 +123,22 @@ pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome,
             "invalid rule id `{id}`; expected <category>-<number>"
         ))
     })?;
-    delete_rule_file(&project.rules_dir(), id).map_err(|e| Error::user(e.message))?;
-    crate::project::sync::note_removed(project, &project.rules_dir().join(format!("{id}.md")))?;
-    append_event(
+    let rule_path = project.rules_dir().join(format!("{id}.md"));
+    if !read_rule_files(&project.rules_dir())
+        .map_err(|error| Error::user(error.message))?
+        .iter()
+        .any(|record| record.id == id)
+    {
+        return Err(Error::user(format!("rule not found: {id}")));
+    }
+    let prepared_events = prepare_event(
         project,
         "rules.updated",
-        "rules",
-        &serde_json::json!({"action": "delete", "ruleId": id}),
+        serde_json::json!({"action": "delete", "ruleId": id}),
     )?;
+    delete_rule_file(&project.rules_dir(), id).map_err(|e| Error::user(e.message))?;
+    crate::project::sync::note_removed(project, &rule_path)?;
+    prepared_events.append_for_id("rules")?;
     Ok(DeleteOutcome {
         category,
         id: number,

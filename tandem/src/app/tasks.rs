@@ -4,10 +4,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::app::support::{
-    active_task_descendant_ids, append_event, create_record, current_timestamp,
-    hierarchy_from_project as hierarchy_from_workspace, require_nonempty,
-    resolve_parent_relationship, resolved_task_descendants, unresolved_blockers_in_hierarchy,
-    validate_state, validate_task_document_against_hierarchy, workspace_deprecation_warnings,
+    active_task_descendant_ids, create_record, current_timestamp,
+    hierarchy_from_project as hierarchy_from_workspace, prepare_event, prepare_events,
+    require_nonempty, resolve_parent_relationship, resolved_task_descendants,
+    unresolved_blockers_in_hierarchy, validate_state, validate_task_document_against_hierarchy,
+    workspace_deprecation_warnings,
 };
 use crate::app::Error;
 use crate::project::write::{ensure_file_unchanged, read_file_snapshot};
@@ -284,6 +285,11 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
         hierarchy.documents.values().map(|doc| doc.id()),
         allocation_prefix,
     );
+    let prepared_events = prepare_event(
+        workspace,
+        "task.created",
+        serde_json::json!({"title": title}),
+    )?;
     let created = create_record(
         workspace,
         &workspace.tasks_dir,
@@ -327,12 +333,7 @@ pub(crate) fn add(workspace: &TandemProject, options: AddOptions) -> Result<AddO
             lines.join("\n")
         },
     )?;
-    append_event(
-        workspace,
-        "task.created",
-        &created.id,
-        &serde_json::json!({"title": title}),
-    )?;
+    prepared_events.append_for_id(&created.id)?;
 
     Ok(AddOutcome {
         id: created.id,
@@ -409,17 +410,18 @@ pub(crate) fn move_to_state(
         synced_accord_event = Some("accord.claimed");
         accord_sync = Some("ready -> claimed".to_string());
     }
+    let mut event_specs = vec![(
+        "task.moved",
+        serde_json::json!({"from": previous_state, "to": state}),
+    )];
+    if let Some(event_name) = synced_accord_event {
+        event_specs.push((event_name, serde_json::json!({})));
+    }
+    ensure_file_unchanged(&doc.path, &signature)?;
+    let prepared_events = prepare_events(workspace, event_specs)?;
     ensure_file_unchanged(&doc.path, &signature)?;
     write_atomic(&doc.path, &patched)?;
-    append_event(
-        workspace,
-        "task.moved",
-        &doc_id,
-        &serde_json::json!({"from": previous_state, "to": state}),
-    )?;
-    if let Some(event_name) = synced_accord_event {
-        append_event(workspace, event_name, &doc_id, &serde_json::json!({}))?;
-    }
+    prepared_events.append_for_id(&doc_id)?;
 
     Ok(MoveTaskOutcome {
         id: doc_id,
@@ -644,15 +646,16 @@ pub(crate) fn update(
         patched
     };
     ensure_file_unchanged(&doc.path, &signature)?;
-    write_atomic(&doc.path, &patched)?;
-    append_event(
+    let prepared_events = prepare_event(
         workspace,
         "task.updated",
-        &doc_id,
-        &serde_json::json!({
+        serde_json::json!({
             "fields": changes.iter().map(|change| change.field.as_str()).collect::<Vec<_>>()
         }),
     )?;
+    ensure_file_unchanged(&doc.path, &signature)?;
+    write_atomic(&doc.path, &patched)?;
+    prepared_events.append_for_id(&doc_id)?;
 
     Ok(UpdateOutcome {
         id: doc_id,
@@ -1024,6 +1027,8 @@ pub(crate) fn complete(
             reviewer: options.reviewer,
         },
     )?;
+    project::write::preflight_archive_board_document(workspace, &doc.path, &signature)?;
+    let prepared_events = prepare_event(workspace, "task.completed", serde_json::json!({}))?;
     let log_path = project::write::archive_board_document(
         workspace,
         &doc.path,
@@ -1031,12 +1036,7 @@ pub(crate) fn complete(
         &patched,
         "completed",
     )?;
-    append_event(
-        workspace,
-        "task.completed",
-        doc.id(),
-        &serde_json::json!({}),
-    )?;
+    prepared_events.append_for_id(doc.id())?;
     drop(_hierarchy_lock);
     Ok(CompleteOutcome {
         id: doc.id().to_string(),
@@ -1104,15 +1104,16 @@ pub(crate) fn cancel(
             ..ResolutionRecord::default()
         },
     )?;
+    project::write::preflight_archive_board_document(workspace, &doc.path, &signature)?;
+    let prepared_events = prepare_event(
+        workspace,
+        "task.canceled",
+        serde_json::json!({"reason": reason}),
+    )?;
     let log_path = project::write::archive_board_document(
         workspace, &doc.path, &signature, &patched, "canceled",
     )?;
-    append_event(
-        workspace,
-        "task.canceled",
-        doc.id(),
-        &serde_json::json!({"reason": reason}),
-    )?;
+    prepared_events.append_for_id(doc.id())?;
     drop(_hierarchy_lock);
 
     Ok(CancelOutcome {
