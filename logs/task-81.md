@@ -3,14 +3,13 @@ id: task-81
 uid: 800443c6-c745-41db-9216-f70642139032
 type: task
 title: "Docs visuals: public Excalidraw diagrams and 0.17.0 captures"
-state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-76", "task-73", "task-74"]
 relatedFiles: ["site/public/images/"]
 tags: ["docs", "ui"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["One polished public Excalidraw workflow diagram replaces D1 and D3: Agents via CLI and People via TUI enter one Board, delegate/deliver work, agent test/review/validate or human visual verify/feedback, then approve to Logs or rework looping to deliver again. Calm layout, no crossing lines, state names secondary at most; existing accepted D4 remains unchanged. Editable native source/PNG pairs retained.", "Actual 0.17.0 Board, session chooser/activity/add-remove/full-TUI switch, sync-status pending/conflict/held examples, TUI conflict and single-workspace read-only web captures are produced on safe disposable replicas, without private data or synthetic output.", "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten.", "Parent receives exact artifact/source paths, native capture observations and preview surfaces for review in the existing docs Sideshow session; no public-page writing or integration is performed by the Worker."]
   claimedAt: "2026-10-13T13:47:07Z"
   deliveredAt: "2026-10-14T02:00:39Z"
@@ -19,14 +18,17 @@ accord:
   summary: "Combined Work and Review diagram replaces rejected D1+D3 per Algorant structure, published for Herdra FIRST. D4 and all9 accepted captures byte-unchanged. New native source/PNG pair and prior drafts preserved; exact3-file revision, native checks and protectedhashes verified. Clean11d5165 held, not integrated."
   evidence: ["New replacement: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI post KImpZaEaSxU; HTTP200. Herdra checks combined diagram before Algorant, no integration.", "Parent inspected full/390px PNG and native EA geometry: People/TUI and Agents/CLI converge sharedBoard, delegation then delivery,2optionalchecking cards plusdirect asneededdecision path, approveLogs/sendbackRework. Single return polyline x680 outside rightmostcardsx620; no crossing lines.", "Parent verified work-and-review.png vault/site SHA25617f8547da11c10b8d5500c0e166aa5c2dfcd3fa15b8197a27d8952db0595cdab; native Work and Review.excalidraw.md/PNG retained. Old SharedBoard/TaskLifecycle sources+PNGs unchanged (prior recorded hashes match); no source overwrite.", "Parent independently ran protectedhashcheckD4+9captures allOK, gitdiffcheck,sitebuild,996linkcheck/21HTML allpassed. Exact revision af0a878→11d5165 addswork-and-review.png andremovesonlyownedshared-board/task-lifecycle PNGs; no prose/layout/Rust/teaser changes.", "All accepted captures retain authentic0.17ANSI/nativeChromium provenance inreviewnotesonly, no publicbanners/injectedstyles. Current delivered boundary is11publicPNGs (two diagrams+ninecaptures), notold12.", "Explicit outcome: held clean at11d5165 forHerdra thenAlgorant acceptance; no worker_finish/integration/cleanup/push/deploy/release."]
   filesChanged: ["site/public/images/work-and-review.png", "site/public/images/source-and-tandem-sync.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
-  updatedAt: "2026-10-14T02:00:39Z"
+  updatedAt: "2026-10-14T03:58:42Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-14T02:01:04Z"
+updatedAt: "2026-10-14T03:58:42Z"
 assignee: "worker-task-81-c628664a"
 validation.criterion: "One polished public Excalidraw workflow diagram replaces D1 and D3: Agents via CLI and People via TUI enter one Board, delegate/deliver work, agent test/review/validate or human visual verify/feedback, then approve to Logs or rework looping to deliver again. Calm layout, no crossing lines, state names secondary at most; existing accepted D4 remains unchanged. Editable native source/PNG pairs retained."
 validation.note: "Herdra passed combined Work and Review diagram in post KImpZaEaSxU, presenting it to Algorant now. Optional suggestion only: trim redundant TUI/CLI/delegate/deliver arrow labels; no further change authorized while acceptance pending. Current11d5165 retained, D4/captures unchanged; parent native/pair/protected-hash/build/link checks pass. Hold integration/completion/cleanup/push/deploy until Algorant answers. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI"
 validation.requestedAt: "2026-10-14T02:01:04Z"
 validation.reviewer: "Algorant"
+archivedAt: "2026-10-14T03:58:42Z"
+resolution:
+  outcome: "completed"
 ---
 ## Latest direction — Algorant via Herdra (supersedes D1/D3 asset map)
 
