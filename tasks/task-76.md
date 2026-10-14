@@ -17,7 +17,7 @@ accord:
   constraints: ["Plan first; Luna/high. Herdra approves this docs writing plan before implementation.", "Currentmain integrated fixes+acceptedvisuals is source; old docs-overhaul57381c9 is preserved reference, not allowed to overwrite currentCLI docs or maintained releaseguide.", "Minimal real-reader prose, seven pages, approved sparse chrome; no narrator/padding/future claims. Apply approved styleguide ifavailable.", "Reuse accepted diagrams/captures/logo/teaser unchanged; no vault/exporter/product/CLI/protocol semantic change.", "Rendered pages and old-URL handling choices go to Herdra in J0qH-JN7PqI before Algorant; no URL decision silently encoded.", "Hold integration/push/deploy until Algorant docs acceptance. Then approved release0.17.1 through maintained gates."]
   updatedAt: "2026-10-14T04:00:55Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-14T04:00:55Z"
+updatedAt: "2026-10-14T04:05:27Z"
 blockers: ["task-81", "task-50", "task-63"]
 assignee: "worker-task-76-3e423e88"
 ---
@@ -40,3 +40,9 @@ Assets unchanged: site/public/images/work-and-review.png, source-and-tandem-sync
 ## Required plan/review/verification
 
 Concrete pageoutline and approximatecontentbudget, assetplacement/caption budget, exactfiles and scaffoldimportmethod, cuts/maintainer relocation, Quickstartcommands+verification, versionclaims, oldURLinventory/options tobringwith renders. No implementation until Herdraapproval. Native '$ just site-build' and '$ cd site && bun run check:links'; check installedbun audit highseverity, light/dark desktop+mobile renderedpages, actuallinks/alt/media, no placeholders. Verify usercommands againstcurrentnative build/protocol0.5.0 on disposableboards. Everymeaningfulreview revision NEW post in SAME J0qH-JN7PqI with MAIN-vs-BRANCH renderedcomparisons, outline/cutlist and boundedMagicDNSHTTPcheck. Parent independently verifies actualpages then Herdrareview then Algorant acceptance. Do not push/deploy or startrelease beforeacceptance.
+
+## Writing plan approved by Herdra
+
+Herdra approved the concrete plan in /tmp/task76-writing-plan-for-herdra.md with all three parent clarifications. Copy existing encoded teaser/poster verbatim from preserved docs-overhaul checkout and verify SHA256; no re-encode or original source changes. Move superseded/maintainer pages out of public docs/ and therefore build/search, not just sidebar hiding; name the exact cut/relocation list and preserve maintained release guide. Sync-state/TUI-conflict captures belong with Concepts storage/sync; curate TUI/session/web images without duplicating sync prose.
+
+Agents page: Pi is only one clearly marked integration example, at most a line or two. Reader is installing Tandem for the first time. Start minimal; no narrator voice or padding; cut prose that repeats a diagram. Combined diagram labels remain as accepted, without optional trim. Bring actual rendered main/branch pages and old-URL map/options to Herdra in J0qH-JN7PqI before Algorant. No URL policy silently encoded or deployment/push until acceptance. Implementation is now explicitly approved; no second plan gate.

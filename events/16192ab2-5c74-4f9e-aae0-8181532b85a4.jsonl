@@ -192,3 +192,4 @@
 {"ts":"2026-10-14T04:00:49Z","event":"task.updated","id":"task-76","summary":"Updated task-76 metadata: title, relatedFiles, constraints, body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":192}
 {"ts":"2026-10-14T04:00:55Z","event":"accord.claimed","id":"task-76","summary":"Accord claim for task-76","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":193}
 {"ts":"2026-10-14T04:01:41Z","event":"task.created","id":"task-83","summary":"Release Tandem 0.17.1 after accepted docs","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":194}
+{"ts":"2026-10-14T04:05:27Z","event":"task.updated","id":"task-76","summary":"Updated task-76 metadata: body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":195}
