@@ -21,7 +21,7 @@ accord:
   filesChanged: ["README.md", "docs/agents/index.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/extensions/index.md", "docs/guides/agents-and-adapters.md", "docs/guides/decisions.md", "docs/guides/docs-site.md", "docs/guides/fully-agentic-workflow.md", "docs/guides/human-in-the-loop.md", "docs/guides/index.md", "docs/guides/theme-tester.md", "docs/guides/upgrading-to-independent-sync.md", "docs/index.md", "docs/packaging/aur-tandem-bin.md", "docs/quick-start/index.md", "docs/reference/configuration.md", "docs/reference/index.md", "docs/skills/index.md", "docs/tui/index.md", "docs/web/index.md", "docs/workspace/index.md", "site/README.md", "site/astro.config.mjs", "site/maintainers/docs-site.md", "site/maintainers/theme-tester.md", "site/public/media/tandem-teaser-poster.jpg", "site/public/media/tandem-teaser.mp4", "site/src/styles/verdigris.css", "tandem/AUR.md", "tandem/README.md", "tandem/RELEASE.md"]
   updatedAt: "2026-10-14T04:42:19Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-14T04:42:19Z"
+updatedAt: "2026-10-14T04:45:45Z"
 blockers: ["task-81", "task-50", "task-63"]
 assignee: "worker-task-76-3e423e88"
 ---
@@ -50,3 +50,9 @@ Concrete pageoutline and approximatecontentbudget, assetplacement/caption budget
 Herdra approved the concrete plan in /tmp/task76-writing-plan-for-herdra.md with all three parent clarifications. Copy existing encoded teaser/poster verbatim from preserved docs-overhaul checkout and verify SHA256; no re-encode or original source changes. Move superseded/maintainer pages out of public docs/ and therefore build/search, not just sidebar hiding; name the exact cut/relocation list and preserve maintained release guide. Sync-state/TUI-conflict captures belong with Concepts storage/sync; curate TUI/session/web images without duplicating sync prose.
 
 Agents page: Pi is only one clearly marked integration example, at most a line or two. Reader is installing Tandem for the first time. Start minimal; no narrator voice or padding; cut prose that repeats a diagram. Combined diagram labels remain as accepted, without optional trim. Bring actual rendered main/branch pages and old-URL map/options to Herdra in J0qH-JN7PqI before Algorant. No URL policy silently encoded or deployment/push until acceptance. Implementation is now explicitly approved; no second plan gate.
+
+## Rendered rev-4 review direction
+
+Herdra passed shape/prose; requested code-copy-button spacing (desktop/mobile) and shorter evidence example, consistent Concepts sync capture width/text size, and cropping only the web capture's empty bottom band. Original unmasked PNG must remain available as evidence; do not alter depicted content. These narrow visual exceptions supersede the blanket unchanged-capture constraint only where explicitly needed; diagrams and other captures stay as accepted. If sync normalization requires actual capture rewriting or a different artifact rather than page layout, ask parent before proceeding.
+
+Decision-12 is accepted for implementation by Herdra: selected old-route aliases into seven pages, retired maintainer routes404, /guides/→/concepts/. Site config only, no network changes. Revised renders go to same session J0qH-JN7PqI for Herdra recheck before Algorant acceptance. No integration/push/deploy/release before that acceptance.
