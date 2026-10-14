@@ -3,14 +3,14 @@ id: task-81
 uid: 800443c6-c745-41db-9216-f70642139032
 type: task
 title: "Docs visuals: public Excalidraw diagrams and 0.17.0 captures"
-state: "validation"
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-76", "task-73", "task-74"]
 relatedFiles: ["site/public/images/"]
 tags: ["docs", "ui"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["One polished public Excalidraw workflow diagram replaces D1 and D3: Agents via CLI and People via TUI enter one Board, delegate/deliver work, agent test/review/validate or human visual verify/feedback, then approve to Logs or rework looping to deliver again. Calm layout, no crossing lines, state names secondary at most; existing accepted D4 remains unchanged. Editable native source/PNG pairs retained.", "Actual 0.17.0 Board, session chooser/activity/add-remove/full-TUI switch, sync-status pending/conflict/held examples, TUI conflict and single-workspace read-only web captures are produced on safe disposable replicas, without private data or synthetic output.", "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten.", "Parent receives exact artifact/source paths, native capture observations and preview surfaces for review in the existing docs Sideshow session; no public-page writing or integration is performed by the Worker."]
   claimedAt: "2026-10-13T13:47:07Z"
   deliveredAt: "2026-10-13T16:59:31Z"
@@ -19,14 +19,11 @@ accord:
   summary: "Implemented and independently checked Herdra's exact D4 three-row layout. New review set posted for Herdra first; hold Algorant handoff/integration/acceptance/cleanup pending recheck. Only D4 PNG changed; all accepted D1/D3/captures unchanged. Clean af0a878 retained."
   evidence: ["Current set: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI postSPXFbM9ETWU, HTTP200; native D4 and390px preview plus unchanged accepted set. Previous final post2QgnioNb-rI marked superseded.", "Parent read native EA scene: exactly2 arrow elements, each2points with same absolute endpointx180/540, y300→420, start/end arrowhead arrow. Endpoints lie between aligned machine panels and full-width remote top. No per-branch or outcomes arrows; no crossing lines. Both machines have same two-line body and ignored-sourceGit note; remote main/tandem side-by-side; outcomes side-by-side sized for text.", "Parent inspected D4 pixels native/390px; manual conflict text until you resolve it. Native vault/site D4 SHA2564c0c95188f4554d58f72ec44d11e957e76644b5f8233abf779c95c91aba1ad16. All3 editable source/PNG pairs retained/hashmatched. No raw scene writing or new exporter.", "Parent independently ran just site-build, site check:links and git diff --check main...HEAD: passed,996links/21HTML; existing i18n/404 warnings unchanged. Diff38d5c0e..HEAD only D4PNG; accepted D1/D3/8terminal/Chromiumweb byte-unchanged. Clean af0a878.", "Review provenance only: real0.17.0 HerdrANSI terminal renders, real unchanged nativeChromium152 read-onlyweb; rawinputs and native900/1280/1920 webPNGs retained. No publicbanner or injectedCSS/productchange. Teaser untouched.", "Explicit decisions: remains delivered/unintegrated. Herdra rechecks this geometry BEFORE Algorant acceptance; no cleanup/complete/push/release/deploy until authorized. Exact Worker and clean captured checkout retained."]
   filesChanged: ["site/public/images/source-and-tandem-sync.png", "site/public/images/shared-board.png", "site/public/images/task-lifecycle.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
-  updatedAt: "2026-10-14T01:26:28Z"
+  note: "NEW direction from Algorant via Herdra: D1+D3 messy; replace BOTH with ONE polished workflow diagram. D4 af0a878 and ALL accepted captures stand BYTE-UNCHANGED. STOP for PLAN BEFORE any edits; original separate-D1/D3 plan is superseded. Plan must be concrete node text, placement/spacing, exact arrows and OUTSIDE loop routing, asset/source paths, handling obsolete owned PNGs. No broad mechanism, tool, or second new diagram."
+  updatedAt: "2026-10-14T01:26:30Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-14T01:26:28Z"
+updatedAt: "2026-10-14T01:26:30Z"
 assignee: "worker-task-81-c628664a"
-validation.criterion: "Authorized PNG/capture assets under site/public/images render legibly at desktop/mobile widths and on dark/light pages; existing teaser is not rewritten."
-validation.note: "Herdra explicitly passed final D4 af0a878 geometry/readability and already accepted all captures. He is presenting postSPXFbM9ETWU (includes full12-asset set and390px D4) to Algorant now. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI. Parent verified exact2 vertical bidirectional arrows/no crossings, native/390px pixels, source/PNG hashes and site/996links; unchanged teaser and accepted captures. Hold integration, Task completion and exact Worker checkout cleanup until Algorant accepts. No push/deploy/release."
-validation.requestedAt: "2026-10-13T17:00:18Z"
-validation.reviewer: "Algorant"
 ---
 ## Latest direction — Algorant via Herdra (supersedes D1/D3 asset map)
 
