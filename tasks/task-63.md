@@ -11,13 +11,13 @@ relatedFiles: ["tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/
 tags: ["protocol"]
 accord:
   status: "claimed"
-  acceptance: ["Two concurrent `tandem add` calls on a Git-backed board each return their final published `task-N` ID in `data.id` whenever `sync.status` is `synced`.", "tandem add task --help and tandem update --help explain that `$ <command>` creates a runnable command validation and unprefixed text is a manual check.", "Relevant user documentation includes one command validation example using the required `$ ` prefix."]
+  acceptance: ["Two concurrent `tandem add` calls on a Git-backed board each return their final published `task-N` ID in `data.id` whenever `sync.status` is `synced`.", "After a successful save, failure of existing final-ID resolution must retain command success and the known ID, with a clear warning naming the resolution problem; no full-UID refinement or new registry.", "tandem add task --help and tandem update --help explain that `$ <command>` creates a runnable command validation and unprefixed text is a manual check.", "Relevant user documentation includes one command validation example using the required `$ ` prefix."]
   claimedAt: "2026-10-14T02:12:29Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Fresh Luna/high Worker, plan before code, after task-64; no new ID registry or speculative resolver fallback.", "Fold task-77 help/docs into this CLI-owned outcome. Coordinate docs/cli/index.md before task-76 content Worker.", "Do not introduce another post-save refusal while fixing final-ID response identity. Temporary tests only; no push/release."]
-  updatedAt: "2026-10-14T02:12:29Z"
+  updatedAt: "2026-10-14T02:18:29Z"
 createdAt: "2026-10-03T03:11:29Z"
-updatedAt: "2026-10-14T02:12:29Z"
+updatedAt: "2026-10-14T02:18:29Z"
 blockers: ["task-64"]
 references: ["task-77"]
 assignee: "worker-task-63-fdc87a3a"
@@ -38,3 +38,7 @@ The CLI maps the outcome ID through its own sync report only (`report.renamed(&o
 After task-64, resolve synced concurrent-add outcomes through existing current-ID/UID support rather than the initiating command's renames alone. Reproduce with parallel native adds on a disposable Git-backed board and assert every synced data.id names the final published record. Reuse the existing authoritative resolver; no second registry or just-in-case fallback. Review post-save error behavior so the fix doesn't reintroduce the refused-mutation hazard.
 
 Fold task-77: add/update --validation help explains `$ <command>` versus unprefixed manual text; add one verified command example in docs/cli/index.md without changing assignment semantics. Parent will cancel 77 as absorbed only once scope is settled/delivered, and complete from this criterion evidence. Serialize with docs prose so the overhaul imports current help/reference changes.
+
+## Boundary confirmed by Herdra; bounded baseline verified
+
+Herdra approved only the narrow existing current_id resolver/contract. Once saved, command never exits error for final-ID lookup failure: success with known ID and a clear warning naming the problem. No full-UID refinement/new ownership. Parent disposable bare-remote check: three concurrent native pairs, all six synced; three returned provisional IDs with empty rename maps. Existing native show/alias resolution resolved all six to correct published IDs; no ambiguity observed in this bounded practical check (not a proof impossible). Evidence /tmp/task63-parent-baseline-evidence.json; temporary repos removed. Plan now approved: mapped ID then existing current_id for synced outcomes, catch resolver error into warning rather than propagate post-save; help/docs fold77 unchanged. Before extra machinery, report any genuine ambiguity reachability observed.
