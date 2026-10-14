@@ -151,6 +151,36 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
     }
 }
 
+fn add_task_response_id(
+    project: &TandemProject,
+    report: &Report,
+    provisional_id: &str,
+    warnings: &mut Vec<String>,
+) -> String {
+    let id = report.renamed(provisional_id);
+    if !matches!(&report.outcome, Outcome::Synced) {
+        return id;
+    }
+
+    match project.current_id(&id) {
+        Ok(current_id) => {
+            if crate::protocol::ids::is_provisional(&current_id) {
+                warnings.push(format!(
+                    "task was saved and synced, but its final ID could not be resolved; retaining provisional ID {current_id}"
+                ));
+            }
+            current_id
+        }
+        Err(error) => {
+            warnings.push(format!(
+                "task was saved and synced, but final-ID resolution failed: {}; retaining known ID {id}",
+                error.message
+            ));
+            id
+        }
+    }
+}
+
 fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     let project = app::project::open_for_write()?;
     match args.command {
@@ -179,14 +209,15 @@ fn add(args: AddArgs, json: bool) -> Result<super::StartupRequest, CliError> {
                 },
             )?;
             let report = publish(&project);
-            let id = report.renamed(&outcome.id);
+            let mut warnings = outcome.warnings;
+            let id = add_task_response_id(&project, &report, &outcome.id, &mut warnings);
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"id":id,"sync":sync_json(&report)},"warnings":outcome.warnings})
+                    serde_json::json!({"ok":true,"data":{"id":id,"sync":sync_json(&report)},"warnings":warnings})
                 );
             } else {
-                print_warnings(&outcome.warnings);
+                print_warnings(&warnings);
                 println!(
                     "Created task\nID: {id}\nTitle: {}\nSync: {}",
                     outcome.title,

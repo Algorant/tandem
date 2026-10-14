@@ -128,6 +128,7 @@ pub(crate) struct AddTaskArgs {
     pub(crate) related_file: Vec<String>,
     #[arg(long, action = clap::ArgAction::Append, allow_hyphen_values = true)]
     pub(crate) constraint: Vec<String>,
+    /// A `$ <command>` value is runnable; unprefixed text is a manual check.
     #[arg(long, action = clap::ArgAction::Append, allow_hyphen_values = true)]
     pub(crate) validation: Vec<String>,
 }
@@ -243,6 +244,7 @@ pub(crate) struct UpdateArgs {
     pub(crate) acceptance: Vec<String>,
     #[arg(long, action = clap::ArgAction::Append, allow_hyphen_values = true)]
     pub(crate) constraint: Vec<String>,
+    /// A `$ <command>` value is runnable; unprefixed text is a manual check.
     #[arg(long, action = clap::ArgAction::Append, allow_hyphen_values = true)]
     pub(crate) validation: Vec<String>,
     #[arg(long)]
