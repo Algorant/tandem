@@ -3,7 +3,7 @@ id: task-81
 uid: 800443c6-c745-41db-9216-f70642139032
 type: task
 title: "Docs visuals: public Excalidraw diagrams and 0.17.0 captures"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-76", "task-73", "task-74"]
@@ -21,8 +21,12 @@ accord:
   filesChanged: ["site/public/images/work-and-review.png", "site/public/images/source-and-tandem-sync.png", "site/public/images/tui-board.png", "site/public/images/tui-session-chooser.png", "site/public/images/tui-session-activity.png", "site/public/images/tui-full-board-selection.png", "site/public/images/sync-status-pending.png", "site/public/images/sync-status-conflict.png", "site/public/images/sync-status-held.png", "site/public/images/tui-sync-conflict.png", "site/public/images/web-read-only.png"]
   updatedAt: "2026-10-14T02:00:39Z"
 createdAt: "2026-10-13T13:46:56Z"
-updatedAt: "2026-10-14T02:00:39Z"
+updatedAt: "2026-10-14T02:01:04Z"
 assignee: "worker-task-81-c628664a"
+validation.criterion: "One polished public Excalidraw workflow diagram replaces D1 and D3: Agents via CLI and People via TUI enter one Board, delegate/deliver work, agent test/review/validate or human visual verify/feedback, then approve to Logs or rework looping to deliver again. Calm layout, no crossing lines, state names secondary at most; existing accepted D4 remains unchanged. Editable native source/PNG pairs retained."
+validation.note: "Herdra passed combined Work and Review diagram in post KImpZaEaSxU, presenting it to Algorant now. Optional suggestion only: trim redundant TUI/CLI/delegate/deliver arrow labels; no further change authorized while acceptance pending. Current11d5165 retained, D4/captures unchanged; parent native/pair/protected-hash/build/link checks pass. Hold integration/completion/cleanup/push/deploy until Algorant answers. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI"
+validation.requestedAt: "2026-10-14T02:01:04Z"
+validation.reviewer: "Algorant"
 ---
 ## Latest direction — Algorant via Herdra (supersedes D1/D3 asset map)
 
