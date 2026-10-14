@@ -4,12 +4,11 @@ uid: ef34cbd8-c699-4582-a2af-2ae1ed59bd51
 type: task
 kind: papercut
 title: "Event envelope in code contradicts protocol spec (summary vs data)"
-state: "in-progress"
 priority: "low"
 relatedFiles: ["protocol/README.md", "protocol/plan/spec.md", "tandem/src/protocol/event.rs", "tandem/src/project/events.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/app/decisions.rs", "tandem/src/app/accord.rs", "tandem/src/app/rules.rs", "tandem/src/app/links.rs", "tandem/src/app/review.rs"]
 tags: ["protocol", "events"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["The protocol spec and the executable event envelope agree on whether `summary` and `data` are required, with a test asserting the chosen contract."]
   claimedAt: "2026-10-13T13:55:03Z"
   deliveredAt: "2026-10-14T01:52:27Z"
@@ -18,11 +17,14 @@ accord:
   summary: "Refreshed readiness against the parent’s updated task scope. Clean source remains d49be5e with no code changes: new writes require structured data and omit summary; historical summary-only and summary+data records remain readable alongside data-only writes; actor/sequence ownership is unchanged. Parent independently passed review and native checks; no integration, push, or deployment performed."
   evidence: ["Current task scope is implemented without further changes.: Parent feedback confirms the refreshed scope matches d49be5e: mandatory `data`, no newly written `summary`, historical summary-only and summary+data read support, and preserved actor/sequence authority.", "Ready source is clean and independently verified.: No files changed since d49be5e. Parent reports independent review and native checks passed; all temporary parent fixtures/panes were cleaned."]
   filesChanged: ["tandem/src/protocol/event.rs", "tandem/src/project/events.rs", "tandem/src/project/mod.rs", "tandem/src/app/support.rs", "tandem/src/app/tasks.rs", "tandem/src/app/accord.rs", "tandem/src/app/decisions.rs", "tandem/src/app/rules.rs", "tandem/src/app/review.rs", "tandem/src/app/links.rs", "tandem/src/tui/logs.rs"]
-  updatedAt: "2026-10-14T01:52:27Z"
+  updatedAt: "2026-10-14T01:52:29Z"
 createdAt: "2026-09-30T03:41:03Z"
-updatedAt: "2026-10-14T01:52:27Z"
+updatedAt: "2026-10-14T01:52:29Z"
 effort: "medium"
 assignee: "worker-task-50-aab3bafd"
+archivedAt: "2026-10-14T01:52:29Z"
+resolution:
+  outcome: "completed"
 ---
 ## Approved batch B, before task-64
 
