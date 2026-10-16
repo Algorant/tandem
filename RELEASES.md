@@ -2,6 +2,21 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.1
+
+Tandem v0.17.1 fixes mutation refusals and concurrent creation responses, and replaces the public documentation with seven focused pages. Protocol remains 0.5.0; current boards need no migration.
+
+### Fixed
+
+- Detectable actor-identity and event-ledger errors are checked before writing or archiving Tasks, Decisions, Accords, Rules, links, and review requests. A refused operation no longer leaves its record changed.
+- Concurrent Git-backed Task creation returns the published ID even when another process numbered the record. If final-ID lookup fails after saving, the command still reports success with the known ID and a clear warning.
+- New audit events carry the protocol's required structured `data` without a free-text `summary`. Readers retain older summary-only and summary-plus-data history without rewriting ledgers.
+
+### Documentation
+
+- Seven reader-focused pages now cover installation, a real Task-through-Logs quickstart, agents, the TUI and read-only web view, commands, configuration, and independent board sync. Approved diagrams, real product captures, and the teaser replace placeholders.
+- CLI help explains runnable `$ <command>` validations versus unprefixed manual checks. Relevant old documentation URLs redirect to their replacements; maintainer-only pages leave the public site.
+
 ## 0.17.0
 
 Tandem v0.17.0 adds a session working set for watching several local boards and switching between their full TUIs. It needs no migration and keeps protocol 0.5.0.
