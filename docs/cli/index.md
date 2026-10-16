@@ -5,6 +5,8 @@ description: Compact reference for Tandem commands and global options.
 
 The `tandem` command finds the nearest workspace from the current directory. Run `tandem --help` or `tandem <command> --help` for the authoritative syntax.
 
+**Upgrade together:** Move every machine and agent sharing a board to 0.17.1 together. Version 0.17.0 skips the new data-only audit events, so its timelines and attempt counts can be incomplete. Verify the binary each agent uses with `tandem --version`, and restart any still-running old clients. No board migration or event-file edits are needed.
+
 | Command | Use |
 | --- | --- |
 | `init [--title TITLE]` | Create a board in the current project. |

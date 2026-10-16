@@ -6,6 +6,8 @@ Curated release notes for published Tandem versions. Add one meaningful `## X.Y.
 
 Tandem v0.17.1 fixes mutation refusals and concurrent creation responses, and replaces the public documentation with seven focused pages. Protocol remains 0.5.0; current boards need no migration.
 
+**Upgrade together:** Move every machine and agent sharing a board to 0.17.1 together. Version 0.17.0 skips the new data-only audit events, so its timelines and attempt counts can be incomplete. Verify the binary each agent uses with `tandem --version`, and restart any still-running old clients. No board migration or event-file edits are needed.
+
 ### Fixed
 
 - Detectable actor-identity and event-ledger errors are checked before writing or archiving Tasks, Decisions, Accords, Rules, links, and review requests. A refused operation no longer leaves its record changed.
