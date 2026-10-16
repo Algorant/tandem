@@ -31,7 +31,7 @@ The site uses a standalone vendored Verdigris theme instead of a Starlight theme
 
 - `src/styles/verdigris.css` maps the Tandem Verdigris palette onto Starlight roles and component styling.
 - `src/styles/shiki/verdigris-*.jsonc` provides paired Expressive Code/Shiki syntax themes.
-- `../docs/guides/theme-tester.md` is the canonical Markdown page for visual theme validation.
+- `maintainers/theme-tester.md` is the internal Markdown page for visual theme validation; it is not copied into the public site.
 - `src/styles/README.md` documents the local theme boundary.
 
 Useful scripts:

@@ -4,167 +4,50 @@ description: Local-first CLI, TUI and protocol for planning and delegating work 
 
 # Tandem
 
-[placeholder for tandem image]
+Tandem helps people and agents plan, claim, deliver, review, and archive project work in a shared local board.
 
-[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [CLI guide](https://trytandem.dev/cli/) · [TUI guide](https://trytandem.dev/tui/) · [Web guide](https://trytandem.dev/web/) · [Workspace](https://trytandem.dev/workspace/)
+[Website](https://trytandem.dev/) · [Quickstart](https://trytandem.dev/quick-start/) · [Concepts](https://trytandem.dev/concepts/) · [CLI](https://trytandem.dev/cli/) · [TUI and web](https://trytandem.dev/tui/)
 
-Tandem is a protocol for planning, coordination, and delegation of tasks/work between humans and agents:
-- It lives in git alongside your project.
-- Files are markdown with some basic frontmatter, and json when more convenient/compact for the agent.
-- It contains a CLI and TUI written in Rust.
-
-This is a monorepo that houses the spec, the cli and tui, and the documentation and deployed site.
-
-## Repository layout
-
-```text
-protocol/      Normative protocol source of truth and detailed specification
-tandem/        Executable Rust protocol, project/app layers, CLI, and Ratatui TUI
-docs/          Public documentation source
-site/          Astro Starlight documentation site
-extensions/    Home for future agent and editor integrations over the tandem CLI
-```
 ## Install
 
-Install the latest released binary with the user-local, no-sudo installer:
+On Linux or macOS, install the latest release and verify the command:
 
 ```sh
 curl -fsSL https://trytandem.dev/install.sh | sh
 tandem --version
 ```
 
-Release binaries are currently published for Linux and mac. Windows binaries are not published yet.
-
-With Rust and Cargo, you can instead install the current tagged source:
+The installer is user-local and requires no `sudo`. With Rust, install from this repository:
 
 ```sh
-cargo install --git https://github.com/Algorant/tandem.git \
-  --tag tandem-v0.10.1 --path tandem --locked
-```
-### AUR
-Released binary through `tandem-bin` in the AUR.
-
-## Get started
-
-Initialize Tandem once at the root of a project:
-
-```sh
-cd /path/to/your/project
-tandem init
-or optionally:
-tandem init --title "My Project"
+cargo install --git https://github.com/Algorant/tandem.git --locked tandem
 ```
 
-## [placeholder for workflow diagram]
+## How it works
 
-Initialization creates a `.tandem/` workspace containing active Board documents, completed or canceled Logs, lifecycle events, project rules, and configuration. Small, non-blocking friction is recorded as a Task with `kind: papercut` (`tandem add task "..." --kind papercut`), and open-ended investigation as `kind: research`; see the [protocol](protocol/README.md#task-kinds). The Markdown files remain the source of truth; use the CLI or TUI for structured updates.
+Run `tandem init` in your project. Tandem creates an ignored `.tandem/` board of Markdown Tasks, Decisions, Rules, and completed Logs. Use the CLI or TUI to claim and deliver work; completed Tasks are archived in Logs. The [Quickstart](https://trytandem.dev/quick-start/) walks through one Task.
 
-[placeholder for .tandem directory structure]
+In a Git repository, the board belongs to the main worktree and syncs independently through the `tandem` branch. Source Git operations do not commit board changes. See [Concepts and sync](https://trytandem.dev/concepts/#board-storage-and-sync).
 
-See the [agent-first quickstart](https://trytandem.dev/quick-start/) to take a small task through the complete workflow.
-
-## Implementation architecture
-
-The Markdown under [`protocol/`](protocol/) is normative. Its executable Rust
-implementation lives in [`tandem/src/protocol/`](tandem/src/protocol/) and is
-consumed by the concrete [`project::TandemProject`](tandem/src/project/mod.rs)
-filesystem boundary. Shared [`app`](tandem/src/app/) operations coordinate
-protocol validation and project I/O. [`cli`](tandem/src/cli/) and
-[`tui`](tandem/src/tui/) are peer interfaces over those operations;
-[`main.rs`](tandem/src/main.rs) only composes process startup and exit handling,
-and `tui/mod.rs` wires the terminal application and cohesive TUI modules.
-
-New projects use protocol `0.5.0`. An older board is converted once with
-`tandem migrate` (0.3.0 moves to the `tandem` branch, 0.4.0 upgrades to 0.5.0,
-turning `research` and `papercut` tags on active Board Tasks into Task kinds);
-it is never converted implicitly. **Install the new Tandem on every machine
-that shares a board before migrating it to 0.5.0 and syncing**: older versions
-reject the new protocol version and kinds.
-
-## Everyday workflow
-
-Human describes task to agent -> agent creates task and accord (contract with deliverables) -> human or agent orchestrator delegates the task to begin being worked on -> agent returns results when done to orchestrator -> work is either auto approved by meeting the requirements or, optionally a human gets final sign off -> task is completed, all work committed and cleaned up.
-
-Large outcomes use a strict Epic → Task → Subtask hierarchy:
+## Repository layout
 
 ```text
-task-10       Epic (root `kind: epic`, global ID)
-└── task-11   Task (direct Epic child, global ID, `epic-task`)
-    └── task-11-1   Subtask (direct Task child, parent-derived ID, `subtask`)
+protocol/      Normative protocol source of truth
+tandem/        Rust CLI, TUI, project, and app implementation
+docs/           Public Markdown documentation source
+site/           Astro Starlight site built from docs/
+extensions/     Home for future agent and editor integrations
 ```
 
-Only Tasks are delegated initially. One Task worker owns its leaf Subtasks as a bounded execution checklist and returns one Task-level handoff; Epics and Subtasks are not independently delegated. Tandem rejects nested Epics, children beneath Subtasks, role/ID mismatches, and role-changing or ID-invalidating reparenting. See [Epics, Tasks, Subtasks, and related work](https://trytandem.dev/concepts/#epics-tasks-subtasks-and-related-work).
+The public site is generated from Markdown under `docs/`; `site/src/content/docs/` is generated and must not be edited directly. The repository protocol in `protocol/` is normative; its executable Rust implementation is under `tandem/src/protocol/`.
 
 ## Development
 
-- **`just dev`** builds the current checkout in release mode and opens a fresh,
-  seeded TUI sandbox in its own temporary Git repository. Try `a` on task-5 for
-  lifecycle actions, task-2 for milestone context, and Logs for completed evidence.
-- **`just dev-project`** explicitly opens the real project workspace. Lifecycle
-  actions can commit its `.tandem` records.
-- **`just dev-test`** opens a shell in a fresh sandbox with the dev `tandem` first
-  on `PATH`; **`just dev-sandbox`** creates a sandbox and prints its path.
-- **`just dev-check`** runs the native/CLI suite and a Git-backed smoke test for
-  assignment freshness, evidence validation, board changes outside source history, and the safety copy
-  (requires `jq`). **`just dev-build`** only builds the release binary.
+- `just dev` builds the current checkout in release mode and opens a disposable Git-backed TUI sandbox.
+- `just dev-project` explicitly opens the real project workspace.
+- `just dev-check` runs native tests and a Git-backed workflow smoke test.
+- `just site-build` builds the documentation site.
 
-No command installs the binary. Sandboxes are retained at the printed temporary
-path for inspection; each new invocation gets a fresh repository. Explicit
-agent-configured preview routes still make `just dev` use the selected worktree
-and fixture; clearing a route restores the safe sandbox default. No automatic
-workspace migration or fallback to the real project occurs.
-
-## TUI
-
-[placeholder tui image/gif]
-
-## Local read-only web view
-
-Browse the nearest workspace with the bundled browser interface:
-
-```sh
-tandem web
-```
-
-It opens the default browser on an available `127.0.0.1` port. Use
-`--port <port>` for a stable port or `--no-open` to print the URL only. The MVP
-serves one workspace and has no mutations or remote access. See the
-[web guide](https://trytandem.dev/web/) for views, security boundaries, and
-deferred capabilities.
-
-## Documentation
-
-[docs on trytandem site]
-
-## Extensions / Skills
-
-[placeholder for pi extension]
-
-If using claude code, codex, etc
-
-[general guidance for agents]
-
-## License
+See [`tandem/README.md`](tandem/README.md) for CLI/TUI development and [`tandem/RELEASE.md`](tandem/RELEASE.md) for maintained release procedures.
 
 Tandem is available under the [MIT License](LICENSE).
-
-## Migrating a workspace to protocol 0.3.0
-
-Tested procedure (2026-08-31) for moving an existing pre-0.3.0 coordination
-workspace to the protocol 0.3.0 binary. There is deliberately no
-converter or compatibility reader for pre-0.3.0 workspaces — the new
-binary only opens 0.3.0 and later workspaces, so this migration is owner-side
-and semi-manual. (`tandem migrate` handles only the 0.3.0 → 0.5.0 and
-0.4.0 → 0.5.0 steps.) This procedure is a working draft and may be removed once the
-migration surface stabilizes.
-
-1. **Install and verify the new binary.** `curl -fsSL https://trytandem.dev/install.sh | sh` then confirm `tandem --version` reports the 0.12.x release.
-2. **Archive the old workspace in git.** Move the whole `.tandem` directory aside (for example `.tandem mv .tandem .tandem_old`), add the ignored actor identity (`printf '.tandem_old/actor-id\n' >> .gitignore`), and commit. The archived state stays recoverable and the board/log/papercut history is not destroyed.
-3. **Initialize the new workspace.** `tandem init --title "..."` creates a minimal current-protocol workspace (states and the `tasks/`, `decisions/`, `rules/`, `logs/`, `events/` layout).
-4. **Transpose durable records by recreating them.** The fresh workspace uses new IDs and mandatory Accord, so recreate rather than copy:
-   - Active state: `tandem add task "..." --acceptance "criterion" [...]` for each retained Task (mandatory Accord acceptance). Add `--kind papercut` Tasks (acceptance optional, low priority by default) for friction notes. Old references and provenance can be dropped; a one-line "continued from task-N, archived under .tandem_old" note preserves context without dangling references.
-   - Rules: `tandem rules add <category> "<text>"` per rule. Omit `--source` when it pointed at archived records.
-   - Key ADR decisions: `tandem add decision "..." --body ...` then `tandem update <decision-id> --status accepted`, which also writes `decidedAt`.
-5. **Verify.** `tandem list`, `show`, `search`, `rules list`, `accord claim/deliver`, and the TUI should behave normally against the fresh workspace.
-
-The defects the first run of this procedure surfaced (`update` rejecting decision documents, `add decision` writing to `.tandem/tasks`, and config-backed rules with flat IDs) have since been fixed: Decisions are updated with `tandem update`, written to `.tandem/decisions/`, and Rules are per-file records with composite IDs.

@@ -1,76 +1,49 @@
 ---
 title: Quickstart
-description: Install Tandem and run one task from idea to completed log.
+description: Install Tandem and take a Task from start to finish.
 ---
-This guide takes you through the Tandem workflow in six steps. You can work with Tandem directly in the terminal or ask your agent to carry out the work.
 
-## 1. Install Tandem
+## Install and verify
 
-Choose one installation method.
-
-### Installer
+On Linux or macOS, install the latest release and check that the command is available:
 
 ```sh
 curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
 ```
 
-### Rust
+The installer is user-local and does not require `sudo`. With Rust, install the current source with `cargo install --git https://github.com/Algorant/tandem.git --locked tandem`.
+
+## Complete a Task
+
+In a Git repository, initialize the board and create a Task with an acceptance criterion:
+
+```console
+$ tandem init
+$ tandem add task "Add a greeting" --acceptance "README contains the greeting"
+Created task
+ID: task-1
+Title: Add a greeting
+Sync: saved locally (no Git remote to sync with)
+$ tandem accord claim task-1 --assignee you
+Accord task-1: claimed (record written; saved locally (no Git remote to sync with))
+```
+
+Add the greeting to `README.md`, then record the result and check:
 
 ```sh
-cargo install --git https://github.com/Algorant/tandem.git --tag tandem-v0.4.0 --path tandem --locked
+printf '\nHello from Tandem.\n' >> README.md
 ```
 
-### AUR
-
-```sh
-paru -S tandem-bin
+```console
+$ tandem accord deliver task-1 --summary "Added a greeting" --evidence "README greeting verified"
+Accord task-1: delivered (record written; saved locally (no Git remote to sync with))
+$ tandem complete task-1
+Completed task-1 (record written; saved locally (no Git remote to sync with))
+$ tandem list --scope archived
+task-1	Add a greeting
 ```
 
-## 2. Initialize a workspace
+This is output from a fresh Git repository without a remote; a configured remote can show a different sync message. `complete` archives the delivered Task in Logs. Use `tandem show task-1` or `tandem search greeting --scope archived` to read it later.
 
-At the root of the project you want to coordinate, run:
-
-```sh
-tandem init
-# Optional: --title "my tandem project"
-```
-
-Tandem creates a `.tandem/` workspace for your active tasks, completed work, and project coordination rules.
-
-## 3. Create a task
-
-For task creation, see the forthcoming [Guidance for agents](/guides/agents-and-adapters/) page. Direct your agent to create a task for you. The agent understands Tandem's fields and can fill them from a natural-language request, such as:
-
-> help me research the best static site generators
->
-> build me a simple terminal todo app
-
-Run `tandem list` to view your tasks in the terminal, or ask your agent to show them.
-
-## 4. Start the work
-
-Invite your agent to begin with an actionable prompt:
-
-> Please begin work on task-4
-
-You can also ask your agent to delegate the task or ask what to do next. The agent can inspect the task, follow the workspace guidance, and report its progress.
-
-## 5. Verify the result
-
-When the work is ready, your agent may respond with a completion message such as:
-
-> Task done! Please review the result: http://localhost:4321
-
-Open the URL, inspect the changes, or review the deliverables that the agent reports. Confirm that the result meets your needs before you give feedback.
-
-## 6. Give feedback
-
-Tell your agent what needs to change. For example:
-
-> The UX needs some work.
-
-> The “Create task” button is not functioning.
-
-The agent can make fixes and ask you to review the result again. When the work is validated, tell the agent that it is validated and move to the next task.
-
-For more information about completed work, open the [Logs view in `tandem tui`](/tui/#views-and-navigation). For the wider workflow, see [Concepts](/concepts/), [CLI](/cli/), [TUI](/tui/), and [Extensions](/extensions/).
+See [Concepts](/concepts/) for board storage and sync, or [Agents](/agents/) to give an agent project-specific instructions.

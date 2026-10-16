@@ -34,7 +34,7 @@ Theme ownership is intentionally scoped to the site project:
 - `site/src/styles/shiki/verdigris-dark.jsonc` and `site/src/styles/shiki/verdigris-light.jsonc` provide syntax highlighting themes whose UI chrome is synchronized with Starlight via `useStarlightUiThemeColors: true`.
 - Expressive Code external stylesheet emission is disabled in the Starlight config so generated code blocks remain self-contained and do not point at stale hashed `ec.*.css` assets after theme changes.
 - `site/scripts/sync-docs.mjs` clears Astro's generated `.astro/` content cache before syncing Markdown, and the dev/build scripts pass Astro `--force`, so code-fence HTML is regenerated when theme or Expressive Code settings change.
-- `docs/guides/theme-tester.md` is the canonical visual maintenance page for exercising headings, links, code blocks, asides, cards, tags, lists, and tables.
+- `site/maintainers/theme-tester.md` is the canonical visual maintenance page for exercising headings, links, code blocks, asides, cards, tags, lists, and tables.
 - `site/src/styles/README.md` is the vendoring boundary note for future packaging work.
 
 Do not add `starlight-theme-gruvbox`, downgrade Astro/Starlight, or introduce another theme package unless that trade-off is explicitly approved. If the Verdigris theme is later published as a reusable package, keep this local CSS/Shiki asset boundary as the source to extract from and preserve any third-party license notices for newly vendored assets.

@@ -486,9 +486,8 @@ body {
 	color: var(--td-vg-heading-h2);
 }
 
-/* Expressive Code and plain pre fallback. */
-.sl-markdown-content pre:not(:where(.not-content *)),
-.expressive-code .frame {
+/* Plain pre fallback. Expressive Code uses its configured frameless output. */
+.sl-markdown-content pre:not(:where(.not-content *)) {
 	border-color: var(--td-vg-code-border);
 	border-radius: 0.75rem;
 	box-shadow: var(--sl-shadow-sm);
@@ -520,7 +519,7 @@ body {
 	border: 0;
 	border-radius: 0;
 	background: var(--td-vg-code-bg);
-	padding: 0.9rem 1rem;
+	padding: 3.4rem 1rem 0.9rem;
 	overflow: auto;
 }
 
@@ -853,6 +852,65 @@ body {
 			color 160ms ease,
 			transform 160ms ease;
 	}
+}
+
+/* Accepted terminal captures retain their native text scale inside a page-width scroll region. */
+.sl-markdown-content p:has(> a[href^='/images/sync-status-']),
+.sl-markdown-content p:has(> a[href='/images/tui-sync-conflict.png']) {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.sl-markdown-content p:has(> a[href^='/images/sync-status-']) img,
+.sl-markdown-content p:has(> a[href='/images/tui-sync-conflict.png']) img {
+	display: block;
+	width: auto;
+	max-width: none;
+}
+
+/* Approved docs presentation: compact headings and unframed navigation. */
+.site-title,
+.site-title img {
+	filter: none;
+	text-shadow: none;
+}
+
+.hero::before,
+.main-pane h1:not(:where(.not-content *))::after,
+.sl-markdown-content h1:not(:where(.not-content *))::after,
+.pagination-links,
+.sl-anchor-link {
+	display: none;
+}
+
+.hero h1 {
+	font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
+	letter-spacing: -0.03em;
+}
+
+.main-pane h1:not(:where(.not-content *)),
+.sl-markdown-content h1:not(:where(.not-content *)) {
+	font-size: 1.75rem;
+	margin-block: 0 0.75rem;
+}
+
+.sl-markdown-content h2:not(:where(.not-content *)) {
+	border: 0;
+	font-size: 1.3rem;
+	margin-block: 1.5rem 0.5rem;
+	padding-block-end: 0;
+}
+
+.sl-markdown-content h3:not(:where(.not-content *)) {
+	margin-block: 1.25rem 0.4rem;
+}
+
+.td-teaser {
+	display: block;
+	width: 100%;
+	height: auto;
+	margin-block: 1rem 1.5rem;
+	border-radius: 0.4rem;
 }
 
 /* Light theme: the mark's second strand switches from cream to dark so it reads on the light background. */

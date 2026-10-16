@@ -45,9 +45,9 @@ protocol implementation.
 
 ## Current status
 
-Planning/specification plus implementation mode. The Rust package builds a `tandem` binary implementing protocol `0.5.0` (decision-9) with a clap 4.6-derived CLI: `init`, `add task|decision`, `show`, `list`, `search`, `update`, `accord claim|deliver|rework|block|resume|release|fail`, `review`, `complete`, `cancel`, `sync`, `sync status|resolve`, `migrate`, `rules list|add|edit|delete`, `tui`, and `web`. `-j/--json`, `-h/--help`, and `-V/--version` are global; help/version work without a workspace, and removed v0 surfaces (upgrade, move, log/decision/papercut families, accord accept, review.status) fail with usage. New workspaces use the `tasks/`, `decisions/`, `rules/`, `logs/`, per-actor `events/` layout with a permanent `uid` on every record; 0.3.0 workspaces are converted once with `tandem migrate`. Active Tasks require a mandatory Accord with acceptance criteria; `complete` accepts a delivered Accord and archives atomically with minimal `resolution{outcome,note,reviewer}` metadata; Papercuts are low-priority Tasks tagged `papercut`. The `tandem tui` implementation uses Ratatui plus crossterm and renders top-level Board, Logs, Rules, and Decisions views with built-in `default-dark` and `verdigris` presets, user theme discovery from `~/.config/tandem/themes/*.toml` or `$XDG_CONFIG_HOME/tandem/themes/*.toml`, and workspace theme selection/overrides from `.tandem/theme.toml`. `1`..`4` switch top-level views; mouse tab clicks remain available. The Board keeps Brainfile-style state subviews (count tabs with the active state getting the full list area), the State Board / Epic Board arrangement toggle, local state/item navigation, manual `r` reload, idle file-change hot reload with safe warning/error surfacing, keyboard quit, mouse wheel/click handling, filters (`f`), and the Validation action `v` (exceptional human review request, accept→archive, or request changes). `e` opens the selected active Task in `$EDITOR`. The Board has four sections: Todo, In progress, Validation, and Papercuts (a flat overlapping `tag: papercut` lens; tagged tasks also stay in their workflow-state sections), and the quick-add and direct state movement (`m`) actions were removed with the protocol cutover, while `a` now opens the Actions picker for the selected task. Logs is a read-only completed-work browser with recency-sorted list, selection/navigation, list/detail focus, detail pane with resolution metadata/body/path/event context, safe load warnings, and `/` search. Rules groups by `always`/`never`/`prefer`/`context` with add/edit/delete prompts. Decisions lists active decision documents with metadata/body/path and a title/body add prompt. `h/j/k/l` stay inside the active view, Enter expands detail, `i` opens the read-only Papercuts inbox, `?` opens the keybinding reference. Remaining gaps include Decisions references/tags prompt parity and configurable keymaps.
+The current Rust package builds the `tandem` binary for protocol `0.5.0`. The CLI and TUI share the same app and protocol behavior. Run `tandem --help` for the current command tree; the public [CLI reference](https://trytandem.dev/cli/) summarizes its commands.
 
-In a Git repository the board is the main worktree's ignored `.tandem/` and syncs through the repository's `tandem` branch, independent of source commits (`project/sync.rs`). Mutations publish immediately, stale reads refresh first, and the TUI and web view sync in the background; each mutation's JSON reports `data.sync`. See `../protocol/README.md#sync` and `../plan/task-49-pi-handoff.md`.
+A Git-backed board lives in the main worktree's ignored `.tandem/` directory and syncs independently through the repository's `tandem` branch. Source Git operations do not commit the board. Board changes sync immediately when possible; offline changes stay saved and report as pending. See [`protocol/README.md`](../protocol/README.md#sync) for the sync contract.
 
 ## Build/run
 
@@ -101,12 +101,17 @@ The earlier `add --subtask <title>` inline-checklist authoring path is deprecate
 
 ## Release and install target
 
-Current release: `tandem` package version `0.6.5`, `tandem` binary, annotated git tag `tandem-v0.6.5`.
+Install the latest released binary with the user-local installer:
 
-Downstream integrations can install the released CLI with:
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
 
-```text
-cargo install --git git@github.com:Algorant/tandem.git --tag tandem-v0.6.5 --path tandem --locked
+With Rust, install the current source from the repository:
+
+```sh
+cargo install --git https://github.com/Algorant/tandem.git --locked tandem
 ```
 
 For local checkout installs before a tag is published:
@@ -216,7 +221,7 @@ Each process serves one discovered workspace and binds only to `127.0.0.1`; ther
 
 The browser interface keeps filters and selection in the current tab. Use its native links, forms, and refresh button with a keyboard or pointer. A visible tab checks for changed project revisions every three seconds. The responsive Verdigris palette follows the browser light/dark preference; the dark preference is the web MVP's Default Dark check. TUI theme selectors do not apply to the browser, and the MVP has no separate web theme picker. The layout supports 390px screens and 200% browser zoom, uses visible focus indicators, and includes text in every status badge.
 
-Deferred web work includes all mutations, remote/LAN access and authentication, SSE/WebSockets, database or synchronization providers, multi-workspace serving, and agent feedback. See the public [Web guide](../docs/web/index.md) for the complete user boundary.
+Deferred web work includes mutations, remote/LAN access and authentication, SSE/WebSockets, database or synchronization providers, multi-workspace serving, and agent feedback. See the public [TUI and web guide](https://trytandem.dev/tui/) for the user-facing boundary.
 
 ## TUI interaction
 
