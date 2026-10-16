@@ -204,3 +204,4 @@
 {"ts":"2026-10-14T05:01:21Z","event":"review.requested","id":"task-76","summary":"Requested validation for task-76","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":204}
 {"ts":"2026-10-16T12:24:27Z","event":"task.completed","id":"task-76","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":205}
 {"ts":"2026-10-16T12:24:58Z","event":"accord.claimed","id":"task-83","summary":"Accord claim for task-83","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":206}
+{"ts":"2026-10-16T12:24:59Z","event":"task.updated","id":"task-83","summary":"Updated task-83 metadata: body","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":207}
