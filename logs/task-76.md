@@ -3,14 +3,13 @@ id: task-76
 uid: 5f373353-a0d5-4373-87fc-5c533f439c89
 type: task
 title: "Docs and site overhaul: write the approved seven pages"
-state: "validation"
 priority: "medium"
 effort: "large"
 references: ["task-51", "task-67", "task-70", "task-71", "task-72", "task-73", "task-74", "task-75", "task-81", "task-27", "task-50", "task-63"]
 relatedFiles: ["docs/", "site/", "README.md", "tandem/README.md", "protocol/README.md", "plan/docs-overhaul.md"]
 tags: ["docs"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["The public site retains the approved seven-page shape, starts with minimal reader-facing prose and incorporates Herdra's approved style guide when available.", "Content accurately explains shipped 0.17.0 session boards, add/remove paths, full-TUI switching, chooser activity, active-board sync versus inactive local snapshots, and agent setup; optional Pi /task routing is not presented as a Tandem CLI command. Web stays single-workspace/read-only.", "Workspace layout, lifecycle/review claims, installation/version guidance and Decision examples from tasks 51/67 are verified and corrected across docs and READMEs.", "Real 0.17.0 product captures, authorized Excalidraw diagram exports and existing teaser presentation are legible and reviewed in the existing docs Sideshow session with main-versus-branch comparisons.", "Site build and link checks pass; public pages contain no placeholders; final integration/deployment occurs only after Algorant's approval.", "A dedicated board-storage/sidecar-sync section within the seven-page shape accurately explains source Git versus the Tandem-managed tandem branch, multi-machine use, pending, true conflicts and held edits, with the required Excalidraw diagram and real sync-status/TUI-conflict captures."]
   claimedAt: "2026-10-14T04:00:55Z"
   deliveredAt: "2026-10-14T05:00:37Z"
@@ -19,15 +18,18 @@ accord:
   summary: "Herdra's rev4 visual fixes and accepted decision12 URL map implemented and independently verified atbb9c3b2. New main/branch rendered set posted for Herdra recheck. Seven content pages plus12static aliases; crop authorized/byte-exact, code clearance and capture scale verified. Hold integration/acceptance/publication for Algorant."
   evidence: ["New review: http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI post1O3cZrg8emA; HTTP200. Actual main20a2538 vsbranchbb9c3b2, sevenpages lightdesktop/darkmobile comparisons, outline/cuts andacceptedoldURLmap. No deployment.", "Parent independently ran sitebuild,176links/20HTML,highseverityBunaudit anddiffcheck: pass;7content+12redirects+404. No highfindings, onebelowthreshold; originali18n/404warningsremain. Sourcecleanbb9c3b2.", "Parent freshgenuineChromium across7pages×light/dark×desktop1440/mobile390 =28checks: no pageoverflow/brokenimages; per-codeRange vscopybutton minimum clearance19.203px, so nofirstlineoverlap. FourSyncCaptureRegions equalwidth752/358 andrenderatnativeimagepixels/textscale; fullsizeaccess retained.", "Parent Chromium followedALL12siteconfigaliases exactdestination/fragments; bothfragmentIDs exist;3retiredmaintainerpathsHTTP404. NativePagefindsearchTandemreturnedONLY7canonicalpages,noaliases/maintainers. Evidence /tmp/task76-parent-rev5-evidence.json; parentdriver/sessionclosed.", "Parent inspected correctednative/mobileQuickstartConceptsTUIpixels; shorter evidenceactualworkflowreplayed byWorker. WebPNG1280×724 equals originalnative1280×900's exacttop724rows byParentSharp rawbuffercompare; footerpreserved,176emptyrowsremoved. Originalretained /tmp/task76-renders/web-read-only-native.png; other10images/mediaunchanged.", "Decision12 acceptedforimplementationbyHerdra: selectedredirects, guides→concepts, maintainer404; siteconfigonly,no network/legacycontentpages. FinalAlgorantdocstasteacceptance/push/deployment/release83stillpending.", "Explicitoutcome: delivered/unintegrated, exactWorker+previewresourcesretainedforreview. No worker_finish/Taskcomplete/cleanup/sourcepush/deploy/release untilHerdra recheckthenAlgorant acceptance."]
   filesChanged: ["README.md", "docs/agents/index.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/extensions/index.md", "docs/guides/agents-and-adapters.md", "docs/guides/decisions.md", "docs/guides/docs-site.md", "docs/guides/fully-agentic-workflow.md", "docs/guides/human-in-the-loop.md", "docs/guides/index.md", "docs/guides/theme-tester.md", "docs/guides/upgrading-to-independent-sync.md", "docs/index.md", "docs/packaging/aur-tandem-bin.md", "docs/quick-start/index.md", "docs/reference/configuration.md", "docs/reference/index.md", "docs/skills/index.md", "docs/tui/index.md", "docs/web/index.md", "docs/workspace/index.md", "site/README.md", "site/astro.config.mjs", "site/maintainers/docs-site.md", "site/maintainers/theme-tester.md", "site/public/images/web-read-only.png", "site/public/media/tandem-teaser-poster.jpg", "site/public/media/tandem-teaser.mp4", "site/src/styles/verdigris.css", "tandem/AUR.md", "tandem/README.md", "tandem/RELEASE.md"]
-  updatedAt: "2026-10-14T05:00:37Z"
+  updatedAt: "2026-10-16T12:24:27Z"
 createdAt: "2026-10-12T15:51:52Z"
-updatedAt: "2026-10-14T05:01:21Z"
+updatedAt: "2026-10-16T12:24:27Z"
 blockers: ["task-81", "task-50", "task-63"]
 assignee: "worker-task-76-3e423e88"
 validation.criterion: "The public site retains the approved seven-page shape, starts with minimal reader-facing prose and incorporates Herdra's approved style guide when available."
 validation.note: "Herdra explicitly passed revision5 pages, copy-button clearance, consistent captures and implemented decision12 redirects; he is presenting post1O3cZrg8emA to Algorant now. http://desktop.tail1cefc.ts.net:8228/session/J0qH-JN7PqI. Parent native/browser/content checks passed; cleanbb9c3b2 retained with preview resources. Human docs/taste acceptance remains required. Hold integration, completion/cleanup, source push, deployment and release83 until Algorant accepts. No further source change requested."
 validation.requestedAt: "2026-10-14T05:01:21Z"
 validation.reviewer: "Algorant"
+archivedAt: "2026-10-16T12:24:27Z"
+resolution:
+  outcome: "completed"
 ---
 ## Current authorization — Algorant via Herdra
 
