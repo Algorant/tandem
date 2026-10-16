@@ -209,3 +209,4 @@
 {"ts":"2026-10-16T12:38:04Z","event":"accord.delivered","id":"task-83","summary":"Accord deliver for task-83","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":209}
 {"ts":"2026-10-16T12:38:28Z","event":"task.completed","id":"task-83","summary":"Completed","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":210}
 {"ts":"2026-10-16T16:45:40Z","event":"task.created","id":"task-85","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":211,"data":{"title":"Document the coordinated 0.17.1 shared-board upgrade"}}
+{"ts":"2026-10-16T16:45:50Z","event":"accord.claimed","id":"task-85","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":212,"data":{}}
