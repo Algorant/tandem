@@ -10,7 +10,7 @@ effort: "medium"
 relatedFiles: ["tandem/src/app/background_sync.rs", "tandem/src/project/sync.rs"]
 tags: ["tui", "rendering"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Attribute ten-second process-wide wchar/syscw deltas to actual write destinations and waited-for child accounting; identify the concrete unnecessary idle-I/O cause and board/log-size dependence before source edits.", "Remove the proven unnecessary idle work while preserving input, resize, local reload, background sync/status and chooser refresh; no speculative redraw patch when PTY is already quiet.", "Parent verifies comparable ten-second before/after wchar/syscw plus segmented PTY byte counts on safe small and ~526-log boards, native checks pass and temporary harnesses/fixtures are removed."]
   claimedAt: "2026-10-17T03:25:52Z"
   deliveredAt: "2026-10-17T04:10:23Z"
@@ -19,9 +19,10 @@ accord:
   summary: "Implemented and committed a per-background-worker content fingerprint guard that skips only unchanged Mode::Publish syncs; two-second checks, 30-second refresh, pending/error retry, and existing changed-board sync behavior remain. Root cause was repeated background Git snapshot/tree materialization, not terminal rendering. Commit 02142c7; checkout clean, no push/release."
   evidence: ["Attribute idle process-wide write totals to actual write destinations and waited-for child accounting; identify concrete unnecessary idle-I/O cause and board-size dependence before source edits.: Verified source call path is BackgroundSync 2s publish → Engine::run base load → snapshot temp-index commands → current/pending tree materialization via ls-tree/cat-file before unchanged detection. Remote-backed 526-log wrapped child output was 3,045,307B/10s versus only 41 PTY bytes; large board process counters scaled sharply over small-board baseline.", "Remove proven unnecessary idle work while preserving input, resize, local reload, background sync/status and chooser refresh; no speculative redraw patch when PTY is already quiet.: Added content-sensitive per-instance baseline from existing synced-board file selection; skip only unchanged Mode::Publish. Baseline advances only on successful sync with identical before/after fingerprints; concurrent edits invalidate it. Mode::Refresh remains unconditional at 30s; pending/errors do not advance baseline, fingerprint errors surface and retry. Same-size preserved-mtime edit and edit-during-publish both triggered correct later publish; 30s refresh fetch still ran. No TUI-render code changed.", "Parent verifies comparable ten-second before/after wchar/syscw plus segmented PTY byte counts on safe small and ~526-log boards, native checks pass and temporary harnesses/fixtures are removed.: Remote-backed 526-log before/after figures are in validation: Δwchar 2,581,131→41; Δsyscw 16,313→3; PTY remained 41 bytes/10s. Local-only 526-log after was Δwchar=41, Δsyscw=3, PTY=41 bytes/10s. Git wrapper separated subprocess stdout from PTY and post-change found zero Git calls in the idle 10s window. Native checks passed and temporary tests/wrappers/fixtures were removed."]
   filesChanged: ["tandem/src/app/background_sync.rs", "tandem/src/project/sync.rs"]
-  updatedAt: "2026-10-17T04:10:23Z"
+  note: "Parent independent verification PASSED: remote small1log baseline10s wchar27,205/syscw175→after0/0; remote526logs3,605,200/16,070→after0/0; PTY0 both before/after after6swarmup. Contentedit same-size+preservedmtime published1.63s; remotepeeredit arrivedonscheduledrefresh; input/resize/quitgood. Native337+76/fmt/strictclippy/diffcheckpass. No logic correction requested."
+  updatedAt: "2026-10-17T04:10:24Z"
 createdAt: "2026-10-17T03:25:22Z"
-updatedAt: "2026-10-17T04:10:23Z"
+updatedAt: "2026-10-17T04:10:24Z"
 assignee: "worker-task-86-5004cbf6"
 ---
 
