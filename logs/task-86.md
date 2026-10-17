@@ -4,13 +4,12 @@ uid: 4f5af325-754e-4c25-9a3e-7880966c7125
 type: task
 kind: "papercut"
 title: "Diagnose and eliminate unnecessary idle TUI I/O"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/app/background_sync.rs", "tandem/src/project/sync.rs"]
 tags: ["tui", "rendering"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Attribute ten-second process-wide wchar/syscw deltas to actual write destinations and waited-for child accounting; identify the concrete unnecessary idle-I/O cause and board/log-size dependence before source edits.", "Remove the proven unnecessary idle work while preserving input, resize, local reload, background sync/status and chooser refresh; no speculative redraw patch when PTY is already quiet.", "Parent verifies comparable ten-second before/after wchar/syscw plus segmented PTY byte counts on safe small and ~526-log boards, native checks pass and temporary harnesses/fixtures are removed."]
   claimedAt: "2026-10-17T03:25:52Z"
   deliveredAt: "2026-10-17T04:34:01Z"
@@ -19,10 +18,13 @@ accord:
   summary: "Moved the synced-path doc comment back onto `is_board_path` and documented `board_fingerprint` accurately. No logic changed. Commit 3164830 (on top of implementation commit 02142c7); checkout clean."
   evidence: ["Correctly document fingerprint and path policy without further implementation changes: `board_fingerprint` now has the content-digest description; the original synced-board-path comment is directly above `is_board_path`. Only comments changed.", "Deliver clean committed Worker checkout: Comment fix committed as 3164830; checkout has no remaining changes."]
   filesChanged: ["tandem/src/project/sync.rs"]
-  updatedAt: "2026-10-17T04:34:01Z"
+  updatedAt: "2026-10-17T04:34:02Z"
 createdAt: "2026-10-17T03:25:22Z"
-updatedAt: "2026-10-17T04:34:01Z"
+updatedAt: "2026-10-17T04:34:02Z"
 assignee: "worker-task-86-5004cbf6"
+archivedAt: "2026-10-17T04:34:02Z"
+resolution:
+  outcome: "completed"
 ---
 
 ## Description
