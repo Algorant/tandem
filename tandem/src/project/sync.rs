@@ -40,6 +40,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 10;
 
 /// File path (relative to the board) to text content.
 pub(crate) type Files = BTreeMap<String, String>;
+pub(crate) type BoardFingerprint = BTreeMap<String, String>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Mode {
@@ -1600,6 +1601,16 @@ pub(crate) fn historical_message(version: &str) -> String {
     )
 }
 
+/// Digests the synced board files by path and content for change detection.
+pub(crate) fn board_fingerprint(board: &Path) -> Result<BoardFingerprint, String> {
+    read_board_dir_inner(board, false).map(|files| {
+        files
+            .into_iter()
+            .map(|(path, content)| (path, fake_oid(&content)))
+            .collect()
+    })
+}
+
 /// Whether a board-relative path is synced board content.
 pub(crate) fn is_board_path(path: &str) -> bool {
     if path == "tandem.md" {
@@ -1645,6 +1656,10 @@ pub(crate) fn top_field(content: &str, key: &str) -> Option<String> {
 
 /// Reads every synced board file below `board`.
 pub(crate) fn read_board_dir(board: &Path) -> Result<Files, String> {
+    read_board_dir_inner(board, true)
+}
+
+fn read_board_dir_inner(board: &Path, allow_missing: bool) -> Result<Files, String> {
     let mut files = Files::new();
     let mut visit = |relative: String| -> Result<(), String> {
         if is_board_path(&relative) {
@@ -1654,17 +1669,22 @@ pub(crate) fn read_board_dir(board: &Path) -> Result<Files, String> {
         }
         Ok(())
     };
-    let Ok(entries) = fs::read_dir(board) else {
-        return Ok(Files::new());
+    let entries = match fs::read_dir(board) {
+        Ok(entries) => entries,
+        Err(error) if allow_missing && error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(Files::new());
+        }
+        Err(error) => return Err(format!("could not read {}: {error}", board.display())),
     };
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| format!("could not list {}: {error}", board.display()))?;
         let name = entry.file_name().to_string_lossy().to_string();
         let path = entry.path();
         if path.is_dir() {
-            for child in fs::read_dir(&path)
-                .map_err(|error| error.to_string())?
-                .flatten()
-            {
+            let children = fs::read_dir(&path).map_err(|error| error.to_string())?;
+            for child in children {
+                let child = child.map_err(|error| error.to_string())?;
                 if child.path().is_file() {
                     visit(format!("{name}/{}", child.file_name().to_string_lossy()))?;
                 }

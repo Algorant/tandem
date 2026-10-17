@@ -85,6 +85,7 @@ impl BackgroundSync {
 fn run(workspace: &TandemProject, alias: &str, stop: &AtomicBool, note: &Mutex<Option<String>>) {
     let mut last_refresh: Option<Instant> = None;
     let mut last_message: Option<String> = None;
+    let mut last_published: Option<sync::BoardFingerprint> = None;
     let mut last_publish = Instant::now();
     let mut retry_after: Option<Instant> = None;
     while !stop.load(Ordering::Acquire) {
@@ -99,11 +100,54 @@ fn run(workspace: &TandemProject, alias: &str, stop: &AtomicBool, note: &Mutex<O
                 } else {
                     Mode::Publish
                 };
+                let (before, before_error) = match sync::board_fingerprint(workspace.data_dir()) {
+                    Ok(fingerprint) => (Some(fingerprint), None),
+                    Err(error) if mode == Mode::Publish => {
+                        let message = Some(format!("Sync fingerprint failed: {error}"));
+                        retry_after = Some(Instant::now() + RETRY_INTERVAL);
+                        if message != last_message {
+                            if let Ok(mut slot) = note.lock() {
+                                *slot = message
+                                    .as_ref()
+                                    .map(|message| format!("Workspace `{alias}`: {message}"));
+                            }
+                        }
+                        last_message = message;
+                        last_publish = Instant::now();
+                        thread::sleep(Duration::from_millis(100));
+                        continue;
+                    }
+                    Err(error) => (None, Some(format!("Sync fingerprint failed: {error}"))),
+                };
+                if mode == Mode::Publish && before.as_ref() == last_published.as_ref() {
+                    last_publish = Instant::now();
+                    thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
                 let message = match sync::sync(workspace, mode) {
                     Ok(report) => {
+                        let successful =
+                            matches!(report.outcome, Outcome::Synced | Outcome::LocalOnly);
                         retry_after = matches!(report.outcome, Outcome::Pending(_))
                             .then(|| Instant::now() + RETRY_INTERVAL);
-                        describe(&report)
+                        let after =
+                            successful.then(|| sync::board_fingerprint(workspace.data_dir()));
+                        let fingerprint_error = match (before, after) {
+                            (Some(before), Some(Ok(after))) if before == after => {
+                                last_published = Some(before);
+                                None
+                            }
+                            (Some(_), Some(Ok(_))) | (None, Some(Ok(_))) => {
+                                last_published = None;
+                                None
+                            }
+                            (_, Some(Err(error))) => {
+                                last_published = None;
+                                Some(format!("Sync fingerprint failed: {error}"))
+                            }
+                            (_, None) => None,
+                        };
+                        describe(&report).or(fingerprint_error).or(before_error)
                     }
                     Err(error) => {
                         retry_after = Some(Instant::now() + RETRY_INTERVAL);
