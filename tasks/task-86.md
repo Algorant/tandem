@@ -7,7 +7,7 @@ title: "Diagnose and eliminate unnecessary idle TUI I/O"
 state: "in-progress"
 priority: "medium"
 effort: "medium"
-relatedFiles: ["tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/chrome.rs", "tandem/src/app/background_sync.rs"]
+relatedFiles: ["tandem/src/app/background_sync.rs", "tandem/src/project/sync.rs"]
 tags: ["tui", "rendering"]
 accord:
   status: "claimed"
@@ -17,7 +17,7 @@ accord:
   constraints: ["Algorant requested immediate bug fix via Herdra; no mockup or unrelated layout/feature changes.", "Plan first, explicit Luna/high; isolated Task worktree. Observe baseline before source edits, with no mutation of real .pi records/event history.", "Use release builds and deterministic PTY/output measurements, not debug timing. Measure ten-second wchar/syscw and report byte/s + calls/s; preserve terminal dimensions/theme/input conditions.", "No general rendering framework, permanent tests/fixtures, push or release without separate authorization. Keep Rules task53 mockup lane separate."]
   updatedAt: "2026-10-17T03:30:30Z"
 createdAt: "2026-10-17T03:25:22Z"
-updatedAt: "2026-10-17T03:30:30Z"
+updatedAt: "2026-10-17T03:55:21Z"
 assignee: "worker-task-86-5004cbf6"
 ---
 
@@ -31,3 +31,11 @@ Use safe disposable Git-backed board snapshots or generated data, never mutate r
 ## Measurement correction from Herdra
 
 Original rates were /proc/PID/io totals, NOT per-fd or confirmed pty writes. Herdr rchar across allpanes~67KB/s and itsCPU unchanged whenTUIsSIGSTOPed, so no evidence terminal is churning. write_bytes145MB vswchar118GB. LiveTandem hasstdio→pty, eventpoll andconnectedAF_UNIXsocketpair (bothends owned bysameprocess). Herdra suspects internalwake/channel loop; investigate socketpair purpose, but test attribution rather than assume. LinuxprocessIO may include waited-forchildren, which a staticFDtable misses. Normal-priority performancefix, noturgent. RootWorker remains diagnostic/read-only before concrete cause+minimalimplementationplan approval; no guesses/syncdisable/renderframework.
+
+## Remote-backed cause verified; guarded implementation approved
+
+Remote-backed526-log release baseline10.010s: PTY41B, processwchar2,581,131/syscw16,313. Git-wrapper attribution3,045,307stdoutB/10s, chiefly13cat-file+19ls-tree calls. BackgroundSync calls fullPublish every2s; Engine loads base/current/pending trees BEFORE unchanged detection. No redraw/socket bug proved; do not change TUI rendering.
+
+Approve a narrow background-only unchanged-publish guard, both local-only/remote-backed, preserving2s local checks and30s remoteRefresh. Use a CONTENT-SENSITIVE fingerprint of existing authoritative synced-board file selection, not length/mtime-only (same-size edits/atomic replacement with preservedtimestamps must be detected). Prefer existing read_board_dir/is_board_path authority, no new registry/cacheframework/dependency. Do not advance successfulbaseline forpending/error. Tie baseline to observedsync input/output: changes DURING sync cannot be markedalready-published by blindlytakinga postsyncfingerprint; conservatively invalidate when before/after differ. Refresh never suppressed. File errors surface through existing warning/retry, not silently swallowed.
+
+Temporary tests: nochange/same-size+preservedmtime/atomicreplace/add/delete,2s localpublish,30s remotechanges,concurrent localedit duringpublish, held/conflict and safetycopy/recovery. Measure uninstrumented matching10sPTY/proc beforeafter and separateGit-wrapper attribution; startupstatussettled andsamegeometry. Nativechecks, cleanup, no permanenttests/fixtures, no push/release. Parentreview beforeintegration.
