@@ -3,7 +3,7 @@ id: task-53
 uid: 26e2bc8c-edb8-46d2-98d8-00e628cd44a0
 type: task
 title: "Rules end to end: starter set, categories, toggles and agent visibility — mockup first"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 tags: ["rules", "ui"]
 accord:
@@ -15,12 +15,16 @@ accord:
   note: "Phase-one53-1 delivered: http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Parentactualpost/PNG/source/hash/cleanGit/HTTPchecks passed. Awaitprototypejudgment/openchoices and separatelyapprovedimplementationplan. No rootcompletion/worker_finish/merge/codeauthorized; retainedAstraWorker clean. EA slotreleased; no browsers/previews."
   updatedAt: "2026-10-17T03:58:15Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-17T03:58:15Z"
+updatedAt: "2026-10-17T03:58:16Z"
 blockers: ["task-81"]
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
 relatedFiles: ["protocol/README.md", "tandem/src/app/project.rs", "tandem/src/app/rules.rs", "tandem/src/project/rules.rs", "tandem/src/tui/rules.rs"]
 assignee: "worker-task-53-b81689dc"
+validation.criterion: "Phase one: an Astra or Fable Worker publishes an explicitly proposed Sideshow end-to-end rules mockup using a toy project, showing the seeded set, always/never/prefer/context categories, on/off behavior and what agents see, with Excalidraw-method diagram assets; Algorant reviews it before any implementation."
+validation.note: "Phase-one prototype judgment ONLY: internalmilestone53-1 delivered (Subtasks cannot separately enterreview). Parent verified actualfourposts matchpayload, bothnativePNGpixels/hashes andeditablesourcespresent, gitclean,HTTP200. http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Futureimplementationcriteria remain gated/unimplemented. DoNOTcomplete/worker_finishroot; awaitprototypeacceptance andnewplan. EA slotreleased."
+validation.requestedAt: "2026-10-17T03:58:16Z"
+validation.reviewer: "Algorant"
 ---
 ## Consolidated scope and gate
 
