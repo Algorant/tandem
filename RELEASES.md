@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.2
+
+Tandem v0.17.2 lets boards sync to remotes that check commit authors. Protocol remains 0.5.0; current boards need no migration.
+
+### Fixed
+
+- Board commits on the `tandem` branch now use the repository's `git config user.name` and `user.email` as author and committer instead of the fixed `Tandem <tandem@localhost>`. Remotes with author push rules, such as GitLab's "author is not a member" check, no longer reject every sync, so records created there get their permanent numbers. Without a configured identity, the old `Tandem <tandem@localhost>` fallback still applies.
+
+**After upgrading:** restart running TUI or web views on affected boards, then run `tandem sync`; records still carrying temporary `task-new-*` IDs are numbered on that first successful sync.
+
 ## 0.17.1
 
 Tandem v0.17.1 fixes mutation refusals and concurrent creation responses, and replaces the public documentation with seven focused pages. Protocol remains 0.5.0; current boards need no migration.

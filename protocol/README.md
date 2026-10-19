@@ -85,6 +85,8 @@ Required fields are `ts`, `seq`, `actor`, `event`, `id`, and structured event-sp
 
 A Git-backed board synchronizes through the repository's `tandem` branch on its remote (`git config tandem.remote`, else `origin`, else the only remote). Source commits never contain the board, so board changes never stage, commit, or block source-branch operations.
 
+Every board commit (sync, safety copy, migration) is authored and committed with the repository's effective Git identity, `git config user.name` and `user.email`, so remotes that check commit authors accept it. A field that is not configured falls back to `Tandem` or `tandem@localhost`; `GIT_AUTHOR_*` and `GIT_COMMITTER_*` environment variables are ignored. The commit identity is Git metadata only: it is unrelated to the checkout-local event actor identity.
+
 Local state lives in the Git directory: `refs/tandem/pending` (safety copy of the latest local snapshot), `refs/tandem/base` (the last `tandem` commit merged), `refs/tandem/remote` (last fetched tip), and private files under `<git-common-dir>/tandem/` (lock, index, open conflicts, status).
 
 One sync, under the board lock:

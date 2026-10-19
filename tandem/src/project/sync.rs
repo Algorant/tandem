@@ -1156,20 +1156,20 @@ impl<'a> Engine<'a> {
         }
         args.push("-m");
         args.push(&message);
-        let identity = [
-            ("GIT_AUTHOR_NAME", "Tandem"),
-            ("GIT_AUTHOR_EMAIL", "tandem@localhost"),
-            ("GIT_COMMITTER_NAME", "Tandem"),
-            ("GIT_COMMITTER_EMAIL", "tandem@localhost"),
-        ];
+        // Board commits carry the repository's Git identity so remotes that
+        // check commit authors accept them.
+        let name = self.identity("user.name", "Tandem");
+        let email = self.identity("user.email", "tandem@localhost");
         let output = git::run(
             &self.ctx.main_worktree,
             &args,
             GitCall {
-                env: identity
-                    .iter()
-                    .map(|(key, value)| (*key, OsString::from(value)))
-                    .collect(),
+                env: vec![
+                    ("GIT_AUTHOR_NAME", OsString::from(&name)),
+                    ("GIT_AUTHOR_EMAIL", OsString::from(&email)),
+                    ("GIT_COMMITTER_NAME", OsString::from(&name)),
+                    ("GIT_COMMITTER_EMAIL", OsString::from(&email)),
+                ],
                 ..Default::default()
             },
         )?;
@@ -1177,6 +1177,14 @@ impl<'a> Engine<'a> {
             Ok(output.stdout_text())
         } else {
             Err(format!("git commit-tree failed: {}", output.stderr.trim()))
+        }
+    }
+
+    /// The effective Git config value for `key`, or `fallback` when unset.
+    fn identity(&self, key: &str, fallback: &str) -> String {
+        match git::text(&self.ctx.main_worktree, &["config", "--get", key]) {
+            Ok(value) if !value.is_empty() => value,
+            _ => fallback.to_string(),
         }
     }
 

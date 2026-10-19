@@ -205,6 +205,91 @@ fn go_online(world: &World, repo: &Path) {
 }
 
 #[test]
+fn board_commits_use_the_repository_identity_so_author_rules_accept_them() {
+    let world = World::new("identity");
+    // Stand in for a hosted push rule: reject commits not authored and
+    // committed by the configured member.
+    let hook = world.remote.join("hooks/pre-receive");
+    fs::write(
+        &hook,
+        "#!/bin/sh\nwhile read old new ref; do\n  for c in $(git rev-list \"$new\" --not --all); do\n    who=$(git log -1 --format='%ae %ce' \"$c\")\n    if [ \"$who\" != 'tests@example.invalid tests@example.invalid' ]; then\n      echo \"Author '${who%% *}' is not a member of team\" >&2\n      exit 1\n    fi\n  done\ndone\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&hook).unwrap().permissions();
+    std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+    fs::set_permissions(&hook, permissions).unwrap();
+
+    let a = world.clone("a");
+    ok(&a, &["init", "--title", "Shared board"]);
+    let created = add_task(&a, "Pushed past the author rule");
+    assert_eq!(created["data"]["id"], "task-1");
+    assert_eq!(created["data"]["sync"]["status"], "synced");
+    let authors = git(
+        &world.remote,
+        &["log", "--format=%an <%ae>|%cn <%ce>", "tandem"],
+    );
+    assert!(!authors.is_empty());
+    for line in authors.lines() {
+        assert_eq!(
+            line,
+            "Tandem Tests <tests@example.invalid>|Tandem Tests <tests@example.invalid>"
+        );
+    }
+
+    // Without any configured identity Tandem falls back to its own, which
+    // the rule rejects; the record stays saved with a temporary ID.
+    let b = world.clone("b");
+    git(&b, &["config", "--unset", "user.name"]);
+    git(&b, &["config", "--unset", "user.email"]);
+    let isolated = |args: &[&str]| -> Value {
+        let mut argv = vec!["--json"];
+        argv.extend(args);
+        let output = Command::new(env!("CARGO_BIN_EXE_tandem"))
+            .args(&argv)
+            .current_dir(&b)
+            .env("TANDEM_SYNC_TIMEOUT", "5")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_AUTHOR_EMAIL", "ignored@example.invalid")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        serde_json::from_slice(&output.stdout).unwrap()
+    };
+    let held = isolated(&["add", "task", "No identity yet", "--acceptance", "done"]);
+    let handle = held["data"]["id"].as_str().unwrap().to_string();
+    assert!(handle.starts_with("task-new-"), "{handle}");
+    assert_eq!(held["data"]["sync"]["status"], "pending");
+    assert!(
+        held["data"]["sync"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("'tandem@localhost' is not a member"),
+        "{held}"
+    );
+    assert_eq!(
+        git(
+            &b,
+            &[
+                "log",
+                "-1",
+                "--format=%an <%ae>|%cn <%ce>",
+                "refs/tandem/pending"
+            ]
+        ),
+        "Tandem <tandem@localhost>|Tandem <tandem@localhost>"
+    );
+
+    // Configuring the repository identity lets the next sync publish and
+    // number the record.
+    configure(&b);
+    let synced = isolated(&["sync"]);
+    assert_eq!(synced["data"]["sync"]["status"], "synced", "{synced}");
+    assert_eq!(ids(&b), vec!["task-1", "task-2"]);
+    assert_eq!(title(&b, "task-2"), "No identity yet");
+}
+
+#[test]
 fn fresh_clone_downloads_the_board_and_source_stays_clean() {
     let (world, a, b) = World::two_machines("hydrate");
     add_task(&a, "Created on A");

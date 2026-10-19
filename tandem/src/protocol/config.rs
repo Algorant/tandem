@@ -39,25 +39,6 @@ pub(crate) fn embedded_rules_warning(root: Option<&yaml_rust2::Yaml>) -> Option<
         "Legacy embedded rules found in the `rules:` block in tandem.md; those rules are not active. Move them to individual files under `.tandem/rules/`.".to_string()
     })
 }
-#[cfg(test)]
-mod tests {
-    use super::embedded_rules_warning;
-    use yaml_rust2::YamlLoader;
-
-    #[test]
-    fn embedded_rules_are_reported_but_empty_defaults_are_not() {
-        let empty = YamlLoader::load_from_str("rules:\n  always: []\n  never: []\n").unwrap();
-        assert!(embedded_rules_warning(empty.first()).is_none());
-
-        let populated = YamlLoader::load_from_str(
-            "rules:\n  always:\n    - id: always-1\n      rule: Keep it explicit\n",
-        )
-        .unwrap();
-        let warning = embedded_rules_warning(populated.first()).unwrap();
-        assert!(warning.contains("rules:` block in tandem.md"));
-        assert!(warning.contains("not active"));
-    }
-}
 
 fn yaml_value_is_populated(value: &yaml_rust2::Yaml) -> bool {
     match value {
@@ -85,3 +66,23 @@ pub(crate) struct RuleItem {
 }
 
 pub(crate) type RulesByCategory = std::collections::BTreeMap<String, Vec<RuleItem>>;
+
+#[cfg(test)]
+mod tests {
+    use super::embedded_rules_warning;
+    use yaml_rust2::YamlLoader;
+
+    #[test]
+    fn embedded_rules_are_reported_but_empty_defaults_are_not() {
+        let empty = YamlLoader::load_from_str("rules:\n  always: []\n  never: []\n").unwrap();
+        assert!(embedded_rules_warning(empty.first()).is_none());
+
+        let populated = YamlLoader::load_from_str(
+            "rules:\n  always:\n    - id: always-1\n      rule: Keep it explicit\n",
+        )
+        .unwrap();
+        let warning = embedded_rules_warning(populated.first()).unwrap();
+        assert!(warning.contains("rules:` block in tandem.md"));
+        assert!(warning.contains("not active"));
+    }
+}
