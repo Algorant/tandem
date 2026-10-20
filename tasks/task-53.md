@@ -3,7 +3,7 @@ id: task-53
 uid: 26e2bc8c-edb8-46d2-98d8-00e628cd44a0
 type: task
 title: "Rules end to end: starter set, categories, toggles and agent visibility — mockup first"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 tags: ["rules", "ui"]
 accord:
@@ -18,11 +18,15 @@ accord:
   filesChanged: ["AGENTS.md", "docs/agents/index.md", "docs/cli/index.md", "docs/quick-start/index.md", "docs/tui/index.md", "plan/agent-adapter-implementation-handoffs.md", "protocol/README.md", "tandem/src/app/project.rs", "tandem/src/app/rules.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/project/agent_files.rs", "tandem/src/project/frontmatter.rs", "tandem/src/project/mod.rs", "tandem/src/project/rules.rs", "tandem/src/project/rules_contract_tests.rs", "tandem/src/project/sync.rs", "tandem/src/protocol/config.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/rules.rs", "tandem/src/web.rs", "tandem/src/web/app.css", "tandem/src/web/ui.js", "tandem/tests/init_behavior.rs", "tandem/tests/sync_behavior.rs"]
   updatedAt: "2026-10-20T23:15:20Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-20T23:15:20Z"
+updatedAt: "2026-10-20T23:15:21Z"
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
 relatedFiles: ["protocol/README.md", "tandem/src/protocol/config.rs", "tandem/src/project/rules.rs", "tandem/src/app/rules.rs", "tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/reload.rs", "docs/agents/index.md", "docs/cli/index.md", "docs/tui/index.md"]
 assignee: "worker-task-53-b81689dc"
+validation.criterion: "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized."
+validation.note: "Updated actual UI postPGtIuqGQnPs in http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Herdra already verified TUIcounts/OnOff/control/selection; requested web commandnowrap is fixed and recaptured, samepostonlywebsurfacechanged. Allparenttechnicalchecks pass, browsers/ownedpreviews stopped. Await Algorant's release screenshot gate; no integration/versionbump/release yet."
+validation.requestedAt: "2026-10-20T23:15:21Z"
+validation.reviewer: "Algorant"
 ---
 ## Approved scope
 
