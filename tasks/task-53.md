@@ -18,14 +18,14 @@ accord:
   filesChanged: ["AGENTS.md", "docs/agents/index.md", "docs/cli/index.md", "docs/quick-start/index.md", "docs/tui/index.md", "plan/agent-adapter-implementation-handoffs.md", "protocol/README.md", "tandem/src/app/project.rs", "tandem/src/app/rules.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/project/agent_files.rs", "tandem/src/project/frontmatter.rs", "tandem/src/project/mod.rs", "tandem/src/project/rules.rs", "tandem/src/project/rules_contract_tests.rs", "tandem/src/project/sync.rs", "tandem/src/protocol/config.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/rules.rs", "tandem/src/web.rs", "tandem/src/web/ui.js", "tandem/tests/init_behavior.rs", "tandem/tests/sync_behavior.rs"]
   updatedAt: "2026-10-20T23:10:51Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-20T23:10:51Z"
+updatedAt: "2026-10-20T23:10:53Z"
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
 relatedFiles: ["protocol/README.md", "tandem/src/protocol/config.rs", "tandem/src/project/rules.rs", "tandem/src/app/rules.rs", "tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/reload.rs", "docs/agents/index.md", "docs/cli/index.md", "docs/tui/index.md"]
 assignee: "worker-task-53-b81689dc"
-validation.criterion: "Phase one: an Astra or Fable Worker publishes an explicitly proposed Sideshow end-to-end rules mockup using a toy project, showing the seeded set, always/never/prefer/context categories, on/off behavior and what agents see, with Excalidraw-method diagram assets; Algorant reviews it before any implementation."
-validation.note: "Phase-one prototype judgment ONLY: internalmilestone53-1 delivered (Subtasks cannot separately enterreview). Parent verified actualfourposts matchpayload, bothnativePNGpixels/hashes andeditablesourcespresent, gitclean,HTTP200. http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Futureimplementationcriteria remain gated/unimplemented. DoNOTcomplete/worker_finishroot; awaitprototypeacceptance andnewplan. EA slotreleased."
-validation.requestedAt: "2026-10-17T03:58:16Z"
+validation.criterion: "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized."
+validation.note: "Actual implemented UI screenshot gate before0.17.3 release: http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI, newest postPGtIuqGQnPs. Parent native/byte/pointer checks pass; real Space/mouse counts, stable selection and enabled-only web verified. Faithful realANSI viewport PNGs, not mockups; optional Obscura web screenshot included. Human approval requested per explicit release gate. No integration/version bump/release yet; previews/browser stopped, shared safejustdev route remains."
+validation.requestedAt: "2026-10-20T23:10:53Z"
 validation.reviewer: "Algorant"
 ---
 ## Approved scope
