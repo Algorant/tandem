@@ -3,11 +3,11 @@ id: task-53
 uid: 26e2bc8c-edb8-46d2-98d8-00e628cd44a0
 type: task
 title: "Rules end to end: starter set, categories, toggles and agent visibility — mockup first"
-state: "validation"
+state: "in-progress"
 priority: "medium"
 tags: ["rules", "ui"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Phase one: an Astra or Fable Worker publishes an explicitly proposed Sideshow end-to-end rules mockup using a toy project, showing the seeded set, always/never/prefer/context categories, on/off behavior and what agents see, with Excalidraw-method diagram assets; Algorant reviews it before any implementation.", "After separate approval: normative on/off representation/defaults, CLI/JSON and context refresh behavior are decided before code; disabled rules remain discoverable and retain IDs, category, text/source and supported metadata.", "After separate approval: init seeds agreed categorized rules, reports them, and idempotently adds a short rules pointer to existing AGENTS.md/CLAUDE.md without creating absent files.", "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized.", "After separate approval: temporary native checks cover seeded/default/present-absent/idempotent pointer cases, toggling/readback and context refresh; published guidance matches the verified contract."]
   claimedAt: "2026-10-17T02:47:10Z"
   deliveredAt: "2026-10-20T23:10:51Z"
@@ -16,17 +16,14 @@ accord:
   summary: "Implemented accepted rules prototype as whole Task: six categorized enabled starters, safe existing-agent-file pointers, enabled-only guidance and retained on/off management via shared CLI/TUI operations; clean source47ca4cf. Parent verified native checks, byte/metadata/pointer matrix, real keyboard+mouse ANSI captures and enabled-only web. Actual UI review remains the pre-release gate."
   evidence: ["Algorant accepted phase-one four-post proposal before implementation; Herdra approved build plan/current retained model and exact symlink/web boundaries. Native EA sources/PNGs retained; no external adapter implementation.", "Parent independently passed 13 isolated checks: seed/pointer none/single/both/shared-symlink/exact/dangling, pre-init nonregular refusal, omitted=true/no rewrite, no-op bytes/events, strict bool errors, CRLF/nested metadata/body retention, disabled-state text edit and same-ID re-enable. Fixtures/harness removed.", "Parent final-source justdevcheck/fmt/strictclippy/diffcheck passed. Worker Git/non-Git matrix covered published/provisional IDs, two-clone refresh, pointer target race/mode, task86/task87 regressions and removed all new temporary native checks.", "Real release-profile TUI at47ca4cf: Space changed six stored5on1off→6on0off; actual SGR mouse action restored5on1off with same selectedalways-2. Category title/width defects fixed and recaptured. Native ANSI files and PNGs retained under/tmp/task53-tui-*; no invented labels/counts.", "WebAPI and Obscura page showed exactly five enabled records, disabledalways-2 absent; assignment schema untouched. Browser/server/ownedpreview panes stopped. Screenshot set at http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI (postPGtIuqGQnPs), boundedHTTP200. Await Herdra/Algorant actualUI review before integration/release. Shared safe justdev route retained for review."]
   filesChanged: ["AGENTS.md", "docs/agents/index.md", "docs/cli/index.md", "docs/quick-start/index.md", "docs/tui/index.md", "plan/agent-adapter-implementation-handoffs.md", "protocol/README.md", "tandem/src/app/project.rs", "tandem/src/app/rules.rs", "tandem/src/cli/commands.rs", "tandem/src/cli/model.rs", "tandem/src/project/agent_files.rs", "tandem/src/project/frontmatter.rs", "tandem/src/project/mod.rs", "tandem/src/project/rules.rs", "tandem/src/project/rules_contract_tests.rs", "tandem/src/project/sync.rs", "tandem/src/protocol/config.rs", "tandem/src/tui/bindings.rs", "tandem/src/tui/input.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/rules.rs", "tandem/src/web.rs", "tandem/src/web/ui.js", "tandem/tests/init_behavior.rs", "tandem/tests/sync_behavior.rs"]
-  updatedAt: "2026-10-20T23:10:51Z"
+  note: "Herdra inspected screenshot postPGtIuqGQnPs: TUI counts/OnOff/control/stable selection look right. One requested localized correction before Algorant sees it: web subtitle command `tandem rules list --all` currently wraps between `--` and `all`. Render it as semantic inline code with nowrap; keep ordinary subtitle text wrapping. Strict CSP is style-src 'self', so do NOT use inline style or weaken CSP; a narrowly scoped class in existing app.css is authorized as necessary for this explicit correction (no red"
+  updatedAt: "2026-10-20T23:12:21Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-20T23:10:53Z"
+updatedAt: "2026-10-20T23:12:21Z"
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
 relatedFiles: ["protocol/README.md", "tandem/src/protocol/config.rs", "tandem/src/project/rules.rs", "tandem/src/app/rules.rs", "tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/reload.rs", "docs/agents/index.md", "docs/cli/index.md", "docs/tui/index.md"]
 assignee: "worker-task-53-b81689dc"
-validation.criterion: "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized."
-validation.note: "Actual implemented UI screenshot gate before0.17.3 release: http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI, newest postPGtIuqGQnPs. Parent native/byte/pointer checks pass; real Space/mouse counts, stable selection and enabled-only web verified. Faithful realANSI viewport PNGs, not mockups; optional Obscura web screenshot included. Human approval requested per explicit release gate. No integration/version bump/release yet; previews/browser stopped, shared safejustdev route remains."
-validation.requestedAt: "2026-10-20T23:10:53Z"
-validation.reviewer: "Algorant"
 ---
 ## Approved scope
 
