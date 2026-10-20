@@ -227,3 +227,4 @@
 {"ts":"2026-10-17T04:34:02Z","event":"task.completed","id":"task-86","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":227,"data":{}}
 {"ts":"2026-10-20T22:45:48Z","event":"task.updated","id":"task-53","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":228,"data":{"fields":["validation","body"]}}
 {"ts":"2026-10-20T22:45:49Z","event":"task.completed","id":"task-53-1","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":229,"data":{}}
+{"ts":"2026-10-20T22:49:47Z","event":"task.updated","id":"task-53","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":230,"data":{"fields":["relatedFiles","constraints","body","blockers"]}}
