@@ -10,12 +10,12 @@ accord:
   status: "blocked"
   acceptance: ["Phase one: an Astra or Fable Worker publishes an explicitly proposed Sideshow end-to-end rules mockup using a toy project, showing the seeded set, always/never/prefer/context categories, on/off behavior and what agents see, with Excalidraw-method diagram assets; Algorant reviews it before any implementation.", "After separate approval: normative on/off representation/defaults, CLI/JSON and context refresh behavior are decided before code; disabled rules remain discoverable and retain IDs, category, text/source and supported metadata.", "After separate approval: init seeds agreed categorized rules, reports them, and idempotently adds a short rules pointer to existing AGENTS.md/CLAUDE.md without creating absent files.", "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized.", "After separate approval: temporary native checks cover seeded/default/present-absent/idempotent pointer cases, toggling/readback and context refresh; published guidance matches the verified contract."]
   claimedAt: "2026-10-17T02:47:10Z"
-  validation: ["$ git diff --check"]
+  validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Phase one is mockup/design only, on a fresh Astra (openai-codex/gpt-6-astra) or Fable Worker; explicit plan before artifacts. The named model is Algorant's exception to Luna for this design pass.", "No implementation, protocol/code changes or actual init/toggle behavior until Algorant reviews the prototype and approves a subsequent plan.", "Keep entire root Task with its Worker; prototype milestone is internal, never separately delegated. Mockup milestone does not complete the whole Task.", "Serialize Excalidraw/Obsidian access after task-81 visual production; existing vault/EA PNG method only, editable source retained, no exporter or hand-written scenes.", "No external adapter implementation under this Task; needed integration work requires a separately authorized handoff. Temporary checks only."]
   note: "Phase-one53-1 delivered: http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Parentactualpost/PNG/source/hash/cleanGit/HTTPchecks passed. Awaitprototypejudgment/openchoices and separatelyapprovedimplementationplan. No rootcompletion/worker_finish/merge/codeauthorized; retainedAstraWorker clean. EA slotreleased; no browsers/previews."
-  updatedAt: "2026-10-17T03:58:15Z"
+  updatedAt: "2026-10-20T22:45:48Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-17T03:58:16Z"
+updatedAt: "2026-10-20T22:45:48Z"
 blockers: ["task-81"]
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
@@ -43,3 +43,13 @@ Task-81 owns current docs diagram production first; serialize the shared Obsidia
 Preserve original init requirement: prebuilt rules helping coordination (read rules, use Tandem CLI/tools, don't mutate board files directly, archive records read-only), a reviewed category for every seeded rule, stable IDs, explicit init output, and an idempotent one-line pointer in existing AGENTS.md and/or CLAUDE.md only. On/off design must specify its durable representation and existing-rule defaults, preserve disabled records, expose CLI/JSON and accessible TUI behavior, and define how context consumers obtain current enabled rules. Normative semantics first, shared app operations next; do not duplicate protocol parsing or modify external framework configuration without an explicit authorized adapter handoff.
 
 This is the combined work from tasks 53/54/20, not permission to start that implementation now.
+
+## Approved prototype and implementation planning — Algorant via Herdra
+
+Prototype accepted (Herdra request mecd47994). Obtain and send the implementation build plan to Herdra BEFORE code; implementation waits for that approval. Ship accepted implementation with task-86 as 0.17.3; 0.17.2/task-87 must be preserved. User must see the real TUI Rules toggle screenshot before release.
+
+Approved choices: enabled boolean; omitted field means enabled, no existing-rule rewrite/migration; new six starter rules enabled and accepted exactly as drafted; rules list defaults enabled-only with explicit all flag; no disable confirmation/warning; session-start agent re-read, no running-agent push or silent failed-read fallback; exact-line pointer in BOTH existing AGENTS.md/CLAUDE.md, never create absent files or rewrite prose. Off retains records/identity; re-enable same identity. Tandem proposes CLI names, normal JSON envelope and timestamp semantics in its plan.
+
+Accepted starters: always: Read current project rules before starting work.; Use Tandem CLI/tools for coordination changes. never: Do not edit board files directly.; Do not alter archived records. prefer: Keep work small and independently verifiable. context: The Board holds active work; Logs hold completed history.
+
+Existing Worker retained, planning only. Native checks and temporary feature checks; no permanent tests/fixtures or external adapter edits. Keep phase-one source/PNG artifacts retained; no more vault work required. Release/push/machine upgrades/open-TUI restarts authorized after plan, implementation and screenshot gates; desktop/archbox coordinated, x1nano when online.
