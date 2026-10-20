@@ -7,15 +7,14 @@ state: "validation"
 priority: "medium"
 tags: ["rules", "ui"]
 accord:
-  status: "blocked"
+  status: "claimed"
   acceptance: ["Phase one: an Astra or Fable Worker publishes an explicitly proposed Sideshow end-to-end rules mockup using a toy project, showing the seeded set, always/never/prefer/context categories, on/off behavior and what agents see, with Excalidraw-method diagram assets; Algorant reviews it before any implementation.", "After separate approval: normative on/off representation/defaults, CLI/JSON and context refresh behavior are decided before code; disabled rules remain discoverable and retain IDs, category, text/source and supported metadata.", "After separate approval: init seeds agreed categorized rules, reports them, and idempotently adds a short rules pointer to existing AGENTS.md/CLAUDE.md without creating absent files.", "After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized.", "After separate approval: temporary native checks cover seeded/default/present-absent/idempotent pointer cases, toggling/readback and context refresh; published guidance matches the verified contract."]
   claimedAt: "2026-10-17T02:47:10Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["Prototype and implementation plan approved by Algorant via Herdra; same retained Astra Worker is approved through implementation.", "Implement normative semantics first, shared app/project operations next; CLI/TUI peers consume them. No external adapter implementation or new tool/framework.", "Temporary feature tests/fixtures only; remove before delivery. Existing tests may receive mechanical field/expectation updates.", "Actual Rules TUI screenshot showing On/Off, counts and toggle goes to Herdra for Algorant BEFORE release.", "Worker owns scoped implementation/clean commits only. Parent owns source reconciliation/integration/push, task lifecycle, preview routing, release, machine upgrades, TUI restarts and worktree cleanup."]
-  note: "Phase-one53-1 delivered: http://desktop.tail1cefc.ts.net:8228/session/XLDMECmdbMI. Parentactualpost/PNG/source/hash/cleanGit/HTTPchecks passed. Awaitprototypejudgment/openchoices and separatelyapprovedimplementationplan. No rootcompletion/worker_finish/merge/codeauthorized; retainedAstraWorker clean. EA slotreleased; no browsers/previews."
-  updatedAt: "2026-10-20T22:49:47Z"
+  updatedAt: "2026-10-20T22:52:33Z"
 createdAt: "2026-10-01T18:27:09Z"
-updatedAt: "2026-10-20T22:49:47Z"
+updatedAt: "2026-10-20T22:52:33Z"
 effort: "large"
 references: ["task-54", "task-20", "task-81"]
 relatedFiles: ["protocol/README.md", "tandem/src/protocol/config.rs", "tandem/src/project/rules.rs", "tandem/src/app/rules.rs", "tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/reload.rs", "docs/agents/index.md", "docs/cli/index.md", "docs/tui/index.md"]
