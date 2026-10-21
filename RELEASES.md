@@ -2,6 +2,19 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.3
+
+Protocol remains 0.5.0; existing boards need no migration.
+
+### Added
+
+- Fresh workspaces start with six categorized coordination rules. Initialization reports them and adds a rules pointer only to existing `AGENTS.md` and `CLAUDE.md` files.
+- Rules can be turned on or off without deletion through the CLI or TUI keyboard/mouse controls. Guidance reads include enabled rules by default; disabled records remain available in the TUI and `tandem rules list --all`.
+
+### Fixed
+
+- Idle TUIs skip unchanged background Git snapshots instead of repeatedly rebuilding board trees. Two-second local checks and periodic remote refresh continue.
+
 ## 0.17.2
 
 Tandem v0.17.2 lets boards sync to remotes that check commit authors. Protocol remains 0.5.0; current boards need no migration.
