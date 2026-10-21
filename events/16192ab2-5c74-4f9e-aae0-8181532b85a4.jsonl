@@ -236,3 +236,4 @@
 {"ts":"2026-10-20T23:15:20Z","event":"accord.delivered","id":"task-53","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":236,"data":{}}
 {"ts":"2026-10-20T23:15:21Z","event":"review.requested","id":"task-53","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":237,"data":{"criterion":"After separate approval: TUI keyboard/mouse state and agent-facing enabled-rule selection are unambiguous, reload-safe and not color-only; any external integration change is separately authorized."}}
 {"ts":"2026-10-21T02:22:14Z","event":"task.completed","id":"task-53","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":238,"data":{}}
+{"ts":"2026-10-21T02:22:29Z","event":"task.updated","id":"task-89","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":239,"data":{"fields":["blockers"]}}

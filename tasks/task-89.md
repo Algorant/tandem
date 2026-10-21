@@ -6,7 +6,6 @@ title: "Release Tandem 0.17.3 and upgrade online clients together"
 state: todo
 priority: "high"
 effort: "medium"
-blockers: ["task-53"]
 references: ["task-86", "task-87"]
 relatedFiles: ["tandem/Cargo.toml", "tandem/Cargo.lock", "RELEASES.md", "justfile", "scripts/release_checks.sh"]
 tags: ["config", "release"]
@@ -17,7 +16,7 @@ accord:
   constraints: ["Authorized by Algorant via Herdra mecd47994/m084bd177; release and push are allowed only after task53 verification and actual TUI screenshot review gate.", "Preserve published 0.17.2/task87; ship task86 idle-I/O guard plus task53 starters/on-off as0.17.3. No unrelated release machinery or adapter changes.", "Upgrade desktop and archbox together immediately after verified publication; x1nano when back online. Restart only Tandem TUIs after preserving their cwd/arguments/session boards; do not interrupt agents or other services."]
   updatedAt: "2026-10-20T22:50:25Z"
 createdAt: "2026-10-20T22:50:25Z"
-updatedAt: "2026-10-20T22:50:25Z"
+updatedAt: "2026-10-21T02:22:29Z"
 ---
 
 ## Description
