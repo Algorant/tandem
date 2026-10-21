@@ -3,18 +3,20 @@ id: task-90
 uid: 8ee67079-7198-46b0-84b1-f61447d6c088
 type: task
 title: "Upgrade x1nano to the coordinated Tandem release when online"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "small"
 references: ["task-89"]
 tags: ["config", "upgrade"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["After x1nano is online, its actual mise-resolved Tandem binary reports the coordinated release (at least0.17.3) before resuming shared-board work.", "Any old open Tandem TUIs are restarted with cwd/arguments/session-board entries preserved; no agents or unrelated services are interrupted."]
+  claimedAt: "2026-10-21T03:28:14Z"
   constraints: ["External availability condition: x1nano was offline at0.17.3 publication; do not claim it upgraded or repeatedly probe/wait.", "Use existing mise/SSH workflow; no source implementation, new infrastructure or profile changes."]
-  updatedAt: "2026-10-21T02:35:32Z"
+  updatedAt: "2026-10-21T03:28:14Z"
 createdAt: "2026-10-21T02:35:32Z"
-updatedAt: "2026-10-21T02:35:32Z"
+updatedAt: "2026-10-21T03:28:14Z"
+assignee: "tandem"
 ---
 
 ## Description
