@@ -241,3 +241,4 @@
 {"ts":"2026-10-21T02:25:44Z","event":"accord.blocked","id":"task-89","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":241,"data":{}}
 {"ts":"2026-10-21T02:26:00Z","event":"accord.resumed","id":"task-89","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":242,"data":{}}
 {"ts":"2026-10-21T02:35:32Z","event":"task.created","id":"task-90","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":243,"data":{"title":"Upgrade x1nano to the coordinated Tandem release when online"}}
+{"ts":"2026-10-21T02:36:38Z","event":"task.created","id":"task-91","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":244,"data":{"title":"Bun dry-run with lockfile-only unexpectedly writes the site lock"}}
