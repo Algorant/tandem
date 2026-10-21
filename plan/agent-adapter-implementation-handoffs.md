@@ -5,6 +5,19 @@ Date: 2026-08-03
 
 This document records the research disposition for framework-neutral agent guidance. It is not runtime prompt text. Normative universal semantics live in `protocol/plan/spec.md`; public operational guidance lives in `docs/guides/agents-and-adapters.md`. Active `.tandem` rules remain repository policy.
 
+## Current handoff: enabled rules (task-53)
+
+This supersedes the historical all-rules consumption wording below. External adapter implementation is **not** part of task-53; the retired `pi-tandem` paths below are historical, not authorization to recreate that adapter.
+
+- On every agent session start, invoke installed `tandem rules list --json` from the explicit project directory through a non-interpolating process API. Validate success, preserve warnings and apply the enabled guidance returned by Tandem.
+- Never parse rule Markdown, invent enable filtering or silently reuse old/empty guidance after a failed read. Resolve failures and disclose sync warnings; normal read freshness is local plus Tandem's existing remote-refresh policy, not a guaranteed remote fetch.
+- Management exposes `rules list --all`, `rules enable ID` and `rules disable ID`, preserving IDs, enabled/changed results and sync diagnostics. The CLI owns defaults, strict boolean parsing and no-op semantics.
+- Rule mutation and read do not automatically inject running context. The consumer must explicitly re-read and apply current guidance; prior transcript text remains.
+- Coordinate upgrade to 0.17.3 and restart old consumers before relying on disabled rules. Older clients ignore the new field; no board migration is needed.
+- Consumer-owned startup hooks/tool schemas/presentation require a separate authorized adapter task. Verify success/warning/error handling and session-start rereads there; do not duplicate protocol logic.
+
+Current public guidance: [Agents](../docs/agents/index.md); normative contract: [Protocol](../protocol/README.md).
+
 ## Disposition
 
 Existing adapter text was research input, not an authority. The table classifies the behavior by its correct owner.

@@ -20,6 +20,7 @@ mod tests {
             uid: None,
             id: id.clone(),
             category: "always".into(),
+            enabled: true,
             source: Some("decision-1".into()),
             created_at: Some("now".into()),
             updated_at: Some("now".into()),

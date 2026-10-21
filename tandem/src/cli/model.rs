@@ -355,8 +355,17 @@ pub(crate) struct RulesArgs {
 }
 #[derive(Debug, Subcommand)]
 pub(crate) enum RulesCommand {
+    /// List enabled rules; --all includes disabled rules.
     List {
         category: Option<String>,
+        #[arg(long)]
+        all: bool,
+    },
+    Enable {
+        id: String,
+    },
+    Disable {
+        id: String,
     },
     Add {
         category: String,

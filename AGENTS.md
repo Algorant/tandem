@@ -57,7 +57,7 @@ Protocol:
 
 CLI/TUI:
 
-- CLI commands (30 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; `web`. There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status` (Decision `update --status` exists).
+- CLI commands (32 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete|enable|disable`; `tui`; `web`. There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status` (Decision `update --status` exists).
 - Completed history is read with `list|search --scope archived|all` and `show`; Decisions with `list --type decision`.
 - Global flags: `-j/--json`, `-h/--help`, `-V/--version`. Other flags are long-form only. Mutations are human-readable by default; every command supports `--json` with `{ "ok", "data", "warnings" }` envelopes.
 - The CLI is Rust (clap-derived) inside `tandem/`.

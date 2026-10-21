@@ -56,7 +56,7 @@ pub(super) struct ReloadSelection {
     /// The selected Board tab, restored by value so tab order changes survive.
     board_view: Option<BoardView>,
     log_doc_id: Option<String>,
-    rule_anchor: Option<(String, Option<usize>)>,
+    rule_anchor: Option<rules::RuleAnchor>,
     decision_doc_id: Option<String>,
 }
 

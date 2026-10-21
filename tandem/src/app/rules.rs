@@ -4,11 +4,16 @@
 //! composite id, the category stored in the record, optional source, and the
 //! rule text as the body.
 
+use std::collections::BTreeMap;
+
 use crate::app::support::{current_timestamp as now_timestamp, document_exists, prepare_event};
 use crate::app::Error;
 use crate::project::rules::{
-    delete_rule_file, next_rule_id, parse_rule_id, read_rule_files, write_rule_file, RuleRecord,
+    delete_rule_file, next_rule_id, parse_rule_id, patch_rule_file, read_rule_files,
+    write_rule_file, RuleRecord,
 };
+use crate::project::write::HierarchyLock;
+use crate::project::yaml_double_quote;
 use crate::project::TandemProject;
 use crate::protocol::config::RULE_CATEGORIES;
 
@@ -51,6 +56,7 @@ pub(crate) fn add(
         id: id.clone(),
         uid: Some(uid),
         category: category.to_string(),
+        enabled: true,
         source,
         created_at: Some(now.clone()),
         updated_at: Some(now),
@@ -80,33 +86,31 @@ pub(crate) fn edit(
     source: Option<String>,
     clear_source: bool,
 ) -> Result<MutationOutcome, Error> {
-    let (category, number) = parse_rule_id(id).ok_or_else(|| {
-        Error::usage(format!(
-            "invalid rule id `{id}`; expected <category>-<number>"
-        ))
-    })?;
+    let _lock = HierarchyLock::acquire(project)?;
+    let record = rule_for_write(project, id)?;
+    let id = record.id.as_str();
+    let (category, number) = parse_rule_id(id).expect("validated rule identity");
     let rule = require_rule_text(rule, "rules edit requires rule text")?;
-    let dir = project.rules_dir();
-    let mut record = read_rule_files(&dir)
-        .map_err(|e| Error::user(e.message))?
-        .into_iter()
-        .find(|record| record.id == id)
-        .ok_or_else(|| Error::user(format!("rule not found: {id}")))?;
     let source = if clear_source {
         None
     } else {
         normalized_source(source.or(record.source.clone()))
     };
     let warning = missing_source_warning(project, source.as_deref())?;
-    record.text = rule.to_string();
-    record.source = source;
-    record.updated_at = Some(now_timestamp());
+    let mut updates =
+        BTreeMap::from([("updatedAt".to_string(), yaml_double_quote(&now_timestamp()))]);
+    let removes = if let Some(source) = source {
+        updates.insert("source".to_string(), yaml_double_quote(&source));
+        Vec::new()
+    } else {
+        vec!["source"]
+    };
     let prepared_events = prepare_event(
         project,
         "rules.updated",
         serde_json::json!({"action": "edit", "ruleId": id}),
     )?;
-    write_rule_file(&dir, &record).map_err(|e| Error::user(e.message))?;
+    patch_rule_file(project, &record.path, &updates, &removes, Some(rule))?;
     prepared_events.append_for_id("rules")?;
     Ok(MutationOutcome {
         category,
@@ -117,7 +121,98 @@ pub(crate) fn edit(
     })
 }
 
+/// All rules remain available to management; consumers opt into enabled selection.
+pub(crate) fn list(
+    project: &TandemProject,
+    category: Option<&str>,
+    all: bool,
+) -> Result<Vec<RuleRecord>, Error> {
+    Ok(read_rule_files(&project.rules_dir())?
+        .into_iter()
+        .filter(|rule| {
+            (all || rule.enabled) && category.is_none_or(|category| category == rule.category)
+        })
+        .collect())
+}
+
+pub(crate) fn current_rule_id(project: &TandemProject, id: &str) -> Result<String, Error> {
+    let Some((_, hex)) = crate::protocol::ids::provisional_parts(id) else {
+        return Ok(id.to_string());
+    };
+    let matches: Vec<_> = read_rule_files(&project.rules_dir())?
+        .into_iter()
+        .filter(|rule| {
+            rule.uid
+                .as_deref()
+                .is_some_and(|uid| uid.replace('-', "").starts_with(hex))
+        })
+        .collect();
+    match matches.as_slice() {
+        [] => Ok(id.to_string()),
+        [rule] => Ok(rule.id.clone()),
+        _ => Err(Error::user(format!("ambiguous provisional rule id: {id}"))),
+    }
+}
+
+fn rule_for_write(project: &TandemProject, id: &str) -> Result<RuleRecord, Error> {
+    if let Some(message) = crate::app::project::historical(project) {
+        return Err(Error::user(format!("cannot change rules: {message}")));
+    }
+    let id = current_rule_id(project, id)?;
+    project.refuse_held(&id)?;
+    if let Some(conflict) = crate::project::sync::conflict_for(project, &id) {
+        return Err(Error::user(format!(
+            "{id} has an unresolved sync conflict: {}",
+            conflict.reason
+        )));
+    }
+    read_rule_files(&project.rules_dir())?
+        .into_iter()
+        .find(|rule| rule.id == id)
+        .ok_or_else(|| Error::user(format!("rule not found: {id}")))
+}
+
+#[derive(Debug)]
+pub(crate) struct StateOutcome {
+    pub(crate) rule_id: String,
+    pub(crate) enabled: bool,
+    pub(crate) changed: bool,
+}
+
+pub(crate) fn set_enabled(
+    project: &TandemProject,
+    id: &str,
+    enabled: bool,
+) -> Result<StateOutcome, Error> {
+    let _lock = HierarchyLock::acquire(project)?;
+    let record = rule_for_write(project, id)?;
+    let changed = record.enabled != enabled;
+    if changed {
+        let updates = BTreeMap::from([
+            ("enabled".to_string(), enabled.to_string()),
+            ("updatedAt".to_string(), yaml_double_quote(&now_timestamp())),
+        ]);
+        let events = prepare_event(
+            project,
+            "rules.updated",
+            serde_json::json!({
+                "action": if enabled { "enable" } else { "disable" }, "ruleId": record.id,
+            }),
+        )?;
+        patch_rule_file(project, &record.path, &updates, &[], None)?;
+        events.append_for_id("rules")?;
+    }
+    Ok(StateOutcome {
+        rule_id: record.id,
+        enabled,
+        changed,
+    })
+}
+
 pub(crate) fn delete(project: &TandemProject, id: &str) -> Result<DeleteOutcome, Error> {
+    let _lock = HierarchyLock::acquire(project)?;
+    let record = rule_for_write(project, id)?;
+    let id = record.id.as_str();
     let (category, number) = parse_rule_id(id).ok_or_else(|| {
         Error::usage(format!(
             "invalid rule id `{id}`; expected <category>-<number>"
@@ -198,7 +293,7 @@ mod tests {
         ));
         let project = TandemProject::initialize(
             &root,
-            "---\nprotocolVersion: 0.2.0\nstates: [todo, in-progress, validation]\nunknown: retain\n---\nbody\n",
+            "---\nprotocolVersion: 0.5.0\nstates: [todo, in-progress, validation]\nunknown: retain\n---\nbody\n",
         )
         .unwrap();
         let papercut_id = "task-99".to_string();

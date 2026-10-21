@@ -171,6 +171,11 @@ pub(super) const BINDINGS: &[Binding] = &[
     },
     Binding {
         scope: BindingScope::Rules,
+        keys: "Space / click state",
+        description: "turn selected rule on/off without deleting it",
+    },
+    Binding {
+        scope: BindingScope::Rules,
         keys: "a/e/d",
         description: "add, edit, or delete a rule",
     },

@@ -412,6 +412,7 @@ async fn rules_api(State(state): State<WebState>) -> Response {
                         category.clone(),
                         items
                             .iter()
+                            .filter(|item| item.enabled)
                             .map(|item| RuleDto {
                                 id: item.id,
                                 rule: item.rule.clone(),

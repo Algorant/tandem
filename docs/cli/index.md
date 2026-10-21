@@ -9,7 +9,7 @@ The `tandem` command finds the nearest workspace from the current directory. Run
 
 | Command | Use |
 | --- | --- |
-| `init [--title TITLE]` | Create a board in the current project. |
+| `init [--title TITLE]` | Create a board with six enabled starter rules; report rules and existing agent-file pointers. |
 | `add task TITLE --acceptance TEXT` | Create a Task; repeat `--acceptance` for more criteria. |
 | `add decision TITLE` | Record a durable decision. |
 | `show ID` · `assignment ID` | Read a record or a Task's delegation details. |
@@ -23,11 +23,18 @@ The `tandem` command finds the nearest workspace from the current directory. Run
 | `link add\|remove ID TYPE TARGET` | Manage typed Task links. |
 | `sync` · `sync status` · `sync resolve ID --keep local\|remote\|edited` | Synchronize and inspect or resolve board changes. |
 | `migrate [--dry-run]` | Convert a supported older board to the current protocol. |
-| `rules list\|add\|edit\|delete` | Read or manage project rules. |
+| `rules list [CATEGORY] [--all]` | Read enabled guidance; `--all` also shows disabled rules. |
+| `rules add\|edit\|delete` · `rules enable ID` · `rules disable ID` | Manage rules; changing state preserves the same record. |
 | `tui [--add-workspace PATH ...]` | Open the TUI; repeat `--add-workspace` to seed more local boards for this invocation. |
 | `web [--port PORT] [--no-open]` | Start the local, read-only web view. |
 
 Global flags: `-j, --json` for JSON, `-h, --help` for help, and `-V, --version` for the installed binary version. There are no other short flags.
+
+Rules list JSON keeps `data` as an array of `{id, category, rule, source, enabled}` items. State changes return `{id, enabled, changed, sync}` within `data`; repeating the same state returns `changed: false` without changing the file, timestamp or event ledger. No disable confirmation is required. Ordinary rule edits preserve enabled state and unrelated metadata.
+
+Fresh init JSON also reports `rules` with final published identities and `pointers` with per-file `added`, `already-present`, `absent` or `same-target` status. Only existing root `AGENTS.md` / `CLAUDE.md` are updated, in place with bytes and mode preserved. A directory/non-regular target is an error; a missing symlink target is skipped. A late failure reports partial initialization instead of rolling it back. An existing board still makes init fail.
+
+**Rules state compatibility:** upgrade sharing clients to **0.17.3** and restart older processes before relying on disabled guidance. No protocol migration is required; omitted `enabled` means true, but older clients ignore false.
 
 A Task validation beginning with `$ ` is a runnable command; unprefixed text is a manual check. For example, `--validation '$ just dev-check'` records a command to run, while `--validation 'Review the rendered page'` records a manual check.
 

@@ -14,7 +14,27 @@ pub(crate) fn patch_frontmatter_content(
     updates: &BTreeMap<String, String>,
     removes: &[&str],
 ) -> Result<String, CliError> {
-    let (frontmatter, body) = split_frontmatter(content).map_err(CliError::user)?;
+    let updates = updates
+        .iter()
+        .map(|(key, value)| (key.clone(), yaml_value_for_update(value)))
+        .collect();
+    patch_frontmatter_yaml_content(content, &updates, removes)
+}
+
+/// Patches selected fields using already-serialized YAML values.
+pub(crate) fn patch_frontmatter_yaml_content(
+    content: &str,
+    updates: &BTreeMap<String, String>,
+    removes: &[&str],
+) -> Result<String, CliError> {
+    let (frontmatter, _) = split_frontmatter(content).map_err(CliError::user)?;
+    let start = content.find('\n').expect("validated delimiter") + 1;
+    let end = start + frontmatter.len();
+    let newline = if content[..start].ends_with("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let mut seen = BTreeMap::<String, bool>::new();
     let mut output_frontmatter = String::new();
     let lines = frontmatter.split_inclusive('\n').collect::<Vec<_>>();
@@ -36,7 +56,7 @@ pub(crate) fn patch_frontmatter_content(
                 continue;
             }
             if let Some(value) = updates.get(key) {
-                output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
+                output_frontmatter.push_str(&format!("{key}: {value}{newline}"));
                 seen.insert(key.to_string(), true);
                 index += 1;
                 while index < lines.len() {
@@ -54,15 +74,20 @@ pub(crate) fn patch_frontmatter_content(
     }
 
     if !output_frontmatter.is_empty() && !output_frontmatter.ends_with('\n') {
-        output_frontmatter.push('\n');
+        output_frontmatter.push_str(newline);
     }
     for (key, value) in updates {
         if !seen.contains_key(key) {
-            output_frontmatter.push_str(&format!("{key}: {}\n", yaml_value_for_update(value)));
+            output_frontmatter.push_str(&format!("{key}: {value}{newline}"));
         }
     }
 
-    Ok(format!("---\n{}---\n{}", output_frontmatter, body))
+    Ok(format!(
+        "{}{}{}",
+        &content[..start],
+        output_frontmatter,
+        &content[end..]
+    ))
 }
 
 /// Replaces the canonical accord block while preserving unrelated source bytes.

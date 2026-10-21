@@ -61,9 +61,33 @@ pub(crate) const DECISION_STATUSES: &[&str] = &[
 #[derive(Debug, Clone)]
 pub(crate) struct RuleItem {
     pub(crate) id: usize,
+    pub(crate) rule_id: String,
+    pub(crate) uid: Option<String>,
+    pub(crate) enabled: bool,
     pub(crate) rule: String,
     pub(crate) source: Option<String>,
 }
+
+/// Omitted state means enabled; quoted strings and other YAML types are invalid.
+pub(crate) fn rule_enabled(value: Option<&yaml_rust2::Yaml>) -> Result<bool, &'static str> {
+    match value {
+        None => Ok(true),
+        Some(yaml_rust2::Yaml::Boolean(enabled)) => Ok(*enabled),
+        Some(_) => Err("enabled must be a YAML boolean"),
+    }
+}
+
+pub(crate) const STARTER_RULES: &[(&str, &str)] = &[
+    ("always", "Read current project rules before starting work."),
+    ("always", "Use Tandem CLI/tools for coordination changes."),
+    ("never", "Do not edit board files directly."),
+    ("never", "Do not alter archived records."),
+    ("prefer", "Keep work small and independently verifiable."),
+    (
+        "context",
+        "The Board holds active work; Logs hold completed history.",
+    ),
+];
 
 pub(crate) type RulesByCategory = std::collections::BTreeMap<String, Vec<RuleItem>>;
 

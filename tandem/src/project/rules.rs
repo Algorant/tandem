@@ -54,6 +54,9 @@ pub(crate) fn rules_by_category(dir: &Path) -> Result<RulesByCategory, CliError>
                     .rsplit_once('-')
                     .and_then(|(_, number)| number.parse::<usize>().ok())
                     .unwrap_or(0),
+                rule_id: rule.id,
+                uid: rule.uid,
+                enabled: rule.enabled,
                 rule: rule.text,
                 source: rule.source,
             });
@@ -86,6 +89,7 @@ pub(crate) struct RuleRecord {
     pub(crate) id: String,
     pub(crate) uid: Option<String>,
     pub(crate) category: String,
+    pub(crate) enabled: bool,
     pub(crate) source: Option<String>,
     pub(crate) created_at: Option<String>,
     pub(crate) updated_at: Option<String>,
@@ -111,9 +115,19 @@ pub(crate) fn read_rule_files(dir: &Path) -> Result<Vec<RuleRecord>, CliError> {
 pub(crate) fn read_rule_file(path: &Path) -> Result<RuleRecord, CliError> {
     let content = fs::read_to_string(path)
         .map_err(|e| CliError::user(format!("failed to read {}: {e}", display_path(path))))?;
-    let (frontmatter, text) = split_frontmatter(&content)
+    parse_rule_content(path, &content)
+}
+
+pub(crate) fn parse_rule_content(path: &Path, content: &str) -> Result<RuleRecord, CliError> {
+    let (frontmatter, text) = split_frontmatter(content)
         .map_err(|e| CliError::user(format!("Parse failure: {}: {e}", display_path(path))))?;
     let fields = super::parse_frontmatter_fields(&frontmatter).map_err(CliError::user)?;
+    let yaml = super::parse_frontmatter_yaml(&frontmatter).map_err(CliError::user)?;
+    let enabled = crate::protocol::config::rule_enabled(
+        yaml.as_ref()
+            .and_then(|root| super::yaml_mapping_value(root, "enabled")),
+    )
+    .map_err(|error| CliError::user(format!("Rule {}: {error}", display_path(path))))?;
     let id = fields
         .get("id")
         .cloned()
@@ -135,6 +149,7 @@ pub(crate) fn read_rule_file(path: &Path) -> Result<RuleRecord, CliError> {
         uid: fields.get("uid").cloned(),
         id,
         category,
+        enabled,
         source: fields.get("source").cloned(),
         created_at: fields.get("createdAt").cloned(),
         updated_at: fields.get("updatedAt").cloned(),
@@ -176,7 +191,10 @@ pub(crate) fn write_rule_file(dir: &Path, rule: &RuleRecord) -> Result<(), CliEr
     if let Some(uid) = &rule.uid {
         frontmatter.push_str(&format!("uid: {uid}\n"));
     }
-    frontmatter.push_str(&format!("category: {}\n", rule.category));
+    frontmatter.push_str(&format!(
+        "category: {}\nenabled: {}\n",
+        rule.category, rule.enabled
+    ));
     if let Some(source) = &rule.source {
         frontmatter.push_str(&format!("source: {}\n", yaml_double_quote(source)));
     }
@@ -187,6 +205,27 @@ pub(crate) fn write_rule_file(dir: &Path, rule: &RuleRecord) -> Result<(), CliEr
         frontmatter.push_str(&format!("updatedAt: {}\n", yaml_double_quote(updated)));
     }
     write_atomic(&path, &format!("---\n{frontmatter}---\n{}\n", rule.text))
+}
+
+/// Patch an existing rule without reconstructing unrelated frontmatter or its body.
+pub(crate) fn patch_rule_file(
+    project: &super::TandemProject,
+    path: &Path,
+    updates: &BTreeMap<String, String>,
+    removes: &[&str],
+    text: Option<&str>,
+) -> Result<(), CliError> {
+    let (content, snapshot) = super::write::read_file_snapshot(project, path)?;
+    let mut patched =
+        super::frontmatter::patch_frontmatter_yaml_content(&content, updates, removes)?;
+    if let Some(text) = text {
+        let (_, body) = split_frontmatter(&patched).map_err(CliError::user)?;
+        patched.truncate(patched.len() - body.len());
+        patched.push_str(text);
+        patched.push('\n');
+    }
+    super::write::ensure_file_unchanged(path, &snapshot)?;
+    write_atomic(path, &patched)
 }
 
 fn validate_rule_category(category: &str) -> Result<(), CliError> {

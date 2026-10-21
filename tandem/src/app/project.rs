@@ -18,6 +18,8 @@ pub(crate) struct InitOptions {
 pub(crate) struct InitOutcome {
     pub(crate) title: String,
     pub(crate) project: TandemProject,
+    pub(crate) rules: Vec<super::rules::MutationOutcome>,
+    pub(crate) pointers: Vec<crate::project::agent_files::PointerOutcome>,
 }
 
 /// One board opened during the current TUI process.
@@ -182,12 +184,29 @@ pub(crate) fn initialize(options: InitOptions) -> Result<InitOutcome, Error> {
             data_dir.display()
         )));
     }
+    let pointers = crate::project::agent_files::PointerPlan::preflight(&root)?;
     let workspace_id = crate::app::support::new_uid();
     let project = TandemProject::initialize(&root, &default_project_config(&title, &workspace_id))?;
-    if let Some(git) = project.git() {
-        crate::project::sync::ensure_excluded(git)?;
-    }
-    Ok(InitOutcome { title, project })
+    let mut rules = Vec::new();
+    let finish = (|| -> Result<_, Error> {
+        if let Some(git) = project.git() {
+            crate::project::sync::ensure_excluded(git)?;
+        }
+        for (category, text) in crate::protocol::config::STARTER_RULES {
+            rules.push(super::rules::add(&project, category, text, None)?);
+        }
+        Ok(pointers.apply()?)
+    })();
+    let pointers = finish.map_err(|error| Error::user(format!(
+        "Partial initialization at {}: board created and {} starter rules saved; instruction pointers may be partially applied. No rollback performed. {}",
+        root.display(), rules.len(), error.message
+    )))?;
+    Ok(InitOutcome {
+        title,
+        project,
+        rules,
+        pointers,
+    })
 }
 
 pub(crate) fn protocol_version(project: &TandemProject) -> Result<String, Error> {

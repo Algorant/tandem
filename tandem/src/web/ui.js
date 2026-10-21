@@ -44,7 +44,7 @@ export function showError(error, retry) {
 
 export function heading(title, description, action) {
   return el('div', { class: 'view-heading' }, [
-    el('div', {}, [el('h2', { id: 'view-title', tabindex: '-1', text: title }), el('p', { text: description })]),
+    el('div', {}, [el('h2', { id: 'view-title', tabindex: '-1', text: title }), el('p', {}, description)]),
     action,
   ]);
 }
@@ -353,7 +353,11 @@ export function renderLogs(data, query, onSearch) {
 export function renderRules(categories) {
   const preferred = ['always', 'never', 'prefer', 'context'];
   const names = [...preferred.filter((name) => name in categories), ...Object.keys(categories).filter((name) => !preferred.includes(name))];
-  return el('div', {}, [heading('Rules', 'Workspace guidance grouped by its canonical category.'), el('div', { class: 'rule-groups' }, names.map((name) => el('section', { class: 'panel rule-group' }, [
+  return el('div', {}, [heading('Rules', [
+    'Enabled workspace guidance, grouped by category. Manage all rules in the TUI or with ',
+    el('code', { class: 'rules-guidance-command', text: 'tandem rules list --all' }),
+    '.',
+  ]), el('div', { class: 'rule-groups' }, names.map((name) => el('section', { class: 'panel rule-group' }, [
     el('h3', {}, [el('span', { text: name }), el('span', { class: 'count', text: categories[name].length })]),
     categories[name].length ? el('div', {}, categories[name].map((rule) => el('article', { class: 'rule' }, [
       el('p', { text: rule.rule }), el('small', { text: `Rule ${rule.id}${rule.source ? ` · Source: ${rule.source}` : ''}` }),

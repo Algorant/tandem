@@ -22,6 +22,7 @@ use crate::protocol::hierarchy::{
 };
 use crate::CliError;
 
+pub(crate) mod agent_files;
 pub(crate) mod events;
 pub(crate) mod frontmatter;
 pub(crate) mod git;

@@ -1992,6 +1992,11 @@ fn number_provisional(files: &mut Files) -> Vec<(String, String)> {
 fn validate_board(files: &Files) -> Result<(), String> {
     let mut documents = Vec::new();
     for (path, content) in files {
+        if path.starts_with("rules/") && path.ends_with(".md") {
+            super::rules::parse_rule_content(&PathBuf::from(".tandem").join(path), content)
+                .map_err(|error| error.message)?;
+            continue;
+        }
         let location = if path.starts_with("logs/") {
             DocumentLocation::Logs
         } else if path.starts_with("tasks/") || path.starts_with("decisions/") {

@@ -209,6 +209,7 @@ enum HitAction {
     FocusDecisionList,
     FocusDecisionDetail,
     ToggleRulePreview,
+    ToggleRuleEnabled,
     FocusRuleList,
     FocusRulePreview,
     ConfirmModal,
@@ -3173,7 +3174,7 @@ tone = "success"
         app.status.clear();
         assert_eq!(
             app.rules_footer_text(),
-            "Rules list · h/l category · j/k select · Enter preview · a add · e edit · d delete · ? help"
+            "Rules list · h/l category · j/k select · Space on/off · Enter preview · a/e/d · ? help"
         );
     }
 
@@ -3202,11 +3203,17 @@ tone = "success"
         app.rules.get_mut("prefer").unwrap().extend([
             crate::protocol::config::RuleItem {
                 id: 1,
+                rule_id: "prefer-1".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "First rule".to_string(),
                 source: None,
             },
             crate::protocol::config::RuleItem {
                 id: 2,
+                rule_id: "prefer-2".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "Second wrapped rule".to_string(),
                 source: Some("decision-10".to_string()),
             },
@@ -3236,11 +3243,17 @@ tone = "success"
         app.rules.get_mut("always").unwrap().extend([
             crate::protocol::config::RuleItem {
                 id: 1,
+                rule_id: "always-1".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "First rule".to_string(),
                 source: None,
             },
             crate::protocol::config::RuleItem {
                 id: 2,
+                rule_id: "always-2".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "Second rule".to_string(),
                 source: Some("decision-10".to_string()),
             },
@@ -3433,7 +3446,7 @@ tone = "success"
         for keys in ["1–4", "f", "m", "v", "Ctrl-U/D · PgUp/PgDn", "a/e/d", "/"] {
             assert!(text.contains(keys), "missing help binding {keys}");
         }
-        for removed in ["t/p/F", "H/L", "A/R/C", "a or n", "Space"] {
+        for removed in ["t/p/F", "H/L", "A/R/C", "a or n"] {
             assert!(!text.contains(removed), "stale help binding {removed}");
         }
     }
@@ -3497,6 +3510,9 @@ tone = "success"
             .unwrap()
             .push(crate::protocol::config::RuleItem {
                 id: 1,
+                rule_id: "always-1".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "A long preview".into(),
                 source: None,
             });
@@ -5794,6 +5810,9 @@ disabled = ["papercut"]
             .unwrap()
             .push(crate::protocol::config::RuleItem {
                 id: 1,
+                rule_id: "always-1".to_string(),
+                uid: None,
+                enabled: true,
                 rule: (0..80)
                     .map(|index| format!("long rule word {index}"))
                     .collect::<Vec<_>>()
@@ -5850,6 +5869,9 @@ disabled = ["papercut"]
             .unwrap()
             .push(crate::protocol::config::RuleItem {
                 id: 1,
+                rule_id: "always-1".to_string(),
+                uid: None,
+                enabled: true,
                 rule: "Keep controls coherent".into(),
                 source: None,
             });

@@ -16,10 +16,17 @@ The installer is user-local and does not require `sudo`. With Rust, install the 
 
 ## Complete a Task
 
-In a Git repository, initialize the board and create a Task with an acceptance criterion:
+In a Git repository, initialize the board:
+
+```sh
+tandem init
+```
+
+Init reports six enabled starter rules (two Always, two Never, one Prefer, one Context) and a rules-pointer outcome for each existing `AGENTS.md` / `CLAUDE.md`. Missing instruction files are not created, exact existing pointers are not duplicated, and symlinks to regular files are appended to in place without replacing the link. This is fresh initialization, not a rerun command for existing boards. Read the current guidance with `tandem rules list`; use `--all` to include disabled records.
+
+Then create a Task with an acceptance criterion:
 
 ```console
-$ tandem init
 $ tandem add task "Add a greeting" --acceptance "README contains the greeting"
 Created task
 ID: task-1

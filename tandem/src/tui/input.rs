@@ -295,6 +295,10 @@ impl TuiApp {
                             self.clamp_rules_state();
                         }
                         HitAction::SelectRuleItem(_) => {}
+                        HitAction::ToggleRuleEnabled if self.view == TuiView::Rules => {
+                            self.toggle_selected_rule()
+                        }
+                        HitAction::ToggleRuleEnabled => {}
                         HitAction::ToggleRulePreview if self.view == TuiView::Rules => {
                             self.handle_rules_key(KeyEvent::from(KeyCode::Enter))
                         }

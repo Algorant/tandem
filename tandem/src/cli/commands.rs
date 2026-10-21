@@ -119,13 +119,25 @@ pub(crate) fn dispatch(command: Command, json: bool) -> Result<super::StartupReq
                 force: false,
             })?;
             let report = publish(&outcome.project);
+            let rules: Vec<_> = outcome.rules.iter().map(|rule| serde_json::json!({
+                "id":report.renamed(&rule.rule_id), "category":rule.category, "rule":rule.rule, "enabled":true,
+            })).collect();
             if json {
                 println!(
                     "{}",
-                    serde_json::json!({"ok":true,"data":{"title":outcome.title,"root":outcome.project.root().display().to_string(),"sync":sync_json(&report)},"warnings":[]})
+                    serde_json::json!({"ok":true,"data":{
+                    "title":outcome.title,"root":outcome.project.root().display().to_string(),
+                    "rules":rules,"pointers":outcome.pointers,"sync":sync_json(&report)
+                },"warnings":[]})
                 );
-            } else if let Outcome::Pending(reason) = &report.outcome {
-                eprintln!("Warning: the new board is not synced yet: {reason}");
+            } else {
+                println!("Initialized {} ({})", outcome.title, sync_text(&report));
+                for rule in &outcome.rules {
+                    println!("{}\tOn\t{}", report.renamed(&rule.rule_id), rule.rule);
+                }
+                for pointer in &outcome.pointers {
+                    println!("{}: {}", pointer.file, pointer.status);
+                }
             }
             Ok(super::StartupRequest::Exit)
         }
@@ -829,30 +841,59 @@ fn cancel(args: CancelArgs, json: bool) -> Result<super::StartupRequest, CliErro
 }
 
 fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    if let RulesCommand::List { category } = args.command {
+    if let RulesCommand::List { category, all } = args.command {
         let (project, mut warnings) = open_read()?;
-        let mut values = crate::project::rules::read_rule_files(&project.rules_dir())?;
-        if let Some(category) = category.as_deref() {
-            values.retain(|rule| rule.category == category);
-        }
+        let values = app::rules::list(&project, category.as_deref(), all)?;
         warnings.extend(app::project::warnings(&project)?);
         if json {
             println!(
                 "{}",
-                serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source})).collect::<Vec<_>>(),"warnings":warnings})
+                serde_json::json!({"ok":true,"data":values.iter().map(|r| serde_json::json!({"id":r.id,"category":r.category,"rule":r.text,"source":r.source,"enabled":r.enabled})).collect::<Vec<_>>(),"warnings":warnings})
             );
         } else {
-            for warning in &warnings {
-                println!("Warning: {warning}");
-            }
+            print_warnings(&warnings);
             for r in values {
-                println!("{}\t{}", r.id, r.text);
+                println!(
+                    "{}\t{}\t{}",
+                    r.id,
+                    if r.enabled { "On" } else { "Off" },
+                    r.text
+                );
             }
         }
         return Ok(super::StartupRequest::Exit);
     }
+    if let RulesCommand::Enable { ref id } | RulesCommand::Disable { ref id } = args.command {
+        let enabled = matches!(args.command, RulesCommand::Enable { .. });
+        let project = app::project::open_for_write()?;
+        let outcome = app::rules::set_enabled(&project, id, enabled)?;
+        let report = publish(&project);
+        let id = report.renamed(&outcome.rule_id);
+        if json {
+            println!(
+                "{}",
+                serde_json::json!({"ok":true,"data":{
+                "id":id,"enabled":outcome.enabled,"changed":outcome.changed,"sync":sync_json(&report)
+            },"warnings":[]})
+            );
+        } else {
+            println!(
+                "{} {id}: {} ({})",
+                if outcome.changed {
+                    "Changed"
+                } else {
+                    "Unchanged"
+                },
+                if outcome.enabled { "On" } else { "Off" },
+                sync_text(&report)
+            );
+        }
+        return Ok(super::StartupRequest::Exit);
+    }
     let (project, rule_id, verb) = match args.command {
-        RulesCommand::List { .. } => unreachable!("handled above"),
+        RulesCommand::List { .. } | RulesCommand::Enable { .. } | RulesCommand::Disable { .. } => {
+            unreachable!("handled above")
+        }
         RulesCommand::Add {
             category,
             text,
@@ -869,14 +910,14 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             clear,
         } => {
             let (project, id) = open_write_for(&id)?;
-            let id = current_rule_id(&project, &id);
+            let id = app::rules::current_rule_id(&project, &id)?;
             let clear_source = clear.iter().any(|field| field == "source");
             let o = app::rules::edit(&project, &id, &text, source, clear_source)?;
             (project, o.rule_id, "Updated")
         }
         RulesCommand::Delete { id } => {
             let (project, id) = open_write_for(&id)?;
-            let id = current_rule_id(&project, &id);
+            let id = app::rules::current_rule_id(&project, &id)?;
             let o = app::rules::delete(&project, &id)?;
             (project, o.rule_id, "Deleted")
         }
@@ -892,27 +933,6 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
         println!("{verb} rule {rule_id} ({})", sync_text(&report));
     }
     Ok(super::StartupRequest::Exit)
-}
-
-/// Maps an outdated provisional rule ID to the rule's current ID.
-fn current_rule_id(project: &TandemProject, id: &str) -> String {
-    let Some((_, hex)) = crate::protocol::ids::provisional_parts(id) else {
-        return id.to_string();
-    };
-    crate::project::rules::read_rule_files(&project.rules_dir())
-        .ok()
-        .and_then(|rules| {
-            let matches: Vec<_> = rules
-                .into_iter()
-                .filter(|rule| {
-                    rule.uid
-                        .as_deref()
-                        .is_some_and(|uid| uid.replace('-', "").starts_with(hex))
-                })
-                .collect();
-            (matches.len() == 1).then(|| matches[0].id.clone())
-        })
-        .unwrap_or_else(|| id.to_string())
 }
 
 fn sync_command(args: SyncArgs, json: bool) -> Result<super::StartupRequest, CliError> {

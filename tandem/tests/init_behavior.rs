@@ -86,7 +86,7 @@ fn init_json_without_title_reports_resolved_default_title() {
 }
 
 #[test]
-fn init_without_json_retains_quiet_success() {
+fn init_without_json_reports_starter_rules_and_pointers() {
     let root_dir = root("quiet-success");
     std::fs::create_dir_all(&root_dir).unwrap();
 
@@ -97,11 +97,11 @@ fn init_without_json_retains_quiet_success() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.status.code(), Some(0));
-    assert!(
-        output.stdout.is_empty(),
-        "non-JSON init must stay quiet: {:?}",
-        String::from_utf8_lossy(&output.stdout)
-    );
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.contains("Initialized quiet"));
+    assert!(text.contains("always-1\tOn\tRead current project rules before starting work."));
+    assert!(text.contains("AGENTS.md: absent"));
+    assert!(text.contains("CLAUDE.md: absent"));
     assert!(output.stderr.is_empty());
 }
 

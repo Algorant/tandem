@@ -38,6 +38,13 @@ pub(super) enum RuleFocus {
     Preview,
 }
 
+#[derive(Debug, Clone)]
+pub(super) struct RuleAnchor {
+    category: String,
+    id: Option<String>,
+    uid: Option<String>,
+}
+
 #[derive(Debug, Default)]
 pub(super) struct RulesState {
     pub(super) selected_category: usize,
@@ -76,14 +83,14 @@ enum RulePrompt {
     Text {
         mode: RulePromptMode,
         category: String,
-        id: Option<usize>,
+        id: Option<String>,
         rule: String,
         source: String,
         step: RulePromptStep,
     },
     Delete {
         category: String,
-        id: usize,
+        id: String,
         rule: String,
     },
 }
@@ -112,13 +119,13 @@ enum RulePromptAction {
     },
     Edit {
         category: String,
-        id: usize,
+        id: String,
         rule: String,
         source: String,
     },
     Delete {
         category: String,
-        id: usize,
+        id: String,
     },
 }
 
@@ -136,25 +143,30 @@ impl TuiApp {
         matches!(self.rules_view.prompt, Some(RulePrompt::Text { .. }))
     }
 
-    pub(super) fn selected_rule_anchor_for_reload(&self) -> Option<(String, Option<usize>)> {
-        Some((
-            self.selected_rule_category().to_string(),
-            self.selected_rule().map(|(_, rule)| rule.id),
-        ))
+    pub(super) fn selected_rule_anchor_for_reload(&self) -> Option<RuleAnchor> {
+        Some(RuleAnchor {
+            category: self.selected_rule_category().to_string(),
+            id: self.selected_rule().map(|(_, rule)| rule.rule_id.clone()),
+            uid: self.selected_rule().and_then(|(_, rule)| rule.uid.clone()),
+        })
     }
 
-    pub(super) fn restore_rule_selection_after_reload(
-        &mut self,
-        anchor: Option<(String, Option<usize>)>,
-    ) {
-        let Some((category, id)) = anchor else {
+    pub(super) fn restore_rule_selection_after_reload(&mut self, anchor: Option<RuleAnchor>) {
+        let Some(RuleAnchor { category, id, uid }) = anchor else {
             self.clamp_rules_state();
             return;
         };
-        let restored = id
-            .map(|id| self.select_rule_by_id(&category, id))
-            .unwrap_or(false);
-        if !restored {
+        let resolved = self.rules.get(&category).and_then(|items| {
+            items
+                .iter()
+                .find(|item| {
+                    uid.as_ref()
+                        .is_some_and(|uid| item.uid.as_ref() == Some(uid))
+                        || id.as_ref() == Some(&item.rule_id)
+                })
+                .map(|item| item.rule_id.clone())
+        });
+        if !resolved.is_some_and(|id| self.select_rule_by_id(&category, &id)) {
             self.select_rule_category(&category);
         }
         self.clamp_rules_state();
@@ -249,6 +261,7 @@ impl TuiApp {
             KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.move_rule_selection(5)
             }
+            KeyCode::Char(' ') if !preview_focused => self.toggle_selected_rule(),
             KeyCode::Char('a') => self.start_rule_add_prompt(),
             KeyCode::Char('e') => self.start_rule_edit_prompt(),
             KeyCode::Char('d') => self.start_rule_delete_prompt(),
@@ -404,25 +417,44 @@ impl TuiApp {
         });
     }
 
+    pub(super) fn toggle_selected_rule(&mut self) {
+        let Some((_, rule)) = self
+            .selected_rule()
+            .map(|(category, rule)| (category, rule.clone()))
+        else {
+            self.status = "No selected rule to toggle.".to_string();
+            return;
+        };
+        match app::rules::set_enabled(&self.workspace, &rule.rule_id, !rule.enabled) {
+            Ok(outcome) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!(
+                    "{}: {}{}",
+                    outcome.rule_id,
+                    if outcome.enabled { "On" } else { "Off" },
+                    reload_note
+                );
+            }
+            Err(error) => {
+                let reload_note = self.reload().warning_note();
+                self.status = format!("Rule toggle error: {}{}", error.message, reload_note);
+            }
+        }
+    }
+
     pub(super) fn rules_context(&self) -> String {
         let total = self.rules_total();
-        self.selected_rule()
-            .map(|(category, rule)| {
-                format!(
-                    "selected {category} #{} · {} project rule{} loaded",
-                    rule.id,
-                    total,
-                    if total == 1 { "" } else { "s" }
-                )
-            })
-            .unwrap_or_else(|| {
-                format!(
-                    "{} has no selected rules · {} project rule{} loaded",
-                    self.selected_rule_category(),
-                    total,
-                    if total == 1 { "" } else { "s" }
-                )
-            })
+        let on = self
+            .rules
+            .values()
+            .flatten()
+            .filter(|rule| rule.enabled)
+            .count();
+        let selected = self
+            .selected_rule()
+            .map(|(_, rule)| format!(" · selected {}", rule.rule_id))
+            .unwrap_or_default();
+        format!("All {total} · On {on} · Off {}{selected}", total - on)
     }
 
     pub(super) fn rules_footer_text(&self) -> String {
@@ -431,9 +463,9 @@ impl TuiApp {
         {
             "Rules preview · j/k scroll · Ctrl-U/D page · Shift-Tab list · Enter close · ? help"
         } else if self.rules_view.preview_open {
-            "Rules list · j/k select · Tab preview · Enter close · a add · e edit · d delete · ? help"
+            "Rules list · j/k select · Space on/off · Tab preview · Enter close · a/e/d · ? help"
         } else {
-            "Rules list · h/l category · j/k select · Enter preview · a add · e edit · d delete · ? help"
+            "Rules list · h/l category · j/k select · Space on/off · Enter preview · a/e/d · ? help"
         };
         self.with_status(controls.to_string())
     }
@@ -536,15 +568,47 @@ impl TuiApp {
             .style(self.theme.panel_style())
             .highlight_style(self.theme.rule_selected_row_style());
         if !compact {
-            list = list.block(rule_list_block(
-                &self.theme,
-                category,
-                self.rules_view.focus == RuleFocus::List,
-            ));
+            let items = self.rules.get(category).map(Vec::as_slice).unwrap_or(&[]);
+            let on = items.iter().filter(|rule| rule.enabled).count();
+            list = list.block(
+                rule_list_block(
+                    &self.theme,
+                    category,
+                    self.rules_view.focus == RuleFocus::List,
+                )
+                .title(format!(
+                    " {} rules · On {on} · Off {} ",
+                    title_case(category),
+                    items.len() - on
+                )),
+            );
         }
         frame.render_stateful_widget(list, area, &mut state);
         self.rules_view.list_offset = state.offset();
         self.register_rule_row_hits(list_area, &rows);
+        if !compact {
+            if let Some((_, rule)) = self.selected_rule() {
+                let label = format!(
+                    "[ Turn {} · Space ]",
+                    if rule.enabled { "off" } else { "on" }
+                );
+                let width = (label.chars().count() as u16).min(area.width.saturating_sub(2));
+                let control = Rect::new(
+                    area.right().saturating_sub(width + 1),
+                    area.bottom().saturating_sub(1),
+                    width,
+                    1,
+                );
+                frame.render_widget(
+                    Paragraph::new(label).style(self.theme.status_style(StatusTone::Accent)),
+                    control,
+                );
+                self.hits.push(HitRegion {
+                    rect: control,
+                    action: HitAction::ToggleRuleEnabled,
+                });
+            }
+        }
     }
 
     fn draw_rule_preview(&mut self, frame: &mut Frame<'_>, area: Rect) {
@@ -755,7 +819,7 @@ impl TuiApp {
         self.rules_view.prompt = Some(RulePrompt::Text {
             mode: RulePromptMode::Edit,
             category,
-            id: Some(rule.id),
+            id: Some(rule.rule_id),
             rule: rule.rule,
             source: rule.source.unwrap_or_default(),
             step: RulePromptStep::Rule,
@@ -775,7 +839,7 @@ impl TuiApp {
         };
         self.rules_view.prompt = Some(RulePrompt::Delete {
             category,
-            id: rule.id,
+            id: rule.rule_id,
             rule: rule.rule,
         });
         if let Some(status) = self.rules_prompt_status() {
@@ -792,7 +856,7 @@ impl TuiApp {
         ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
-                self.select_rule_by_id(&outcome.category, outcome.id);
+                self.select_rule_by_id(&outcome.category, &outcome.rule_id);
                 self.status = format_rule_outcome("Added", &outcome, &reload_note);
             }
             Err(error) => {
@@ -802,8 +866,13 @@ impl TuiApp {
         }
     }
 
-    fn finish_rule_edit(&mut self, category: String, id: usize, rule: String, source: String) {
-        let rule_id = format!("{category}-{id}");
+    fn finish_rule_edit(
+        &mut self,
+        _category: String,
+        rule_id: String,
+        rule: String,
+        source: String,
+    ) {
         match app::rules::edit(
             &self.workspace,
             &rule_id,
@@ -813,7 +882,7 @@ impl TuiApp {
         ) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
-                self.select_rule_by_id(&outcome.category, outcome.id);
+                self.select_rule_by_id(&outcome.category, &outcome.rule_id);
                 self.status = format_rule_outcome("Edited", &outcome, &reload_note);
             }
             Err(error) => {
@@ -823,8 +892,7 @@ impl TuiApp {
         }
     }
 
-    fn finish_rule_delete(&mut self, category: String, id: usize) {
-        let rule_id = format!("{category}-{id}");
+    fn finish_rule_delete(&mut self, _category: String, rule_id: String) {
         match app::rules::delete(&self.workspace, &rule_id) {
             Ok(outcome) => {
                 let reload_note = self.reload().warning_note();
@@ -842,7 +910,7 @@ impl TuiApp {
         }
     }
 
-    fn select_rule_by_id(&mut self, category: &str, id: usize) -> bool {
+    fn select_rule_by_id(&mut self, category: &str, id: &str) -> bool {
         let Some(category_index) = RULE_CATEGORIES
             .iter()
             .position(|candidate| *candidate == category)
@@ -853,7 +921,7 @@ impl TuiApp {
         if let Some(item_index) = self
             .rules
             .get(category)
-            .and_then(|items| items.iter().position(|item| item.id == id))
+            .and_then(|items| items.iter().position(|item| item.rule_id == id))
         {
             self.rules_view.selected_item = item_index;
             true
@@ -886,7 +954,7 @@ impl RulePrompt {
                 }
                 KeyCode::Enter | KeyCode::Char('y') => RulePromptAction::Delete {
                     category: category.clone(),
-                    id: *id,
+                    id: id.clone(),
                 },
                 _ => RulePromptAction::None,
             },
@@ -918,7 +986,7 @@ impl RulePrompt {
                         },
                         RulePromptMode::Edit => RulePromptAction::Edit {
                             category: category.clone(),
-                            id: id.unwrap_or_default(),
+                            id: id.clone().unwrap_or_default(),
                             rule: rule.trim().to_string(),
                             source: source.trim().to_string(),
                         },
@@ -971,7 +1039,7 @@ impl RulePrompt {
                     RulePromptMode::Add => "Add rule",
                     RulePromptMode::Edit => "Edit rule",
                 };
-                let id = id.map(|id| format!(" #{id}")).unwrap_or_default();
+                let id = id.as_ref().map(|id| format!(" {id}")).unwrap_or_default();
                 match step {
                     RulePromptStep::Rule => format!(
                         "{action}{id} in {category}: {} · Enter source · Esc cancel",
@@ -1089,7 +1157,14 @@ fn rule_preview_lines(
     let mut lines = vec![
         Line::from(vec![
             Span::styled(title_case(category), theme.rule_row_accent_style(category)),
-            Span::styled(format!("  Rule #{}", rule.id), theme.label_style()),
+            Span::styled(
+                format!(
+                    "  {} · {}",
+                    rule.rule_id,
+                    if rule.enabled { "On" } else { "Off" }
+                ),
+                theme.label_style(),
+            ),
             Span::styled(format!("  ·  {source}"), theme.muted_style()),
         ]),
         Line::from(""),
@@ -1111,15 +1186,30 @@ fn rule_row_line(
 ) -> Line<'static> {
     let width = width.max(12);
     let cursor = if selected { "› " } else { "  " };
-    let id = format!("#{:<3}", item.id);
+    let id = if item.id > 0 {
+        format!("#{:<3}", item.id)
+    } else {
+        format!("{} ", item.rule_id)
+    };
+    let state = if item.enabled { "On " } else { "Off" };
     let source = item
         .source
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("project config");
-    let source_width = (width / 4).clamp(8, 24);
+    let source_width = if width < 48 {
+        (width / 4).saturating_sub(6).max(4)
+    } else {
+        (width / 4).clamp(8, 24)
+    };
     let source = super::truncate(source, source_width);
-    let fixed_width = cursor.chars().count() + id.chars().count() + source.chars().count() + 5;
+    let preview_prefix = format!("  {state} ");
+    let source_prefix = "  ·  ";
+    let fixed_width = cursor.chars().count()
+        + id.chars().count()
+        + source.chars().count()
+        + preview_prefix.chars().count()
+        + source_prefix.chars().count();
     let preview_width = width.saturating_sub(fixed_width).max(1);
     let preview = super::truncate(&item.rule, preview_width);
 
@@ -1133,15 +1223,14 @@ fn rule_row_line(
             },
         ),
         Span::styled(id, theme.rule_row_accent_style(category)),
-        Span::styled(format!("  {preview}"), theme.text_style()),
-        Span::styled(format!("  ·  {source}"), theme.muted_style()),
+        Span::styled(format!("{preview_prefix}{preview}"), theme.text_style()),
+        Span::styled(format!("{source_prefix}{source}"), theme.muted_style()),
     ])
 }
 
 fn rule_list_block<'a>(theme: &TuiTheme, category: &str, focused: bool) -> Block<'a> {
     Block::default()
         .borders(Borders::ALL)
-        .title(format!(" {} rules ", title_case(category)))
         .border_style(if focused {
             theme.rule_row_accent_style(category)
         } else {
@@ -1277,6 +1366,9 @@ mod tests {
     fn compact_rule_row_is_one_line_and_truncates_at_narrow_widths() {
         let item = RuleItem {
             id: 17,
+            rule_id: "prefer-17".to_string(),
+            uid: None,
+            enabled: true,
             rule: "Keep every important word readable instead of expanding row heights".to_string(),
             source: Some("decision-10 selected direction".to_string()),
         };
@@ -1314,6 +1406,9 @@ mod tests {
         let theme = TuiTheme::default_dark();
         let item = RuleItem {
             id: 2,
+            rule_id: "never-2".to_string(),
+            uid: None,
+            enabled: true,
             rule: "Use a restrained active treatment".to_string(),
             source: None,
         };

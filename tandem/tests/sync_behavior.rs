@@ -393,16 +393,16 @@ fn rules_and_subtasks_from_two_machines_get_distinct_numbers() {
             "task-1",
         ],
     );
-    assert_eq!(rule_b["data"]["id"], "always-2");
+    assert_eq!(rule_b["data"]["id"], "always-4");
     assert_eq!(sub_b["data"]["id"], "task-1-2");
     ok(&a, &["sync"]);
-    let rules: Vec<String> = ok(&a, &["rules", "list"])["data"]
+    let rules: Vec<String> = ok(&a, &["rules", "list", "always"])["data"]
         .as_array()
         .unwrap()
         .iter()
         .map(|rule| rule["id"].as_str().unwrap().to_string())
         .collect();
-    assert_eq!(rules, vec!["always-1", "always-2"]);
+    assert_eq!(rules, vec!["always-1", "always-2", "always-3", "always-4"]);
     assert_eq!(ids(&a), vec!["task-1", "task-1-1", "task-1-2"]);
 }
 
