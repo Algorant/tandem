@@ -3,7 +3,7 @@ id: task-92
 uid: 903edb6b-5b88-4c2d-9b32-277488a49c51
 type: task
 kind: "research"
-title: "Plan live editable SSH workspaces in the Tandem TUI"
+title: "Plan live read-only SSH workspaces in the Tandem TUI"
 state: "validation"
 priority: "medium"
 effort: "medium"
@@ -11,16 +11,16 @@ relatedFiles: ["tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/s
 tags: ["tui", "ssh"]
 accord:
   status: "delivered"
-  acceptance: ["A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions.", "The plan honors on-demand owner-machine Tandem execution over SSH, fully editable remote TUI boards, explicit compatible-version errors, and no copies/mounts/always-on service or special offline machinery."]
+  acceptance: ["A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions.", "The reduced approved plan uses on-demand owner-machine Tandem reads and normal owner-side refresh, read-only remote TUI boards, same-minor/protocol compatibility errors, and no copies/mounts/services or special offline machinery."]
   claimedAt: "2026-10-22T18:50:46Z"
   deliveredAt: "2026-10-22T18:59:15Z"
   validation: ["$ tandem tui --help"]
   constraints: ["Planning/read-only investigation only; no source/protocol changes, remote-board writes, new infrastructure or implementation dispatch until Algorant approves the plan.", "Herdra research task39's mirror/readonly recommendation is superseded by Algorant's approved SSH-owner execution shape; do not implement htt here."]
   summary: "Source-grounded SSH workspace plan submitted throughHerdra beforecode; 3productquestions pending. LargeLocal/SSHbackend refactor with nativeaggregate read, owner-machine CLIwrites, separate live cadence and minor-release rollout; no source/remote changes."
   evidence: ["Read Herdra research/task39 and explicitly superseded its mirror/readonly path with approved SSH-owner execution shape.", "Two bounded read-only source audits completed: ssh-tui-seams and ssh-cli-contract. Parent checked concreteTuiApp/localreload/editor, ReadSnapshot/DTO/CLI compactlist gaps, Validation accept/rework serverpreconditions and sync cadence. Existing rawEDITOR path lacks CLI parity; no hidden claim of full coverage.", "Native tandem0.17.3 tui --help verified current localPath-only addworkspace; gitstatus clean/synced. No source/spec change, remoteexperiment/write, mount/service, htt edit or implementationWorker launched.", "Plan mc82876f6 names new workspace snapshot JSON read, existing write families +missingthinfrontdoors, active2s/remote30s/chooser5s cadence, moduleblast radius/size, risks and3questions. AwaitHerdra/Algorant approval before concreteimplementationcontract/Worker."]
-  updatedAt: "2026-10-22T18:59:15Z"
+  updatedAt: "2026-10-22T19:33:52Z"
 createdAt: "2026-10-22T18:48:19Z"
-updatedAt: "2026-10-22T18:59:17Z"
+updatedAt: "2026-10-22T19:33:52Z"
 assignee: "tandem"
 validation.criterion: "A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions."
 validation.note: "Plan and3questions submitted viaHerdra mc82876f6; sourceauditcomplete, no code. Need decisions about remoteEDITOR/fulltaskeditparity, remote-onlystartupscope and initialsame-minorcompatibility. Nativeaddress/backend/snapshot design requires approval before implementation."
@@ -46,3 +46,7 @@ Likely20–30files/2–4kchangedlines (rough): app/project workspace/snapshot/SS
 Questions for Algorant: (1) remote-hostEDITOR over temporarySSHPTY (recommended), versus explicitly defer raw task editing? (2) keep local-primary mixed sessions ashtt uses (recommended), versus remote-only startup too? (3) sameTandemminor0.18.x plus matchingboardprotocol for initial compatibility, patch versions may differ?
 
 After approval, obtain isolatedLuna/highWorker concreteplan BEFORE edits, verify isolatedSSHfixtures/allactions/cleanup/nativechecks/actualrenders, shipminor0.18.0 and upgradeallmachines, then handaddress/compatibilitycontract toHerdra task41 forrealcartlabverification withAlgorant. No realcartlabwrites during planning/pre-release tests.
+
+## FINAL APPROVED REDUCED SCOPE — m56365c6d
+
+Algorant changed remote boards to READ-ONLY live views. This supersedes every earlier write/editor/signoff proposal above. Drop remote mutation APIs, edit/PTY and write-argument transport. Clearly label remote read-only views; hide/disable ALL write affordances with a plain hint, not mutation attempts/errors. Local-primary only; remote addresses also accepted by chooser. Require same0.18.x minor (patchskew allowed) and matchingboardprotocol. Keep one conditional read-snapshot command, RAM-only model, active~2s/chooser~5s polling; parent chooses existing owner-native30s sync for Gitfreshness. No realcart-labrecordmutation tests/commands ever; owner-native normal read/sync refresh explicitly permitted byHerdra. Revised estimate15–22files/1.5–2.5kLOC, read-model/roster/reload cross-cutting work remains. Herdra instructed proceedisolatedWorker with concreteplan BEFOREedits, ship0.18.0/allmachineupgrade andhandoffaddress/compatcontract toHerdra task41.

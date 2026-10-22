@@ -253,3 +253,4 @@
 {"ts":"2026-10-22T18:59:13Z","event":"task.updated","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":253,"data":{"fields":["body"]}}
 {"ts":"2026-10-22T18:59:15Z","event":"accord.delivered","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":254,"data":{}}
 {"ts":"2026-10-22T18:59:17Z","event":"review.requested","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":255,"data":{"criterion":"A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions."}}
+{"ts":"2026-10-22T19:33:52Z","event":"task.updated","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":256,"data":{"fields":["title","acceptance","body"]}}
