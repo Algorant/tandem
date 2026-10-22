@@ -4,7 +4,7 @@ uid: 903edb6b-5b88-4c2d-9b32-277488a49c51
 type: task
 kind: "research"
 title: "Plan live editable SSH workspaces in the Tandem TUI"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/editor.rs"]
@@ -20,8 +20,12 @@ accord:
   evidence: ["Read Herdra research/task39 and explicitly superseded its mirror/readonly path with approved SSH-owner execution shape.", "Two bounded read-only source audits completed: ssh-tui-seams and ssh-cli-contract. Parent checked concreteTuiApp/localreload/editor, ReadSnapshot/DTO/CLI compactlist gaps, Validation accept/rework serverpreconditions and sync cadence. Existing rawEDITOR path lacks CLI parity; no hidden claim of full coverage.", "Native tandem0.17.3 tui --help verified current localPath-only addworkspace; gitstatus clean/synced. No source/spec change, remoteexperiment/write, mount/service, htt edit or implementationWorker launched.", "Plan mc82876f6 names new workspace snapshot JSON read, existing write families +missingthinfrontdoors, active2s/remote30s/chooser5s cadence, moduleblast radius/size, risks and3questions. AwaitHerdra/Algorant approval before concreteimplementationcontract/Worker."]
   updatedAt: "2026-10-22T18:59:15Z"
 createdAt: "2026-10-22T18:48:19Z"
-updatedAt: "2026-10-22T18:59:15Z"
+updatedAt: "2026-10-22T18:59:17Z"
 assignee: "tandem"
+validation.criterion: "A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions."
+validation.note: "Plan and3questions submitted viaHerdra mc82876f6; sourceauditcomplete, no code. Need decisions about remoteEDITOR/fulltaskeditparity, remote-onlystartupscope and initialsame-minorcompatibility. Nativeaddress/backend/snapshot design requires approval before implementation."
+validation.requestedAt: "2026-10-22T18:59:17Z"
+validation.reviewer: "Algorant"
 ---
 
 ## Description
