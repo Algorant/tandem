@@ -250,3 +250,4 @@
 {"ts":"2026-10-21T03:32:09Z","event":"task.completed","id":"task-90","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":250,"data":{}}
 {"ts":"2026-10-22T18:48:19Z","event":"task.created","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":251,"data":{"title":"Plan live editable SSH workspaces in the Tandem TUI"}}
 {"ts":"2026-10-22T18:50:46Z","event":"accord.claimed","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":252,"data":{}}
+{"ts":"2026-10-22T18:59:13Z","event":"task.updated","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":253,"data":{"fields":["body"]}}
