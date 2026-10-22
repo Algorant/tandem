@@ -13,14 +13,14 @@ accord:
   status: "delivered"
   acceptance: ["A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions.", "The reduced approved plan uses on-demand owner-machine Tandem reads and normal owner-side refresh, read-only remote TUI boards, same-minor/protocol compatibility errors, and no copies/mounts/services or special offline machinery."]
   claimedAt: "2026-10-22T18:50:46Z"
-  deliveredAt: "2026-10-22T18:59:15Z"
+  deliveredAt: "2026-10-22T19:33:54Z"
   validation: ["$ tandem tui --help"]
   constraints: ["Planning/read-only investigation only; no source/protocol changes, remote-board writes, new infrastructure or implementation dispatch until Algorant approves the plan.", "Herdra research task39's mirror/readonly recommendation is superseded by Algorant's approved SSH-owner execution shape; do not implement htt here."]
-  summary: "Source-grounded SSH workspace plan submitted throughHerdra beforecode; 3productquestions pending. LargeLocal/SSHbackend refactor with nativeaggregate read, owner-machine CLIwrites, separate live cadence and minor-release rollout; no source/remote changes."
-  evidence: ["Read Herdra research/task39 and explicitly superseded its mirror/readonly path with approved SSH-owner execution shape.", "Two bounded read-only source audits completed: ssh-tui-seams and ssh-cli-contract. Parent checked concreteTuiApp/localreload/editor, ReadSnapshot/DTO/CLI compactlist gaps, Validation accept/rework serverpreconditions and sync cadence. Existing rawEDITOR path lacks CLI parity; no hidden claim of full coverage.", "Native tandem0.17.3 tui --help verified current localPath-only addworkspace; gitstatus clean/synced. No source/spec change, remoteexperiment/write, mount/service, htt edit or implementationWorker launched.", "Plan mc82876f6 names new workspace snapshot JSON read, existing write families +missingthinfrontdoors, active2s/remote30s/chooser5s cadence, moduleblast radius/size, risks and3questions. AwaitHerdra/Algorant approval before concreteimplementationcontract/Worker."]
-  updatedAt: "2026-10-22T19:33:52Z"
+  summary: "Algorant approved reduced READ-ONLY SSH workspace plan viaHerdra m56365c6d. Revisedsize15–22files/1.5–2.5kLOC submittedm332edba1; no code. Local-primary, same0.18minor/protocol, oneconditional RAMsnapshot, livepolling and plainreadonly UI; allmutation/editor/PTY scope removed."
+  evidence: ["Sourceaudits ssh-tui-seams/ssh-cli-contract established concreteTandemProject coupling, missingaggregateJSONread and separatelocal250ms/2sPublish/30sRefresh/60sCLIreadcadences; parentcheckedsourceandnative0.17.3help.", "Originaleditableproposal superseded by explicitAlgorant/Herdra reducedscope. Questions resolved: no remoteediting, localprimaryonly, same0.18.xminor+boardprotocol. Nativeowner30srefreshchosen; no newservice/cache/offlineframework.", "Revisedscope/size returnedtoHerdra before implementation; isolatedLuna/highWorker willprovide concreteplanbeforeedits. No source/spec/remote-boardchanges duringresearch, no copies/mounts/htt edits."]
+  updatedAt: "2026-10-22T19:33:54Z"
 createdAt: "2026-10-22T18:48:19Z"
-updatedAt: "2026-10-22T19:33:52Z"
+updatedAt: "2026-10-22T19:33:54Z"
 assignee: "tandem"
 validation.criterion: "A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions."
 validation.note: "Plan and3questions submitted viaHerdra mc82876f6; sourceauditcomplete, no code. Need decisions about remoteEDITOR/fulltaskeditparity, remote-onlystartupscope and initialsame-minorcompatibility. Nativeaddress/backend/snapshot design requires approval before implementation."
