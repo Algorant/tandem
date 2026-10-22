@@ -4,13 +4,12 @@ uid: 903edb6b-5b88-4c2d-9b32-277488a49c51
 type: task
 kind: "research"
 title: "Plan live read-only SSH workspaces in the Tandem TUI"
-state: "validation"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/editor.rs"]
 tags: ["tui", "ssh"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions.", "The reduced approved plan uses on-demand owner-machine Tandem reads and normal owner-side refresh, read-only remote TUI boards, same-minor/protocol compatibility errors, and no copies/mounts/services or special offline machinery."]
   claimedAt: "2026-10-22T18:50:46Z"
   deliveredAt: "2026-10-22T19:33:54Z"
@@ -18,14 +17,19 @@ accord:
   constraints: ["Planning/read-only investigation only; no source/protocol changes, remote-board writes, new infrastructure or implementation dispatch until Algorant approves the plan.", "Herdra research task39's mirror/readonly recommendation is superseded by Algorant's approved SSH-owner execution shape; do not implement htt here."]
   summary: "Algorant approved reduced READ-ONLY SSH workspace plan viaHerdra m56365c6d. Revisedsize15–22files/1.5–2.5kLOC submittedm332edba1; no code. Local-primary, same0.18minor/protocol, oneconditional RAMsnapshot, livepolling and plainreadonly UI; allmutation/editor/PTY scope removed."
   evidence: ["Sourceaudits ssh-tui-seams/ssh-cli-contract established concreteTandemProject coupling, missingaggregateJSONread and separatelocal250ms/2sPublish/30sRefresh/60sCLIreadcadences; parentcheckedsourceandnative0.17.3help.", "Originaleditableproposal superseded by explicitAlgorant/Herdra reducedscope. Questions resolved: no remoteediting, localprimaryonly, same0.18.xminor+boardprotocol. Nativeowner30srefreshchosen; no newservice/cache/offlineframework.", "Revisedscope/size returnedtoHerdra before implementation; isolatedLuna/highWorker willprovide concreteplanbeforeedits. No source/spec/remote-boardchanges duringresearch, no copies/mounts/htt edits."]
-  updatedAt: "2026-10-22T19:33:54Z"
+  reviewer: "Algorant"
+  updatedAt: "2026-10-22T19:33:56Z"
 createdAt: "2026-10-22T18:48:19Z"
-updatedAt: "2026-10-22T19:33:54Z"
+updatedAt: "2026-10-22T19:33:56Z"
 assignee: "tandem"
 validation.criterion: "A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions."
 validation.note: "Plan and3questions submitted viaHerdra mc82876f6; sourceauditcomplete, no code. Need decisions about remoteEDITOR/fulltaskeditparity, remote-onlystartupscope and initialsame-minorcompatibility. Nativeaddress/backend/snapshot design requires approval before implementation."
 validation.requestedAt: "2026-10-22T18:59:17Z"
 validation.reviewer: "Algorant"
+archivedAt: "2026-10-22T19:33:56Z"
+resolution:
+  outcome: "completed"
+  reviewer: "Algorant"
 ---
 
 ## Description
