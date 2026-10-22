@@ -3,20 +3,22 @@ id: task-93
 uid: 20050a50-e6ab-49a9-aacc-8d9d09e435ff
 type: task
 title: "Live read-only SSH workspaces in the TUI"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "large"
 references: ["task-92", "task-86"]
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/app/queries.rs", "tandem/src/app/dto.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/state.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/rules.rs", "tandem/src/tui/decisions.rs", "tandem/src/tui/validation.rs", "tandem/src/tui/workflow_prompt.rs", "tandem/src/tui/theme.rs", "tandem/Cargo.toml", "tandem/Cargo.lock", "docs/tui/index.md", "docs/cli/index.md"]
 tags: ["tui", "ssh"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Local-primary TUI accepts repeatable HOST:/absolute/path addresses through --add-workspace and the chooser; canonical session entries are ephemeral and visibly identify host/remote/read-only, while local workspaces retain current behavior.", "One native JSON snapshot command supplies complete read-only Board/Logs/Rules/Decisions/details/activity/config/diagnostic state using shared app/protocol projections, with an opaque content-sensitive conditional revision covering records, rules including enabled state, events and board-side display/theme inputs; snapshots exist only in client RAM.", "Remote operations invoke the owning machine's compatible installed Tandem over short-lived SSH; sameTandemminor0.18.x (patchesmaydiffer) and matchingboardprotocol are required with clear errors. No local board copies/mounts/phantom localproject, daemon/service or remote mutation/editor/PTY API is introduced.", "Every remote board write affordance and shortcut is hidden/disabled with a plain read-only/edit-on-owner hint before any mutation; filters/navigation/details/session controls remain usable. Tests prove no writes are sent remotely or accidentally applied to the local primary board.", "Active remote reads ~2s, visible chooser summaries ~5s and owner-native sync freshness ~30s run off the input/render loop; unchanged revisions avoid repeated full payload/Git snapshot work, changes and selection update correctly, and all owned child work is reaped on switching/exit/error without offline cache/queue machinery.", "Temporary isolated local/SSH fixture checks cover address/quoting/compatibility, complete/tolerant data and revision changes, allread-only gates/localeditparity, liveness/idleI/O and cleanup. Native tests/fmt/strictclippy and applicable docs build pass; actual renders and final address/compatibility guidance are supplied for the authorized0.18.0 rollout/Herdra task41 handoff."]
+  claimedAt: "2026-10-22T19:34:16Z"
   validation: ["$ just dev-check", "$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["PLAN FIRST: return concreteimplementationplan and materialgaps BEFORE editing. Algorant viaHerdra m56365c6d approved this reducedshape, not any remote write support.", "One rootTask/isolated retainedLuna-highWorker; subtasks ifneeded areinternalmilestones only. Prefer narrow per-board Local/SSH read boundary, not genericstorage/RPC/actionbus framework or broad architecture rewrite.", "Remote READ-ONLY means no recordauthoring operations (add/update/accord/review/complete/cancel/link/rules/edit) and no raweditor/PTY/signoff extensions. Only native snapshot/version reads and normal owner-side sync refresh are permitted.", "No realcart-labrecord writes EVER. Verification uses generated disposable boards on owningmachines, never copies/mirrors of realboards. No changes to realremoteprofiles/credentials/infrastructure or liveTUIprocesses without parent authorization.", "No remote-only startup, Herdr discovery/dependency, htt/adapter edits, persistedroster, silentcachedfallback, offline stateframework/queue, or automatic write retry. Clear standardSSH/version/protocol errors.", "Preserve local tolerantdiagnostics, rules/UIDselection, theme/presentation behavior, lifecycle guards and task86idle-I/O fix. Authoritative parsing/roles remain protocol/app on owner, no frontendMarkdown/frontmatter parser.", "Temporary featurechecks/harnesses/fixtures only, removebeforeREADY; existingtests maygetnecessarymechanicalupdates. No permanentnewtests unlessseparatelyapproved.", "Report whole-root evidence/fullchangedfiles. Worker owns code/cleancommits only; parent owns previewrouting/integration/Tandemacceptance/release/push and all-machineupgrade/restarts. Target0.18.0; propose any earlybranchCargo bump needed for honest compatibilitytests in the plan, no tag/release byWorker."]
-  updatedAt: "2026-10-22T19:33:57Z"
+  updatedAt: "2026-10-22T19:34:16Z"
 createdAt: "2026-10-22T19:33:57Z"
-updatedAt: "2026-10-22T19:33:57Z"
+updatedAt: "2026-10-22T19:34:16Z"
+assignee: "worker-task-93-1b445c3a"
 ---
 
 ## Description

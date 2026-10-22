@@ -257,3 +257,4 @@
 {"ts":"2026-10-22T19:33:54Z","event":"accord.delivered","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":257,"data":{}}
 {"ts":"2026-10-22T19:33:56Z","event":"task.completed","id":"task-92","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":258,"data":{}}
 {"ts":"2026-10-22T19:33:57Z","event":"task.created","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":259,"data":{"title":"Live read-only SSH workspaces in the TUI"}}
+{"ts":"2026-10-22T19:34:16Z","event":"accord.claimed","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":260,"data":{}}
