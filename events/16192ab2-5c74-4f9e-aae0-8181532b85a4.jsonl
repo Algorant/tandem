@@ -260,3 +260,4 @@
 {"ts":"2026-10-22T19:34:16Z","event":"accord.claimed","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":260,"data":{}}
 {"ts":"2026-10-22T19:43:34Z","event":"task.updated","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":261,"data":{"fields":["body"]}}
 {"ts":"2026-10-22T19:53:33Z","event":"accord.blocked","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":262,"data":{}}
+{"ts":"2026-10-22T19:56:47Z","event":"task.updated","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":263,"data":{"fields":["constraints","validation"]}}
