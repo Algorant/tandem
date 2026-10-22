@@ -4,19 +4,21 @@ uid: 903edb6b-5b88-4c2d-9b32-277488a49c51
 type: task
 kind: "research"
 title: "Plan live editable SSH workspaces in the Tandem TUI"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 relatedFiles: ["tandem/src/app/project.rs", "tandem/src/cli/model.rs", "tandem/src/cli/commands.rs", "tandem/src/tui/mod.rs", "tandem/src/tui/reload.rs", "tandem/src/tui/editor.rs"]
 tags: ["tui", "ssh"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A source-grounded plan is sent through Herdra to Algorant BEFORE implementation, naming read/write commands, live refresh, touched modules, approximate size and material risks, with no more than four questions.", "The plan honors on-demand owner-machine Tandem execution over SSH, fully editable remote TUI boards, explicit compatible-version errors, and no copies/mounts/always-on service or special offline machinery."]
+  claimedAt: "2026-10-22T18:50:46Z"
   validation: ["$ tandem tui --help"]
   constraints: ["Planning/read-only investigation only; no source/protocol changes, remote-board writes, new infrastructure or implementation dispatch until Algorant approves the plan.", "Herdra research task39's mirror/readonly recommendation is superseded by Algorant's approved SSH-owner execution shape; do not implement htt here."]
-  updatedAt: "2026-10-22T18:48:19Z"
+  updatedAt: "2026-10-22T18:50:46Z"
 createdAt: "2026-10-22T18:48:19Z"
-updatedAt: "2026-10-22T18:48:19Z"
+updatedAt: "2026-10-22T18:50:46Z"
+assignee: "tandem"
 ---
 
 ## Description
