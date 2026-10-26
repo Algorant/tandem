@@ -267,3 +267,4 @@
 {"ts":"2026-10-26T03:59:36Z","event":"rules.updated","id":"rules","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":267,"data":{"action":"add","ruleId":"never-6"}}
 {"ts":"2026-10-26T04:00:50Z","event":"task.updated","id":"task-88","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":268,"data":{"fields":["body"]}}
 {"ts":"2026-10-26T04:00:51Z","event":"task.updated","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":269,"data":{"fields":["constraints","body"]}}
+{"ts":"2026-10-26T04:00:53Z","event":"accord.blocked","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":270,"data":{}}

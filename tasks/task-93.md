@@ -15,10 +15,10 @@ accord:
   claimedAt: "2026-10-22T19:34:16Z"
   validation: ["$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
   constraints: ["HOLD by Algorant via Herdra m7b9810e6: preserve the stopped retained Worker and current dirty compiling seam unchanged. No source edits, builds, tests, SSH/SCP, fixtures or further investigation until explicit owner resume.", "When resumed, behavioral validation is E2E-only under the new global testing rule: no unit tests. Earlier unit/full-suite test directions are superseded; choose concrete E2E checks on resume, without running just dev-check's unit suite.", "Read-only remote product scope remains unchanged; the proposed larger selected-session/read-model migration is NOT approved by this hold. Resolve scope before further implementation.", "No remote record-authoring/editor/PTY API, no copies/mounts/services/offline machinery or new infrastructure; no real remote verification project record writes ever.", "Parent owns future scope approval/resume, integration, release, upgrades and cleanup. Do not discard, reset, commit or remove retained dirty work while held."]
-  note: "Algorant via Herdra m7b9810e6: HOLD while focusing on cart-lab. Retain exact stopped Worker/dirty compiling seam, no further work until explicit resume. Worker already settled(done); worker_pause correctly made no runtime changes. On resume E2E-only/no unit tests, and expanded model migration still needs approval. No source/build/test/SSH activity performed."
-  updatedAt: "2026-10-26T04:00:51Z"
+  note: "Algorant requested HOLD while focusing on another project. Preserve the exact stopped Worker and dirty compiling seam; no further work until explicit resume. E2E-only/no-unit validation and required scope approval remain in force. Public-hygiene wording neutralized only; no source, runtime, build, test or SSH changes."
+  updatedAt: "2026-10-26T04:00:53Z"
 createdAt: "2026-10-22T19:33:57Z"
-updatedAt: "2026-10-26T04:00:51Z"
+updatedAt: "2026-10-26T04:00:53Z"
 assignee: "worker-task-93-1b445c3a"
 ---
 
