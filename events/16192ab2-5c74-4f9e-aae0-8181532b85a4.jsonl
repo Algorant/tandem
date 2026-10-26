@@ -263,3 +263,4 @@
 {"ts":"2026-10-22T19:56:47Z","event":"task.updated","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":263,"data":{"fields":["constraints","validation"]}}
 {"ts":"2026-10-22T19:57:05Z","event":"accord.blocked","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":264,"data":{}}
 {"ts":"2026-10-26T02:34:39Z","event":"task.created","id":"task-94","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":265,"data":{"title":"Bulk JSON board export with an updated-time window"}}
+{"ts":"2026-10-26T02:36:50Z","event":"task.canceled","id":"task-94","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":266,"data":{"reason":"superseded: Algorant chose a raw .tandem file reader in obsmd's devlog (2026-10-26)"}}

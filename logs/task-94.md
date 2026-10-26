@@ -3,7 +3,6 @@ id: task-94
 uid: b22ebbd6-332f-44db-9db9-128b0aeb9ffb
 type: task
 title: "Bulk JSON board export with an updated-time window"
-state: todo
 priority: "medium"
 effort: "medium"
 references: ["task-93"]
@@ -16,7 +15,11 @@ accord:
   constraints: ["Capture/scoping request only: leave unstarted until explicit execution direction. Concrete Worker plan before implementation when started.", "Keep this independent of held task93; do not recover/resume/edit/discard its Worker or compiling seam. Implement from clean main in its own isolated Task checkout when authorized.", "V1 time filter is explicitly updatedAt, which satisfies the requested updated-or-terminal filter; include original terminal timestamp fields for obsmd's own finer filtering. No invented terminal-event semantics, durable cursor, new log command, cache/service or broad snapshot/TUI refactor.", "Use shared app snapshot/detail projections and one snapshot open; no per-record CLI, timestamp subprocess or duplicate Markdown/frontmatter parser.", "E2E behavioral checks only under current global rule; compiler/fmt/lint are separate checks. Temporary generated state only, no real-board mutations or archived-record edits."]
   updatedAt: "2026-10-26T02:34:39Z"
 createdAt: "2026-10-26T02:34:39Z"
-updatedAt: "2026-10-26T02:34:39Z"
+updatedAt: "2026-10-26T02:36:50Z"
+archivedAt: "2026-10-26T02:36:50Z"
+resolution:
+  outcome: "canceled"
+  note: "superseded: Algorant chose a raw .tandem file reader in obsmd's devlog (2026-10-26)"
 ---
 
 ## Description
