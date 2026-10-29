@@ -1,0 +1,6 @@
+# gitguard: stops a push that adds a real secret or personal record (Algorant/docs/sharing-framework.md).
+mode = "enabled"
+
+[jev]
+mode = "full"
+offline = "warn"
