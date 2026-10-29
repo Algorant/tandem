@@ -2,6 +2,14 @@
 
 Guidance for AI agents working in the Tandem repository.
 
+## Ideas worth borrowing
+
+- Accords: an explicit claim/deliver/rework/accept agreement kept separate from workflow state and review — `protocol/README.md` (Accord and archive).
+- Plain Markdown board with per-actor append-only event ledgers, so concurrent agents never contend on one log — `protocol/README.md` (Events), `tandem/src/project/events.rs`.
+- Board sync on its own Git branch, independent of source commits, with held edits instead of a broken shared board — `protocol/README.md` (Sync), `tandem/src/project/sync.rs`.
+- One binary with strict layers: `protocol` owns meaning, `project` owns files, `app` owns operations, and `cli`/`tui` are peer interfaces — `tandem/src/`.
+- Rules as Markdown records that agents re-read at session start — `tandem/src/project/rules.rs`, `tandem/src/project/agent_files.rs`.
+
 ## Project summary
 
 Tandem is a local-first protocol and toolchain for human/agent project coordination.
