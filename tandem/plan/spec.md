@@ -33,7 +33,7 @@ first-class Tandem Decision.
 - Installed Brainfile implementation under `/usr/lib/node_modules/@brainfile/cli` for feature discovery.
 - Current Brainfile TUI behavior and shortcomings.
 - Tandem protocol draft in `../../protocol/plan/spec.md`.
-- Local Brainfile v3 direction in `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`.
+- Local Brainfile v3 direction in `~/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`.
 
 Feature parity remains a planning reference. The locked v0 CLI/TUI scope below is binding for the first implementation pass.
 

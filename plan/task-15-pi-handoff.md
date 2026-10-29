@@ -54,15 +54,15 @@ Create/run commands:
 rm -rf /tmp/tandem-task-15-preview
 mkdir -p /tmp/tandem-task-15-preview
 cd /tmp/tandem-task-15-preview
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem init --title 'Task 15 TUI workflow preview'
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview durable workflow actions' --acceptance 'Claim, deliver, block, resume, and complete from the TUI' --acceptance 'Show acceptance, blockers, milestone progress, and evidence'
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview blocking dependency' --acceptance 'Dependency can be archived before parent completion'
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview milestone child' --acceptance 'Milestone status appears under its parent Task' --parent task-1
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem update task-1 --blocker task-2
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord claim task-2 --assignee preview
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord deliver task-2 --summary 'Dependency evidence recorded' --evidence 'native CLI deliver and show'
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem complete task-2
-/home/ivan/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem tui
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem init --title 'Task 15 TUI workflow preview'
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview durable workflow actions' --acceptance 'Claim, deliver, block, resume, and complete from the TUI' --acceptance 'Show acceptance, blockers, milestone progress, and evidence'
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview blocking dependency' --acceptance 'Dependency can be archived before parent completion'
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem add task 'Preview milestone child' --acceptance 'Milestone status appears under its parent Task' --parent task-1
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem update task-1 --blocker task-2
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord claim task-2 --assignee preview
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem accord deliver task-2 --summary 'Dependency evidence recorded' --evidence 'native CLI deliver and show'
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem complete task-2
+~/.herdr/worktrees/tandem/worker-task-15-make-durable-task-and-milestone-work/tandem/target/release/tandem tui
 ```
 
 ## Consumer/version handoff

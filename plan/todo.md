@@ -10,7 +10,7 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 - [x] Chose working project/protocol name: **Tandem**.
 - [x] Chose `accord` as the replacement for Brainfile's `contract` object.
 - [x] Established `tandem` as the user-facing CLI and reserved `td` for future/internal tool prefixes.
-- [x] Renamed local repository to `/home/ivan/dev/projects/tandem`.
+- [x] Renamed local repository to `~/dev/projects/tandem`.
 - [x] Created private GitHub repo: `Algorant/tandem`.
 - [x] Set initial monorepo direction with `protocol/` and `tandem/` areas.
 - [x] Created initial protocol and TUI specs.
@@ -36,7 +36,7 @@ This todo tracks monorepo-level work that cuts across the protocol, TUI, and ext
 
 - [x] Implement accepted decision-7 across protocol, CLI, TUI, and integrations: derive Epic/Task/Subtask roles from resolved documents, enforce global `task-N` IDs for Epics/Tasks and `task-N-M` only for Subtasks, emit `epic-task`/`subtask`/generic `parent`, and reject invalid roles, IDs, and reparenting.
 - [ ] Integrate delegated Task campaigns with the accepted worker direction: Epics are not delegated; Worker A executes a delegated Task's Subtask documents through one `pi-todos` checklist and one root settlement without independent Subtask delegation.
-- [x] Reconcile protocol docs against live Brainfile protocol plus `/home/ivan/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
+- [x] Reconcile protocol docs against live Brainfile protocol plus `~/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md` enough for v0 implementation.
 - [x] Build a Brainfile CLI/TUI feature parity and improvement matrix before implementation decisions.
 - [ ] Keep Markdown planning docs canonical until the TUI can safely manage Tandem documents; migrate/dogfood Tandem documents after that.
 - [x] Define minimal Rust implementation layout inside `tandem/` as implementation begins.
