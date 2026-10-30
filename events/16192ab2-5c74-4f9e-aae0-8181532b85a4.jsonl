@@ -274,3 +274,4 @@
 {"ts":"2026-10-30T13:35:21Z","event":"task.created","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":274,"data":{"title":"Board exclude-tag filter with a saved default view per workspace"}}
 {"ts":"2026-10-30T13:35:27Z","event":"task.updated","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":275,"data":{"fields":["references"]}}
 {"ts":"2026-10-30T13:50:20Z","event":"accord.claimed","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":276,"data":{}}
+{"ts":"2026-10-30T14:07:12Z","event":"accord.delivered","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":277,"data":{}}
