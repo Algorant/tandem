@@ -2,6 +2,14 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.4
+
+Protocol remains 0.5.0; existing boards need no migration.
+
+### Added
+
+- A workspace can open its TUI Board with some tags hidden: add `[board] hide_tags = ["work"]` to `.tandem/config.toml`. The filter bar shows `hiding #work`, and **Show hidden tags** under `f` shows them for the session. `tandem list`, `tandem search` and `tandem web` are not filtered; older Tandem versions ignore the setting.
+
 ## 0.17.3
 
 Protocol remains 0.5.0; existing boards need no migration.
