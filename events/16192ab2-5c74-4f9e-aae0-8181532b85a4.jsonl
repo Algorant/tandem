@@ -271,3 +271,4 @@
 {"ts":"2026-10-29T03:15:45Z","event":"rules.updated","id":"rules","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":271,"data":{"action":"edit","ruleId":"never-6"}}
 {"ts":"2026-10-29T03:15:47Z","event":"rules.updated","id":"rules","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":272,"data":{"action":"add","ruleId":"prefer-7"}}
 {"ts":"2026-10-29T03:16:00Z","event":"task.created","id":"task-95","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":273,"data":{"title":"rules add returns provisional ID without reporting final rename"}}
+{"ts":"2026-10-30T13:35:21Z","event":"task.created","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":274,"data":{"title":"Board exclude-tag filter with a saved default view per workspace"}}
