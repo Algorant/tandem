@@ -3,15 +3,17 @@ id: task-96
 uid: c134ee18-5415-4fb3-bc3f-b75390835d63
 type: task
 title: "Board exclude-tag filter with a saved default view per workspace"
-state: todo
+state: "in-progress"
 priority: "medium"
 tags: ["tui", "config"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The TUI Board can hide every task carrying a chosen tag, and the active filter summary shows the exclusion.", "A workspace can save that exclusion as its Board view in `.tandem/config.toml`, and a fresh `tandem tui` in that workspace opens with it applied and can clear it for the session.", "A plan is approved through Herdra before implementation starts."]
-  updatedAt: "2026-10-30T13:35:21Z"
+  claimedAt: "2026-10-30T13:50:20Z"
+  updatedAt: "2026-10-30T13:50:20Z"
 createdAt: "2026-10-30T13:35:21Z"
-updatedAt: "2026-10-30T13:35:27Z"
+updatedAt: "2026-10-30T13:50:20Z"
+assignee: "tandem"
 ---
 
 ## Description
