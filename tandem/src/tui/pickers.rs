@@ -61,6 +61,7 @@ enum PickerAction {
     SetTag(Option<String>),
     SetPriority(Option<String>),
     SetDeliveredUntriaged(bool),
+    ShowHiddenTags,
     ClearAll,
     Validation(&'static str),
     Workflow(&'static str),
@@ -608,6 +609,19 @@ impl TuiApp {
                 action: PickerAction::SetDeliveredUntriaged(false),
             },
             PickerOption {
+                label: "Show hidden tags".into(),
+                detail: if self.board_filters.hidden_tags.is_empty() {
+                    "No tags are hidden".into()
+                } else {
+                    format!(
+                        "Stop {} for this session",
+                        self.board_filters.hidden_tags_label()
+                    )
+                },
+                enabled: !self.board_filters.hidden_tags.is_empty(),
+                action: PickerAction::ShowHiddenTags,
+            },
+            PickerOption {
                 label: "Clear all filters".into(),
                 detail: "Show the complete Board".into(),
                 enabled: self.board_filters.is_active(),
@@ -844,6 +858,10 @@ impl TuiApp {
             }
             PickerAction::SetDeliveredUntriaged(value) => {
                 self.board_filters.delivered_untriaged = value;
+                self.restore_filtered_selection(selected_id.as_deref());
+            }
+            PickerAction::ShowHiddenTags => {
+                self.board_filters.hidden_tags.clear();
                 self.restore_filtered_selection(selected_id.as_deref());
             }
             PickerAction::ClearAll => {

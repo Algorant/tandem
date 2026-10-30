@@ -104,6 +104,8 @@ pub(super) struct BoardFilters {
     pub(super) tag: Option<String>,
     pub(super) priority: Option<String>,
     pub(super) delivered_untriaged: bool,
+    /// Tags whose tasks the Board hides, from the workspace's saved Board view.
+    pub(super) hidden_tags: Vec<String>,
 }
 
 impl BoardFilters {
@@ -112,6 +114,16 @@ impl BoardFilters {
             || self.tag.is_some()
             || self.priority.is_some()
             || self.delivered_untriaged
+            || !self.hidden_tags.is_empty()
+    }
+
+    pub(super) fn hidden_tags_label(&self) -> String {
+        let tags = self
+            .hidden_tags
+            .iter()
+            .map(|tag| format!("#{tag}"))
+            .collect::<Vec<_>>();
+        format!("hiding {}", tags.join(", "))
     }
 
     pub(super) fn summary(&self) -> String {
@@ -127,6 +139,9 @@ impl BoardFilters {
         }
         if self.delivered_untriaged {
             parts.push("delivered · untriaged".to_string());
+        }
+        if !self.hidden_tags.is_empty() {
+            parts.push(self.hidden_tags_label());
         }
         if parts.is_empty() {
             "no Board filters".to_string()
@@ -1884,11 +1899,28 @@ pub(super) fn board_filter_bar_line(filters: &BoardFilters, theme: &TuiTheme) ->
         ));
         spans.push(Span::raw(" "));
     }
+    if !filters.hidden_tags.is_empty() {
+        spans.push(Span::styled(
+            chip_text(&filters.hidden_tags_label(), theme),
+            theme.progress_chip_style(StatusTone::Muted),
+        ));
+        spans.push(Span::raw(" "));
+    }
     spans.push(Span::styled(" f change or clear ", theme.muted_style()));
     Line::from(spans)
 }
 
 pub(super) fn board_filters_match(doc: &Document, filters: &BoardFilters) -> bool {
+    if !filters.hidden_tags.is_empty()
+        && document_tags(doc).iter().any(|candidate| {
+            filters
+                .hidden_tags
+                .iter()
+                .any(|hidden| candidate.eq_ignore_ascii_case(hidden))
+        })
+    {
+        return false;
+    }
     if let Some(kind) = filters.kind.as_deref() {
         if doc.field("kind") != Some(kind) {
             return false;

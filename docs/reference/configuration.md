@@ -39,4 +39,13 @@ tone = "accent"
 
 Supported tag tones are `accent`, `success`, `warning`, `error`, `muted`, `orange`, `sand`, and `purple`. Existing standard badges can be hidden with `[board.badges] disabled = ["priority"]`; use `tandem tui` to see the available badges and labels.
 
+To open a workspace's Board with some tags hidden, list them in its `.tandem/config.toml`:
+
+```toml
+[board]
+hide_tags = ["work"]
+```
+
+The TUI hides tasks carrying those tags and shows `hiding #work` in the filter bar; choose **Show hidden tags** under `f` to see them for the session. `tandem list`, `tandem search` and `tandem web` are not filtered.
+
 The TUI's session board list is temporary and is not stored in user configuration. See the [TUI guide](/tui/) for adding and removing boards in a session.

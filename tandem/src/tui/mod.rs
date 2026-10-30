@@ -368,6 +368,10 @@ impl TuiApp {
             workspace_summary_refresh_requested: false,
         };
         app.reload();
+        // The workspace's saved Board view applies once on open; later reloads
+        // leave the session's filters alone so clearing it sticks.
+        app.board_filters.hidden_tags = app.theme.board_hidden_tags().to_vec();
+        app.clamp_selection();
         Ok(app)
     }
 
@@ -1643,6 +1647,7 @@ in-progress = "active"
             tag: Some("ux".to_string()),
             priority: None,
             delivered_untriaged: false,
+            ..BoardFilters::default()
         };
 
         let todo_entries = state_board_entries(&docs, &[], "todo", &filters, &BTreeSet::new());
@@ -1875,6 +1880,7 @@ in-progress = "active"
                 tag: Some("ux".to_string()),
                 priority: None,
                 delivered_untriaged: false,
+                ..BoardFilters::default()
             },
         );
         assert_eq!(
@@ -1963,6 +1969,7 @@ in-progress = "active"
                 tag: Some("ux".to_string()),
                 priority: None,
                 delivered_untriaged: false,
+                ..BoardFilters::default()
             },
         );
 
@@ -2464,6 +2471,7 @@ tone = "success"
             tag: Some("tui".to_string()),
             priority: Some("high".to_string()),
             delivered_untriaged: true,
+            ..BoardFilters::default()
         };
         assert!(board_filters_match(&delivered, &filters));
         assert!(!board_filters_match(&no_accord, &filters));
@@ -2494,6 +2502,7 @@ tone = "success"
             tag: Some("tui".to_string()),
             priority: Some("high".to_string()),
             delivered_untriaged: false,
+            ..BoardFilters::default()
         };
         let tabs = board_view_tabs(&["todo".to_string()], &docs, &filters);
         assert_eq!(tabs[0].count, 1);
@@ -2552,6 +2561,7 @@ tone = "success"
             tag: Some("research".to_string()),
             priority: Some("high".to_string()),
             delivered_untriaged: false,
+            ..BoardFilters::default()
         };
 
         let footer = app.board_footer_text();

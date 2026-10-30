@@ -74,6 +74,7 @@ pub(super) struct TuiTheme {
     state_badges: BTreeMap<String, Color>,
     badge_style: BadgeStyle,
     badge_config: BadgeConfig,
+    board_hidden_tags: Vec<String>,
     transparent_background: bool,
     no_color: bool,
 }
@@ -211,6 +212,7 @@ impl TuiTheme {
             state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
             badge_config: BadgeConfig::default(),
+            board_hidden_tags: Vec::new(),
             transparent_background: false,
             no_color: false,
         }
@@ -267,6 +269,7 @@ impl TuiTheme {
             state_badges: BTreeMap::new(),
             badge_style: BadgeStyle::Muted,
             badge_config: BadgeConfig::default(),
+            board_hidden_tags: Vec::new(),
             transparent_background: false,
             no_color: false,
         }
@@ -347,6 +350,13 @@ impl TuiTheme {
         );
         if let Some(user_config_path) = user_config_path {
             apply_display_config_file(&mut theme, &mut warnings, user_config_path);
+            if !theme.board_hidden_tags.is_empty() {
+                warnings.push(format!(
+                    "Config warning: {} sets board.hide_tags, which applies per workspace only; set it in .tandem/config.toml",
+                    display_path(user_config_path)
+                ));
+                theme.board_hidden_tags.clear();
+            }
         }
         // Compatibility: older workspaces used .tandem/theme.toml for Board badge
         // display semantics. Keep reading those sections during migration, but let
@@ -786,6 +796,11 @@ impl TuiTheme {
         self.transparent_background = enabled;
     }
 
+    /// Tags the workspace's saved Board view hides, from `[board] hide_tags`.
+    pub(super) fn board_hidden_tags(&self) -> &[String] {
+        &self.board_hidden_tags
+    }
+
     fn set_badge_style(&mut self, style: BadgeStyle) {
         self.badge_style = style;
     }
@@ -947,6 +962,17 @@ impl TuiTheme {
                 } else if !matches!(key.as_str(), "style" | "badge_style" | "badge-style") {
                     warnings.push(format!(
                         "Config warning line {line_number}: unknown badge key `{section}.{key}`"
+                    ));
+                }
+                continue;
+            }
+
+            if section == "board" {
+                if matches!(key.as_str(), "hide_tags" | "hide-tags") {
+                    self.board_hidden_tags = parse_hidden_tags(raw_value);
+                } else {
+                    warnings.push(format!(
+                        "Config warning line {line_number}: unknown Board key `{section}.{key}`"
                     ));
                 }
                 continue;
@@ -1431,6 +1457,39 @@ fn parse_badge_disabled_list(value: &str) -> BTreeSet<String> {
         .map(|item| normalized_badge_id(&item))
         .filter(|item| !item.is_empty())
         .collect()
+}
+
+/// Parses `hide_tags` from the raw TOML value. Tags may be written `"#work"`,
+/// so a `#` inside the array is a tag prefix, and only text after the
+/// closing bracket can be a comment.
+fn parse_hidden_tags(raw: &str) -> Vec<String> {
+    let raw = raw.trim();
+    let mut quote = None;
+    let mut end = raw.len();
+    for (index, ch) in raw.char_indices() {
+        match (quote, ch) {
+            (None, '"' | '\'') => quote = Some(ch),
+            (Some(open), _) if ch == open => quote = None,
+            (None, ']') => {
+                end = index + 1;
+                break;
+            }
+            _ => {}
+        }
+    }
+    let items = if raw.starts_with('[') {
+        parse_string_list(&raw[..end])
+    } else {
+        vec![parse_value(raw)]
+    };
+    let mut tags = Vec::new();
+    for tag in items {
+        let tag = tag.trim_start_matches('#').trim().to_ascii_lowercase();
+        if !tag.is_empty() && !tags.contains(&tag) {
+            tags.push(tag);
+        }
+    }
+    tags
 }
 
 fn parse_string_list(value: &str) -> Vec<String> {
