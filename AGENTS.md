@@ -213,9 +213,20 @@ than on whether the work is visual.
 
 ## Validating TUI changes
 
-A rendered pane is evidence. Spawn a Herdr pane and read the result with
-`herdr pane read --format ansi` to check layout, counts, wrapping, colors, and
-attributes. Build release, not debug: debug builds render slowly enough to
+A rendered terminal is evidence. Run the TUI in an hc terminal, wait for it to
+draw, read the screen, then close it:
+
+```sh
+t=$(hc run --bg --no-notify --json --cwd "$SANDBOX" -- tandem tui | jq -r .address)
+hc wait "$t" --output 'expected text' --timeout 10
+hc read "$t"
+hc kill "$t" && hc rm "$t"
+```
+
+`hc read` prints the exact screen as plain text (200x120 by default), which
+settles layout, counts, and wrapping; drive keys with `hc keys "$t" f enter`.
+It carries no ANSI styling, so colors and attributes need a human look. Build
+release, not debug: debug builds render slowly enough to
 distort flicker, resize, and latency observations. `just dev` builds release
 and opens a disposable Git-backed sandbox; `just dev-project` explicitly targets
 the real project records. Use `just dev-check` for native tests and a Git-backed
