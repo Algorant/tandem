@@ -277,3 +277,4 @@
 {"ts":"2026-10-30T14:07:12Z","event":"accord.delivered","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":277,"data":{}}
 {"ts":"2026-10-30T14:36:57Z","event":"task.completed","id":"task-96","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":278,"data":{}}
 {"ts":"2026-10-30T20:11:51Z","event":"rules.updated","id":"rules","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":279,"data":{"action":"edit","ruleId":"always-4"}}
+{"ts":"2026-11-06T15:04:12Z","event":"task.created","id":"task-97","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":280,"data":{"title":"complete delivers and accepts in one write: tandem complete --summary/--evidence/--file-changed"}}
