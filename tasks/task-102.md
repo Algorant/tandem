@@ -9,12 +9,13 @@ effort: "medium"
 references: ["task-100"]
 tags: ["tui", "plan-first"]
 accord:
-  status: "claimed"
+  status: "blocked"
   acceptance: ["Algorant approves the desktop same-terminal restart plan before any action; the legacy homelab Board remains untouched.", "The approved desktop restart uses the same supported terminal and verified installed latest binary, preserving its workspace roster and visible view/selection/filters without losing unsaved input.", "Actual desktop replacement process version and Board read are verified; no legacy-client action, core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
   claimedAt: "2026-11-08T05:26:38Z"
-  updatedAt: "2026-11-08T06:29:41Z"
+  note: "Approved desktop restart paused after verified graceful exit of old TUI: original same-terminal zsh prompt displays `tt`, but hc read cannot distinguish editable input from autosuggestion. No launch command sent or shell input cleared. Await Algorant's confirmation via Herdra md85e7ad9. View/roster/selection/filter snapshot and previous executable retained in /tmp/tandem-desktop-restart-gxioxu8m; no other runtime action."
+  updatedAt: "2026-11-08T06:31:32Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T06:29:42Z"
+updatedAt: "2026-11-08T06:31:32Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
