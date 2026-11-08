@@ -2,7 +2,7 @@
 id: task-102
 uid: 7b891c16-1665-49dc-8891-286fdb7b4ce0
 type: task
-title: "Resolve old Board clients without reviving retired infrastructure"
+title: "Restart the supported desktop Board after preserving its current view"
 state: "validation"
 priority: "medium"
 effort: "medium"
@@ -10,12 +10,12 @@ references: ["task-100"]
 tags: ["tui", "plan-first"]
 accord:
   status: "blocked"
-  acceptance: ["Algorant approves the supported desktop same-terminal restart plan and explicitly chooses retention or retirement of the legacy Board before any corresponding action.", "Any approved restart uses an existing supported terminal and verified installed latest binary, preserving its workspace roster and visible view/selection/filters without losing unsaved input.", "Actual replacement process versions and Board reads are verified; any legacy retirement is separately authorized with unobservable session-state risk disclosed. No core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
+  acceptance: ["Algorant approves the desktop same-terminal restart plan before any action; the legacy homelab Board remains untouched.", "The approved desktop restart uses the same supported terminal and verified installed latest binary, preserving its workspace roster and visible view/selection/filters without losing unsaved input.", "Actual desktop replacement process version and Board read are verified; no legacy-client action, core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
   claimedAt: "2026-11-08T05:26:38Z"
   note: "HOLD both clients per Herdra m474dee4d; awaiting cart-lab accessibility/current-use evidence for legacy Board and then Algorant's explicit choice. No restart/termination or retired-infrastructure revival."
-  updatedAt: "2026-11-08T05:29:27Z"
+  updatedAt: "2026-11-08T05:29:46Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T05:29:27Z"
+updatedAt: "2026-11-08T05:29:46Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
@@ -37,5 +37,5 @@ Before0.17.4 → after verified installed latest0.17.5 in the SAME native Board 
 
 Verify actual replacement process executable/version (not installed --version alone), same board/roster/view/selection/filters, prompt-free rendering and a bounded native Board read. If replacement startup fails, stop only the new client and report; the approved recovery may reopen the retained prior executable/argv (known old timeout vulnerability). Never roll back board records. Remove temporary recovery copies only after successful checks.
 
-## Legacy disposition gate
-Before any retirement, Algorant must explicitly choose to discard or otherwise handle the unobservable draft/session state. Any later operation must target only the exact approved client; no shell/daemon/HC/seedbox action is implied. No legacy restart or replacement in another tab is included in the desktop plan.
+## Final scope from Herdra mcf7a3a22
+Leave the legacy homelab Board untouched. Its restart, retirement, reattach, further probes, or replacement are NOT part of this Task. Only the desktop supported-terminal plan is queued for Algorant's approval, with view preservation and actual running-version verification. No runtime action is approved yet.
