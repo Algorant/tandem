@@ -14,7 +14,7 @@ accord:
   claimedAt: "2026-11-08T05:26:38Z"
   updatedAt: "2026-11-08T05:26:38Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T05:26:39Z"
+updatedAt: "2026-11-08T05:27:14Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
@@ -41,3 +41,7 @@ Verify replacement PID's real executable/version (not just installed --version),
 If replacement startup fails, stop only the new client and report the error; with the approved recovery scope, reopen the backed-up previous executable/argv in the same cwd, retaining its known timeout vulnerability. Do not roll back board records or silently change runtime/version. Delete temporary executable backups only once the replacement checks pass.
 
 Current read-only desktop snapshot: Board / ALL, hiding #work, selected task-48; recheck just before execution because live state can change. Homelab view/draft is not yet attested; confirmation requested from cart-lab's Ceph (m18dbb215).
+
+
+## HOLD / target-use gate
+Herdra m474dee4d holds BOTH restarts before asking Algorant. Legacy process existence is not a reason to revive retired infrastructure or relaunch it. Obtain cart-lab's read-only accessibility/current-use evidence, then return one short concrete choice: restart in an existing supported terminal, leave it running, or retire it with Algorant's approval. No restart, keys, process termination or retired-tool fallback authorized. If owner intent/current view cannot be attested, record that explicitly rather than infer it.
