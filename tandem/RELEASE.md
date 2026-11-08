@@ -41,36 +41,15 @@ Concrete bounded candidates and risks:
 
 ### Current capabilities
 
-- CLI commands: `--version`, `version`, `init`, `list`, `show`, `add`, `move`, `update`, `complete`, `cancel`, `search`, `papercut add|list|show|resolve`, `log list|show|search`, `accord claim|deliver|accept|rework|block|fail`, `rules list|add|edit|delete`, `decision list|show|add`, `tui`, and `web`.
-- JSON read paths for supported read commands using `{ "ok": true, "data": ..., "warnings": [] }` envelopes.
-- Markdown/YAML-frontmatter Tandem workspace support under `.tandem/`, with active work in `.tandem/board/`, completed logs in `.tandem/logs/`, optional lightweight friction records in `.tandem/papercuts/`, and per-actor audit events in `.tandem/events/<actor-id>.jsonl`.
-- Default workflow states are `todo`, `in-progress`, and `validation`; legacy `state: review` reads are tolerated.
-- Conservative state/accord synchronization for common CLI transitions.
-- Ratatui/crossterm TUI with top-level Board, Logs, Rules, and Decisions tabs.
-- Board Validation flow for delivered work, with action hints for approve, request changes, and complete/log flows.
-- Board state subviews with task metadata, local navigation, quick-add (`a`), filter (`f`), state-move (`m`), Validation (`v`), arrangement (`b`), manual reload (`r`), inline row activation (`Enter`), optional detail pane (`Tab`), and `$EDITOR` open for selected active tasks (`e`).
-- A universal sectioned `?` keybinding reference plus a global read-only Papercuts utility inbox opened with `i`.
-- Event/deadline-driven rendering, idle file-change hot reload with selection preservation, and safe warning/error surfacing for reload parse/load issues.
-- Completed-log browser with search filtering, visible-viewport row projection, grouped rules management prompts, and basic decision browsing/add prompts.
-- Built-in `default-dark` and `verdigris` themes, user theme discovery from `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user theme selection from `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, workspace selection/overrides from `.tandem/theme.toml`, and workspace Board display settings from `.tandem/config.toml`.
-- Mouse tab/click/scroll support and fixed keyboard defaults.
-- Read-only `tandem web [--port <port>] [--no-open]` interface with embedded assets, loopback-only one-workspace serving, Board/Validation/details/Logs/Rules/Decisions/health views, revision polling, responsive Verdigris light/dark styling, keyboard focus support, safe Markdown, and restrictive browser security headers.
-- Initial `docs/` Markdown source tree and `site/` Astro Starlight docs site with GitHub Pages workflow.
+The maintained CLI command tree and JSON contract are documented by [`tandem --help`](../docs/cli/index.md) and the [CLI reference](../docs/cli/index.md); the normative workspace layout and protocol are in [`protocol/README.md`](../protocol/README.md). The terminal UI and its current key reference are described in the [TUI guide](../docs/tui/index.md), and theme and Board display settings in [Configuration](../docs/reference/configuration.md). These sources are authoritative; this checklist intentionally avoids duplicating command, file-layout, and keybinding inventories.
 
 ### Known limitations
 
-- Binary artifact automation is configured through cargo-dist/GitHub Actions for Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon. Windows is not supported initially.
-- GitHub Releases are expected to contain `tandem-installer.sh`, one archive per supported target, per-artifact SHA-256 files, and aggregate `sha256.sum` checksums.
-- The primary install command is `curl -fsSL https://trytandem.dev/install.sh | sh`; that URL should redirect to the cargo-dist generated installer for the latest GitHub Release.
-- AUR binary package automation updates `tandem-bin` for x86_64 after release artifacts/checksums exist; it uses `AUR_SSH_PRIVATE_KEY` to push to AUR and never builds Tandem from source in the AUR package.
-- No root Rust workspace or split crates; Cargo source install commands must target `--path tandem`.
-- Most mutation commands remain human-readable; `tandem add --json` now provides structured creation output, while broader structured mutation output is deferred.
-- The web interface is local and read-only. Web mutations, remote/LAN access and authentication, SSE/WebSockets, database/sync providers, multi-workspace serving, and agent feedback remain deferred.
-- TUI gaps remain for configurable keymaps, Papercut mutation actions, decision reference/tag prompt parity, richer action buttons, and state/accord divergence warning surfaces.
-- Keybindings are fixed defaults; custom keymap config is deferred.
-- Markdown rendering is styled basics only.
-- Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope for v0.
-- Docs-site build currently succeeds but may emit a Starlight warning about `Entry docs → 404 was not found`; this is non-blocking for the generated static output and should be tracked as docs-site polish.
+- Binary artifacts currently target Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon; Windows is not supported.
+- The web interface is local and read-only, binds to loopback, and serves one workspace. Remote access and web mutations are not supported.
+- The project remains a single Rust binary crate under `tandem/`, not a root Cargo workspace or split crates; Cargo source installs target `--path tandem`.
+- TUI keybindings are fixed defaults, and Markdown rendering supports styled basics only. See [Configuration](../docs/reference/configuration.md) for current settings.
+- Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope.
 
 ### Install target
 
