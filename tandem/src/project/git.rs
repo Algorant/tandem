@@ -76,6 +76,11 @@ pub(crate) fn run(dir: &Path, args: &[&str], call: GitCall<'_>) -> Result<GitOut
     for (key, value) in &call.env {
         command.env(key, value);
     }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
     command
         .stdin(if call.stdin.is_some() {
             Stdio::piped()
@@ -115,7 +120,18 @@ pub(crate) fn run(dir: &Path, args: &[&str], call: GitCall<'_>) -> Result<GitOut
             Err(error) => return Err(format!("could not wait for git: {error}")),
         }
         if call.timeout.is_some_and(|limit| started.elapsed() >= limit) {
-            let _ = child.kill();
+            #[cfg(unix)]
+            {
+                let result = unsafe { libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL) };
+                if result == -1 {
+                    let error = std::io::Error::last_os_error();
+                    return Err(format!("could not terminate git process group: {error}"));
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = child.kill();
+            }
             let _ = child.wait();
             timed_out = true;
             break None;
