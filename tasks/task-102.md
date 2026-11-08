@@ -3,7 +3,7 @@ id: task-102
 uid: 7b891c16-1665-49dc-8891-286fdb7b4ce0
 type: task
 title: "Preserve and restart only the two old Board clients after Algorant approves"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-100"]
@@ -14,8 +14,12 @@ accord:
   claimedAt: "2026-11-08T05:26:38Z"
   updatedAt: "2026-11-08T05:26:38Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T05:26:38Z"
+updatedAt: "2026-11-08T05:26:39Z"
 assignee: "tandem"
+validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
+validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
+validation.requestedAt: "2026-11-08T05:26:39Z"
+validation.reviewer: "Algorant"
 ---
 
 ## Description
