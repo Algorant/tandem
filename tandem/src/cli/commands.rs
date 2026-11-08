@@ -890,7 +890,7 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
         }
         return Ok(super::StartupRequest::Exit);
     }
-    let (project, rule_id, verb) = match args.command {
+    let (project, rule_id, verb, resolve_added_id) = match args.command {
         RulesCommand::List { .. } | RulesCommand::Enable { .. } | RulesCommand::Disable { .. } => {
             unreachable!("handled above")
         }
@@ -901,7 +901,7 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
         } => {
             let project = app::project::open_for_write()?;
             let o = app::rules::add(&project, &category, &text, source)?;
-            (project, o.rule_id, "Created")
+            (project, o.rule_id, "Created", true)
         }
         RulesCommand::Edit {
             id,
@@ -913,21 +913,43 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             let id = app::rules::current_rule_id(&project, &id)?;
             let clear_source = clear.iter().any(|field| field == "source");
             let o = app::rules::edit(&project, &id, &text, source, clear_source)?;
-            (project, o.rule_id, "Updated")
+            (project, o.rule_id, "Updated", false)
         }
         RulesCommand::Delete { id } => {
             let (project, id) = open_write_for(&id)?;
             let id = app::rules::current_rule_id(&project, &id)?;
             let o = app::rules::delete(&project, &id)?;
-            (project, o.rule_id, "Deleted")
+            (project, o.rule_id, "Deleted", false)
         }
     };
     let report = publish(&project);
-    let rule_id = report.renamed(&rule_id);
+    let mut warnings = Vec::new();
+    let provisional_or_renamed_id = report.renamed(&rule_id);
+    let rule_id = if resolve_added_id && matches!(&report.outcome, Outcome::Synced) {
+        match app::rules::current_rule_id(&project, &provisional_or_renamed_id) {
+            Ok(id) => {
+                if crate::protocol::ids::is_provisional(&id) {
+                    warnings.push(format!(
+                        "rule was saved and synced, but its final ID could not be resolved; retaining provisional ID {id}"
+                    ));
+                }
+                id
+            }
+            Err(error) => {
+                warnings.push(format!(
+                    "rule was saved and synced, but final-ID resolution failed: {}; retaining known ID {provisional_or_renamed_id}",
+                    error.message
+                ));
+                provisional_or_renamed_id
+            }
+        }
+    } else {
+        provisional_or_renamed_id
+    };
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":{"id":rule_id,"sync":sync_json(&report)},"warnings":[]})
+            serde_json::json!({"ok":true,"data":{"id":rule_id,"sync":sync_json(&report)},"warnings":warnings})
         );
     } else {
         println!("{verb} rule {rule_id} ({})", sync_text(&report));
