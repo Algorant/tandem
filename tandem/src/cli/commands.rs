@@ -952,6 +952,7 @@ fn rules(args: RulesArgs, json: bool) -> Result<super::StartupRequest, CliError>
             serde_json::json!({"ok":true,"data":{"id":rule_id,"sync":sync_json(&report)},"warnings":warnings})
         );
     } else {
+        print_warnings(&warnings);
         println!("{verb} rule {rule_id} ({})", sync_text(&report));
     }
     Ok(super::StartupRequest::Exit)
