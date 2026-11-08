@@ -21,7 +21,7 @@ accord:
   filesChanged: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
   updatedAt: "2026-11-08T05:04:45Z"
 createdAt: "2026-11-08T05:01:33Z"
-updatedAt: "2026-11-08T05:04:45Z"
+updatedAt: "2026-11-08T05:06:21Z"
 assignee: "bound-git-timeout"
 ---
 
@@ -32,3 +32,7 @@ Approved by Herdra m122e8c27 in incident task-98. Concrete live evidence: old TU
 Plan first. Smallest causal fix is owned subprocess-group cleanup at the shared Git runner (supported releases Linux/macOS) so descendants cannot keep its pipes open beyond timeout. Reuse current timeout; no lock-file deletion/reader bypass/notes fallback/new orchestration framework or generic retry infrastructure. Any dependency choice must stay minimal; supported-platform boundary explicit. No live-machine recovery in this Worker; parent coordinates the incident.
 
 Verification must drive real Git and real SSH. No mocked SSH wrapper/transport, no fabricated helper binary, no persistent fake fixtures or maintained tests. Suggested temporary E2E: a disposable local Git board uses a read-only GitHub SSH remote; identify and SIGSTOP only its own freshly spawned SSH descendant to induce the same real hang, allow TANDEM_SYNC_TIMEOUT to expire, assert own Git/SSH gone and `show` returns. No remote-board writes, no new sshd/account/profile. Explain the chosen check before implementation; if unavailable ask rather than fake it. Preserve out-of-scope legacy tests (project-wide cutover belongs to owner). No push/release.
+
+
+## Parent independent E2E verification
+At ready source commit 5e33995, drove the release binary on a temporary Git-backed board with a read-only GitHub SSH origin and a nonexistent temporary pushurl (so publishing externally was impossible). Identified its own Git/SSH parentage and PGID, SIGSTOPed only that fresh SSH child. With TANDEM_SYNC_TIMEOUT=2, sync returned the timeout in 1.997s; both Git and SSH PIDs were gone; a separate native show read task-1 in 0.699s. Switched the disposable origin to a local bare Git remote with pushes enabled: sync reported synced and a new rule published as numbered prefer-2. Temporary repositories and harness removed after verification. No mocked transport or live-board mutations.
