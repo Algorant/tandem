@@ -300,3 +300,4 @@
 {"ts":"2026-11-08T05:01:55Z","event":"task.updated","id":"task-98","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":300,"data":{"fields":["references","body"]}}
 {"ts":"2026-11-08T05:04:45Z","event":"accord.delivered","id":"task-99","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":301,"data":{}}
 {"ts":"2026-11-08T05:06:21Z","event":"task.updated","id":"task-99","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":302,"data":{"fields":["body"]}}
+{"ts":"2026-11-08T05:06:34Z","event":"accord.rework","id":"task-99","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":303,"data":{}}
