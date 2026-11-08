@@ -11,3 +11,7 @@ targets = [
   "x86_64-apple-darwin",
   "aarch64-apple-darwin",
 ]
+
+# cargo-dist 0.32 defaults ARM macOS to the retired macos-14 image.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-latest"
