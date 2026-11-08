@@ -8,13 +8,17 @@ state: "in-progress"
 priority: "low"
 tags: ["docs", "release"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["tandem/RELEASE.md's post-release steps (or the release notes' upgrade guidance) tell mise users how to pick up a just-published release immediately, e.g. MISE_USE_VERSIONS_HOST=0 mise up github:Algorant/tandem, and to confirm with tandem --version"]
   claimedAt: "2026-11-08T03:00:39Z"
+  deliveredAt: "2026-11-08T03:01:06Z"
   validation: ["$ mise settings get use_versions_host", "$ tandem --version", "$ git diff --check"]
-  updatedAt: "2026-11-08T03:00:39Z"
+  summary: "Documented the immediate mise versions-host bypass and exact-version verification in the post-release checklist; committed as 6da61ed."
+  evidence: ["tandem/RELEASE.md's post-release steps tell mise users how to pick up a just-published release immediately and confirm the exact published version: Added step 7 with `MISE_USE_VERSIONS_HOST=0 mise up github:Algorant/tandem` and `tandem --version`, explicitly warning not to trust `latest` while the versions host may be stale.", "Preserve existing release gates and other steps: Diff adds only the new post-release step; `git diff --check` passed.", "Verify CLI help accepts env setting/current settings: `mise up --help` displayed upgrade usage, `mise settings get use_versions_host` returned true, and the env-prefixed settings query returned false.", "Do not run live upgrades; confirm Tandem version: No upgrade was run; `tandem --version` reported `tandem 0.17.4`."]
+  filesChanged: ["tandem/RELEASE.md"]
+  updatedAt: "2026-11-08T03:01:06Z"
 createdAt: "2026-10-19T18:37:51Z"
-updatedAt: "2026-11-08T03:00:39Z"
+updatedAt: "2026-11-08T03:01:06Z"
 effort: "small"
 relatedFiles: ["tandem/RELEASE.md"]
 assignee: "fresh-mise-upgrades"
