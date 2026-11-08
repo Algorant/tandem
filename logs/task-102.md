@@ -3,26 +3,31 @@ id: task-102
 uid: 7b891c16-1665-49dc-8891-286fdb7b4ce0
 type: task
 title: "Restart the supported desktop Board after preserving its current view"
-state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-100"]
 tags: ["tui", "plan-first"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Algorant approves the desktop same-terminal restart plan before any action; the legacy homelab Board remains untouched.", "The approved desktop restart uses the same supported terminal and verified installed latest binary, preserving its workspace roster and visible view/selection/filters without losing unsaved input.", "Actual desktop replacement process version and Board read are verified; no legacy-client action, core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
   claimedAt: "2026-11-08T05:26:38Z"
   deliveredAt: "2026-11-08T06:33:16Z"
   summary: "Completed Algorant-approved desktop-only same-terminal Board restart from0.17.4 to actual running0.17.5. Graceful old-client exit, explicitly approved shell-input clear, same terminal/cwd/TTY, original Board/ALL/task-48/hiding#work/IDasc/single-workspace view restored and verified. Native Board read succeeded; no cart-lab, HC/core, shell restart or unrelated action."
   evidence: ["Approval: Herdra m43210b93 relayed desktop restart approval; ma3df0652 explicitly approved clearing visible `tt` and launching the new client after the required pause. No unsaved TUI prompt/draft was present.", "Exact old client PID2339450/startticks38462949 in HCt1v (`herdra / tandem`), cwd~/Projects/herdra, ttypts10,0.17.4. Captured original argv/screen/view/roster and temporary executable recovery copy, then old TUI exited gracefully after q; no signal/force-kill.", "After explicit input-clear approval, original zsh1786605 in the same terminal launched the verified installed0.17.5 executable. New actual running PID1770060, same cwd/tty; /proc/1770060/exe --version reports tandem0.17.5 and executable SHA256 bfcd6248ca9fb6f270a42feb4d3757fc975a7c79aa49a64efda0c77a5f786bee matches release.", "Restored task-48 selection with existing navigation; Board/ALL, hiding#work, IDasc, no detail/expanded rows and single herdra workspace preserved. Full before/after Board text frames were byte-identical excluding transient footer status. Roster verification showed only herdra and closing it retained selection/filter.", "Native0.17.5 show task-48 --json in the same workspace returned ok:true/id task-48/location board in0.038s. No manual board/config changes, core/shell restart, legacy-client action or seedbox interruption. Temporary previous-executable recovery copy removed after successful verification."]
-  updatedAt: "2026-11-08T06:33:16Z"
+  reviewer: "Algorant"
+  updatedAt: "2026-11-08T06:33:17Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T06:33:16Z"
+updatedAt: "2026-11-08T06:33:17Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
 validation.requestedAt: "2026-11-08T05:26:39Z"
 validation.reviewer: "Algorant"
+archivedAt: "2026-11-08T06:33:17Z"
+resolution:
+  outcome: "completed"
+  note: "Desktop-only restart verified and completed under Algorant's explicit approvals; actual running0.17.5, same-terminal view restored, Board read0.038s. Legacy Board and HC/core untouched."
+  reviewer: "Algorant"
 ---
 ## Authorization: HOLD both clients
 Herdra m474dee4d holds both restarts pending evidence/Algorant's choice. No restart, termination, keys, reattach, core action or legacy-tool fallback authorized. The original proposal to relaunch both clients is superseded by this target/use gate.
