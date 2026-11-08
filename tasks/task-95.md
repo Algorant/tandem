@@ -8,13 +8,17 @@ state: "in-progress"
 priority: "low"
 tags: ["rules"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["A successful synced `tandem rules add --json` returns the final rule ID, or reports the provisional-to-final mapping in `sync.renamed`."]
   claimedAt: "2026-11-08T02:59:40Z"
+  deliveredAt: "2026-11-08T03:01:38Z"
   validation: ["$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
-  updatedAt: "2026-11-08T02:59:40Z"
+  summary: "Synced rules-add responses now resolve provisional IDs with current_rule_id and preserve the known ID with a warning if resolution fails, without changing edit/delete behavior."
+  evidence: ["A successful synced `tandem rules add --json` returns the final rule ID, or reports the provisional-to-final mapping in `sync.renamed`.: Ran concurrent native adds in separate clones of a temporary Git repo backed by a local bare remote: the synced response returned `prefer-2`, which `rules list` in that clone showed for its own `beta` rule; the competing add correctly reported pending after a ref-lock race and retained its provisional ID. Temporary repository was removed."]
+  filesChanged: ["tandem/src/cli/commands.rs"]
+  updatedAt: "2026-11-08T03:01:38Z"
 createdAt: "2026-10-29T03:16:00Z"
-updatedAt: "2026-11-08T02:59:40Z"
+updatedAt: "2026-11-08T03:01:38Z"
 effort: "small"
 relatedFiles: ["tandem/src/cli/commands.rs"]
 assignee: "published-rule-response"
