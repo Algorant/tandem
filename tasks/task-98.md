@@ -13,7 +13,7 @@ accord:
   claimedAt: "2026-11-08T04:59:57Z"
   updatedAt: "2026-11-08T04:59:57Z"
 createdAt: "2026-11-08T04:59:47Z"
-updatedAt: "2026-11-08T05:01:55Z"
+updatedAt: "2026-11-08T05:06:55Z"
 assignee: "tandem"
 references: ["task-99"]
 ---
@@ -32,3 +32,8 @@ Installed CLI is 0.17.4, but the live lock holder is the deleted 0.17.3 TUI exec
 Herdra approved a narrow intervention (m122e8c27), but no signal is sent until cart-lab's Ceph confirms a safe window for the active seedbox verification. Proposed recovery: revalidate the orphan PID/PPID/argv/pipe relationship and TERM only that SSH process, then verify flock release and bounded read-only `show`. No TUI restart, lock deletion or board-record mutation.
 
 Prevention is separately owned by task-99 (Bound Git timeout Worker): plan-first shared Git runner subprocess-group cleanup, with native Git/SSH timeout E2E and post-timeout board read. Pi task-613 owns wrapper diagnostics separately.
+
+## Recovery result
+cart-lab's Ceph approved the isolated intervention (m302f1166). Immediately rechecked exact orphan GitHub git-upload-pack argv, parent1, stderr pipe186417764 matching TUI fd10, and the TUI's lock fd. Sent exactly one pidfd-directed SIGTERM to SSH3072904 only. The orphan disappeared; the TUI remained running; lslocks showed no board-lock entries. Native `tandem show task-105 --json` succeeded in 2.958s, exit0, ok:true, no stderr. No TUI restart/keys, lock-file deletion, board-record writes or seedbox-process action.
+
+Requested the additional real task-105 Northstar checkpoint from cart-lab per .pi/Herdra; awaiting their actual success/error. .pi's independent timeout diagnostics remain separate. Parent independently verified task-99's native Git/SSH prevention in 1.997s and post-timeout read in 0.699s, plus a successful local-bare-remote sync with pushes enabled.
