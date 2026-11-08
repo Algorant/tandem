@@ -14,6 +14,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 4. The recipe runs the existing Rust formatting, release-profile tests/builds, dist-profile build, strict clippy, and version checks, followed by the site build, built-site link check, high-severity Bun audit, web JavaScript syntax check, and `git diff --check`. All these gates complete before creating/pushing the annotated tag and `main`.
 5. After pushing, the recipe waits for the matching Release workflow, then verifies the GitHub Release is non-draft/non-prerelease and includes curated notes and required nonempty assets. Only after that verification it waits for the matching `Update tandem-bin AUR package` workflow. The AUR wait is bounded; success is reported, while a failed or timed-out AUR run is explicitly reported as a downstream packaging follow-up and does not undo verified GitHub publication.
 6. Smoke-test the primary installer after publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
+7. For mise users picking up the just-published release immediately, run `MISE_USE_VERSIONS_HOST=0 mise up github:Algorant/tandem`, then confirm `tandem --version` reports the exact published version; do not trust `latest` while mise's versions host may be stale.
 
 ### Release cycle effort and friction audit
 
