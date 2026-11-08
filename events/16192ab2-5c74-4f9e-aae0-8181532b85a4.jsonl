@@ -283,3 +283,4 @@
 {"ts":"2026-11-08T02:59:38Z","event":"task.updated","id":"task-95","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":283,"data":{"fields":["effort","relatedFiles","validation","body"]}}
 {"ts":"2026-11-08T02:59:40Z","event":"accord.claimed","id":"task-95","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":284,"data":{}}
 {"ts":"2026-11-08T03:00:04Z","event":"task.updated","id":"task-42","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":285,"data":{"fields":["body","references"]}}
+{"ts":"2026-11-08T03:00:05Z","event":"accord.blocked","id":"task-42","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":286,"data":{}}
