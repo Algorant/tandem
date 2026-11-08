@@ -12,10 +12,10 @@ accord:
   status: "blocked"
   acceptance: ["Algorant approves the desktop same-terminal restart plan before any action; the legacy homelab Board remains untouched.", "The approved desktop restart uses the same supported terminal and verified installed latest binary, preserving its workspace roster and visible view/selection/filters without losing unsaved input.", "Actual desktop replacement process version and Board read are verified; no legacy-client action, core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
   claimedAt: "2026-11-08T05:26:38Z"
-  note: "HOLD both clients per Herdra m474dee4d; awaiting cart-lab accessibility/current-use evidence for legacy Board and then Algorant's explicit choice. No restart/termination or retired-infrastructure revival."
-  updatedAt: "2026-11-08T05:29:46Z"
+  note: "Desktop-only supported-terminal restart awaits Algorant's approval. Legacy homelab Board left untouched per Herdra mcf7a3a22; no further probes or runtime actions."
+  updatedAt: "2026-11-08T05:29:47Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T05:29:46Z"
+updatedAt: "2026-11-08T05:29:47Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
