@@ -3,16 +3,18 @@ id: task-98
 uid: d26c5994-71f7-462a-9457-dd595ba83cf4
 type: task
 title: "Diagnose and recover a stuck TUI board-sync lock without disrupting active work"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "medium"
 tags: ["tui", "sync"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Identify the process/control-flow cause holding the board lock with live evidence and source locations.", "Agree safe recovery with cart-lab's Ceph, preserve seedbox work, and verify read-only Board access returns promptly after recovery (or record why intervention cannot yet proceed).", "Record the smallest prevention fix and its real-system verification plan, with implementation delegated only once cause and scope are established."]
-  updatedAt: "2026-11-08T04:59:47Z"
+  claimedAt: "2026-11-08T04:59:57Z"
+  updatedAt: "2026-11-08T04:59:57Z"
 createdAt: "2026-11-08T04:59:47Z"
-updatedAt: "2026-11-08T04:59:47Z"
+updatedAt: "2026-11-08T04:59:57Z"
+assignee: "tandem"
 ---
 
 ## Description
