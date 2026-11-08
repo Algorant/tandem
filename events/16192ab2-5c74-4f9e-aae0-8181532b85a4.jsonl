@@ -321,3 +321,4 @@
 {"ts":"2026-11-08T05:29:47Z","event":"accord.blocked","id":"task-102","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":321,"data":{}}
 {"ts":"2026-11-08T05:53:36Z","event":"accord.claimed","id":"task-101","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":322,"data":{}}
 {"ts":"2026-11-08T05:54:11Z","event":"task.updated","id":"task-101","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":323,"data":{"fields":["tags"]}}
+{"ts":"2026-11-08T05:54:12Z","event":"accord.delivered","id":"task-101","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":324,"data":{}}
