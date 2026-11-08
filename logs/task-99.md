@@ -3,14 +3,13 @@ id: task-99
 uid: 61d45ec0-13ba-4a7f-b382-1cbdc99426fd
 type: task
 title: "Terminate owned Git SSH descendants when a sync timeout expires"
-state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["task-98"]
 relatedFiles: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
 tags: ["sync"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version."]
   claimedAt: "2026-11-08T05:01:36Z"
   deliveredAt: "2026-11-08T05:06:47Z"
@@ -19,10 +18,14 @@ accord:
   summary: "Unix Git subprocess-group cleanup is committed at 5e33995; the real SSH timeout and board-lock-release criteria passed in both Worker and parent verification."
   evidence: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.: Both Worker and parent induced the hang by stopping only the fresh real SSH descendant in the test Git process group. Sync returned the timeout instead of hanging, and both captured Git and SSH PIDs were gone.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.: Worker's separate native show returned task-1 immediately after timeout; parent measured its separate show at 0.699s.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version.: Worker's local bare remote board remained readable after sync with pushes deliberately disabled. Parent's healthy local bare-remote control synced successfully and published a new rule as `prefer-2`. The implementation changes only the shared Git runner and its libc dependency/lock entry; no protocol or release/version edits."]
   filesChanged: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
-  updatedAt: "2026-11-08T05:06:47Z"
+  updatedAt: "2026-11-08T05:06:59Z"
 createdAt: "2026-11-08T05:01:33Z"
-updatedAt: "2026-11-08T05:06:47Z"
+updatedAt: "2026-11-08T05:06:59Z"
 assignee: "bound-git-timeout"
+archivedAt: "2026-11-08T05:06:59Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: bound-git-timeout → main at 5e339952c00c07f107c8da1d6fc9be886b98887e."
 ---
 
 ## Description
