@@ -3,17 +3,19 @@ id: task-102
 uid: 7b891c16-1665-49dc-8891-286fdb7b4ce0
 type: task
 title: "Preserve and restart only the two old Board clients after Algorant approves"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-100"]
 tags: ["tui", "plan-first"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart.", "Only the two identified Board clients are replaced with the verified installed latest binary, preserving each workspace roster and visible view/selection/filters without losing unsaved input.", "Actual replacement process versions and Board reads are verified; no core restart, unrelated process action, seedbox interruption, protocol migration or manual board-record edits occur."]
-  updatedAt: "2026-11-08T05:26:13Z"
+  claimedAt: "2026-11-08T05:26:38Z"
+  updatedAt: "2026-11-08T05:26:38Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T05:26:13Z"
+updatedAt: "2026-11-08T05:26:38Z"
+assignee: "tandem"
 ---
 
 ## Description
