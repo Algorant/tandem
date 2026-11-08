@@ -3,17 +3,19 @@ id: task-101
 uid: 99fa1bfb-098d-48f9-85f5-20023e8f9dff
 type: task
 title: "Update x1nano's installed Tandem when it reconnects"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "small"
 references: ["task-100"]
 tags: ["config", "needs-x1nano"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["When x1nano reconnects, update its existing mise-managed github:Algorant/tandem latest install without restarting running TUIs or cores.", "Verify the actual latest release selected executable and PATH command version, and its SHA-256 against the current verified release artifact; record the exact installed version."]
-  updatedAt: "2026-11-08T05:24:49Z"
+  claimedAt: "2026-11-08T05:53:36Z"
+  updatedAt: "2026-11-08T05:53:36Z"
 createdAt: "2026-11-08T05:24:49Z"
-updatedAt: "2026-11-08T05:24:49Z"
+updatedAt: "2026-11-08T05:53:36Z"
+assignee: "tandem"
 ---
 
 ## Description
