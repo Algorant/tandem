@@ -14,7 +14,7 @@ accord:
   claimedAt: "2026-11-08T05:26:38Z"
   updatedAt: "2026-11-08T06:29:41Z"
 createdAt: "2026-11-08T05:26:13Z"
-updatedAt: "2026-11-08T06:29:41Z"
+updatedAt: "2026-11-08T06:29:42Z"
 assignee: "tandem"
 validation.criterion: "Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."
 validation.note: "Narrow plan recorded in the Task; ready for Herdra to present to Algorant. Nothing restarted. Desktop native HC target is verified; homelab is a distinct legacy PTY/pane, not HCcart-lab/t1, so its exact accessibility and view/draft must be confirmed before operation."
@@ -38,3 +38,6 @@ Verify actual replacement process executable/version (not installed --version al
 
 ## Final scope from Herdra mcf7a3a22
 Leave the legacy homelab Board untouched. Its restart, retirement, reattach, further probes, or replacement are NOT part of this Task. Only the desktop supported-terminal plan is queued for Algorant's approval, with view preservation and actual running-version verification. No runtime action is approved yet.
+
+## Desktop-only approval
+Herdra m43210b93 relays Algorant's explicit approval: "yes sure restart the board". Proceed only with the same supported desktop Board terminal, preserve selection/filter/view, and verify actual running executable plus Board read. Stop if unsaved input or view preservation is uncertain. No legacy homelab, HC/core, shell restart or other runtime work.
