@@ -293,3 +293,4 @@
 {"ts":"2026-11-08T03:01:08Z","event":"task.completed","id":"task-88","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":293,"data":{}}
 {"ts":"2026-11-08T03:01:38Z","event":"accord.delivered","id":"task-95","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":294,"data":{}}
 {"ts":"2026-11-08T03:01:41Z","event":"task.completed","id":"task-95","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":295,"data":{}}
+{"ts":"2026-11-08T04:59:47Z","event":"task.created","id":"task-98","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":296,"data":{"title":"Diagnose and recover a stuck TUI board-sync lock without disrupting active work"}}
