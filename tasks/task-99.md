@@ -10,19 +10,18 @@ references: ["task-98"]
 relatedFiles: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
 tags: ["sync"]
 accord:
-  status: "rework"
+  status: "delivered"
   acceptance: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version."]
   claimedAt: "2026-11-08T05:01:36Z"
-  deliveredAt: "2026-11-08T05:04:45Z"
+  deliveredAt: "2026-11-08T05:06:47Z"
   validation: ["$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings", "$ cargo build --release --manifest-path tandem/Cargo.toml"]
   constraints: ["Scope only shared Git child lifecycle plus a minimal dependency/lock update if necessary.", "Do not touch real cart-lab processes, locks, records, seedbox, or recovery work.", "No maintained tests or mocked transports; remove temporary repro artifacts before delivery."]
-  summary: "Git invocations now own a Unix process group and timeout sends SIGKILL to that group before waiting or joining readers; committed as 5e33995."
-  evidence: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.: Read-only SSH access to this repo's configured GitHub remote was confirmed. In the temporary-board repro, SIGSTOP was sent to the fresh direct SSH child after confirming its parent was the repro Git PID and its PGID matched that Git process group. Sync returned the timeout result; both captured Git and SSH PIDs were absent afterward.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.: Immediately after the timed-out sync exited, a separate release-binary `tandem show task-1 --json` succeeded and returned `id: task-1`.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version.: A separate temporary board with a local bare Git remote completed `tandem sync --json` promptly (expected `pending`, because its pushurl deliberately targeted a nonexistent path), and native `show --json` read task-1 successfully. Changes touch only shared Git runner and libc dependency/lock entry; no protocol or version edits."]
+  summary: "Unix Git subprocess-group cleanup is committed at 5e33995; the real SSH timeout and board-lock-release criteria passed in both Worker and parent verification."
+  evidence: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.: Both Worker and parent induced the hang by stopping only the fresh real SSH descendant in the test Git process group. Sync returned the timeout instead of hanging, and both captured Git and SSH PIDs were gone.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.: Worker's separate native show returned task-1 immediately after timeout; parent measured its separate show at 0.699s.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version.: Worker's local bare remote board remained readable after sync with pushes deliberately disabled. Parent's healthy local bare-remote control synced successfully and published a new rule as `prefer-2`. The implementation changes only the shared Git runner and its libc dependency/lock entry; no protocol or release/version edits."]
   filesChanged: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
-  note: "Parent verification passed at identical 5e33995: real Git/SSH descendant SIGSTOP under owned PGID → timeout 1.997s, both PIDs gone, separate show 0.699s; healthy LOCAL bare-remote control with actual pushes enabled → synced, rule published prefer-2. No source correction needed. I appended this evidence to the active Task body before finish, which made the scope fingerprint stale even though scope/criteria are unchanged; worker_finish correctly refused without changes. Please reread task-99 and resubmit the"
-  updatedAt: "2026-11-08T05:06:34Z"
+  updatedAt: "2026-11-08T05:06:47Z"
 createdAt: "2026-11-08T05:01:33Z"
-updatedAt: "2026-11-08T05:06:34Z"
+updatedAt: "2026-11-08T05:06:47Z"
 assignee: "bound-git-timeout"
 ---
 
