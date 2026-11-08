@@ -316,3 +316,4 @@
 {"ts":"2026-11-08T05:26:39Z","event":"review.requested","id":"task-102","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":316,"data":{"criterion":"Algorant approves the narrow two-client restart plan and the homelab original terminal/view/draft is confirmed before any restart."}}
 {"ts":"2026-11-08T05:27:14Z","event":"task.updated","id":"task-102","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":317,"data":{"fields":["body"]}}
 {"ts":"2026-11-08T05:27:15Z","event":"accord.blocked","id":"task-102","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":318,"data":{}}
+{"ts":"2026-11-08T05:29:27Z","event":"task.updated","id":"task-102","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":319,"data":{"fields":["title","acceptance","body"]}}
