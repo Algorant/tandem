@@ -7,7 +7,6 @@ title: "Offer parent closure after last Subtask and flag finished blockers"
 state: todo
 priority: "low"
 effort: "medium"
-references: ["~/.pi task-100"]
 tags: ["workflow", "epic", "accord"]
 accord:
   status: "ready"
@@ -16,7 +15,7 @@ accord:
   constraints: ["Low-priority, unstarted backlog; no implementation authorized by this board edit."]
   updatedAt: "2026-10-13T13:27:40Z"
 createdAt: "2026-09-22T19:50:16Z"
-updatedAt: "2026-10-13T13:27:40Z"
+updatedAt: "2026-11-08T03:00:04Z"
 ---
 ## Scope trimmed by Algorant via Herdra
 
@@ -25,3 +24,8 @@ Keep low priority and unstarted. Only two items remain:
 2. Flag blocker references pointing to already-finished Tasks so people can see stale dependency links; do not silently clear or rewrite them.
 
 Epic-specific closure/exemptions, guided Epic evidence, cross-repo closure tracking, event-collision investigation and mistaken-Epic cleanup are removed from this Task. Define exact finished/eligible predicates against current protocol when work is authorized; no implementation now.
+
+## Staleness triage
+Owner decision: park, retaining Algorant's explicit deferral. Since filing, the protocol architecture campaign and 0.17.1–0.17.4 landed; current `app/tasks.rs::complete` still archives only the selected Task, and the newer TUI Board filter work does not offer parent closure or diagnose archived blockers. This is not already fixed. The newer task-97 is separate completion-path work, not a delivered replacement.
+
+Re-check trigger: task-97's completion-path change lands, or Algorant explicitly resumes these two UX items. Re-evaluate their predicates against that implementation before authorizing UI work. External historical context: Pi board task-100 (not a local Tandem record).
