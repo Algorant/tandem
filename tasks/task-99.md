@@ -3,20 +3,22 @@ id: task-99
 uid: 61d45ec0-13ba-4a7f-b382-1cbdc99426fd
 type: task
 title: "Terminate owned Git SSH descendants when a sync timeout expires"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["task-98"]
 relatedFiles: ["tandem/src/project/git.rs", "tandem/Cargo.toml", "tandem/Cargo.lock"]
 tags: ["sync"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A real Git-over-SSH fetch timeout terminates its owned Git/SSH subprocesses and returns rather than hanging on inherited stdout/stderr pipes.", "After the timeout, the board lock releases and a separate native `tandem show --json` can read the temporary board promptly.", "Normal Git-backed native board operations still work, without changing protocol, sync cadence, or release/version."]
+  claimedAt: "2026-11-08T05:01:36Z"
   validation: ["$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings", "$ cargo build --release --manifest-path tandem/Cargo.toml"]
   constraints: ["Scope only shared Git child lifecycle plus a minimal dependency/lock update if necessary.", "Do not touch real cart-lab processes, locks, records, seedbox, or recovery work.", "No maintained tests or mocked transports; remove temporary repro artifacts before delivery."]
-  updatedAt: "2026-11-08T05:01:33Z"
+  updatedAt: "2026-11-08T05:01:36Z"
 createdAt: "2026-11-08T05:01:33Z"
-updatedAt: "2026-11-08T05:01:33Z"
+updatedAt: "2026-11-08T05:01:36Z"
+assignee: "bound-git-timeout"
 ---
 
 ## Description
