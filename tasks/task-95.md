@@ -4,18 +4,20 @@ uid: e62d583b-ccae-4978-a5be-6247194e0731
 type: task
 kind: "papercut"
 title: "rules add returns provisional ID without reporting final rename"
-state: todo
+state: "in-progress"
 priority: "low"
 tags: ["rules"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A successful synced `tandem rules add --json` returns the final rule ID, or reports the provisional-to-final mapping in `sync.renamed`."]
+  claimedAt: "2026-11-08T02:59:40Z"
   validation: ["$ cargo fmt --manifest-path tandem/Cargo.toml -- --check", "$ cargo clippy --manifest-path tandem/Cargo.toml --all-targets --all-features -- -D warnings"]
-  updatedAt: "2026-11-08T02:59:38Z"
+  updatedAt: "2026-11-08T02:59:40Z"
 createdAt: "2026-10-29T03:16:00Z"
-updatedAt: "2026-11-08T02:59:38Z"
+updatedAt: "2026-11-08T02:59:40Z"
 effort: "small"
 relatedFiles: ["tandem/src/cli/commands.rs"]
+assignee: "published-rule-response"
 ---
 On 0.17.3, `rules add --json` with category prefer returned `prefer-new-ff7c64e3` and sync data reported `status: synced` with an empty `renamed` map, yet `rules list` immediately showed the rule as `prefer-7`.
 
