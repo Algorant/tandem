@@ -10,9 +10,11 @@ relatedFiles: ["tandem/RELEASE.md"]
 accord:
   status: "ready"
   acceptance: ["tandem/RELEASE.md capability and limitation descriptions match current native command tree, protocol layout and mutation JSON support without changing the maintained release procedure."]
-  updatedAt: "2026-10-16T12:26:31Z"
+  validation: ["$ tandem --help", "$ git diff --check"]
+  updatedAt: "2026-11-08T02:59:34Z"
 createdAt: "2026-10-16T12:26:31Z"
-updatedAt: "2026-10-16T12:26:31Z"
+updatedAt: "2026-11-08T02:59:34Z"
+effort: "small"
 ---
 
 ## Description
