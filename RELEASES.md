@@ -2,6 +2,16 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.5
+
+Protocol remains 0.5.0; existing boards need no migration. Running clients keep their old code until restarted.
+
+### Fixed
+
+- Git sync timeouts now terminate the owned Git/SSH process group before draining output. A stuck SSH descendant can no longer keep the Board locked indefinitely after its Git parent times out.
+- Concurrent `rules add` commands resolve the final published rule ID even when another sync numbered the rule. If resolution fails after saving, the command retains success and reports a warning.
+- The release checklist points to current capability documentation and explains how mise users can bypass a stale versions host and verify a just-published upgrade.
+
 ## 0.17.4
 
 Protocol remains 0.5.0; existing boards need no migration.
