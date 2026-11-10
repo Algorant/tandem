@@ -3,16 +3,18 @@ id: task-105
 uid: de0b8e22-a899-42bf-bf69-b7c41f608f3c
 type: task
 title: "Keep x1nano's installed Tandem on the latest verified release"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "small"
 tags: ["config", "needs-x1nano"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["When x1nano is reachable, its existing mise-managed latest install selects the latest verified Tandem release, with the PATH command and actual selected executable version and SHA-256 checked against the published release artifact.", "No core or TUI on x1nano is restarted while updating it."]
-  updatedAt: "2026-11-10T16:00:02Z"
+  claimedAt: "2026-11-10T17:55:18Z"
+  updatedAt: "2026-11-10T17:55:18Z"
 createdAt: "2026-11-10T16:00:02Z"
-updatedAt: "2026-11-10T16:00:02Z"
+updatedAt: "2026-11-10T17:55:18Z"
+assignee: "tandem"
 ---
 
 ## Description
