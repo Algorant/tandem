@@ -6,14 +6,14 @@ title: "Keep x1nano's installed Tandem on the latest verified release"
 state: "in-progress"
 priority: "low"
 effort: "small"
-tags: ["config", "needs-x1nano"]
+tags: ["config"]
 accord:
   status: "claimed"
   acceptance: ["When x1nano is reachable, its existing mise-managed latest install selects the latest verified Tandem release, with the PATH command and actual selected executable version and SHA-256 checked against the published release artifact.", "No core or TUI on x1nano is restarted while updating it."]
   claimedAt: "2026-11-10T17:55:18Z"
   updatedAt: "2026-11-10T17:55:18Z"
 createdAt: "2026-11-10T16:00:02Z"
-updatedAt: "2026-11-10T17:55:18Z"
+updatedAt: "2026-11-10T17:55:40Z"
 assignee: "tandem"
 ---
 
