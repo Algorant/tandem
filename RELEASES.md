@@ -2,6 +2,19 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.6
+
+Protocol remains 0.5.0; existing boards need no migration.
+
+### Added
+
+- `tandem list --no-sync` reads the local board without refreshing it: no Git fetch, push or sync work. Windows and dashboards that poll many boards can display state without each read paying for a board sync.
+- `tandem list --json` items now carry the record's type, kind, title, location, state, priority, effort, assignee, parentId, tags, accordStatus and updatedAt, so one call per board answers a display's needs. `id` and `title` keep their previous positions and meaning.
+
+### Fixed
+
+- Herdra's window can read a dozen boards each minute without spawning a board sync per read. It consumes `list --no-sync --json` once per board and leaves syncing to each board's owner.
+
 ## 0.17.5
 
 Protocol remains 0.5.0; existing boards need no migration. Running clients keep their old code until restarted.
