@@ -38,6 +38,45 @@ pub(crate) struct DocumentSummaryDto {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct DocumentListItemDto {
+    pub(crate) id: String,
+    #[serde(rename = "type")]
+    pub(crate) document_type: String,
+    pub(crate) kind: Option<String>,
+    pub(crate) title: String,
+    pub(crate) location: &'static str,
+    pub(crate) state: Option<String>,
+    pub(crate) priority: Option<String>,
+    pub(crate) effort: Option<String>,
+    pub(crate) assignee: Option<String>,
+    pub(crate) parent_id: Option<String>,
+    pub(crate) tags: Vec<String>,
+    pub(crate) accord_status: Option<String>,
+    pub(crate) updated_at: Option<String>,
+}
+
+/// Cheap per-record projection for list output: every field a display caller
+/// needs, with no hierarchy resolution. Full detail comes from `show`.
+pub(crate) fn list_item(document: &Document) -> DocumentListItemDto {
+    DocumentListItemDto {
+        id: document.id().to_string(),
+        document_type: document.doc_type().to_string(),
+        kind: document.kind().map(str::to_string),
+        title: document.title().to_string(),
+        location: document.location.as_str(),
+        state: document.field("state").map(str::to_string),
+        priority: document.field("priority").map(str::to_string),
+        effort: document.field("effort").map(str::to_string),
+        assignee: document.field("assignee").map(str::to_string),
+        parent_id: document.field("parentId").map(str::to_string),
+        tags: values(document, "tags"),
+        accord_status: accord_status(document).map(str::to_string),
+        updated_at: document.field("updatedAt").map(str::to_string),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct DocumentDetailDto {
     #[serde(flatten)]
     pub(crate) summary: DocumentSummaryDto,

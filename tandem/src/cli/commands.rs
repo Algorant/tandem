@@ -81,6 +81,13 @@ fn open_read() -> Result<(TandemProject, Vec<String>), CliError> {
     Ok((project, warnings))
 }
 
+/// Opens the board without refreshing it, for display callers that poll often.
+fn open_read_local() -> Result<(TandemProject, Vec<String>), CliError> {
+    let project = app::project::open()?;
+    let warnings = project.held_edit_warnings();
+    Ok((project, warnings))
+}
+
 fn print_warnings(warnings: &[String]) {
     for warning in warnings {
         eprintln!("Warning: {warning}");
@@ -310,7 +317,11 @@ fn validate_kind_filter(kind: Option<&str>) -> Result<(), CliError> {
 }
 
 fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
-    let (project, warnings) = open_read()?;
+    let (project, warnings) = if args.no_sync {
+        open_read_local()?
+    } else {
+        open_read()?
+    };
     let docs = app::queries::documents_for_scope(
         &project,
         match args.scope {
@@ -353,7 +364,7 @@ fn list(args: ListArgs, json: bool) -> Result<super::StartupRequest, CliError> {
     if json {
         println!(
             "{}",
-            serde_json::json!({"ok":true,"data":documents.iter().map(|d| serde_json::json!({"id":d.id(),"title":d.title()})).collect::<Vec<_>>(),"warnings":warnings})
+            serde_json::json!({"ok":true,"data":documents.iter().map(app::dto::list_item).collect::<Vec<_>>(),"warnings":warnings})
         );
     } else {
         print_warnings(&warnings);

@@ -194,6 +194,9 @@ pub(crate) struct ListArgs {
     pub(crate) linked_to: Option<String>,
     #[arg(long)]
     pub(crate) limit: Option<usize>,
+    /// Skip the board refresh and read local files only: no Git, no network
+    #[arg(long)]
+    pub(crate) no_sync: bool,
 }
 #[derive(Debug, Args)]
 pub(crate) struct SearchArgs {

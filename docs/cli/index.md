@@ -13,7 +13,7 @@ The `tandem` command finds the nearest workspace from the current directory. Run
 | `add task TITLE --acceptance TEXT` | Create a Task; repeat `--acceptance` for more criteria. |
 | `add decision TITLE` | Record a durable decision. |
 | `show ID` · `assignment ID` | Read a record or a Task's delegation details. |
-| `list` · `search QUERY` | Find Board items; use `--scope archived` for Logs. |
+| `list [--no-sync]` · `search QUERY` | Find Board items; use `--scope archived` for Logs. `--no-sync` skips the board refresh, so display callers can poll without Git work. |
 | `update ID` | Change supported metadata or a record body. Does not change Task state or Accord status. |
 | `accord claim ID --assignee NAME` | Claim work. |
 | `accord deliver ID --summary TEXT --evidence TEXT` | Record the result and evidence. Repeat `--evidence` as needed. |
@@ -43,5 +43,7 @@ With `--json`, commands return an envelope such as:
 ```json
 {"ok":true,"data":{},"warnings":[]}
 ```
+
+`list --json` items carry `id`, `type`, `kind`, `title`, `location`, `state`, `priority`, `effort`, `assignee`, `parentId`, `tags`, `accordStatus` and `updatedAt`, so one call per board covers a window's needs. With `--no-sync` the command reads local files only: no Git, no network, and possibly a board another client has not refreshed yet.
 
 JSON errors instead return `ok: false` and an `error` object (no `data` or `warnings`): `{"ok":false,"error":{"code":"...","message":"...","details":{}}}`. Human-readable output is the default. For a Task workflow, see the [Quickstart](/quick-start/).
