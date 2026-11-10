@@ -8,12 +8,15 @@ priority: "medium"
 effort: "small"
 tags: ["cli", "sync"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["`tandem list --no-sync` performs no board sync: a stale-board read spawns zero Git processes and returns the same records as today.", "`tandem list --json` items include state, kind, role, type, priority, effort, assignee, parentId/relationship, tags, accordStatus and location in one call, keeping id/title unchanged.", "Default `tandem list` (and other read commands) keep their current refresh behavior; docs describe the display-caller shape."]
   claimedAt: "2026-11-10T15:48:15Z"
-  updatedAt: "2026-11-10T15:48:15Z"
+  deliveredAt: "2026-11-10T16:00:16Z"
+  summary: "Added `tandem list --no-sync` (local-only read) and richer one-call list JSON for display callers, documented, verified end-to-end on a real Git board, and released as0.17.6."
+  evidence: ["Disposable real Git board with local bare remote, forced stale sync state: `list --no-sync --json` spawned zero Git children and returned the same 3 records; default `list --json` still refreshed (26 Git children including fetch) and returned identical data.", "JSON items carry id/type/kind/title/location/state/priority/effort/assignee/parentId/tags/accordStatus/updatedAt; fields matched `show --json` for the same records; id/title unchanged.", "Docs updated in docs/cli/index.md; cargo fmt, strict clippy, dev-check (12 suites) and site build passed. No new tests, mocks or real-board writes; verification sandbox removed.", "Released tandem-v0.17.6: GitHub Release non-draft with13 verified assets/checksums, live installer smoke-matched; desktop and homelab installed0.17.6 with binary SHA256 52192b8c…; x1nano offline, tracked by standing needs-x1nano task-105. AUR job failure is a separate Arch openssl4.1 packaging issue (papercut task-104)."]
+  updatedAt: "2026-11-10T16:00:16Z"
 createdAt: "2026-11-10T15:48:03Z"
-updatedAt: "2026-11-10T15:48:15Z"
+updatedAt: "2026-11-10T16:00:16Z"
 assignee: "tandem"
 ---
 
