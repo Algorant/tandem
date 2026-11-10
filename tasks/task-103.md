@@ -3,16 +3,18 @@ id: task-103
 uid: 3d65151f-efba-4842-83bb-f39ad0b9f5b3
 type: task
 title: "Make tandem list cheap and complete for display callers"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "small"
 tags: ["cli", "sync"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["`tandem list --no-sync` performs no board sync: a stale-board read spawns zero Git processes and returns the same records as today.", "`tandem list --json` items include state, kind, role, type, priority, effort, assignee, parentId/relationship, tags, accordStatus and location in one call, keeping id/title unchanged.", "Default `tandem list` (and other read commands) keep their current refresh behavior; docs describe the display-caller shape."]
-  updatedAt: "2026-11-10T15:48:03Z"
+  claimedAt: "2026-11-10T15:48:15Z"
+  updatedAt: "2026-11-10T15:48:15Z"
 createdAt: "2026-11-10T15:48:03Z"
-updatedAt: "2026-11-10T15:48:03Z"
+updatedAt: "2026-11-10T15:48:15Z"
+assignee: "tandem"
 ---
 
 ## Description
