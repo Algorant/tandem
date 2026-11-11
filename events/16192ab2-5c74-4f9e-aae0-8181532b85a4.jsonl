@@ -343,3 +343,4 @@
 {"ts":"2026-11-11T17:01:22Z","event":"task.created","id":"task-107","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":343,"data":{"title":"Public repo review 2 of 6: tandem cleanup, simplification and look"}}
 {"ts":"2026-11-11T17:09:54Z","event":"accord.delivered","id":"task-107","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":344,"data":{}}
 {"ts":"2026-11-11T17:09:56Z","event":"accord.blocked","id":"task-107","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":345,"data":{}}
+{"ts":"2026-11-11T18:33:35Z","event":"accord.resumed","id":"task-107","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":346,"data":{}}
