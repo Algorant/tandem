@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Install Tandem and take a Task from start to finish.
+description: Install tandem and take a Task from start to finish.
 ---
 
 ## Install and verify
@@ -39,7 +39,7 @@ Accord task-1: claimed (record written; saved locally (no Git remote to sync wit
 Add the greeting to `README.md`, then record the result and check:
 
 ```sh
-printf '\nHello from Tandem.\n' >> README.md
+printf '\nHello from tandem.\n' >> README.md
 ```
 
 ```console

@@ -1,307 +1,37 @@
-# Tandem CLI/TUI
+# tandem
 
-This directory contains planning and implementation work for the Tandem user-facing CLI and terminal UI.
+The rust CLI and TUI for a tandem board, and the implementation behind the public documentation.
 
-Current phase: CLI v0 surface complete for the current known scope, with forward focus on the Rust/Ratatui TUI. `tandem tui` now launches a Board-first shell where delivered work is handled through the Board Validation state/subview rather than a separate top-level Review pane.
+- `src/protocol/` — the executable form of [`protocol/README.md`](../protocol/README.md); normative meaning stays in the protocol
+- `src/project/` — `.tandem/` discovery, files, Git sync and locking
+- `src/app/` — shared operations over the project: Tasks, Accords, review, rules, queries
+- `src/cli/`, `src/tui/`, `src/web.rs` — peer interfaces; none owns protocol rules
+- `examples/themes/` — `default-dark` and `verdigris` theme files
 
-## Scope
+The user-facing behavior lives in the [docs](../docs/): [CLI](../docs/cli/index.md), [TUI and web](../docs/tui/index.md), [configuration](../docs/reference/configuration.md), and [concepts](../docs/concepts/index.md). `tandem --help` is the authoritative command tree.
 
-The CLI/TUI area owns:
-
-- `tandem` CLI command design and user experience
-- CLI output/error conventions and command workflow design
-- Ratatui app architecture
-- board/review/logs/rules/decisions views
-- responsive layouts
-- theming
-- mouse support and hit-map interaction model
-- keyboard and command-palette UX
-- review, accord, completion, and logs workflows as presented in the UI
-- TUI tests and snapshots
-
-The CLI/TUI area does **not** own the underlying protocol semantics. Normative
-rules and data-model decisions belong in `../protocol/`; their executable Rust
-implementation lives in `src/protocol/` and both interfaces must represent it
-faithfully.
-
-## Implemented architecture
-
-The package remains one binary crate with five cohesive boundaries:
-
-- `src/protocol/` implements the normative repository protocol Markdown.
-- `src/project/` exposes concrete `project::TandemProject` discovery, reads,
-  raw-source preservation, locking, conflict checks, atomic writes, archive
-  moves, and event files; it does not infer protocol meaning.
-- `src/app/` provides shared typed queries and mutation use cases over protocol
-  rules and `TandemProject`, without printing or rendering.
-- `src/cli/` owns argument parsing, dispatch, and exact human/JSON output.
-- `src/tui/` owns terminal lifecycle, transient state, input, projection, and
-  rendering. `src/tui/mod.rs` is the wiring root for its cohesive modules.
-
-CLI and TUI are peers over shared `app` and protocol behavior. `src/main.rs`
-only composes startup, TUI handoff, errors, and process exit. There is no legacy
-root `Workspace`, generic persistence layer, public library crate, or second
-protocol implementation.
-
-## Current status
-
-The current Rust package builds the `tandem` binary for protocol `0.5.0`. The CLI and TUI share the same app and protocol behavior. Run `tandem --help` for the current command tree; the public [CLI reference](https://trytandem.dev/cli/) summarizes its commands.
-
-A Git-backed board lives in the main worktree's ignored `.tandem/` directory and syncs independently through the repository's `tandem` branch. Source Git operations do not commit the board. Board changes sync immediately when possible; offline changes stay saved and report as pending. See [`protocol/README.md`](../protocol/README.md#sync) for the sync contract.
-
-## Build/run
-
-From this directory:
+## Build and run
 
 ```text
+cargo build --release
 cargo run -- --version
 cargo run -- init
-cargo run -- add task "Implement next CLI slice" --acceptance "works"
 cargo run -- list
-cargo run -- accord claim task-1 --assignee pi
-cargo run -- accord deliver task-1 --summary done --evidence "cargo test"
-cargo run -- complete task-1 --note "verified"
-cargo run -- rules add always "Run tests before completing tasks."
-cargo run -- tui
 ```
 
-Use `cargo run -- <command>` during early development. The package binary name is `tandem`.
+From the repository root, `just dev` builds a release binary and opens a disposable Git-backed board; `just dev-check` runs the native checks and a workflow smoke test.
 
-### TUI idle benchmark
+## Tests
 
-There is no TUI benchmark harness at present. The previous `just bench-tui-idle` recipe and its Python PTY driver were removed in task-242; see task-233 for the measurement approach that replaces them.
-
-## Epic, Task, and Subtask hierarchy
-
-The CLI derives roles from resolved documents and enforces one strict three-tier hierarchy:
+The maintained tests are end-to-end: they drive the real binary against disposable Git repositories. Compiler, formatting and lint checks are separate.
 
 ```text
-task-10       Epic: root `type: task`, `kind: epic`; global ID
-└── task-11   Task: `parentId: task-10`; global ID; `epic-task`
-    └── task-11-1   Subtask: `parentId: task-11`; parent-derived ID; `subtask`
+cargo fmt -- --check
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Create the same structure with normal `add` commands and always consume the returned IDs:
+TUI changes are verified by running the real TUI in an hc terminal and reading the screen; see the repository [`AGENTS.md`](../AGENTS.md).
 
-```text
-tandem add task "Coordinate the release" --kind epic --acceptance "Release shipped"
-tandem add task "Write release notes" --parent task-10 --acceptance "Notes published"
-tandem add task "Check upgrade notes" --parent task-11 --acceptance "Upgrade notes verified"
-```
+## Release
 
-Epics and Tasks—including standalone, generic-parent, and direct Epic Tasks—allocate the next global `task-N` across active Board documents and completed Logs. Only a Subtask directly beneath a Task allocates the next `<Task ID>-M` suffix. Completed suffixes are not reused. `tandem show` exposes `tasks` for an Epic, `subtasks` for a Task, and no child collection for a Subtask.
-
-Subtasks are leaves. A parented Epic, child beneath a Subtask, direct Epic Task with a hierarchical ID, global-ID Subtask, or deeper task ID is a structural error. There is no legacy compatibility exception. IDs are immutable, so `tandem update --parent` is accepted only when the prospective parent preserves the document's canonical role and existing ID; invalid reparenting is rejected without mutation.
-
-`parentId` may also resolve to a decision or custom document. That child remains a global-ID Task with human label `Parent` and JSON `parentRelationship: "parent"`, and it may own parent-derived Subtasks. Direct Epic Tasks use `Task of Epic` / `epic-task`; only direct Task children use `Subtask of` / `subtask`.
-
-Only Tasks are initial delegation roots. Epics are decomposed into independently delegated Tasks; one delegated Task worker executes its direct Subtasks through a session todo projection and returns one Task-level handoff. Epics and Subtasks are not independently delegated.
-
-The earlier `add --subtask <title>` inline-checklist authoring path is deprecated and rejected. Existing inline `subtasks` metadata remains readable, but the CLI does not create it for new lifecycle-bearing work.
-
-## Release and install target
-
-Install the latest released binary with the user-local installer:
-
-```sh
-curl -fsSL https://trytandem.dev/install.sh | sh
-tandem --version
-```
-
-With Rust, install the current source from the repository:
-
-```sh
-cargo install --git https://github.com/Algorant/tandem.git --locked tandem
-```
-
-For local checkout installs before a tag is published:
-
-```text
-cargo install --path tandem --locked
-tandem --version
-```
-
-Integrations should call the installed `tandem` binary (with `--json` for reads), locating it through `TANDEM_BIN` or `tandem` on `$PATH` in that order. Curated public GitHub Release notes live in root `RELEASES.md`, which cargo-dist includes in the matching GitHub Release body; reusable install, validation, known-limitation, and release-command details are in `RELEASE.md`.
-
-## TUI session boards
-
-The TUI starts with the board discovered from its launch directory. Press `w` to open the session board chooser, `Ctrl-A` to add an existing board by path, and `Ctrl-D` to remove the selected inactive board. Session membership is in memory only and is forgotten when the TUI exits. Paths can name a board root, a directory inside a board, or a linked worktree; symlinks and linked worktrees resolving to the same board reuse one session entry. The current board must be switched away from before it can be removed.
-
-For disposable previews, repeat `tandem tui --add-workspace PATH` to seed additional existing boards for that invocation only. No workspace roster is read from or written to user configuration.
-
-## Implemented TUI themes and keys
-
-`tandem tui` starts from the built-in `default-dark` palette, discovers user theme files, applies the user's XDG config, applies any workspace theme override, then applies workspace display config:
-
-1. built-in presets: `default-dark` and `verdigris`
-2. user theme files: `$XDG_CONFIG_HOME/tandem/themes/*.toml`, or `~/.config/tandem/themes/*.toml` when `XDG_CONFIG_HOME` is unset
-3. user config: `$XDG_CONFIG_HOME/tandem/config.toml`, or `~/.config/tandem/config.toml` when `XDG_CONFIG_HOME` is unset
-4. workspace theme selector/override: `.tandem/theme.toml`
-5. workspace TUI display config: `.tandem/config.toml`
-
-Use the user config for your normal machine-wide preference:
-
-```toml
-theme = "verdigris"
-transparent_background = true
-badge_style = "muted"
-```
-
-Use `.tandem/theme.toml` only when a project should override the user's normal theme. `base`, `builtin`, and `extends` remain accepted selector aliases for existing workspace files. After the selector, user config and workspace `.tandem/theme.toml` may override simple TOML-style string color values (`"#RRGGBB"`, `"#RGB"`, or supported terminal color names) and supported root settings:
-
-```toml
-theme = "my-custom-dark"
-
-[colors]
-accent = "#8ec07c"
-```
-
-Color aliases declared earlier in the same theme file can be reused by all color settings, including workflow-state chips. State IDs are not limited to the defaults; add each configured ID that needs a distinct override. Omitted IDs keep the muted fallback and all badge styles retain their existing shape/labels (`TODO`, `WIP`, `VAL`, and compact equivalents):
-
-```toml
-[aliases]
-state-todo = "#7aa2f7"
-state-active = "#e0af68"
-state-validation = "#bb9af7"
-
-[colors]
-accent = "state-active"
-
-[badges.states]
-todo = "state-todo"
-in-progress = "state-active"
-validation = "state-validation"
-```
-
-Install example presets as user themes with:
-
-```text
-mkdir -p ~/.config/tandem/themes
-cp tandem/examples/themes/default-dark.toml ~/.config/tandem/themes/default-dark.toml
-cp tandem/examples/themes/verdigris.toml ~/.config/tandem/themes/verdigris.toml
-```
-
-The Verdigris example maps `in-progress` to burnt copper (`#c96f3d`) and `validation` to heather (`#ad8294`) through readable aliases; `todo` deliberately retains the muted fallback.
-
-A user theme file may inherit from a built-in and provide only overrides:
-
-```toml
-name = "my-custom-dark"
-base = "default-dark"
-
-[colors]
-accent = "#8ec07c"
-```
-
-Supported built-in presets are `default-dark` (conservative dark/default) and `verdigris` (repo default here). Supported keys:
-
-- root keys: `theme` (workspace selector), `base`, `builtin`, `extends`, `name`, `transparent_background` (optional boolean; default `false`), `badge_style` (optional; default `muted`) or `[badges] style`
-- `[colors]`: `background`, `panel`, `text`, `muted`, `accent`, `success`, `warning`, `error`, `border`, `selected_bg`, `selected_fg`
-- `[priority]`: `critical`, `high`, `medium`, `low`, `none`
-- `[badges]`: `style` for visual badge styling; legacy `disabled` remains accepted during migration
-- `[board.badges]` or legacy `[badges]`: `disabled` (list of built-in badge IDs or configured tag names to suppress)
-- `[board.badges.tags.<tag>]` or legacy `[badges.tags.<tag>]`: optional `label` and optional `tone` (`accent`, `success`, `warning`, `error`, `muted`, `orange`, `sand`/`beige`, or `purple`) for tag-badge overrides and project/user opt-ins
-- `[badges.tones]`: theme-owned `orange`, `sand`, and `purple` Board tag colors
-- `[badges.accord]`: legacy `ready`, `claimed`, `delivered`, `accepted`, `rework`, `failed`, `blocked`, `unknown`
-- `[aliases]`: named colors declared before their uses in the same file; aliases may reuse an earlier alias
-- `[badges.states]`: arbitrary configured workflow state IDs mapped to colors; IDs without an entry use the existing muted fallback
-- `[badges.review]`: `not-ready`, `pending`, `accepted`, `changes-requested`, `rejected`, `failed`, `unknown`
-
-## Read-only web interface
-
-Open a bundled local browser view of the nearest Tandem workspace:
-
-```text
-cargo run --manifest-path tandem/Cargo.toml -- web
-```
-
-By default, Tandem selects an available port, prints the loopback URL and project path, and opens the default browser. Use `cargo run --manifest-path tandem/Cargo.toml -- web --no-open` for a terminal-only preview that prints the URL. Add `--port <port>` when a stable local port is useful, and press `Ctrl-C` to stop the server. The interface is read-only and provides Board, Validation attention, document relationships and details, Logs search/detail, Rules, Decisions detail, and project health/warnings over the versioned `/api/v1` read API.
-
-Each process serves one discovered workspace and binds only to `127.0.0.1`; there is no remote-bind option. It validates the loopback Host, allows no mutation requests or request bodies, sends no permissive CORS headers, and applies no-store, CSP, frame, referrer, and MIME-sniffing protections. Safe Markdown output cannot load remote links or images. HTML, CSS, and JavaScript are embedded in the binary, so installed and packaged builds need neither the source tree nor Node.js at runtime.
-
-The browser interface keeps filters and selection in the current tab. Use its native links, forms, and refresh button with a keyboard or pointer. A visible tab checks for changed project revisions every three seconds. The responsive Verdigris palette follows the browser light/dark preference; the dark preference is the web MVP's Default Dark check. TUI theme selectors do not apply to the browser, and the MVP has no separate web theme picker. The layout supports 390px screens and 200% browser zoom, uses visible focus indicators, and includes text in every status badge.
-
-Deferred web work includes mutations, remote/LAN access and authentication, SSE/WebSockets, database or synchronization providers, multi-workspace serving, and agent feedback. See the public [TUI and web guide](https://trytandem.dev/tui/) for the user-facing boundary.
-
-## TUI interaction
-
-In the TUI, press `w` to search and switch among boards in the current session; the current board, task counts, and attention counts are shown. Successful switches load that board's full TUI and theme with clean view state. `1`..`4` switch Board/Logs/Rules/Decisions, arrows or `j`/`k` move, `Ctrl-U`/`Ctrl-D` or page keys page, `e` in Board edits, `/` in Logs filters, `?` opens the universal key reference, and `q` quits outside text input. Board uses explicit `f` filter, `m` move, and `v` Validation pickers; its tabs are ALL (default) then each workflow state, every tab is split into STANDARD, RESEARCH, and PAPERCUTS sections driven by the `kind` field, and `f` can also filter by kind. Mouse clicks use the same semantic actions for tabs, rows, panes, pickers, confirmations, previews, and safe footer controls. The wheel targets the pane under the pointer. Overlays consume pointer input. `h/l` stays local. Tab/Shift-Tab changes pane focus only; Enter activates the selected item. Text prompts retain all printable characters, including `?` and `q`; `Ctrl-C` is the emergency quit. A manual PTY smoke should confirm the status line includes `theme built-in verdigris + .../.config/tandem/config.toml` for global selection, or a `.tandem/theme.toml` suffix when a workspace overrides it. Invalid user/workspace theme or display config files are non-fatal and appear as warnings in the status line. Remove the user or workspace selector to return to `default-dark`.
-
-`transparent_background = true` may be set in a user theme, user config, or `.tandem/theme.toml` to avoid forcing the app/panel background colors and let terminal default or compositor transparency show through where practical. Omitted themes keep the current opaque background behavior.
-
-`badge_style` controls Board priority/status/tag chips: `muted` (default softened fill), `accent` (small colored rail), `text` (colored label), `ghost` (transparent chip outline), or `solid` (legacy saturated fill). Rounded-edge badge rendering remains deferred.
-
-Default Board badges are limited to priority (`CRIT`, `HIGH`, `MED`, `LOW`), common repository work tags (`BUG`, `FEAT`, `CHORE`, `RESEARCH`, `SPIKE`, `DELIVERABLE`), validation `VISUAL`, attention accord/review statuses, and subtask progress. `BUG`, `FEAT`, and `CHORE` are built in as common cross-repository work kinds. Project/domain tags such as `tui`, `cli`, `docs`, `spec`, or `protocol` remain opt-in. Configure extra tag badges, override a built-in label/tone, or suppress badges in user config or workspace `.tandem/config.toml`:
-
-```toml
-[board.badges]
-disabled = ["deliverable", "visual"]
-
-[board.badges.tags.tui]
-label = "TUI"
-tone = "accent"
-
-[board.badges.tags.docs]
-# label defaults to "DOCS"
-tone = "success"
-```
-
-User config applies before workspace `.tandem/config.toml`; workspace badge config is therefore the final override. Legacy `[badges]` / `[badges.tags.*]` sections in theme files are still read during migration, but `.tandem/theme.toml` should remain for theme selection/color/style behavior. `disabled` is a simple suppression list for built-ins or configured tag names, not a regex/rule engine.
-
-The built-in work badges use theme-owned named tones: `BUG` uses `orange`, `FEAT` uses `sand`, and `CHORE` uses `purple`. Existing config tones remain compatible. `beige` is accepted as an alias for `sand`. Theme authors can override the palette without hard-coding colors in Board rendering:
-
-```toml
-[badges.tones]
-orange = "#fb923c"
-sand = "#d6b98c"
-purple = "#c084fc"
-```
-
-Verdigris maps these roles to burnt copper (`#c96f3d`), ready sand (`#e6bf86`), and validation heather (`#ad8294`). The named tones preserve all badge styles and terminal/no-color behavior.
-
-`NO_COLOR=1` or `TANDEM_NO_COLOR=1` uses the terminal/no-color fallback even when user/workspace config selects Verdigris or a user theme.
-
-## Documentation
-
-- `plan/spec.md` — CLI/TUI draft
-- `plan/todo.md` — CLI/TUI task tracker
-- `../README.md` — parent project overview
-- `../plan/spec.md` — parent project plan
-- `../plan/todo.md` — parent project todo
-- `../protocol/README.md` — protocol area overview
-- `../protocol/plan/spec.md` — protocol draft the CLI/TUI must follow
-- `../AGENTS.md` — agent guidance
-
-## Key current decisions
-
-- Product/protocol name: **Tandem**
-- CLI/TUI directory: `tandem/`
-- CLI binary: `tandem`
-- CLI design and the current known CLI v0 implementation came before TUI implementation; future CLI work should be explicit new features or bug fixes.
-- V0 TUI invocation: `tandem tui` only.
-- TUI implementation target: Rust + Ratatui with crossterm terminal events/backend.
-- `tandem tui` currently has top-level Board, Logs, Rules, and Decisions tabs. `1`..`4` are the keyboard view switchers, mouse tab clicks switch views explicitly, and local navigation keys stay inside the active view. `i` or the global open-count indicator opens a temporary read-only Papercuts list/detail panel without adding a fifth view; closing it restores the current view state. Board has state subview tabs with counts (including a flat overlapping Papercuts tag lens with `parentId` context), a full-width selected-state list with richer rows, `a` Actions, `f` filter, `v` Validation actions, and `e` opens the selected active task document in `$EDITOR`. Logs lists completed work by recency, supports local list/detail browsing, filters with `/` then Enter/Esc, and remains read-only for editor-open behavior. Rules lists grouped categories and supports add/edit/delete prompts in `src/tui/rules.rs`; Tab has no top-level fallback there. Decisions lists active ADR-compatible `decision` records, supports list/body focus, shows selected metadata/body/path, and supports a basic title/body add prompt in `src/tui/decisions.rs`; `$EDITOR` editing for decisions/custom documents is deferred. Built-in `default-dark` and `verdigris` presets apply by default/selection, user themes are discovered from `~/.config/tandem/themes/*.toml` or `$XDG_CONFIG_HOME/tandem/themes/*.toml`, `.tandem/theme.toml` can select a built-in or user theme, and documented color keys can override the selected palette.
-- Basic feature parity with live Brainfile CLI/TUI is the baseline; improvements and omissions must be intentional.
-- Do not assume a persistent `done` column.
-- Make review, accord status, validation, and logs prominent.
-- Theme support is required from the beginning.
-- Mouse support should use a hit-map style model, be enabled by default, and exclude drag/drop in v0.
-
-
-## Locked CLI/TUI decisions (current)
-
-These summarize the current implementation (protocol `0.5.0`, `decision-9`). `tandem --help` and `../protocol/README.md` are authoritative; if this list disagrees with either, it is stale.
-
-- Commands (30 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete`; `tui`; `web`.
-- There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status`. Completed history uses `list|search --scope archived|all`; Decisions use `add decision`, `list --type decision`, and `update <decision-id> --status`.
-- Lifecycle: no command sets `state` directly. `accord deliver` requires `--summary` and non-empty `--evidence` and leaves `state` unchanged; `review <id> --criterion <exact acceptance criterion> --note <text>` is the only route to `validation`; `complete` accepts a delivered Accord and archives, warning but succeeding for an undelivered Task.
-- `tandem accord`: `claim`, `deliver`, `rework`, `block`, `resume`, `release`, `fail`. Persisted `accord.status: ready` is the initial status and cannot be set through an accord action.
-- Human-readable output by default (tab-separated lines for list/search, labeled detail blocks for show); `--json` returns `{ "ok", "data", "warnings" }` envelopes for every command.
-- Only the global `-j`, `-h`, and `-V` short flags exist; everything else is long-form.
-- Implementation language: Rust (clap-derived) inside `tandem/`.
-- TUI: `tandem tui`; board mutations, theme, and mouse support included; Board, Logs, Rules, and Decisions views.
-- Validation queue: Board state/subview for work escalated with `tandem review`, awaiting complete or rework.
-- Keymaps: fixed defaults in v0; custom keymap config later.
-- Markdown rendering: styled basics in v0.
-- Theme config loading order: built-in defaults, then user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, then user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badges load from user config and workspace `.tandem/config.toml`.
-- Deferred from v0: non-core command families and integrations listed in `plan/spec.md`, plus schemas, fixtures, and root Rust workspace layout.
+[`RELEASE.md`](RELEASE.md) holds the maintained release procedure, gates and installer targets. [`AUR.md`](AUR.md) covers the `tandem-bin` package.

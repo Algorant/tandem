@@ -4,7 +4,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import { ExpressiveCodeTheme } from 'astro-expressive-code';
 
-const siteTitle = 'Tandem';
+const siteTitle = 'tandem';
 const siteDescription = 'Local-first coordination for humans and agents working in the same repository.';
 const siteUrl = 'https://trytandem.dev';
 const socialImage = `${siteUrl}/social-card.svg`;
@@ -43,12 +43,12 @@ export default defineConfig({
       logo: {
         dark: './src/assets/tandem-mark.svg',
         light: './src/assets/tandem-mark-light.svg',
-        alt: 'Tandem linked work mark',
+        alt: 'tandem linked work mark',
       },
       social: [
         {
           icon: 'github',
-          label: 'Tandem on GitHub',
+          label: 'tandem on GitHub',
           href: 'https://github.com/Algorant/tandem',
         },
       ],
@@ -71,7 +71,7 @@ export default defineConfig({
         },
         { tag: 'meta', attrs: { property: 'og:type', content: 'website' } },
         { tag: 'meta', attrs: { property: 'og:site_name', content: siteTitle } },
-        { tag: 'meta', attrs: { property: 'og:title', content: 'Tandem documentation' } },
+        { tag: 'meta', attrs: { property: 'og:title', content: 'tandem documentation' } },
         { tag: 'meta', attrs: { property: 'og:description', content: siteDescription } },
         { tag: 'meta', attrs: { property: 'og:url', content: siteUrl } },
         { tag: 'meta', attrs: { property: 'og:image', content: socialImage } },
@@ -79,11 +79,11 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image:alt',
-            content: 'Tandem: local-first coordination for human and agent work.',
+            content: 'tandem: local-first coordination for human and agent work.',
           },
         },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' } },
-        { tag: 'meta', attrs: { name: 'twitter:title', content: 'Tandem documentation' } },
+        { tag: 'meta', attrs: { name: 'twitter:title', content: 'tandem documentation' } },
         { tag: 'meta', attrs: { name: 'twitter:description', content: siteDescription } },
         { tag: 'meta', attrs: { name: 'twitter:image', content: socialImage } },
       ],

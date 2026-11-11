@@ -14,7 +14,7 @@ Guidance for AI agents working in the Tandem repository.
 
 Tandem is a local-first protocol and toolchain for human/agent project coordination.
 
-It is inspired by Brainfile's file-based task model, but Tandem is intended to lean harder into collaboration, orchestration, review, and explicit work agreements between humans and agents.
+It is inspired by [Brainfile](https://brainfile.md/)'s file-based task model, but Tandem is intended to lean harder into collaboration, orchestration, review, and explicit work agreements between humans and agents.
 
 Core concepts:
 
@@ -29,101 +29,46 @@ Core concepts:
 
 Current direction is intentionally simple:
 
-- Keep this as one parent monorepo named `tandem`.
-- Keep exactly three major child areas for now: `protocol/`, `tandem/`, and `extensions/`.
+- Keep this one monorepo: `protocol/` for the normative protocol, `tandem/` for the Rust implementation, and `docs/` with `site/` for the public documentation.
 - Repository `protocol/` Markdown is the normative protocol source of truth. `tandem/src/protocol/` is its executable Rust implementation, not a second specification.
-- The protocol baseline is inspired by the live Brainfile protocol plus the local v3 direction in `~/.dotfiles/pi/.pi/plan/brainfile_v3_spec.md`: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
+- The protocol baseline is inspired by the [Brainfile](https://brainfile.md/) protocol: review state, complete/archive as an action, logs as first-class history, and accord/contract-to-state alignment. Tandem does not need Brainfile import/migration or long-term Brainfile nomenclature compatibility.
 - `tandem/` is the canonical home for the shared Rust CLI + TUI app. The user-facing command is `tandem`; do not reintroduce `tdm` or split the app unless explicitly asked.
 - The Rust architecture is implemented as `protocol`, `project`, `app`, `cli`, and `tui` modules in one binary crate. `project::TandemProject` owns concrete `.tandem/` discovery and filesystem safety; shared `app` operations coordinate protocol rules and project I/O; CLI and TUI are peer interfaces. `main.rs` and `tui/mod.rs` are wiring roots, not protocol or persistence owners.
 - The TUI target is Rust + Ratatui, but v0 implementation stays under `tandem/`. Do not turn the whole repository into a Rust workspace or introduce `crates/`, `tandem-core`, schemas, fixtures, CI, or other structure in v0.
-- `extensions/` is the scoped home for future agent/editor integrations. It currently holds no integration: the `pi-tandem` adapter was retired (`decision-10`), and the `tandem` CLI with `--json` is the integration surface. Integration code must not duplicate Tandem protocol parsing or mutation behavior.
+- The `tandem` CLI with `--json` is the integration surface. The `pi-tandem` adapter was retired (`decision-10`); integration code must not duplicate Tandem protocol parsing or mutation behavior.
 - Prefer the smallest next useful step. Proposals are welcome, but mark them as proposals/open questions rather than encoding them as settled decisions.
-- Do not rename directories, move specs out of `plan/`, or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
+- Do not rename directories or collapse/expand the repo layout unless the orchestrator explicitly delegates that change.
 
-## Locked decisions (current)
+## Where the rules live
 
-These summarize the current implementation: protocol `0.5.0` (`decision-9`) and the clap-derived `tandem` CLI. `protocol/README.md` is normative and `tandem --help` prints the authoritative command tree; if this list disagrees with either, they win and this file is stale.
+`protocol/README.md` is normative for board meaning, `tandem --help` is the authoritative command tree, and `docs/` is the public behaviour. Read those instead of a copy kept here. The invariants an agent most often needs:
 
-Protocol:
-
-- Canonical workflow field: `state` / `states`. Active states are exactly `todo`, `in-progress`, and `validation`.
-- Current protocol version: `0.5.0`. A `0.3.0` or `0.4.0` board is converted once by `tandem migrate`; ordinary commands on an older board fail with the required version and never upgrade implicitly. There is no `tandem upgrade`.
-- Board layout: `.tandem/tandem.md`, `tasks/`, `decisions/`, `rules/`, `logs/`, and per-actor `events/`. Every record has a permanent `uid`. In Git the board is the main worktree's ignored `.tandem/` and syncs through the repository's `tandem` branch, independent of source commits; Tandem syncs it itself.
-- First-class document types are `task` and `decision`; Decisions are ADR-compatible durable records with a `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`) and no workflow `state`. Only `task` and `decision` can be created.
-- Default task identity: `type: task`; every Epic and Task uses the global flat `task-N` namespace, including a direct Task beneath an Epic. Only a Subtask directly beneath a Task uses the parent-derived `task-N-M` form. IDs are immutable.
-- Hierarchy roles are derived from resolved documents, never ID shape: an Epic is `type: task` plus `kind: epic` and is root-only; a Task is a normal task that is root-level, has a generic non-task parent, or is directly parented by an Epic; a Subtask is a normal task directly parented by a Task and cannot have children. Direct Epic children use relationship `epic-task`, Task children use `subtask`, and decision parents use generic `parent`. Role-specific IDs are strict: a role/ID mismatch is a structural error, and reparenting that would change a role (such as clearing a Subtask's parent) is refused before writing.
-- Task `kind` is `epic`, `research`, or `papercut`; tags are never kinds. A papercut needs only a title, defaults to low priority, and is never a Subtask.
-- Work agreement object: `accord`. Accord statuses: `ready`, `claimed`, `delivered`, `rework`, `blocked`, and terminal `accepted` or `failed`. Typed `links` (`relates-to`, `duplicates`, `fixed-by`/`fixes`, `supersedes`) are separate from hierarchy and loose `references`.
-- Rules: Markdown records with composite IDs such as `always-12`, a category, optional `source`, and the rule text as the body.
-- References: `parentId` and blockers must resolve (errors); related `references` may point to any Tandem document by ID or an absolute `http(s)` URL (unresolved IDs warn).
-- Lifecycle: no command sets `state` directly. `accord claim|rework|release`, `review`, `complete`, and `cancel` change it. `accord deliver` requires `--summary` and non-empty `--evidence`, sets `accord.status: delivered`, and leaves `state` unchanged. `tandem review <id> --criterion <exact acceptance criterion> --note <text>` is the only route to `validation`; review status is not stored. `tandem complete` accepts a delivered Accord and archives atomically, and completing an undelivered Task warns but succeeds. `tandem cancel` archives with `resolution.outcome: canceled` and rejects active descendants.
-- Events: per-actor `.tandem/events/<actor-id>.jsonl` ledgers hold minimal audit-only lifecycle records requiring `ts`, `event`, `id`, `actor`, and `seq`. Actor identity is checkout-local (`<git-dir>/tandem-actor-id`, or `.tandem/actor-id` outside Git); Tandem owns it and integrations must not generate, copy, parse, or globally inject it.
-- Completed logs: archived records in `.tandem/logs/` are the primary source of truth; events enrich timeline/audit.
-- Sync: a local record that parses but would make the shared board invalid is a held edit; reads use the shared version with a warning, and `tandem sync resolve <id> --keep remote` repairs it.
-- Validation/lint: built-in structural validation only; unresolved `parentId`/`blockers` are errors, unresolved related references and rule sources are warnings.
-- Brainfile migration/import is not a requirement and has no command.
-
-CLI/TUI:
-
-- CLI commands (32 leaves): `init`; `add task|decision`; `show`; `assignment`; `list`; `search`; `update`; `accord claim|deliver|rework|block|resume|release|fail`; `review`; `complete`; `cancel`; `link add|remove`; `sync`, `sync status|resolve`; `migrate`; `rules list|add|edit|delete|enable|disable`; `tui`; `web`. There is no `move`, `log`, `decision`, `papercut`, `upgrade`, or `version` command, no `accord ready|accept`, and no Task `update --status` (Decision `update --status` exists).
-- Completed history is read with `list|search --scope archived|all` and `show`; Decisions with `list --type decision`.
-- Global flags: `-j/--json`, `-h/--help`, `-V/--version`. Other flags are long-form only. Mutations are human-readable by default; every command supports `--json` with `{ "ok", "data", "warnings" }` envelopes.
-- The CLI is Rust (clap-derived) inside `tandem/`.
-- TUI invocation: `tandem tui`. Board mutations are part of the TUI.
-- TUI top-level views: Board, Logs, Rules, Decisions; validation work is presented through the Board Validation state and actions.
-- Theme and mouse support are included. Mouse is enabled by default for click/scroll/tab/action-button interactions; drag/drop is excluded.
-- Theme config loading order: built-in defaults, user TOML themes in `$XDG_CONFIG_HOME/tandem/themes/*.toml` or `~/.config/tandem/themes/*.toml`, user config in `$XDG_CONFIG_HOME/tandem/config.toml` or `~/.config/tandem/config.toml`, then workspace selector/override at `.tandem/theme.toml`; Board display settings such as project tag badge opt-ins load from user config and workspace `.tandem/config.toml`.
-- Keybindings are fixed defaults; custom keymap config is deferred.
-- Markdown rendering is styled basics.
-- Deferred: templates, schema CLI, MCP/hooks/auth, external archive integrations, schemas, fixtures, and root Rust workspace layout.
-
+- Protocol `0.5.0`; `tandem migrate` converts an older board once, and ordinary commands never upgrade implicitly.
+- The board is the main worktree's ignored `.tandem/`, synced by Tandem through the repository's `tandem` branch, independent of source commits.
+- Workflow states are `todo`, `in-progress` and `validation`; no command sets `state` directly.
+- Accord statuses are `ready`, `claimed`, `delivered`, `rework`, `blocked`, and terminal `accepted`/`failed`; `deliver` needs a summary and evidence; `complete` accepts and archives; `cancel` archives as canceled.
+- `review` is the only route into `validation`, and its status is not stored.
+- Records are Markdown with YAML frontmatter, a permanent `uid`, and immutable IDs.
 
 ## Repository layout
 
 ```text
 .
 ├── AGENTS.md
-├── README.md              # parent project README
-├── plan/
-│   ├── spec.md            # parent project plan/spec
-│   └── todo.md            # parent project todo
-├── protocol/
-│   ├── README.md          # protocol area README
-│   └── plan/
-│       ├── spec.md        # Tandem protocol draft
-│       └── todo.md        # protocol todo
-├── tandem/
-│   ├── README.md          # CLI/TUI area README
-│   └── plan/
-│       ├── spec.md        # CLI + Rust/Ratatui TUI draft
-│       └── todo.md        # CLI/TUI todo
-└── extensions/
-    ├── README.md          # integrations area README
-    └── plan/
-        ├── spec.md        # integrations area draft
-        └── todo.md        # integrations todo
+├── README.md
+├── protocol/          # normative protocol: README.md, assignment.md, links.md
+├── tandem/            # Rust binary crate: src/{protocol,project,app,cli,tui}, RELEASE.md, AUR.md
+├── docs/              # public Markdown documentation source
+├── site/              # Astro Starlight site built from docs/
+├── scripts/           # release and development helpers
+└── justfile
 ```
 
-The repo is intentionally a monorepo for now. Do not split protocol/CLI/TUI/extensions into separate repositories unless explicitly asked.
-
+The Rust package lives under `tandem/`; there is no root Cargo workspace. Do not split the protocol, CLI/TUI and docs into separate repositories unless explicitly asked.
 
 ## Current state
 
-This project is currently in planning/specification plus implementation mode. There is no root Rust workspace; CLI/TUI implementation lives in the single `tandem/` Rust binary crate that builds `tandem`, and integration work lives under `extensions/`.
-
-Primary planning documents:
-
-- `plan/spec.md`
-- `plan/todo.md`
-- `protocol/README.md`
-- `protocol/plan/spec.md`
-- `protocol/plan/todo.md`
-- `tandem/README.md`
-- `tandem/plan/spec.md`
-- `tandem/plan/todo.md`
-- `extensions/README.md`
-- `extensions/plan/spec.md`
-- `extensions/plan/todo.md`
+The CLI and TUI ship as 0.17.x against protocol 0.5.0. Development happens in the single Rust crate under `tandem/`; the public documentation is `docs/`, published by `site/`. `protocol/README.md` and `tandem --help` win over any summary in this file.
 
 ## Naming rules
 
@@ -135,7 +80,7 @@ Use these names consistently unless the user explicitly changes them:
 - Protocol config file: `.tandem/tandem.md`
 - CLI binary: `tandem`
 - CLI/TUI area: `tandem/`
-- Integrations area: `extensions/`
+- Public documentation: `docs/` source, `site/` build
 - Work agreement object: `accord`
 - User-facing CLI: `tandem`; reserve `td` for future/internal tool prefixes
 
@@ -167,7 +112,7 @@ Protocol:
 - Treat completion as an action/archive transition, not a persistent `done` column.
 - Keep human workflow state, accord state, and review state separate.
 - Preserve unknown fields and minimize file rewrites.
-- Use the local v3 Brainfile proposal as directional input for review/logs/completion behavior.
+- Treat [Brainfile](https://brainfile.md/) as the design reference for review, logs and completion behavior.
 
 CLI/TUI:
 
@@ -183,10 +128,9 @@ CLI/TUI:
 - Keep implementation under the single `tandem/` binary crate. Preserve the implemented dependency direction: `protocol` owns meaning, `project` owns concrete files, `app` owns shared operations, and peer `cli`/`tui` interfaces consume those layers.
 - Evaluate live Brainfile CLI/TUI features for parity, then decide what to keep, rename, improve, or intentionally omit.
 
-Extensions:
+Integrations:
 
-- Keep integrations under `extensions/` for now.
-- Any future integration is a thin adapter over an installed `tandem` CLI: use `execFile`/argument arrays, avoid shell interpolation, and consume CLI JSON.
+- Any future agent or editor integration is a thin adapter over an installed `tandem` CLI: use `execFile`/argument arrays, avoid shell interpolation, and consume CLI JSON.
 - Do not duplicate Tandem protocol parsing or mutation behavior in an integration; call `tandem` and keep behavior in the CLI/protocol.
 
 ## Protocol architecture refactor campaign (completed)
@@ -196,10 +140,8 @@ The `refactor/protocol-architecture` campaign is **complete**. Campaign Epic
 exists. There is no implementation freeze on `main`.
 
 The campaign established five ownership boundaries that remain in force:
-`protocol`, `project`, `app`, `cli`, and `tui`. See
-[`plan/refactor_campaign_baseline.md`](plan/refactor_campaign_baseline.md) and
-[`plan/refactor_spec.md`](plan/refactor_spec.md) for the historical record and
-`decision-8` for the architecture decision itself.
+`protocol`, `project`, `app`, `cli`, and `tui`. `decision-8` records the
+architecture decision; the campaign history is in the archived Logs.
 
 One campaign practice survives as an ongoing repository rule:
 

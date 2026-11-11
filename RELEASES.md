@@ -2,6 +2,18 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.17.7
+
+Protocol remains 0.5.0; existing boards need no migration.
+
+### Changed
+
+- Board sync commits are written as `tandem: sync` without a machine name. The public board branch no longer publishes the hostname in its history; existing commits keep the names they already have.
+
+### Documentation
+
+- The README leads with a banner and links to the docs instead of restating them; the release checklist points at the current capability pages rather than an inventory that drifts.
+
 ## 0.17.6
 
 Protocol remains 0.5.0; existing boards need no migration.

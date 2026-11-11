@@ -1,6 +1,6 @@
 ---
 title: TUI and web
-description: Browse local Tandem boards in the terminal or read-only browser view.
+description: Browse local tandem boards in the terminal or read-only browser view.
 ---
 
 ## Terminal UI
@@ -9,7 +9,7 @@ Run `tandem tui` to open the board discovered from the current directory. Press 
 
 The active board syncs in the background. Inactive boards do not; while the chooser is open, their local summaries refresh about every five seconds.
 
-[![Tandem TUI with its board tabs and task list.](/images/tui-board.png)](/images/tui-board.png)
+[![tandem TUI with its board tabs and task list.](/images/tui-board.png)](/images/tui-board.png)
 
 [![Session activity and recorded assignees in the chooser.](/images/tui-session-activity.png)](/images/tui-session-activity.png)
 
@@ -27,6 +27,8 @@ Disabled rules retain the same UID, ID, text and metadata, so re-enabling does n
 
 `tandem web` opens a browser view of one discovered workspace. It is read-only and binds to loopback; it does not serve a workspace roster or allow remote access. Its Rules page shows enabled guidance only; manage disabled records in the TUI or with `tandem rules list --all`.
 
-[![The read-only web view of one Tandem workspace.](/images/web-read-only.png)](/images/web-read-only.png)
+[![The read-only web view of one tandem workspace.](/images/web-read-only.png)](/images/web-read-only.png)
 
 See [Configuration](/reference/configuration/) for TUI themes and Board badges. Board storage and sync behavior are covered in [Concepts](/concepts/#board-storage-and-sync).
+
+The web view serves one workspace over loopback from embedded assets, under `/api/v1`, with restrictive security headers and no-store caching; the page polls the board revision about every three seconds. `tandem tui` reports its exit through the terminal's status line, which a PTY capture can check.

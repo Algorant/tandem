@@ -1148,15 +1148,15 @@ impl<'a> Engine<'a> {
     }
 
     fn commit(&self, tree: &str, parents: &[String], message: &str) -> Result<String, String> {
-        let host = hostname();
-        let message = format!("{message} from {host}");
+        // Board commits are readable on a public repository: keep the message
+        // free of machine names.
         let mut args = vec!["commit-tree", "--no-gpg-sign", tree];
         for parent in parents {
             args.push("-p");
             args.push(parent);
         }
         args.push("-m");
-        args.push(&message);
+        args.push(message);
         // Board commits carry the repository's Git identity so remotes that
         // check commit authors accept them.
         let name = self.identity("user.name", "Tandem");
@@ -2114,15 +2114,6 @@ fn timeout() -> Duration {
         .and_then(|value| value.parse().ok())
         .unwrap_or(DEFAULT_TIMEOUT_SECS);
     Duration::from_secs(secs)
-}
-
-fn hostname() -> String {
-    fs::read_to_string("/etc/hostname")
-        .ok()
-        .map(|name| name.trim().to_string())
-        .filter(|name| !name.is_empty())
-        .or_else(|| std::env::var("HOSTNAME").ok())
-        .unwrap_or_else(|| "unknown host".to_string())
 }
 
 fn now_secs() -> u64 {
