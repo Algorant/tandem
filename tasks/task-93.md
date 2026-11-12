@@ -18,7 +18,7 @@ accord:
   note: "Algorant requested HOLD while focusing on another project. Preserve the exact stopped Worker and dirty compiling seam; no further work until explicit resume. E2E-only/no-unit validation and required scope approval remain in force. Public-hygiene wording neutralized only; no source, runtime, build, test or SSH changes."
   updatedAt: "2026-10-26T04:00:53Z"
 createdAt: "2026-10-22T19:33:57Z"
-updatedAt: "2026-10-26T04:00:53Z"
+updatedAt: "2026-11-12T04:31:12Z"
 assignee: "worker-task-93-1b445c3a"
 ---
 
@@ -42,3 +42,11 @@ Preserve dependency direction: app/project cannot import tui types/functions. Ex
 Prefer existing TUI trackedthread/job and stdprocess style forSSH; Tokio currently servesweb and doesnotjustifyaddinga TUIruntime/framework. Ifruntime/dependency/semanticrefactor becomesnecessary, stopfirst. SSH hostvalidation/POSIXquoting mustcoverreadpath/revision; rejectcontrolchars, handleapostrophes/spaces, standarddeadlines/reaponlyownedchildren,no multiplexer/service.
 
 No newloopbacksshd/account/SSHprofile orotherinfrastructure. Code/build/temporarylocalchecks mayproceed; ANY remoteSSH/SCPfixture setup requires a focusedparentquestion naming exactexistingalias,tmpdirectory,binarydeployment/invocation strategy andcleanup. Useexistingexisting owner-machine SSH linkslinks andgeneratedtempboards only; neverrealcart-labrecordmutation. No newproductiontestflags. Parent coordinatesfixturecommands afterreview.
+
+## Held seam parked outside the worktree
+On 2026-11-11 the stopped Worker's checkout was removed after its uncommitted seam was preserved and verified byte-for-byte outside the repository:
+
+- `~/.pi/cache/held/task-93/task-93-interim-66a87b0.tar.gz` — the 7 modified and 2 new files at base `66a87b0`
+- `interim-seam.diff`, `interim-seam.status.txt`, `SHA256SUMS` beside it
+
+Restore by untarring over a fresh checkout of `66a87b0` (or applying the diff). Nothing from the seam was committed to `main`, and the branch was deleted with the checkout because it held no commits. The HOLD still stands: this is parked, not approved, and the known gaps (filesystem enumeration in `app`, swallowed config errors, ad-hoc payload shape, SSH helper reaping) are unresolved.
