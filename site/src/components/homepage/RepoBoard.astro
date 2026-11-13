@@ -9,6 +9,23 @@
 import HomepageMark from './HomepageMark.astro';
 ---
 
+<section class="product-showcase" aria-label="Tandem in use">
+  <figure class="product-showcase__figure">
+    <img class="product-showcase__shot product-showcase__shot--dark-desktop" src="/images/homepage/board-dark-desktop.png" alt="Tandem TUI Board in the dark Verdigris theme, showing seven example Tasks." />
+    <img class="product-showcase__shot product-showcase__shot--light-desktop" src="/images/homepage/board-light-desktop.png" alt="Tandem TUI Board in the light Verdigris theme, showing seven example Tasks." />
+    <img class="product-showcase__shot product-showcase__shot--dark-phone" src="/images/homepage/board-dark-phone.png" alt="Tandem TUI Board at a narrow terminal width, dark Verdigris theme, showing seven example Tasks." />
+    <img class="product-showcase__shot product-showcase__shot--light-phone" src="/images/homepage/board-light-phone.png" alt="Tandem TUI Board at a narrow terminal width, light Verdigris theme, showing seven example Tasks." />
+    <figcaption class="product-showcase__caption"><strong>The Board</strong><span>Actual Tandem TUI · example workspace · v0.17.7</span></figcaption>
+  </figure>
+  <figure class="product-showcase__figure">
+    <img class="product-showcase__shot product-showcase__shot--dark-desktop" src="/images/homepage/task-dark-desktop.png" alt="Tandem TUI detail for task-1, Add a title filter, in the dark Verdigris theme." />
+    <img class="product-showcase__shot product-showcase__shot--light-desktop" src="/images/homepage/task-light-desktop.png" alt="Tandem TUI detail for task-1, Add a title filter, in the light Verdigris theme." />
+    <img class="product-showcase__shot product-showcase__shot--dark-phone" src="/images/homepage/task-dark-phone.png" alt="Tandem TUI detail for task-1 at a narrow terminal width, dark Verdigris theme." />
+    <img class="product-showcase__shot product-showcase__shot--light-phone" src="/images/homepage/task-light-phone.png" alt="Tandem TUI detail for task-1 at a narrow terminal width, light Verdigris theme." />
+    <figcaption class="product-showcase__caption"><strong>A Task</strong><span>Selected in the actual TUI · task title, state, owner and Accord</span></figcaption>
+  </figure>
+</section>
+
 <section class="repo">
   <div class="repo__board">
     <div class="repo__board-head">
@@ -56,6 +73,65 @@ tandem add task "Add a greeting" --acceptance "README contains the greeting"</co
 <p class="repo__next"><a href="/quick-start/">Take a Task from start to finish in the Quickstart</a> · <a href="/concepts/">Read how the board works</a></p>
 
 <style>
+  .product-showcase {
+    display: grid;
+    gap: 1rem;
+    margin-block: 0 2.5rem;
+  }
+
+  .product-showcase__figure {
+    margin: 0;
+    overflow: hidden;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.85rem;
+    background: var(--td-vg-panel);
+  }
+
+  .product-showcase__shot {
+    display: none;
+    width: 100%;
+    height: auto;
+    background: var(--td-vg-ink);
+  }
+
+  :global(html[data-theme='dark']) .product-showcase__shot--dark-desktop {
+    display: block;
+  }
+
+  :global(html[data-theme='light']) .product-showcase__shot--light-desktop {
+    display: block;
+  }
+
+  .product-showcase__caption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.85rem;
+    padding: 0.7rem 1rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+  }
+
+  .product-showcase__caption strong {
+    color: var(--sl-color-gray-1);
+  }
+
+  @media (max-width: 46rem) {
+    .product-showcase {
+      gap: 0.75rem;
+      margin-block-end: 2rem;
+    }
+
+    :global(html[data-theme='dark']) .product-showcase__shot--dark-desktop,
+    :global(html[data-theme='light']) .product-showcase__shot--light-desktop {
+      display: none;
+    }
+
+    :global(html[data-theme='dark']) .product-showcase__shot--dark-phone,
+    :global(html[data-theme='light']) .product-showcase__shot--light-phone {
+      display: block;
+    }
+  }
+
   .repo {
     display: grid;
     grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
