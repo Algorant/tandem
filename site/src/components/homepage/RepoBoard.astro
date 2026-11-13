@@ -45,12 +45,12 @@ import HomepageMark from './HomepageMark.astro';
 
 <section class="repo__band">
   <div>
-    <h2>Two commands to a real board</h2>
+    <h2>Start a real board</h2>
     <p>The installer is user-local and needs no <code>sudo</code>. Initialize in the repository you already work in, then create your first Task.</p>
   </div>
   <pre class="repo__commands"><code>curl -fsSL https://trytandem.dev/install.sh | sh
 tandem init
-tandem add task "Add a greeting"</code></pre>
+tandem add task "Add a greeting" --acceptance "README contains the greeting"</code></pre>
 </section>
 
 <p class="repo__next"><a href="/quick-start/">Take a Task from start to finish in the Quickstart</a> · <a href="/concepts/">Read how the board works</a></p>

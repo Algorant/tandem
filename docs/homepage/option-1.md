@@ -25,24 +25,24 @@ hero:
 
 <div class="td-home-loop">
 <div class="td-home-loop__step">
-<span class="td-home-loop__number">01 · todo</span>
+<span class="td-home-loop__number">01 · plan</span>
 <h3>Write it down</h3>
-<p>One Markdown file with its acceptance criteria, its priority and the files it relates to.</p>
+<p>One Markdown file with its acceptance criteria, priority and related files.</p>
 </div>
 <div class="td-home-loop__step td-home-loop__step--agree">
-<span class="td-home-loop__number">02 · in progress</span>
-<h3>Claim the work</h3>
-<p>An Accord records who took the Task and what they owe. Two agents do not quietly work the same thing.</p>
+<span class="td-home-loop__number">02 · claim</span>
+<h3>Make ownership visible</h3>
+<p>The Accord records who claimed the Task and what they owe. The current owner is visible on the Board.</p>
 </div>
 <div class="td-home-loop__step td-home-loop__step--review">
-<span class="td-home-loop__number">03 · validation</span>
-<h3>Hand it back</h3>
-<p>A delivery carries a summary and evidence. A result someone must judge goes to review instead of being declared done.</p>
+<span class="td-home-loop__number">03 · deliver or review</span>
+<h3>Show the result</h3>
+<p>A delivery carries a summary and evidence. If an unresolved criterion needs a human decision, review is the optional next step.</p>
 </div>
 <div class="td-home-loop__step td-home-loop__step--complete">
-<span class="td-home-loop__number">04 · logs</span>
-<h3>It becomes history</h3>
-<p>Completion archives the Task in Logs, so the next person reads what happened and why.</p>
+<span class="td-home-loop__number">04 · archive</span>
+<h3>Keep the history</h3>
+<p>Completion archives the Task in Logs, where the next person can read what happened and why.</p>
 </div>
 </div>
 
