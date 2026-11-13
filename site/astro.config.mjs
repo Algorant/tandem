@@ -7,7 +7,7 @@ import { ExpressiveCodeTheme } from 'astro-expressive-code';
 const siteTitle = 'tandem';
 const siteDescription = 'Local-first coordination for humans and agents working in the same repository.';
 const siteUrl = 'https://trytandem.dev';
-const socialImage = `${siteUrl}/social-card.svg`;
+const socialImage = `${siteUrl}/social-card.png`;
 
 const verdigrisLight = ExpressiveCodeTheme.fromJSONString(
   fs.readFileSync(new URL('./src/styles/shiki/verdigris-light.jsonc', import.meta.url), 'utf-8')
