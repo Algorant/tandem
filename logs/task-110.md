@@ -3,24 +3,27 @@ id: task-110
 uid: 57e52edc-3962-437d-8649-6fbcc495dea8
 type: task
 title: "Reconcile tandem's repo and site wordmarks in context"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109"]
 relatedFiles: ["docs/banner.svg", "README.md", "site/src/assets/", "site/public/"]
 tags: ["ui", "wordmark"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Both current marks are shown side by side in their actual README and docs-site contexts.", "Three to five numbered alternatives communicate two abstract things collaborating and each is shown as a README banner, a docs-site header and a favicon at small sizes.", "One Sideshow post in the new 'tandem wordmark' session contains the comparison and options, with tracked repo and live site unchanged."]
   claimedAt: "2026-11-13T16:38:36Z"
   deliveredAt: "2026-11-13T17:42:51Z"
   validation: ["$ git diff --exit-code"]
   summary: "Algorant chose the EXISTING docs-site mark (two interlaced loops + lowercase tandem) and wants repo and site to match it. Read-only handoff complete: high-def dark/light renders of that lockup drawn from the site's own SVG source at 7x, with SVG-vs-HTML split, fonts and colours named; the choice is recorded in the same post. The four explored options stay as record only, no option adopted. Adoption (README banner rebuilt from the site mark) moves to a separate implementation track; nothing tracked changed here."
   evidence: ["Sideshow post http://desktop.tail1cefc.ts.net:8228/session/c4JYCfBnD8Q (post 7tO59nEXJ3g, v9): decide surface now records the choice; high-def CURRENT cards sit after the served-header screenshot", "Mark SVG unmodified: site/src/assets/tandem-mark.svg (strands #689d6a + #ebdbb2) and tandem-mark-light.svg (#689d6a + #504945), 96x96 viewBox, ink 78 x 41.8 units; both attached as downloads", "Name is separate HTML text: Starlight title 24px/600, 0.36px tracking, 88px wide, colour #427b58 light / #d5e7d0 dark; declared system sans, Arial-metric face (Liberation Sans) used in the render", "Served geometry: 64px header band, 40x40px logo box, 27.75px ink-to-ink gap; cards are 1600x720 PNGs rendered from SVG at 7x", "git diff --exit-code clean; git status shows no tracked or untracked changes; MagicDNS session URL HTTP 200"]
-  updatedAt: "2026-11-13T17:42:51Z"
+  updatedAt: "2026-11-13T17:43:38Z"
 createdAt: "2026-11-13T16:38:20Z"
-updatedAt: "2026-11-13T17:42:51Z"
+updatedAt: "2026-11-13T17:43:38Z"
 assignee: "pi:tandem-wordmark"
+archivedAt: "2026-11-13T17:43:38Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: main → main at a356a454ef54157978437bdec78c12f2a41d2a2c."
 ---
 
 ## Description

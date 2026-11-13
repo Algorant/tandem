@@ -372,3 +372,4 @@
 {"ts":"2026-11-13T17:42:22Z","event":"task.updated","id":"task-111","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":372,"data":{"fields":["references","body"]}}
 {"ts":"2026-11-13T17:42:35Z","event":"accord.claimed","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":373,"data":{}}
 {"ts":"2026-11-13T17:42:51Z","event":"accord.delivered","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":374,"data":{}}
+{"ts":"2026-11-13T17:43:38Z","event":"task.completed","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":375,"data":{}}
