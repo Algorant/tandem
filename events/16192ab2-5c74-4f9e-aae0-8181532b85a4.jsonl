@@ -355,3 +355,4 @@
 {"ts":"2026-11-12T04:32:57Z","event":"task.updated","id":"task-93","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":355,"data":{"fields":["body"]}}
 {"ts":"2026-11-13T01:36:16Z","event":"task.created","id":"task-109","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":356,"data":{"title":"Revisit the tandem README and documentation site (Algorant to outline)"}}
 {"ts":"2026-11-13T16:37:27Z","event":"task.updated","id":"task-109","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":357,"data":{"fields":["acceptance","body"]}}
+{"ts":"2026-11-13T16:38:20Z","event":"task.created","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":358,"data":{"title":"Reconcile tandem's repo and site wordmarks in context"}}
