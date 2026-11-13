@@ -4,19 +4,21 @@ uid: 84b237b4-8a35-4b0d-8891-1b6777b2a92d
 type: task
 kind: "research"
 title: "Research landing pages and docs stacks for tandem"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109"]
 relatedFiles: ["site/", "docs/"]
 tags: ["docs", "research"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Both reference sites' framework/theme/hosting/deploy and landing/docs split are evidenced from live source and public repos, with source commits/versions and uncertainty explicitly stated.", "The current tandem stack is accurately compared with one or two realistic routes, including estimated effort and source-checked free/self-hosted or hosted-tier constraints.", "One neutral findings post is published in a new 'tandem docs site' Sideshow session, with no implementation changes."]
+  claimedAt: "2026-11-13T16:38:34Z"
   validation: ["$ git diff --exit-code"]
-  updatedAt: "2026-11-13T16:38:22Z"
+  updatedAt: "2026-11-13T16:38:34Z"
 createdAt: "2026-11-13T16:38:22Z"
-updatedAt: "2026-11-13T16:38:22Z"
+updatedAt: "2026-11-13T16:38:34Z"
+assignee: "pi:tandem-docs-site"
 ---
 
 ## Description
