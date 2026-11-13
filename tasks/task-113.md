@@ -3,20 +3,22 @@ id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
 title: "Prototype tandem homepages with Starlight's landing layout"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
 relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs"]
 tags: ["ui", "docs"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Three or four numbered, distinct options run through real Astro/Starlight landing pages on an isolated prototype branch, not generic static HTML approximations of the docs layout.", "Each option is shown in dark/light desktop and narrow-phone renders plus the first docs page transition, using the selected existing tandem site wordmark.", "A short feature/override explanation accompanies each option in one new post within session 'tandem docs site'; nothing is pushed or deployed, and final homepage implementation waits for Algorant's choice."]
+  claimedAt: "2026-11-13T17:42:35Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
   constraints: ["No framework migration, hosting changes, new dependencies or production deployment.", "No generated docs edits or DOM-replacement screenshot mockups; use real source pages and normal Starlight layouts.", "No alternative wordmark; use the existing site mark and coordinate source assets with task-112."]
-  updatedAt: "2026-11-13T17:42:20Z"
+  updatedAt: "2026-11-13T17:42:35Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T17:42:20Z"
+updatedAt: "2026-11-13T17:42:35Z"
+assignee: "pi:starlight-homepage-options"
 ---
 
 ## Description
