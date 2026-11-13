@@ -7,7 +7,7 @@ state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-110"]
-relatedFiles: ["README.md", "docs/brand/", "docs/banner.svg", "docs/index.md", "site/astro.config.mjs", "site/src/assets/", "site/public/", "site/src/styles/verdigris.css"]
+relatedFiles: ["README.md", "docs/brand/", "docs/banner.svg", "docs/index.md", "site/astro.config.mjs", "site/src/assets/", "site/public/", "site/src/styles/verdigris.css", "site/scripts/sync-docs.mjs"]
 tags: ["ui", "docs"]
 accord:
   status: "claimed"
@@ -17,7 +17,7 @@ accord:
   constraints: ["No alternate wordmark, site redesign, new hosting, new runtime service or unrelated cleanup.", "No second human approval gate: Algorant approved this exact current-mark adoption.", "No screenshot enlargement as an asset; keep text/name treatment faithful and SVG output crisp."]
   updatedAt: "2026-11-13T17:46:46Z"
 createdAt: "2026-11-13T17:41:05Z"
-updatedAt: "2026-11-13T17:51:52Z"
+updatedAt: "2026-11-13T18:03:40Z"
 assignee: "pi:matching-site-wordmark"
 ---
 
@@ -52,3 +52,8 @@ Internal plan approved via mc2183b9d, no extra human gate. Existing site/src/ass
 The plain docs/brand/ folder keeps byte-identical ORIGINAL task-110 current-lockup dark/light PNGs (not substituted new banner renders), original comparison board and four alternative boards; source SVG reference copies are explicitly reference-only. No brand generators/package hooks.
 
 Live capture constraint: Obscura was observed painting CLOSED GitHub/Starlight dialogs as open over the target area. The existing browsing-skill one-shot headless Chromium CLI exception is approved solely for faithful before/after publication images with real dark/light media preferences, fresh disposable profiles and immediate process cleanup. No user's browser/profile, visible window, installs, Playwright/Puppeteer/Selenium or DOM-hidden fake captures. This is a concrete renderer-gap check, not a general new browser workflow.
+
+## Integration ordering approved by Herdra
+Herdra m7a25d684 explicitly authorizes starter to merge with Worktrunk --no-remove after source checks, then push/normal deploy/live dark+light verification, and only then worker_finish to accept/archive/close/remove the already-integrated child. If worker_finish refuses that state, stop and report; no workaround. This keeps Task completion after the actual requested outcome.
+
+Existing sync-docs.mjs may exclude reference-only docs/brand/ from the public documentation collection; that is needed so its reference README does not become a docs page, not a new brand-generator pipeline.
