@@ -3,14 +3,13 @@ id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
 title: "Ship option 2 with real Board and Task images"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
 relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/index.mdx", "site/public/images/"]
 tags: ["ui", "docs"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Option2’s actual landing layout includes useful real images of tandem in use, captured from the real app in an isolated nonpersonal sample workspace, with both themes where meaningful and established capture provenance.", "The revised image-bearing homepage is rendered at real dark/light desktop/phone viewports with the mocked Quickstart transition, and published as a clearly labelled revised preview in the existing tandem docs site session.", "Algorant explicitly approves that revised preview before any production merge/push/deploy; after approval, live landing and first docs page are verified in both themes/widths before deferred worker_finish."]
   claimedAt: "2026-11-13T17:42:35Z"
   deliveredAt: "2026-11-13T19:32:27Z"
@@ -19,10 +18,14 @@ accord:
   summary: "Algorant-approved option2 with real Board/Task figures is merged, pushed and live at trytandem.dev; all8actual homepage/Quickstart theme/width states verified and live after-shots published in the existing session."
   evidence: ["ExactapprovedHEAD6a262ea mergedthroughWorktrunkpreservedcheckout andpushed; normaldocsrun43491621663success. No unselectedroutes/framework/hosting/dependency/redesignchanges.", "Parent canonicalURLcontentverifiednewhomepage and all8servedPNGvariantsbyte-match source. Parent independentbuild8pages/link179across20HTML/diffcheck passed atsameHEAD beforeintegration; branch/maincleanunchanged.", "LIVEhomepage+Quickstart dark/light×1440×900/390×844,DPR1: headings/themes/images/CTAassertionspass;0brokenimages/open dialogs; actualmanualthemepickerchangesassetsagainstsystemlight. Threeprototype routes404.", "AfterpostlXWV8Rwedx8 in existingsessionyf_6Zb7WQVc contains4fullpagehomepage+4Quickstartviewportimages; previousapprovedpreviewpreserved. Parentinspected4homepagefullthumbnails+lightdesktop/darkphoneQuickstart. SessionMagicDNSHTTP200.", "Alltemporarycapturejobs/profile/processes/portsclosed; nativechildrenempty. DisposableChromiumcleanup-timeGPUfatalexit134 recordedwithboundedreapingaftercompletecaptures; no furtherdiagnosis/newcapture or liveuserappchanges. ExplicitAlgYES recordedonTask beforepublication."]
   filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
-  updatedAt: "2026-11-13T19:32:27Z"
+  updatedAt: "2026-11-13T19:32:35Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T19:32:27Z"
+updatedAt: "2026-11-13T19:32:35Z"
 assignee: "pi:starlight-homepage-options"
+archivedAt: "2026-11-13T19:32:35Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: starlight-homepage-options → main at 6a262ea25b951f1edd65b207aa8c993b8eca09b6."
 ---
 
 ## Description
