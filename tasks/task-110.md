@@ -13,13 +13,13 @@ accord:
   status: "delivered"
   acceptance: ["Both current marks are shown side by side in their actual README and docs-site contexts.", "Three to five numbered alternatives communicate two abstract things collaborating and each is shown as a README banner, a docs-site header and a favicon at small sizes.", "One Sideshow post in the new 'tandem wordmark' session contains the comparison and options, with tracked repo and live site unchanged."]
   claimedAt: "2026-11-13T16:38:36Z"
-  deliveredAt: "2026-11-13T16:59:05Z"
+  deliveredAt: "2026-11-13T16:59:15Z"
   validation: ["$ git diff --exit-code"]
   summary: "Mockup-only wordmark study: both current marks shown in their real contexts, four numbered middle-ground marks (twin t, weave, embrace, yoke) each shown as README banner, docs-site header (dark+light) and favicon with true 16/24/32 px legibility renders. One Sideshow post in a new 'tandem wordmark' session; tracked repo, docs site and deployment unchanged."
-  evidence: ["Sideshow post: http://desktop.tail1cefc.ts.net:8228/session/c4JYCfBnD8Q (post 7tO59nEXJ3g)", "Airplane-mode check: published from localhost:8228 session; MagicDNS session URL returned HTTP 200 via curl --max-time 3 (not from a browser render)", "Artifacts (ignored, not committed): .pi/proposals/tandem-wordmark/ with generate.py, legibility.py, svg/ sources and png/ boards", "git diff --exit-code: clean; git status: no tracked or untracked changes", "Live header measured from trytandem.dev: 64px tall, light #f3ebcf / dark #222526, title 24px/600 in theme accent; one favicon file per theme"]
-  updatedAt: "2026-11-13T16:59:05Z"
+  evidence: ["Sideshow post: http://desktop.tail1cefc.ts.net:8228/session/c4JYCfBnD8Q (post 7tO59nEXJ3g)", "One bounded reachability check: curl --noproxy '*' --max-time 3 on the MagicDNS session URL returned HTTP 200; localhost:8228 returned HTTP 200", "Artifacts (ignored, not committed): .pi/proposals/tandem-wordmark/ with generate.py, legibility.py, svg/ sources and png/ boards", "git diff --exit-code: clean; git status: no tracked or untracked changes", "Live header measured from trytandem.dev: 64px tall, light #f3ebcf / dark #222526, title 24px/600 in theme accent; one favicon file per theme"]
+  updatedAt: "2026-11-13T16:59:15Z"
 createdAt: "2026-11-13T16:38:20Z"
-updatedAt: "2026-11-13T16:59:05Z"
+updatedAt: "2026-11-13T16:59:15Z"
 assignee: "pi:tandem-wordmark"
 ---
 
