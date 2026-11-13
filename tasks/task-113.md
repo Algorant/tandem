@@ -3,14 +3,14 @@ id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
 title: "Ship the selected Starlight homepage and docs transition"
-state: "validation"
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
 relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs", "site/tsconfig.json"]
 tags: ["ui", "docs"]
 accord:
-  status: "delivered"
+  status: "rework"
   acceptance: ["Production homepage matches Algorant's selected option2 on real Astro/Starlight, using the chosen current wordmark and the mocked landing-to-Quickstart docs transition; options1/3 and preview-only routes are not deployed.", "After merge/push and normal docs deployment, LIVE landing and first docs page are checked in dark/light at real desktop and phone viewport widths, with actual running theme/layout confirmed and no renderer substitutions or DOM surgery.", "The same tandem docs site session contains the live after-shots; Task completion follows live verification using the approved deferred worker_finish ordering."]
   claimedAt: "2026-11-13T17:42:35Z"
   deliveredAt: "2026-11-13T18:11:19Z"
@@ -19,14 +19,11 @@ accord:
   summary: "Three real Starlight landing-page prototypes published as numbered choices with dark/light desktop/phone renders and the shared Quickstart transition. Source and command/lifecycle copy reviewed and corrected; branch remains isolated, unpushed and undeployed for Algorant's choice."
   evidence: ["Local prototype branch starlight-homepage-options has commits d6baa6e and fd6641c, clean. docs/homepage contains1 Markdown +2 MDX splash pages; scoped RepoBoard/QuietPage components and shared original-mark component; only minimal MDX copy support/@site alias added. docs/index, regular docs and verdigris.css remain untouched.", "One options post DpjbX4ohWcw in existing 'tandem docs site' session yf_6Zb7WQVc; currentversion13,13 imageframes: each option dark/light at real1440×900 desktop and390×844 phone, plus Quickstart docs transition. Exact viewport/theme/DPR1 recorded by native Chromium; HTTP200 session check.", "Parent independently reviewed all8 source files, source diffs and bounded desktop/phone renders for all3 layouts plus Quickstart. Source copy corrections: plan/claim/deliver-or-optional-review/archive are lifecycle steps, not4storedstates; owner visible rather than false no-overlap guarantee; Task CLI includes acceptance, no false command count. Real disposable native init/add/claim/deliver/complete sequence verified by manus; sandbox removed.", "Parent reran just site-build (11pages), check:links (221links/23HTML), git diff --check at fd6641c: allpass. Source was not merged/pushed/deployed; only task112current-wordmark source independently landed on main.", "Renderer correction preserved: Obscura screenshot DOES reflow during capture; the earlier opposite inference was wrong. Confirmed blockers are closed-dialog painting and dropped grid CSS. Bounded installed headless Chromium publication-capture exception used, no Playwright/Puppeteer/Selenium, no userprofile/visiblewindow/DOMsurgery/newdeps; browser and preview closed."]
   filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
-  updatedAt: "2026-11-13T18:13:43Z"
+  note: "Algorant chose option2 and authorized shipping via Herdra me96b22a7. This is the approved production phase after successful prototypes, not rejection of the mockups; deliver selected homepage/transition for starter deployment and live verification."
+  updatedAt: "2026-11-13T18:13:45Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T18:13:43Z"
+updatedAt: "2026-11-13T18:13:45Z"
 assignee: "pi:starlight-homepage-options"
-validation.criterion: "A short feature/override explanation accompanies each option in one new post within session 'tandem docs site'; nothing is pushed or deployed, and final homepage implementation waits for Algorant's choice."
-validation.note: "Technical source/render/build/link checks verified. Only the product/taste choice between3 homepage directions remains Algorant's; prototype branch is intentionally not merged or deployed. Posted options and transition frames are ready for that choice."
-validation.requestedAt: "2026-11-13T18:11:20Z"
-validation.reviewer: "Algorant"
 ---
 
 ## Description
