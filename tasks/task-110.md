@@ -19,7 +19,7 @@ accord:
   evidence: ["Session c4JYCfBnD8Q / post7tO59nEXJ3g, current version4. One post includes current source marks side by side, full current README banner, measured/reconstructed light/dark docs headers and the actual live header capture; current favicon included.", "Options1 Twin t (shared crossbar),2 Weave (two paths cross),3 Embrace (arcs around shared core),4 Yoke (two arrive, one continues). Each shown in1280×320 README banner,64px docs header in both themes and a16px browser tab/48px tile. Extra legibility sheet renders16/24/32px at6× without smoothing.", "Parent inspected bounded thumbnail renders of today, all4 option boards and pixel-legibility sheet. One correction pass added literal side-by-side current comparison and corrected palette/recommendation wording. Weave has two strand colours; ochre only where a third/shared element exists. Weave preference explicitly taste, not an exclusive16px legibility claim; yoke also survives.", "Typography remains a stand-in (Adwaita Sans600/-0.018em), not an adoption decision. Headers/favicon placements are reconstructions from live geometry/colours, clearly labelled; no light-mode banner variant. Final direction belongs to Algorant.", "rsvg-convert renders inspected; exact-size favicon variants inspected; one parent MagicDNS session HTTP200 check. git diff --exit-code clean; artifacts only under ignored .pi/proposals/tandem-wordmark/. No tracked code/assets, site build, deployment, account or runtime setting changes."]
   updatedAt: "2026-11-13T17:03:50Z"
 createdAt: "2026-11-13T16:38:20Z"
-updatedAt: "2026-11-13T17:38:47Z"
+updatedAt: "2026-11-13T17:41:03Z"
 assignee: "pi:tandem-wordmark"
 ---
 
@@ -39,3 +39,6 @@ Do not change or build anything into the tracked repo or live site. Put temporar
 Algorant, verbatim (2026-11-13, via Herdra m4d4d7d8b): "for tandem wordmark: high def version of the docs site wordmark, can you show me that in dark and light?"
 
 Add large, crisp renders of the EXISTING docs-site wordmark from its actual source SVG, on the real dark/light site backgrounds, to the same wordmark post/session. This is not a proposed replacement or adoption. Show both complete lockups; if the name is separate HTML, reproduce current type/weight and label that fact. No screenshot upscaling and no tracked repo/site changes.
+
+## Algorant’s choice — exploration concluded
+Herdra m4b71009c (2026-11-13) relays the exact follow-up: "I just want the repo and the docs site to match with that, basically". The EXISTING trytandem.dev mark wins; none of the four new options is adopted. The high-resolution dark/light request folds into applying that current mark consistently. Close the exploration after its final artifact handoff; implementation is separately scoped and authorized, not an extra design-acceptance gate.
