@@ -3,20 +3,22 @@ id: task-112
 uid: dde15def-367b-424f-b30e-986b08beb544
 type: task
 title: "Use the current tandem site wordmark consistently in README and header"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-110"]
 relatedFiles: ["README.md", "docs/banner.svg", "docs/index.md", "site/astro.config.mjs", "site/src/assets/", "site/public/", "site/src/styles/verdigris.css", "site/scripts/"]
 tags: ["ui", "docs"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The current site mark remains unchanged in identity, with one authoritative SVG geometry source and derived dark/light assets shared by README and docs header; no cassette banner or independently redrawn replacement remains in those public surfaces.", "GitHub README uses dark/light picture selection and docs header renders the matching current wordmark in both themes; favicon is geometrically consistent or explicitly retained if already on-brand.", "After commit/push and the normal docs deploy, real github.com README and live trytandem.dev header are checked in dark and light, and their before/after appears in the existing tandem wordmark Sideshow session."]
+  claimedAt: "2026-11-13T17:41:11Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
   constraints: ["No alternate wordmark, site redesign, new hosting, new runtime service or unrelated cleanup.", "No second human approval gate: Algorant approved this exact current-mark adoption.", "No screenshot enlargement as an asset; keep text/name treatment faithful and SVG output crisp."]
-  updatedAt: "2026-11-13T17:41:05Z"
+  updatedAt: "2026-11-13T17:41:11Z"
 createdAt: "2026-11-13T17:41:05Z"
-updatedAt: "2026-11-13T17:41:05Z"
+updatedAt: "2026-11-13T17:41:11Z"
+assignee: "pi:matching-site-wordmark"
 ---
 
 ## Description

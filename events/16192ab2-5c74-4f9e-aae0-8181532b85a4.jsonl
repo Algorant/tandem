@@ -367,3 +367,4 @@
 {"ts":"2026-11-13T17:38:47Z","event":"task.updated","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":367,"data":{"fields":["body"]}}
 {"ts":"2026-11-13T17:41:03Z","event":"task.updated","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":368,"data":{"fields":["body"]}}
 {"ts":"2026-11-13T17:41:05Z","event":"task.created","id":"task-112","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":369,"data":{"title":"Use the current tandem site wordmark consistently in README and header"}}
+{"ts":"2026-11-13T17:41:11Z","event":"accord.claimed","id":"task-112","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":370,"data":{}}
