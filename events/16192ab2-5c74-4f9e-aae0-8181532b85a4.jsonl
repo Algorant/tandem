@@ -369,3 +369,4 @@
 {"ts":"2026-11-13T17:41:05Z","event":"task.created","id":"task-112","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":369,"data":{"title":"Use the current tandem site wordmark consistently in README and header"}}
 {"ts":"2026-11-13T17:41:11Z","event":"accord.claimed","id":"task-112","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":370,"data":{}}
 {"ts":"2026-11-13T17:42:20Z","event":"task.created","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":371,"data":{"title":"Prototype tandem homepages with Starlight's landing layout"}}
+{"ts":"2026-11-13T17:42:22Z","event":"task.updated","id":"task-111","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":372,"data":{"fields":["references","body"]}}
