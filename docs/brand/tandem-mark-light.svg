@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="tandem-mark-light-title">
+  <title id="tandem-mark-light-title">Tandem linked work mark</title>
+  <defs>
+    <!-- The even, round-ended gap around the second strand, cut into the first strand (a true gap: it shows whatever is behind the mark). -->
+    <mask id="tandem-mark-light-gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="116">
+      <rect x="-10" y="-10" width="116" height="116" fill="#fff"/>
+      <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" fill="none" stroke="#000" stroke-width="13.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="9">
+    <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" stroke="#689d6a" mask="url(#tandem-mark-light-gap)"/>
+    <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" stroke="#504945"/>
+  </g>
+</svg>

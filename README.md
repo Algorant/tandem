@@ -1,4 +1,7 @@
-![tandem](docs/banner.svg)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/public/banner-dark.svg">
+  <img alt="tandem" src="site/public/banner-light.svg">
+</picture>
 
 tandem is my local-first board for planning and delegating work between people and agents, stored as Markdown in the repository. It is a rust CLI and TUI, the protocol the board follows, and the docs that explain both.
 

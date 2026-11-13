@@ -8,11 +8,15 @@ const sourceDir = join(repoRoot, 'docs');
 const targetDir = join(repoRoot, 'site', 'src', 'content', 'docs');
 const astroCacheDir = join(repoRoot, 'site', '.astro');
 const keepFiles = new Set(['.gitignore', 'README.txt']);
+// Retained reference artwork, not documentation pages: docs/brand/README.md must
+// not become a Starlight route.
+const referenceOnlyDirs = new Set(['brand']);
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
+      if (referenceOnlyDirs.has(relative(sourceDir, path))) continue;
       yield* walk(path);
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       yield path;

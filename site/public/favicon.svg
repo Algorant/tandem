@@ -1,17 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tandem">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="tandem">
+  <title>tandem</title>
+  <!-- Current mark geometry from site/src/assets/tandem-mark.svg, embedded verbatim at 0.564 scale.
+       Only the stroke weight is set for a 64px tile (11 instead of 9, gap mask 16.5): same paths, no redraw. -->
   <defs>
     <linearGradient id="bg" x1="8" x2="56" y1="6" y2="58" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#1d2021"/>
       <stop offset="1" stop-color="#2f4a38"/>
     </linearGradient>
-    <mask id="gap" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
-      <rect width="64" height="64" fill="#fff"/>
-      <path d="M21 40c-6 0-11-4.1-11-9.1s5-9.1 11-9.1c4.1 0 7.1 1.8 10.6 5.2l4.8 4.7c3.2 3.1 5.5 4.6 8.5 4.6 3.7 0 6.4-2.1 6.4-5s-2.8-5-6.4-5c-2.4 0-4.3.9-6.6 3" transform="rotate(180 32 32)" fill="none" stroke="#000" stroke-width="9.75" stroke-linecap="round" stroke-linejoin="round"/>
+    <mask id="gap" maskUnits="userSpaceOnUse" x="-10" y="-10" width="116" height="116">
+      <rect x="-10" y="-10" width="116" height="116" fill="#fff"/>
+      <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" fill="none" stroke="#000" stroke-width="16.5" stroke-linecap="round" stroke-linejoin="round"/>
     </mask>
   </defs>
   <rect width="64" height="64" rx="16" fill="url(#bg)"/>
-  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="6.5">
-    <path d="M21 40c-6 0-11-4.1-11-9.1s5-9.1 11-9.1c4.1 0 7.1 1.8 10.6 5.2l4.8 4.7c3.2 3.1 5.5 4.6 8.5 4.6 3.7 0 6.4-2.1 6.4-5s-2.8-5-6.4-5c-2.4 0-4.3.9-6.6 3" stroke="#689d6a" mask="url(#gap)"/>
-    <path d="M21 40c-6 0-11-4.1-11-9.1s5-9.1 11-9.1c4.1 0 7.1 1.8 10.6 5.2l4.8 4.7c3.2 3.1 5.5 4.6 8.5 4.6 3.7 0 6.4-2.1 6.4-5s-2.8-5-6.4-5c-2.4 0-4.3.9-6.6 3" transform="rotate(180 32 32)" stroke="#ebdbb2"/>
+  <g transform="translate(4.923 4.923) scale(0.564102)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="11">
+    <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" stroke="#689d6a" mask="url(#gap)"/>
+    <path d="M31 62c-9.6 0-17.5-6.8-17.5-15.2S21.4 31.6 31 31.6c6.6 0 11.3 2.9 17 8.6l6 6.1c5.3 5.3 9 8.1 14.2 8.1 5.9 0 10.4-3.5 10.4-8.1s-4.5-8.2-10.4-8.2c-3.9 0-7.2 1.6-10.9 5.2" transform="rotate(180 48 48)" stroke="#ebdbb2"/>
   </g>
 </svg>
