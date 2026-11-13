@@ -2,7 +2,7 @@
 id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
-title: "Preview option 2 with real tandem images before shipping"
+title: "Ship option 2 with real Board and Task images"
 state: "validation"
 priority: "medium"
 effort: "medium"
@@ -15,13 +15,13 @@ accord:
   claimedAt: "2026-11-13T17:42:35Z"
   deliveredAt: "2026-11-13T19:14:15Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
-  constraints: ["No production merge/push/deploy until Algorant approves the revised image-bearing preview; earlier no-second-acceptance is superseded.", "Preserve selected option2, normal docs transition, canonical wordmark and docs/brand sync exclusion; no unselected routes, framework/hosting change or new dependency campaign.", "Use real app/sample workspace, no personal data, fake UI or synthetic terminal screenshots; no restart/edit of live user boards or terminals."]
+  constraints: ["Revised preview6_IaAC14HDw/source6a262ea is explicitly approved; ship exactly option2 with the two real Board/Task figures and ordinary Quickstart transition.", "Preserve canonical brand/normaldocs/docsbrand exclusion; no unselected routes, framework/hosting/dependency change or additional redesign.", "Merge with Worktrunk --no-remove, normal push/deploy, verify live8views and same-session afterpost BEFORE deferred worker_finish; no repeated sample/PTy capture or parallel screenshot services."]
   summary: "Revised option2 preview now contains real current Tandem TUI Board and selected-Task images; verified locally and published for Algorant's explicit approval. Nothing merged, pushed or deployed; production phase remains gated."
   evidence: ["Clean isolated branch6a262ea atop13e76e2/main3676f64. Two prominent product figures immediately after splash hero;8committedPNGassets cover actual appdark/light×desktop/phone. CurrentStarlightdata-theme andresponsiveCSS select correspondingimage, includingmanualthemepicker.", "Real0.17.7TUI via one isolated samplePTY/loopbackttyd; HOME/XDG/runtime/no-remoteGit state isolated. AppnativeVerdigris dark and supportedworkspacecustomlight theme loaded throughrealTUIreload; no post-recolor/mockUI/personaldata. Actualterminal202×39desktop and52×35phone;native resizebadgeclearednaturally.", "Parent reviewed source diff and bounded actual Board dark/light, Taskdetail dark/lightphone, homepage darkdesktop/lightphone frames. Realproductviews present in source; firstscreen includesBoard. BothTaskandBoardare TUI, notCLIoutput. Post6_IaAC14HDw clearlydistinguishes revisedlocalpreview fromstilloldlivehomepage.", "Parent independently reran justsite-build (8pages), check:links (179links/20HTML), gitdiff--check at6a262ea: pass. No unselectedroutes/noindex; normalQuickstart andcanonicalbrand/docsbrandexclusionpreserved. Manus verifiedall8homepage/Quickstart×theme/widthcontexts andmanualtheme selection.", "Newsame-sessionpost6_IaAC14HDw in yf_6Zb7WQVc. All temporaryTTYD/PTY/browser/profile/preview processes andsample scratchremoved perhandoff; nativechildrenchecked separately. HOLDfrommerge/push/deploy untilAlgorantexplicitYES; afterapprovalstillneedsactualproductiondeploy/livechecks/deferredfinish."]
   filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
-  updatedAt: "2026-11-13T19:14:15Z"
+  updatedAt: "2026-11-13T19:22:12Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T19:14:17Z"
+updatedAt: "2026-11-13T19:22:12Z"
 assignee: "pi:starlight-homepage-options"
 validation.criterion: "Algorant explicitly approves that revised preview before any production merge/push/deploy; after approval, live landing and first docs page are verified in both themes/widths before deferred worker_finish."
 validation.note: "Revised image-bearing preview6_IaAC14HDw is delivered and parent-reviewed at6a262ea. Local source/build/link checks pass; production is untouched. Algorant's explicit yes is required for this visible result before integration; live verification follows only after that approval."
@@ -63,3 +63,8 @@ Algorant, verbatim (2026-11-13 via Herdra m68db7fed): "the current tandem landin
 The currently live page is the old docs-layout homepage with task-112’s new wordmark. Option2 is NOT deployed; its selected mockup contains no product screenshots. Add real images showing tandem in use within option2’s actual landing layout, in the spirit of mr-boxington/hokum.app: real TUI board/task/CLI screenshots or a short real animated demo, from the actual app on an isolated sample workspace without personal data; capture both themes where meaningful. No fake app or synthetic terminal presentation passed off as real output.
 
 Show the revised landing in dark/light at desktop/phone widths, plus the ordinary Quickstart transition, in the same tandem docs site session yf_6Zb7WQVc. Publish an explicit new revised-preview milestone so the historical selected mockup is not confused with this new result. Algorant must approve the image-bearing preview before ANY production merge/push/deploy. This latest reaction OVERRIDES the earlier no-second-acceptance instruction. Deferred finish ordering still applies AFTER that approval: merge → normal deploy → real live checks/post → worker_finish. No main changes or deployment for this revision until Algorant says yes.
+
+## Revised preview approved — publication authorized
+Algorant’s answer via Herdra m3cfa7384 (2026-11-13): "Yes: ship option 2 with the two real images (Board and Task)". This explicitly approves revised preview6_IaAC14HDw/source6a262ea after the added image-bearing review gate. The earlier deployment hold is satisfied, not bypassed.
+
+Ship exactly this selected option2 with its real Board/Task figures and ordinary Quickstart transition. Starter verifies unchanged source, integrates with Worktrunk --no-remove, pushes for normal docs deployment, then verifies LIVE homepage and firstdocs page in dark/light desktop/phone (8views), posts live after-shots in the same sessionyf_6Zb7WQVc, and only then worker_finish accepts/closes/removes. No additional taste gate, redesign, new capture framework, PTY/sample recapture, unselected routes or infrastructure work. Use one finite browser capture pass for the live static pages, no extra parallel terminal services. Gracefully close that owned browser; if an already-integrated finish is refused, stop/report as previously instructed.
