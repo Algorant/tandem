@@ -17,7 +17,7 @@ accord:
   constraints: ["No alternate wordmark, site redesign, new hosting, new runtime service or unrelated cleanup.", "No second human approval gate: Algorant approved this exact current-mark adoption.", "No screenshot enlargement as an asset; keep text/name treatment faithful and SVG output crisp."]
   updatedAt: "2026-11-13T17:46:46Z"
 createdAt: "2026-11-13T17:41:05Z"
-updatedAt: "2026-11-13T17:46:46Z"
+updatedAt: "2026-11-13T17:51:52Z"
 assignee: "pi:matching-site-wordmark"
 ---
 
@@ -45,3 +45,10 @@ Besides the README/header, align other visible repo artifacts with the existing 
 Keep reference assets together in a plain tracked folder, docs/brand/: current dark/light source SVGs, high-resolution current renders, and task-110’s comparison board showing today’s two marks side by side plus all four alternative boards. Include a short README with one-line file descriptions and an unambiguous statement that the existing site mark is current and the alternatives are historical/not adopted. No generator scripts in the repo for this. Historical comparison boards may depict the cassette as explicitly requested reference; remove active cassette assets/usages, not history from the retained comparison.
 
 Commit/push and the normal docs deployment are explicitly authorized, with real GitHub README and live header checked in both themes and before/after in the existing wordmark session. Do not broaden into homepage redesign (that is prototype-only task-113).
+
+## Approved minimal implementation contract
+Internal plan approved via mc2183b9d, no extra human gate. Existing site/src/assets/tandem-mark.svg and tandem-mark-light.svg remain the canonical header geometry family. Active banner pair exists ONLY at site/public/banner-dark.svg and banner-light.svg: README picture references those very repo files, docs landing references their served URLs. Do not add duplicate docs/banner-dark/light copies. Remove the two old cassette banner files.
+
+The plain docs/brand/ folder keeps byte-identical ORIGINAL task-110 current-lockup dark/light PNGs (not substituted new banner renders), original comparison board and four alternative boards; source SVG reference copies are explicitly reference-only. No brand generators/package hooks.
+
+Live capture constraint: Obscura was observed painting CLOSED GitHub/Starlight dialogs as open over the target area. The existing browsing-skill one-shot headless Chromium CLI exception is approved solely for faithful before/after publication images with real dark/light media preferences, fresh disposable profiles and immediate process cleanup. No user's browser/profile, visible window, installs, Playwright/Puppeteer/Selenium or DOM-hidden fake captures. This is a concrete renderer-gap check, not a general new browser workflow.
