@@ -374,3 +374,4 @@
 {"ts":"2026-11-13T17:42:51Z","event":"accord.delivered","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":374,"data":{}}
 {"ts":"2026-11-13T17:43:38Z","event":"task.completed","id":"task-110","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":375,"data":{}}
 {"ts":"2026-11-13T17:44:11Z","event":"task.completed","id":"task-111","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":376,"data":{}}
+{"ts":"2026-11-13T17:46:46Z","event":"task.updated","id":"task-112","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":377,"data":{"fields":["relatedFiles","acceptance","body"]}}
