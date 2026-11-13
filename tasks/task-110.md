@@ -19,7 +19,7 @@ accord:
   evidence: ["Session c4JYCfBnD8Q / post7tO59nEXJ3g, current version4. One post includes current source marks side by side, full current README banner, measured/reconstructed light/dark docs headers and the actual live header capture; current favicon included.", "Options1 Twin t (shared crossbar),2 Weave (two paths cross),3 Embrace (arcs around shared core),4 Yoke (two arrive, one continues). Each shown in1280×320 README banner,64px docs header in both themes and a16px browser tab/48px tile. Extra legibility sheet renders16/24/32px at6× without smoothing.", "Parent inspected bounded thumbnail renders of today, all4 option boards and pixel-legibility sheet. One correction pass added literal side-by-side current comparison and corrected palette/recommendation wording. Weave has two strand colours; ochre only where a third/shared element exists. Weave preference explicitly taste, not an exclusive16px legibility claim; yoke also survives.", "Typography remains a stand-in (Adwaita Sans600/-0.018em), not an adoption decision. Headers/favicon placements are reconstructions from live geometry/colours, clearly labelled; no light-mode banner variant. Final direction belongs to Algorant.", "rsvg-convert renders inspected; exact-size favicon variants inspected; one parent MagicDNS session HTTP200 check. git diff --exit-code clean; artifacts only under ignored .pi/proposals/tandem-wordmark/. No tracked code/assets, site build, deployment, account or runtime setting changes."]
   updatedAt: "2026-11-13T17:03:50Z"
 createdAt: "2026-11-13T16:38:20Z"
-updatedAt: "2026-11-13T17:03:50Z"
+updatedAt: "2026-11-13T17:38:47Z"
 assignee: "pi:tandem-wordmark"
 ---
 
@@ -33,3 +33,9 @@ Algorant's words, verbatim (2026-11-13, relayed by Herdra m437ba28e):
 Show both current marks side by side in their real contexts: the README's cassette-tape banner and trytandem.dev's header mark. Explore 3–5 numbered middle-ground options, simpler than the site's and richer than the cassette; carry the abstract idea of two things working together (humans and agents, without literal person/robot symbols). Show EACH option in a README banner, docs-site header, and at small favicon sizes. Use current repo-style rules and verdigris family, lowercase tandem. One post in a fresh Sideshow session named exactly 'tandem wordmark'.
 
 Do not change or build anything into the tracked repo or live site. Put temporary proposals only under ignored .pi/proposals/tandem-wordmark/ or another explicitly disposable local artifact directory; never overwrite the real marks. No commits, pushes, deployment, dependency/tool installation or unrelated cleanup. Taste/final adoption remain Algorant's choice. Send the completed post and artifact evidence to the starter; starter reports to Herdra.
+
+
+## Additional current-wordmark view
+Algorant, verbatim (2026-11-13, via Herdra m4d4d7d8b): "for tandem wordmark: high def version of the docs site wordmark, can you show me that in dark and light?"
+
+Add large, crisp renders of the EXISTING docs-site wordmark from its actual source SVG, on the real dark/light site backgrounds, to the same wordmark post/session. This is not a proposed replacement or adoption. Show both complete lockups; if the name is separate HTML, reproduce current type/weight and label that fact. No screenshot upscaling and no tracked repo/site changes.
