@@ -1,6 +1,6 @@
 ---
 /**
- * Prototype homepage option 2: a repository-shaped landing.
+ * Selected homepage: a repository-shaped landing.
  *
  * The board is shown as it actually is — a directory of Markdown files next to
  * the source — beside three short notes on what those files carry. Styles are
@@ -13,14 +13,14 @@ import HomepageMark from './HomepageMark.astro';
   <div class="repo__board">
     <div class="repo__board-head">
       <HomepageMark class="repo__mark" />
-      <span class="repo__board-label">the board, as files</span>
+      <span class="repo__board-label">example board files</span>
     </div>
     <pre class="repo__tree"><code>my-project/
 ├── README.md
 ├── src/
 └── .tandem/                 <span class="repo__note">not in source Git</span>
     ├── tandem.md            <span class="repo__note">board settings</span>
-    ├── tasks/task-113.md    <span class="repo__note">a unit of work</span>
+    ├── tasks/task-1.md      <span class="repo__note">a unit of work</span>
     ├── decisions/           <span class="repo__note">durable choices</span>
     ├── rules/               <span class="repo__note">read at session start</span>
     ├── logs/                <span class="repo__note">completed work</span>
