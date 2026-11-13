@@ -1,0 +1,120 @@
+---
+/**
+ * Prototype homepage option 3: the quiet page.
+ *
+ * One mark, one paragraph, one row of facts and a plain index. No cards, no
+ * panels, no second colour. Styles are scoped to this component; the docs theme
+ * and every docs page are untouched.
+ */
+import HomepageMark from './HomepageMark.astro';
+---
+
+<section class="quiet">
+  <HomepageMark class="quiet__mark" />
+
+  <p class="quiet__line">
+    One board for the work a person and their agents share: Tasks with acceptance criteria, Accords for
+    who owes what, Decisions for lasting choices, and Rules both sides read before starting.
+  </p>
+
+  <div class="quiet__row">
+    <div class="quiet__fact">
+      <span class="quiet__key">storage</span>
+      <span>plain Markdown in <code>.tandem/</code></span>
+    </div>
+    <div class="quiet__fact">
+      <span class="quiet__key">interface</span>
+      <span>one <code>tandem</code> command, a TUI, a read-only web view</span>
+    </div>
+    <div class="quiet__fact">
+      <span class="quiet__key">sync</span>
+      <span>the board's own Git branch</span>
+    </div>
+  </div>
+
+  <nav class="quiet__index" aria-label="Documentation">
+    <a href="/quick-start/">Quickstart</a>
+    <a href="/concepts/">Concepts</a>
+    <a href="/agents/">Agents</a>
+    <a href="/tui/">TUI and web</a>
+    <a href="/cli/">CLI</a>
+  </nav>
+</section>
+
+<style>
+  .quiet {
+    display: grid;
+    justify-items: center;
+    gap: 1.75rem;
+    margin-block: 1.25rem 3rem;
+    text-align: center;
+  }
+
+  .quiet__mark {
+    width: min(11rem, 45vw);
+    opacity: 0.95;
+  }
+
+  .quiet__line {
+    max-width: 34rem;
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-lg);
+    line-height: 1.6;
+  }
+
+  .quiet__row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 56rem;
+    padding-block: 1.5rem;
+    border-block: 1px solid var(--sl-color-hairline);
+    text-align: start;
+  }
+
+  .quiet__fact {
+    display: grid;
+    gap: 0.3rem;
+    padding-inline: 0.25rem;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+
+  .quiet__key {
+    color: var(--td-vg-verdigris);
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .quiet__index {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 1.75rem;
+    font-size: var(--sl-text-sm);
+  }
+
+  .quiet__index a {
+    color: var(--sl-color-gray-2);
+    text-decoration: none;
+  }
+
+  .quiet__index a:hover {
+    color: var(--sl-color-accent-high);
+    text-decoration: underline;
+  }
+
+  @media (max-width: 50rem) {
+    .quiet__row {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+      text-align: center;
+      justify-items: center;
+    }
+  }
+</style>

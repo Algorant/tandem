@@ -1,0 +1,28 @@
+---
+title: tandem
+description: Local-first coordination for people and agents working in the same repository.
+template: splash
+pagefind: false
+editUrl: false
+head:
+  - tag: meta
+    attrs:
+      name: robots
+      content: noindex
+hero:
+  title: Your work, next to your code.
+  tagline: One board directory inside the repository you already have. No service to run, no second place to look, and no export step at the end.
+  actions:
+    - text: Install tandem
+      link: /quick-start/
+      variant: primary
+      icon: rocket
+    - text: See how the board works
+      link: /concepts/
+      variant: minimal
+      icon: open-book
+---
+
+import RepoBoard from '@site/src/components/homepage/RepoBoard.astro';
+
+<RepoBoard />

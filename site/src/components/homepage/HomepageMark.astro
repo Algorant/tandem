@@ -1,0 +1,47 @@
+---
+/**
+ * The current tandem site mark, in its dark and light variants.
+ *
+ * Both files are the site's existing wordmark assets; this component only
+ * chooses between them from Starlight's theme, so no geometry is duplicated.
+ * Prototype homepage pages import it; nothing else changes.
+ */
+import markDark from '../../assets/tandem-mark.svg?url';
+import markLight from '../../assets/tandem-mark-light.svg?url';
+
+interface Props {
+  class?: string;
+  alt?: string;
+}
+
+const { class: className, alt = '' } = Astro.props;
+---
+
+<span class:list={['hp-mark', className]}>
+  <img class="hp-mark__image hp-mark__image--dark" src={markDark} alt={alt} width="96" height="96" />
+  <img class="hp-mark__image hp-mark__image--light" src={markLight} alt={alt} width="96" height="96" />
+</span>
+
+<style>
+  .hp-mark {
+    display: block;
+    line-height: 0;
+  }
+
+  .hp-mark__image {
+    width: 100%;
+    height: auto;
+  }
+
+  .hp-mark__image--light {
+    display: none;
+  }
+
+  :global([data-theme='light']) .hp-mark__image--dark {
+    display: none;
+  }
+
+  :global([data-theme='light']) .hp-mark__image--light {
+    display: block;
+  }
+</style>

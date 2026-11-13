@@ -1,0 +1,228 @@
+---
+/**
+ * Prototype homepage option 2: a repository-shaped landing.
+ *
+ * The board is shown as it actually is — a directory of Markdown files next to
+ * the source — beside three short notes on what those files carry. Styles are
+ * scoped to this component; the docs theme and every docs page are untouched.
+ */
+import HomepageMark from './HomepageMark.astro';
+---
+
+<section class="repo">
+  <div class="repo__board">
+    <div class="repo__board-head">
+      <HomepageMark class="repo__mark" />
+      <span class="repo__board-label">the board, as files</span>
+    </div>
+    <pre class="repo__tree"><code>my-project/
+├── README.md
+├── src/
+└── .tandem/                 <span class="repo__note">not in source Git</span>
+    ├── tandem.md            <span class="repo__note">board settings</span>
+    ├── tasks/task-113.md    <span class="repo__note">a unit of work</span>
+    ├── decisions/           <span class="repo__note">durable choices</span>
+    ├── rules/               <span class="repo__note">read at session start</span>
+    ├── logs/                <span class="repo__note">completed work</span>
+    └── events/*.jsonl       <span class="repo__note">append-only history</span></code></pre>
+  </div>
+
+  <ol class="repo__points">
+    <li>
+      <h3>A Task is one file</h3>
+      <p>Its title, acceptance criteria, priority, tags, and the Accord that says who claimed it and what they delivered.</p>
+    </li>
+    <li>
+      <h3>Rules are read, not remembered</h3>
+      <p>Project guidance lives in the board and is listed at the start of a session, so an agent works to the rules as they are today.</p>
+    </li>
+    <li>
+      <h3>The board keeps its own history</h3>
+      <p>Source commits stay source commits. The board syncs through its own branch, and a conflicting change is reported for a deliberate decision instead of overwriting someone.</p>
+    </li>
+  </ol>
+</section>
+
+<section class="repo__band">
+  <div>
+    <h2>Two commands to a real board</h2>
+    <p>The installer is user-local and needs no <code>sudo</code>. Initialize in the repository you already work in, then create your first Task.</p>
+  </div>
+  <pre class="repo__commands"><code>curl -fsSL https://trytandem.dev/install.sh | sh
+tandem init
+tandem add task "Add a greeting"</code></pre>
+</section>
+
+<p class="repo__next"><a href="/quick-start/">Take a Task from start to finish in the Quickstart</a> · <a href="/concepts/">Read how the board works</a></p>
+
+<style>
+  .repo {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+    margin-block: 2.5rem 3rem;
+  }
+
+  .repo__board {
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.9rem;
+    background: var(--td-vg-panel);
+    box-shadow: var(--sl-shadow-sm);
+    overflow: hidden;
+  }
+
+  .repo__board-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    border-block-end: 1px solid var(--sl-color-hairline);
+    background: var(--td-vg-panel-soft);
+  }
+
+  .repo__mark {
+    width: 2rem;
+  }
+
+  .repo__board-label {
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-xs);
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .repo__tree {
+    margin: 0;
+    padding: 1.1rem;
+    background: transparent;
+    border: 0;
+    color: var(--td-vg-text);
+    font-size: var(--sl-text-xs);
+    line-height: 1.75;
+    overflow-x: auto;
+  }
+
+  .repo__tree code {
+    background: none;
+    border: 0;
+    color: inherit;
+    font-size: inherit;
+    padding: 0;
+  }
+
+  .repo__note {
+    color: var(--sl-color-gray-4);
+  }
+
+  .repo__points {
+    display: grid;
+    gap: 1.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: repo-point;
+  }
+
+  .repo__points li {
+    counter-increment: repo-point;
+    padding-inline-start: 2.25rem;
+    position: relative;
+  }
+
+  .repo__points li::before {
+    content: counter(repo-point, decimal-leading-zero);
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 0.1rem;
+    color: var(--td-vg-verdigris);
+    font-family: var(--__sl-font-mono);
+    font-size: var(--sl-text-xs);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  .repo__points h3 {
+    margin: 0 0 0.35rem;
+    color: var(--sl-color-white);
+    font-size: var(--sl-text-lg);
+  }
+
+  .repo__points p {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+    line-height: 1.6;
+  }
+
+  .repo__band {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 2rem;
+    align-items: center;
+    margin-block: 0 2rem;
+    padding: 1.6rem 1.75rem;
+    border: 1px solid color-mix(in srgb, var(--sl-color-accent) 32%, var(--sl-color-hairline));
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--td-vg-verdigris-low) 26%, var(--td-vg-panel));
+  }
+
+  .repo__band h2 {
+    margin: 0 0 0.4rem;
+    font-size: var(--sl-text-xl);
+  }
+
+  .repo__band p {
+    margin: 0;
+    color: var(--sl-color-gray-2);
+    font-size: var(--sl-text-sm);
+  }
+
+  .repo__commands {
+    margin: 0;
+    font-size: var(--sl-text-xs);
+    line-height: 1.7;
+    background: var(--td-vg-code-bg);
+    white-space: pre-wrap;
+  }
+
+  .repo__commands code {
+    background: none;
+    border: 0;
+    font-size: inherit;
+    padding: 0;
+  }
+
+  .repo__next {
+    text-align: center;
+    color: var(--sl-color-gray-3);
+    font-size: var(--sl-text-sm);
+  }
+
+  @media (max-width: 60rem) {
+    .repo,
+    .repo__band {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1.5rem;
+    }
+  }
+
+  /* On a phone the tree stands on its own; the annotations would need a
+     sideways scroll to read, so the file names carry it instead. */
+  @media (max-width: 46rem) {
+    .repo__note {
+      display: none;
+    }
+
+    .repo__tree {
+      font-size: 0.8125rem;
+      overflow-x: visible;
+    }
+
+    /* Keep the install line whole on a phone rather than breaking the URL. */
+    .repo__commands {
+      font-size: 0.7rem;
+    }
+  }
+</style>

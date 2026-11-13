@@ -11,6 +11,9 @@ const keepFiles = new Set(['.gitignore', 'README.txt']);
 // Retained reference artwork, not documentation pages: docs/brand/README.md must
 // not become a Starlight route.
 const referenceOnlyDirs = new Set(['brand']);
+// Starlight content pages: Markdown, plus MDX for source pages that need
+// first-party Astro components. Both stay owned by `docs/`.
+const contentExtensions = ['.md', '.mdx'];
 
 async function* walk(dir) {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -18,7 +21,7 @@ async function* walk(dir) {
     if (entry.isDirectory()) {
       if (referenceOnlyDirs.has(relative(sourceDir, path))) continue;
       yield* walk(path);
-    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+    } else if (entry.isFile() && contentExtensions.some((extension) => entry.name.endsWith(extension))) {
       yield path;
     }
   }
@@ -45,4 +48,4 @@ for await (const source of walk(sourceDir)) {
   copied += 1;
 }
 
-console.log(`Synced ${copied} Markdown file(s) from ${relative(repoRoot, sourceDir)} to ${relative(repoRoot, targetDir)}.`);
+console.log(`Synced ${copied} Markdown/MDX file(s) from ${relative(repoRoot, sourceDir)} to ${relative(repoRoot, targetDir)}.`);
