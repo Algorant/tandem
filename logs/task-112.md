@@ -3,14 +3,13 @@ id: task-112
 uid: dde15def-367b-424f-b30e-986b08beb544
 type: task
 title: "Use the current tandem site wordmark consistently in README and header"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-110"]
 relatedFiles: ["README.md", "docs/brand/", "docs/banner.svg", "docs/index.md", "site/astro.config.mjs", "site/src/assets/", "site/public/", "site/src/styles/verdigris.css", "site/scripts/sync-docs.mjs"]
 tags: ["ui", "docs"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["The existing site mark is the current identity, with authoritative dark/light SVG assets consistently used in README, docs header, favicon and social preview; no active cassette usage or proposed replacement is adopted.", "A plain docs/brand/ folder retains current dark/light source SVGs and high-res renders plus the original comparison and four exploration boards, with short file descriptions/current-versus-historical labels and no brand-generator scripts.", "GitHub README uses dark/light picture selection and the docs header renders the matching existing wordmark in both themes; other visible repository artifacts share the docs styling.", "After commit/push and normal docs deployment, real github.com README and live trytandem.dev header are checked in dark/light and their before/after appears in the existing tandem wordmark Sideshow session."]
   claimedAt: "2026-11-13T17:41:11Z"
   deliveredAt: "2026-11-13T18:23:55Z"
@@ -18,10 +17,14 @@ accord:
   constraints: ["No alternate wordmark, site redesign, new hosting, new runtime service or unrelated cleanup.", "No second human approval gate: Algorant approved this exact current-mark adoption.", "No screenshot enlargement as an asset; keep text/name treatment faithful and SVG output crisp."]
   summary: "Approved existing site identity adopted across README/site banners, favicon/social artwork and retained references; merged/pushed/deployed, real dark/light before/after checked, and Algorant's manual GitHub preview upload independently verified."
   evidence: ["Main commits a568a0b,29c19e3,dc0aecd,3676f64; normal docs deployments43479403288 and43481032582 bothsuccess. No new generator/dependency/framework/hosting.", "Parent source/geometry/reference-byte review passed; independent build176links/20HTML and diff checks passed. Original current renders/comparison/four exploration PNGs retained; canonical SVG pair unchanged; docs/brand excluded from public collection.", "Genuine LIVE GitHub README light/dark loaded matching1280×320 banner currentSrc; live trytandem.dev header resolved light/dark canonicalmarks,24px600name, unchanged headerpixels. Parent inspected all4boundedAFTERframes;8before/afterframes posted in5omIQ5rDcnU, sessionc4JYCfBnD8Q.", "Algorant uploaded the supplied1280×640/90989B socialPNG himself. Parent publicHTML og:image and twitter:image agree with GraphQL openGraphImageUrl; usesCustomOpenGraphImage=true. Downloadedpubliccard pixel comparison AE=0. Parent revised same adoptionpost with that fact and corrected oldlandingvsoption2attribution.", "Origin updated socialPNG confirmed; CloudflarecanonicalURL still caches prior1200×630 same-artworkexport temporarily(max-age14400). No cache/infrastructure changes. Current wordmark identity correct either export. Headless capture ownedprocesses andObscura closed per delivery."]
-  updatedAt: "2026-11-13T18:23:55Z"
+  updatedAt: "2026-11-13T18:24:02Z"
 createdAt: "2026-11-13T17:41:05Z"
-updatedAt: "2026-11-13T18:23:55Z"
+updatedAt: "2026-11-13T18:24:02Z"
 assignee: "pi:matching-site-wordmark"
+archivedAt: "2026-11-13T18:24:02Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: matching-site-wordmark → main at 3676f6413cc895e6adc8bce02df3481b6239d388."
 ---
 
 ## Description
