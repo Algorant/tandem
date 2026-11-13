@@ -6,7 +6,7 @@ The current mark is the interlaced-strands artwork used by the site and repo; th
 - `tandem-mark-light.svg` — reference copy of the active light mark
 - `current-lockup-dark.png` — original high-resolution dark lockup render from task-110
 - `current-lockup-light.png` — original high-resolution light lockup render from task-110
-- `site/public/social-card.png` — 1200×630 PNG export of the active social preview SVG for platform upload
+- `site/public/social-card.png` — 1280×640 PNG export of the active social preview SVG for platform upload
 - `comparison-current-marks.png` — original task-110 comparison of the cassette banner and current site mark
 - `exploration-1-twin-t.png` — historical twin-t exploration board, not adopted
 - `exploration-2-weave.png` — historical weave exploration board, not adopted
