@@ -10,14 +10,18 @@ references: ["task-109", "task-111", "task-112"]
 relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs", "site/tsconfig.json"]
 tags: ["ui", "docs"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Three or four numbered, distinct options run through real Astro/Starlight landing pages on an isolated prototype branch, not generic static HTML approximations of the docs layout.", "Each option is shown in dark/light desktop and narrow-phone renders plus the first docs page transition, using the selected existing tandem site wordmark.", "A short feature/override explanation accompanies each option in one new post within session 'tandem docs site'; nothing is pushed or deployed, and final homepage implementation waits for Algorant's choice."]
   claimedAt: "2026-11-13T17:42:35Z"
+  deliveredAt: "2026-11-13T18:05:26Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
   constraints: ["No framework migration, hosting changes, new dependencies or production deployment.", "No generated docs edits or DOM-replacement screenshot mockups; use real source pages and normal Starlight layouts.", "No alternative wordmark; use the existing site mark and coordinate source assets with task-112."]
-  updatedAt: "2026-11-13T17:42:35Z"
+  summary: "Three real Starlight splash options are built, captured and published; corrected lifecycle/CLI copy, recaptured affected views, and verified the displayed command sequence."
+  evidence: ["just site-build: passed; Astro built 11 pages.", "cd site && bun run check:links: passed; 221 internal links across 23 HTML files.", "git diff --check: passed.", "Disposable native CLI verification: tandem init; tandem add task \"Add a greeting\" --acceptance \"README contains the greeting\"; claim; deliver with summary/evidence; complete; task-1 appeared in Logs.", "Corrected lifecycle copy: plan → claim (recorded owner visible) → deliver, with optional review for an unresolved criterion → archive. Logs is a location, not a Task state. No absolute no-overlap guarantee.", "Corrected Obscura finding: the earlier screenshot-width-only inference was wrong; actual viewport emulation does reflow (390×844 and phone media query true). Obscura blockers are its closed-dialog paint and dropped grid declaration; affected option 1/2 views were recaptured in approved headless Chromium.", "Bounded Chromium rerun: 8 affected option 1/2 views, real built pages, each actual viewport/theme/DPR matched requested 1440×900 or 390×844, dark/light, DPR 1; no broken images. Browser and preview server stopped, disposable profile/temp captures removed.", "Sideshow post updated in place in session yf_6Zb7WQVc: DpjbX4ohWcw. Original research post unchanged.", "Branch starlight-homepage-options; commits d6baa6e and fd6641c. No push, merge or deploy."]
+  filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
+  updatedAt: "2026-11-13T18:05:26Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T17:52:38Z"
+updatedAt: "2026-11-13T18:05:26Z"
 assignee: "pi:starlight-homepage-options"
 ---
 
