@@ -8,14 +8,11 @@ priority: "low"
 tags: ["docs"]
 accord:
   status: "ready"
-  acceptance: ["Algorant's outline for the README and documentation-site revisit is recorded in this Task, and only then is the work scoped and started."]
-  updatedAt: "2026-11-13T01:36:16Z"
+  acceptance: ["Algorant's outline is recorded and the README and docs site match it"]
+  updatedAt: "2026-11-13T16:37:27Z"
 createdAt: "2026-11-13T01:36:16Z"
-updatedAt: "2026-11-13T01:36:16Z"
+updatedAt: "2026-11-13T16:37:27Z"
 ---
+Algorant, verbatim (relayed by Herdra mab59b45a): "add a task in the tandem project to revisit the readme and documentation site accompanying it. no specifics yet I will outline them when its time."
 
-## Description
-
-Requested by Algorant via Herdra mbe585485. Revisit the tandem README and its documentation site. No specifics yet: he will outline what he wants later.
-
-Do not start, scope, plan or dispatch this work until his outline arrives. The public face was just shipped (a356a45, 0.17.7: README with banner, one docs owner, lowercase product name), so this is a later pass over the same surface, not a correction of that work.
+Capture only: no plan or research on this card until Algorant supplies and authorizes its scope. Keep it unclaimed and unstarted.
