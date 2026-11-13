@@ -4,24 +4,27 @@ uid: 84b237b4-8a35-4b0d-8891-1b6777b2a92d
 type: task
 kind: "research"
 title: "Research landing pages and docs stacks for tandem"
-state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-113"]
 relatedFiles: ["site/", "docs/"]
 tags: ["docs", "research"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Both reference sites' framework/theme/hosting/deploy and landing/docs split are evidenced from live source and public repos, with source commits/versions and uncertainty explicitly stated.", "The current tandem stack is accurately compared with one or two realistic routes, including estimated effort and source-checked free/self-hosted or hosted-tier constraints.", "One neutral findings post is published in a new 'tandem docs site' Sideshow session, with no implementation changes."]
   claimedAt: "2026-11-13T16:38:34Z"
   deliveredAt: "2026-11-13T16:54:44Z"
   validation: ["$ git diff --exit-code"]
   summary: "Read-only docs-site research published as one neutral post (version2) in session 'tandem docs site': source-verified stacks/deploys for mr boxington and hokum, current tandem comparison, two realistic routes with estimated effort and vendor-checked hosting constraints. No implementation or tracked file changes."
   evidence: ["Post H3w7tC9cb9I / session yf_6Zb7WQVc (version2,5 surfaces), checked MagicDNS session URL HTTP200; git diff --exit-code passes.", "mr-boxington: live VitePress1.6.4; public jdx/mr-boxington commit25d6ed35b6d6bbd74cf6d833c0ff05c7fc335375 confirms home-layout frontmatter/custom Vue slots, docs pages, workflow GitHub Pages deployment. hokum: anomalyco/hokum deve2e31b146792da21b9c6c691703433a6d2d72bbe confirms custom Bun HTML/Markdown build and Cloudflare Worker with run_worker_first:true; documented manual deploy/no site-deploy CI in inspected repo, private automation unknown.", "Current tandem a356a45: Astro7.3.3/Starlight0.41.11,7 docs pages, Pagefind, current homepage in docs shell, Actions Pages deployment behind Cloudflare. Latest upstream versions inspected/cited (Astro7.4.11, Starlight0.42.11, VitePress stable1.6.4/pre-release2). No update performed.", "Routes described neutrally: keep Astro/Starlight and use existing landing layout (estimate half-day initial +1–2 days taste rounds), or port7 pages/theme integration to VitePress (estimate2–4 days). Estimates labelled, not benchmarks; framework-independent palette/artwork/content reuse distinguished from framework-specific CSS/config ports.", "Parent verification read pinned package/workflow files for both reference repos, hokum's wrangler config/worker source, Starlight pages docs and Cloudflare static-assets billing docs. One correction pass removed subjective/absolute claims, added clickable commit/doc sources and explicit per-route free/self-host constraints; run_worker_first invocation quota now stated accurately. Third-party issue claims labelled unreproduced.", "Artifacts in ignored .pi/research/tandem-docs-site/; no repo/site implementation, commits, pushes, accounts or infrastructure changes. Final product direction remains Algorant's decision."]
-  updatedAt: "2026-11-13T16:54:44Z"
+  updatedAt: "2026-11-13T17:44:11Z"
 createdAt: "2026-11-13T16:38:22Z"
-updatedAt: "2026-11-13T17:42:22Z"
+updatedAt: "2026-11-13T17:44:11Z"
 assignee: "pi:tandem-docs-site"
+archivedAt: "2026-11-13T17:44:11Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: main → main at a356a454ef54157978437bdec78c12f2a41d2a2c."
 ---
 
 ## Description
