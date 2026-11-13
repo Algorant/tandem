@@ -17,7 +17,7 @@ accord:
   constraints: ["No alternate wordmark, site redesign, new hosting, new runtime service or unrelated cleanup.", "No second human approval gate: Algorant approved this exact current-mark adoption.", "No screenshot enlargement as an asset; keep text/name treatment faithful and SVG output crisp."]
   updatedAt: "2026-11-13T17:46:46Z"
 createdAt: "2026-11-13T17:41:05Z"
-updatedAt: "2026-11-13T18:03:40Z"
+updatedAt: "2026-11-13T18:23:53Z"
 assignee: "pi:matching-site-wordmark"
 ---
 
@@ -57,3 +57,8 @@ Live capture constraint: Obscura was observed painting CLOSED GitHub/Starlight d
 Herdra m7a25d684 explicitly authorizes starter to merge with Worktrunk --no-remove after source checks, then push/normal deploy/live dark+light verification, and only then worker_finish to accept/archive/close/remove the already-integrated child. If worker_finish refuses that state, stop and report; no workaround. This keeps Task completion after the actual requested outcome.
 
 Existing sync-docs.mjs may exclude reference-only docs/brand/ from the public documentation collection; that is needed so its reference README does not become a docs page, not a new brand-generator pipeline.
+
+## GitHub social-preview operator boundary and final verification
+Algorant chose manual upload, verbatim via Herdra m0fc4e0ea/ma7b94122: "ok yes I will upload it put the file I'm going to upload in a place I can easliy get to and then tell me the instructions". Starter exported the same artwork at1280×640 (uniform scale, outer-background-only crop), updated source PNG/reference dimensions in3676f64, and copied90,989bytes to ~/Downloads/tandem-social-preview.png. No agent login/upload.
+Algorant then confirmed via Herdra m2f989d16: "Ok looks like its done". Parent verified public og:image and twitter:image point to https://repository-images.githubusercontent.com/1281279955/fec1e144-0325-4bca-968a-589b699e95d6; GraphQL usesCustomOpenGraphImage=true. Downloaded1280×640 card is pixel-identical (ImageMagick AE=0) to the suppliedPNG. Normal docs deploy3676f64/run43481032582 succeeded. Origin serves the updated1280PNG; canonical Cloudflarecache still carries the earlier1200×630 export of the SAME artwork (max-age14400), not an old identity. No infrastructure/configuration changes made.
+Parent reviewed genuine dark/light GitHub README and live header frames and corrected adoption-post attribution: the current old docs-layout landing has only task112’s banner swap; selected task113homepage is NOT deployed. Post5omIQ5rDcnU in existing sessionc4JYCfBnD8Q includes8before/afterframes plus the verified uploadedcard.
