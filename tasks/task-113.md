@@ -7,7 +7,7 @@ state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
-relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs"]
+relatedFiles: ["docs/", "site/src/components/", "site/src/styles/", "site/astro.config.mjs", "site/scripts/sync-docs.mjs", "site/tsconfig.json"]
 tags: ["ui", "docs"]
 accord:
   status: "claimed"
@@ -17,7 +17,7 @@ accord:
   constraints: ["No framework migration, hosting changes, new dependencies or production deployment.", "No generated docs edits or DOM-replacement screenshot mockups; use real source pages and normal Starlight layouts.", "No alternative wordmark; use the existing site mark and coordinate source assets with task-112."]
   updatedAt: "2026-11-13T17:42:35Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T17:42:35Z"
+updatedAt: "2026-11-13T17:52:38Z"
 assignee: "pi:starlight-homepage-options"
 ---
 
@@ -35,3 +35,9 @@ Show each option rendered in dark and light, at desktop and a narrow phone width
 Use an isolated branch/worktree; no push, production deploy, main-branch edit, new framework, dependency upgrade campaign or hosting change. Source prototype pages live under docs/ and are built normally; do not hand-edit generated site/src/content/docs/. If MDX is needed, minimally extend the existing sync step to copy MDX source as well rather than bypassing the source ownership boundary. Keep overrides/components scoped to prototypes so docs pages retain their ordinary layout.
 
 Publish ONE new homepage-options post in the EXISTING 'tandem docs site' session yf_6Zb7WQVc (the neutral research post remains intact). Four required render contexts per option, and a docs transition view, with short comparison notes. Report to starter, who verifies and forwards the link to Herdra. No second manus under this manus; bounded helpers/Workers are allowed. Wordmark adoption(task-112) runs separately; coordinate its canonical asset paths through the starter rather than independently redrawing/copying mark geometry.
+
+
+## Internal verification approval
+Renderer evidence from manus m3774208b: Obscura0.2.6 screenshot width390 only crops while innerWidth1280/innerHeight720 and phone mediaquery remain unchanged; it also paints closed Starlight search dialogs over the header. A finite installed-Chromium headless capture run is approved under the documented pixel-exact publication/rendering-gap exception: fresh disposable profile, Node built-in WebSocket/CDP for real1440×900 and390×844 viewport/media settings,13 requested views, loopback-only debugging, actual viewport/DPR/theme recorded, no DOM surgery or screenshot substitution, no automation dependencies/visible browser/user profile. Close/reap browser and stop preview on completion.
+
+Minimal MDX source-copy support and @site alias in site/tsconfig.json are allowed source wiring for the prototype components; generated docs remain untouched. No hosting, framework or production change.
