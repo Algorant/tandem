@@ -391,3 +391,4 @@
 {"ts":"2026-11-13T19:14:15Z","event":"accord.delivered","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":391,"data":{}}
 {"ts":"2026-11-13T19:14:17Z","event":"review.requested","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":392,"data":{"criterion":"Algorant explicitly approves that revised preview before any production merge/push/deploy; after approval, live landing and first docs page are verified in both themes/widths before deferred worker_finish."}}
 {"ts":"2026-11-13T19:22:12Z","event":"task.updated","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":393,"data":{"fields":["title","constraints","body"]}}
+{"ts":"2026-11-13T19:22:13Z","event":"accord.rework","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":394,"data":{}}
