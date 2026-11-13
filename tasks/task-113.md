@@ -3,7 +3,7 @@ id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
 title: "Prototype tandem homepages with Starlight's landing layout"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
@@ -21,8 +21,12 @@ accord:
   filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
   updatedAt: "2026-11-13T18:11:19Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T18:11:19Z"
+updatedAt: "2026-11-13T18:11:20Z"
 assignee: "pi:starlight-homepage-options"
+validation.criterion: "A short feature/override explanation accompanies each option in one new post within session 'tandem docs site'; nothing is pushed or deployed, and final homepage implementation waits for Algorant's choice."
+validation.note: "Technical source/render/build/link checks verified. Only the product/taste choice between3 homepage directions remains Algorant's; prototype branch is intentionally not merged or deployed. Posted options and transition frames are ready for that choice."
+validation.requestedAt: "2026-11-13T18:11:20Z"
+validation.reviewer: "Algorant"
 ---
 
 ## Description

@@ -381,3 +381,4 @@
 {"ts":"2026-11-13T18:05:26Z","event":"accord.delivered","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":381,"data":{}}
 {"ts":"2026-11-13T18:09:57Z","event":"task.updated","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":382,"data":{"fields":["body"]}}
 {"ts":"2026-11-13T18:11:19Z","event":"accord.delivered","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":383,"data":{}}
+{"ts":"2026-11-13T18:11:20Z","event":"review.requested","id":"task-113","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":384,"data":{"criterion":"A short feature/override explanation accompanies each option in one new post within session 'tandem docs site'; nothing is pushed or deployed, and final homepage implementation waits for Algorant's choice."}}
