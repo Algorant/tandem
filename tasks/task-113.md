@@ -3,7 +3,7 @@ id: task-113
 uid: 22818acd-136c-4769-aa57-f398219b9c59
 type: task
 title: "Preview option 2 with real tandem images before shipping"
-state: "in-progress"
+state: "validation"
 priority: "medium"
 effort: "medium"
 references: ["task-109", "task-111", "task-112"]
@@ -21,8 +21,12 @@ accord:
   filesChanged: ["docs/homepage/option-1.md", "site/src/components/homepage/RepoBoard.astro", "site/src/components/homepage/HomepageMark.astro", "site/src/components/homepage/QuietPage.astro", "site/scripts/sync-docs.mjs", "site/tsconfig.json", "docs/homepage/option-2.mdx", "docs/homepage/option-3.mdx"]
   updatedAt: "2026-11-13T19:14:15Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T19:14:15Z"
+updatedAt: "2026-11-13T19:14:17Z"
 assignee: "pi:starlight-homepage-options"
+validation.criterion: "Algorant explicitly approves that revised preview before any production merge/push/deploy; after approval, live landing and first docs page are verified in both themes/widths before deferred worker_finish."
+validation.note: "Revised image-bearing preview6_IaAC14HDw is delivered and parent-reviewed at6a262ea. Local source/build/link checks pass; production is untouched. Algorant's explicit yes is required for this visible result before integration; live verification follows only after that approval."
+validation.requestedAt: "2026-11-13T19:14:17Z"
+validation.reviewer: "Algorant"
 ---
 
 ## Description
