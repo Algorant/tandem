@@ -22,7 +22,7 @@ accord:
   note: "Algorant explicitly approved the revised two-image option2 viaHerdra m3cfa7384. Source6a262ea accepted; now executing approved integration/deploy/live-verification phase, not source rework or a new taste gate."
   updatedAt: "2026-11-13T19:22:13Z"
 createdAt: "2026-11-13T17:42:20Z"
-updatedAt: "2026-11-13T19:22:13Z"
+updatedAt: "2026-11-13T19:32:26Z"
 assignee: "pi:starlight-homepage-options"
 ---
 
@@ -65,3 +65,8 @@ Show the revised landing in dark/light at desktop/phone widths, plus the ordinar
 Algorant’s answer via Herdra m3cfa7384 (2026-11-13): "Yes: ship option 2 with the two real images (Board and Task)". This explicitly approves revised preview6_IaAC14HDw/source6a262ea after the added image-bearing review gate. The earlier deployment hold is satisfied, not bypassed.
 
 Ship exactly this selected option2 with its real Board/Task figures and ordinary Quickstart transition. Starter verifies unchanged source, integrates with Worktrunk --no-remove, pushes for normal docs deployment, then verifies LIVE homepage and firstdocs page in dark/light desktop/phone (8views), posts live after-shots in the same sessionyf_6Zb7WQVc, and only then worker_finish accepts/closes/removes. No additional taste gate, redesign, new capture framework, PTY/sample recapture, unselected routes or infrastructure work. Use one finite browser capture pass for the live static pages, no extra parallel terminal services. Gracefully close that owned browser; if an already-integrated finish is refused, stop/report as previously instructed.
+
+## Final production verification
+Approved source6a262ea was integrated unchanged with Worktrunk --no-remove --no-commit --no-rebase, pushed to main, and deployed successfully by docs run43491621663. Parent canonicalhomepage fetch confirms the selectedlayout and bothfigures; all8live productPNGvariants byte-match the approved committedsource.
+Manus verified LIVE homepage and unchangedQuickstart in dark/light at1440×900 and390×844,DPR1 (8views), correct headings/resolvedthemes, zero brokenimages/open dialogs, correct productvariants, manualStarlightthemetoggle and primaryQuickstartlink. All3unselectedprototype URLs return404. Full-pagehomepageaftershots and viewportQuickstartshots published in same-sessionpost lXWV8Rwedx8 (yf_6Zb7WQVc); approvedpreviewpostpreserved. Parent independently readpost/source and inspectedboundedall4fullhomepages pluslightdesktop/darkphoneQuickstart. Nativechildinventory empty; clean source/main remains6a262ea.
+Cleanup exception preserved, not hidden: graceful CDP Browser.close did not exit promptly; the captureguard ended the disposableChrome after allcaptureassertions/images completed, with exit134/GPUfatal. Exactownedprofile/process tree reaped and noownedprofile/process/port/HCchild remains. NoGPUdiagnosis, core extraction, retries, userbrowser or infrastructure changes. This didnotaffect the already-complete verified images/pages. Completion follows the successful live outcome and explicit Algorant approval, with no second taste gate.
