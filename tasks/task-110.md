@@ -3,19 +3,21 @@ id: task-110
 uid: 57e52edc-3962-437d-8649-6fbcc495dea8
 type: task
 title: "Reconcile tandem's repo and site wordmarks in context"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-109"]
 relatedFiles: ["docs/banner.svg", "README.md", "site/src/assets/", "site/public/"]
 tags: ["ui", "wordmark"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Both current marks are shown side by side in their actual README and docs-site contexts.", "Three to five numbered alternatives communicate two abstract things collaborating and each is shown as a README banner, a docs-site header and a favicon at small sizes.", "One Sideshow post in the new 'tandem wordmark' session contains the comparison and options, with tracked repo and live site unchanged."]
+  claimedAt: "2026-11-13T16:38:36Z"
   validation: ["$ git diff --exit-code"]
-  updatedAt: "2026-11-13T16:38:20Z"
+  updatedAt: "2026-11-13T16:38:36Z"
 createdAt: "2026-11-13T16:38:20Z"
-updatedAt: "2026-11-13T16:38:20Z"
+updatedAt: "2026-11-13T16:38:36Z"
+assignee: "pi:tandem-wordmark"
 ---
 
 ## Description
