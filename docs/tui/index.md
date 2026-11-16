@@ -19,16 +19,12 @@ The full TUI has Board, Logs, Rules, and Decisions views. Switch with `1`–`4` 
 
 ### Rules
 
-Rules management shows **all** records, including disabled ones. Rows and previews say **On** or **Off**; overall and selected-category counts distinguish enabled and disabled rules. With the list focused, **Space** toggles the selected rule; clicking **Turn on / Turn off** does the same. **Enter** still opens/closes preview, and navigation/add/edit/delete keep their existing bindings. No toggle confirmation is required.
-
-Disabled rules retain the same UID, ID, text and metadata, so re-enabling does not create a replacement. Selection follows identity through in-process reload, including publication of provisional IDs. Enabled state and rule identity survive restarting the TUI; a fresh process uses its normal default selection. Toggles never push guidance into a running agent's context.
+The Rules view shows every rule, including disabled ones, marked **On** or **Off**. Press **Space** on the selected rule, or click **Turn on / Turn off**, to toggle it; **Enter** opens or closes its preview. A disabled rule keeps its ID and text, so turning it back on restores the same rule. Toggling a rule does not change what a running agent has already read.
 
 ## Read-only web view
 
-`tandem web` opens a browser view of one discovered workspace. It is read-only and binds to loopback; it does not serve a workspace roster or allow remote access. Its Rules page shows enabled guidance only; manage disabled records in the TUI or with `tandem rules list --all`.
+`tandem web` opens a browser view of one discovered workspace. It is read-only, local to this machine, and refreshes as the board changes. Its Rules page shows enabled guidance only; manage disabled records in the TUI or with `tandem rules list --all`.
 
 [![The read-only web view of one tandem workspace.](/images/web-read-only.png)](/images/web-read-only.png)
 
 See [Configuration](/reference/configuration/) for TUI themes and Board badges. Board storage and sync behavior are covered in [Concepts](/concepts/#board-storage-and-sync).
-
-The web view serves one workspace over loopback from embedded assets, under `/api/v1`, with restrictive security headers and no-store caching; the page polls the board revision about every three seconds. `tandem tui` reports its exit through the terminal's status line, which a PTY capture can check.

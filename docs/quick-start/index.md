@@ -22,17 +22,20 @@ In a Git repository, initialize the board:
 tandem init
 ```
 
-Init reports six enabled starter rules (two Always, two Never, one Prefer, one Context) and a rules-pointer outcome for each existing `AGENTS.md` / `CLAUDE.md`. Missing instruction files are not created, exact existing pointers are not duplicated, and symlinks to regular files are appended to in place without replacing the link. This is fresh initialization, not a rerun command for existing boards. Read the current guidance with `tandem rules list`; use `--all` to include disabled records.
+Init adds six starter rules and points any existing agent instructions file at them. Read them with `tandem rules list`.
 
-Then create a Task with an acceptance criterion:
+Then create a Task with an acceptance criterion and claim it:
 
-```console
-$ tandem add task "Add a greeting" --acceptance "README contains the greeting"
+```sh
+tandem add task "Add a greeting" --acceptance "README contains the greeting"
+tandem accord claim task-1 --assignee you
+```
+
+```text
 Created task
 ID: task-1
 Title: Add a greeting
 Sync: saved locally (no Git remote to sync with)
-$ tandem accord claim task-1 --assignee you
 Accord task-1: claimed (record written; saved locally (no Git remote to sync with))
 ```
 
@@ -40,14 +43,14 @@ Add the greeting to `README.md`, then record the result and check:
 
 ```sh
 printf '\nHello from tandem.\n' >> README.md
+tandem accord deliver task-1 --summary "Added a greeting" --evidence "README greeting verified"
+tandem complete task-1
+tandem list --scope archived
 ```
 
-```console
-$ tandem accord deliver task-1 --summary "Added a greeting" --evidence "README greeting verified"
+```text
 Accord task-1: delivered (record written; saved locally (no Git remote to sync with))
-$ tandem complete task-1
 Completed task-1 (record written; saved locally (no Git remote to sync with))
-$ tandem list --scope archived
 task-1	Add a greeting
 ```
 

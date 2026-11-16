@@ -26,6 +26,8 @@ The `tandem` command finds the nearest workspace from the current directory. Run
 | `tui [--add-workspace PATH ...]` | Open the TUI; repeat `--add-workspace` to seed more local boards for this invocation. |
 | `web [--port PORT] [--no-open]` | Start the local, read-only web view. |
 
+`web` serves one discovered workspace over loopback from embedded assets, with no workspace roster or remote access. Its JSON API is under `/api/v1`, responses carry restrictive security headers and `no-store` caching, and the page polls the board revision about every three seconds.
+
 Global flags: `-j, --json` for JSON, `-h, --help` for help, and `-V, --version` for the installed binary version. There are no other short flags.
 
 Rules list JSON keeps `data` as an array of `{id, category, rule, source, enabled}` items. State changes return `{id, enabled, changed, sync}` within `data`; repeating the same state returns `changed: false` without changing the file, timestamp or event ledger. No disable confirmation is required. Ordinary rule edits preserve enabled state and unrelated metadata.

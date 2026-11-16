@@ -855,14 +855,12 @@ body {
 }
 
 /* Accepted terminal captures retain their native text scale inside a page-width scroll region. */
-.sl-markdown-content p:has(> a[href^='/images/sync-status-']),
-.sl-markdown-content p:has(> a[href='/images/tui-sync-conflict.png']) {
+.sl-markdown-content p:has(> a[href^='/images/sync-status-']) {
 	max-width: 100%;
 	overflow-x: auto;
 }
 
-.sl-markdown-content p:has(> a[href^='/images/sync-status-']) img,
-.sl-markdown-content p:has(> a[href='/images/tui-sync-conflict.png']) img {
+.sl-markdown-content p:has(> a[href^='/images/sync-status-']) img {
 	display: block;
 	width: auto;
 	max-width: none;

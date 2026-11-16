@@ -21,12 +21,6 @@ A board outside Git is local to that directory. For multiple machines, install a
 
 If two machines change the same record differently, the remote version remains on the shared board while tandem preserves both versions locally and reports a conflict. Inspect it with `tandem sync status`, then resolve the reported record with `tandem sync resolve <id> --keep local|remote|edited`. tandem may also hold back a local edit that would make the shared board invalid; fix the reported record and sync again. A conflict or held edit does not discard the saved local work.
 
-[![A board change waiting to sync is reported as pending.](/images/sync-status-pending.png)](/images/sync-status-pending.png)
-
 [![A same-record conflict is preserved for resolution.](/images/sync-status-conflict.png)](/images/sync-status-conflict.png)
-
-[![An invalid local record is held out of the shared board.](/images/sync-status-held.png)](/images/sync-status-held.png)
-
-[![The TUI identifies a record with a sync conflict.](/images/tui-sync-conflict.png)](/images/tui-sync-conflict.png)
 
 See the [Quickstart](/quick-start/) for a complete Task, and the [CLI reference](/cli/) for sync commands.

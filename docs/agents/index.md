@@ -22,7 +22,7 @@ evidence.
 Do not edit `.tandem/` directly.
 ```
 
-Fresh `tandem init` seeds six enabled coordination rules and appends this line to existing `AGENTS.md` and `CLAUDE.md` files only: Read the current project rules with `tandem rules list` before starting work. It does not create missing instruction files, duplicate an exact existing line, or make init rerunnable. Symlinks to regular files are appended to in place; aliases of one target receive one insertion.
+Fresh `tandem init` seeds six enabled coordination rules (two Always, two Never, one Prefer, one Context) and appends this line to existing `AGENTS.md` and `CLAUDE.md` files only: Read the current project rules with `tandem rules list` before starting work. Init reports the outcome for each of those files. It does not create missing instruction files, duplicate an exact existing line, or make init rerunnable on an existing board. Symlinks to regular files are appended to in place without replacing the link; aliases of one target receive one insertion.
 
 At the start of **each session**, read `tandem rules list --json`, check `ok` and `warnings`, and apply the returned enabled rules without reclassifying their categories. Reads use tandem's normal local/remote refresh policy: a stale-sync warning is not a promise of current remote guidance. Report and resolve failed reads rather than silently reusing old or empty guidance. `tandem rules list --all` includes disabled records for management, not active instructions.
 
