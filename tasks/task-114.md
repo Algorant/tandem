@@ -3,19 +3,21 @@ id: task-114
 uid: 0fed0330-232d-4c11-aefc-4aa813888ff2
 type: task
 title: "Apply the eight README and docs-site tweaks"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "medium"
 references: ["task-113"]
 relatedFiles: ["README.md", "docs/quick-start/index.md", "docs/agents/index.md", "docs/tui/index.md", "docs/concepts/index.md", "docs/reference/", "site/public/images/", "site/src/components/homepage/RepoBoard.astro"]
 tags: ["docs"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["All eight approved README/docs tweaks are applied as described, and no other content or design changes are made.", "TUI and Concepts screenshots are current real captures from an isolated sample board; Concepts keeps one sync-status image, and unreferenced old images are removed.", "Site build, link check and git diff --check pass; after deployment the README on GitHub and the changed live pages are checked, with after-shots in session yf_6Zb7WQVc."]
+  claimedAt: "2026-11-16T05:16:29Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
-  updatedAt: "2026-11-16T05:16:14Z"
+  updatedAt: "2026-11-16T05:16:29Z"
 createdAt: "2026-11-16T05:16:14Z"
-updatedAt: "2026-11-16T05:16:14Z"
+updatedAt: "2026-11-16T05:16:29Z"
+assignee: "pi:readme-and-docs-tweaks"
 ---
 
 ## Description
