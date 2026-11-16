@@ -10,13 +10,17 @@ references: ["task-113"]
 relatedFiles: ["README.md", "docs/quick-start/index.md", "docs/agents/index.md", "docs/tui/index.md", "docs/concepts/index.md", "docs/reference/", "site/public/images/", "site/src/components/homepage/RepoBoard.astro"]
 tags: ["docs"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["All eight approved README/docs tweaks are applied as described, and no other content or design changes are made.", "TUI and Concepts screenshots are current real captures from an isolated sample board; Concepts keeps one sync-status image, and unreferenced old images are removed.", "Site build, link check and git diff --check pass; after deployment the README on GitHub and the changed live pages are checked, with after-shots in session yf_6Zb7WQVc."]
   claimedAt: "2026-11-16T05:16:29Z"
+  deliveredAt: "2026-11-16T05:26:59Z"
   validation: ["$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
-  updatedAt: "2026-11-16T05:16:29Z"
+  summary: "All eight README/docs tweaks applied on branch readme-and-docs-tweaks at 90ed14e; TUI/web/sync images recaptured from tandem 0.17.7 on an isolated sample board; three unreferenced images removed. Awaiting starter merge, deploy and live after-shots."
+  evidence: ["just site-build: 8 pages built, Complete", "cd site && bun run check:links: 173 internal links across 20 HTML files OK", "git diff --check: clean", "Local dist renders of /, /quick-start/, /agents/, /tui/, /concepts/, /cli/ at dark 1440x900 and light 390x844, DPR1: correct h1/theme, 0 broken images, expected images visible", "One sequential capture pass: one ttyd PTY + one tandem web on loopback + one headless Chromium; Chromium exited gracefully (code 0); no owned processes/profiles left"]
+  filesChanged: ["README.md", "docs/agents/index.md", "docs/cli/index.md", "docs/concepts/index.md", "docs/quick-start/index.md", "docs/tui/index.md", "site/public/images/", "site/src/components/homepage/RepoBoard.astro", "site/src/styles/verdigris.css"]
+  updatedAt: "2026-11-16T05:26:59Z"
 createdAt: "2026-11-16T05:16:14Z"
-updatedAt: "2026-11-16T05:16:29Z"
+updatedAt: "2026-11-16T05:26:59Z"
 assignee: "pi:readme-and-docs-tweaks"
 ---
 
