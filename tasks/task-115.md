@@ -3,19 +3,21 @@ id: task-115
 uid: 7b17f57b-91be-4c84-9851-ec6c76e68224
 type: task
 title: "Add a demo clip and Screenshots section to the README"
-state: todo
+state: "in-progress"
 priority: "low"
 effort: "medium"
 references: ["task-114"]
 relatedFiles: ["README.md", "docs/brand/", "site/public/images/"]
 tags: ["docs"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A ## Screenshots section near the end shows four real stills in a 2-column table with small captions; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
+  claimedAt: "2026-11-17T15:40:13Z"
   validation: ["$ git diff --check"]
-  updatedAt: "2026-11-17T15:40:03Z"
+  updatedAt: "2026-11-17T15:40:13Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T15:40:03Z"
+updatedAt: "2026-11-17T15:40:13Z"
+assignee: "pi:readme-demo-clip"
 ---
 
 ## Description
