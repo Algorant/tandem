@@ -11,12 +11,12 @@ relatedFiles: ["README.md", "docs/brand/", "site/public/images/"]
 tags: ["docs"]
 accord:
   status: "claimed"
-  acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A ## Screenshots section near the end shows four real stills in a 2-column table with small captions; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
+  acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A ## Showcase section near the end shows four real stills in a 2-column table with small captions; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
   claimedAt: "2026-11-17T15:40:13Z"
   validation: ["$ git diff --check"]
-  updatedAt: "2026-11-17T15:40:13Z"
+  updatedAt: "2026-11-17T18:16:59Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T17:57:30Z"
+updatedAt: "2026-11-17T18:16:59Z"
 assignee: "pi:readme-demo-clip"
 ---
 
@@ -45,3 +45,6 @@ No live boards, private records, personal paths or machine names in frame. One s
 Algorant Ceph m7b87f16a reports Algorant approved ONE README/media review hub on portfolio task-25. Existing posts are supporting previews/history, not parallel asks. No new sessions, captures or render investigations; no public changes until approval. Layout is now case-by-case: Showcase section or compact3–4-image row under banner; demo-first only where useful, not a universal mandate.
 
 Submitted tandem recommendation: demo after intro (it shows live TUI/CLI coordination) plus2×2stills near end. Currentstatus: isolated mock/branch7fdd8bf only. Decision: approveclip/layout. Existing supportingpreview: http://desktop.tail1cefc.ts.net:8228/p/Z2jkMT07Gl0. Await hubURL/selection; no new parallel review request or implementation.
+
+## One matching layout revision for the hub
+Algorant Ceph m8e94fed4 requests one bounded layout revision: render demo after intro plus2×2 **Showcase** near end, using existing media only. Update supporting postZ2jkMT07Gl0 IN PLACE (no new session/post/captures/media, full reread or render loops). Keep sourceREADME and mock matching, including Showcaseheading. Publicchanges remain held. Return exact supporting /p/link+version+whatrendernowshows toAlgorantCeph for replacementrowinsolehub iMTCezlsbAo/post8t9eEWa7nIY. Preserveprivacyholds; no cutover/networkwork.
