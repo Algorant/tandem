@@ -9,35 +9,6 @@ tandem is my local-first board for planning and delegating work between people a
 
 <img alt="A person claims a Task in the tandem TUI, then an agent claims another from the CLI and the open Board reloads live." src="site/public/images/readme/demo.webp" width="100%">
 
-## Install
-
-```sh
-curl -fsSL https://trytandem.dev/install.sh | sh
-tandem --version
-```
-
-The installer is user-local and needs no `sudo`. With Rust, install from this repository:
-
-```sh
-cargo install --git https://github.com/Algorant/tandem.git --locked tandem
-```
-
-## How to use this repo
-
-You don't need this repo to use tandem: install the release, then follow the [quickstart](https://trytandem.dev/quick-start/).
-
-## Core
-
-- **[protocol](protocol/README.md)** — the normative board format: Tasks, Decisions, Rules, Logs, Accords, and the event ledgers behind them
-- **[tandem](tandem/README.md)** — the Rust CLI and TUI that read and write a `.tandem/` board, with the app and project layers underneath
-- **[docs](docs/)** — the published source for [trytandem.dev](https://trytandem.dev/), built by [site](site/)
-
-## Development
-
-- `just dev` builds a release binary and opens a disposable Git-backed board
-- `just dev-check` runs the native checks and a workflow smoke test
-- `just site-build` builds the documentation site
-
 <table>
   <tr>
     <td width="50%">
@@ -66,6 +37,35 @@ You don't need this repo to use tandem: install the release, then follow the [qu
     </td>
   </tr>
 </table>
+
+## Install
+
+```sh
+curl -fsSL https://trytandem.dev/install.sh | sh
+tandem --version
+```
+
+The installer is user-local and needs no `sudo`. With Rust, install from this repository:
+
+```sh
+cargo install --git https://github.com/Algorant/tandem.git --locked tandem
+```
+
+## How to use this repo
+
+You don't need this repo to use tandem: install the release, then follow the [quickstart](https://trytandem.dev/quick-start/).
+
+## Core
+
+- **[protocol](protocol/README.md)** — the normative board format: Tasks, Decisions, Rules, Logs, Accords, and the event ledgers behind them
+- **[tandem](tandem/README.md)** — the Rust CLI and TUI that read and write a `.tandem/` board, with the app and project layers underneath
+- **[docs](docs/)** — the published source for [trytandem.dev](https://trytandem.dev/), built by [site](site/)
+
+## Development
+
+- `just dev` builds a release binary and opens a disposable Git-backed board
+- `just dev-check` runs the native checks and a workflow smoke test
+- `just site-build` builds the documentation site
 
 ## License
 
