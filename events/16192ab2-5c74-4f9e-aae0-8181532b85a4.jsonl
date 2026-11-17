@@ -404,3 +404,4 @@
 {"ts":"2026-11-17T17:57:30Z","event":"task.updated","id":"task-115","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":404,"data":{"fields":["body"]}}
 {"ts":"2026-11-17T18:16:59Z","event":"task.updated","id":"task-115","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":405,"data":{"fields":["acceptance","body"]}}
 {"ts":"2026-11-17T19:45:16Z","event":"task.updated","id":"task-115","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":406,"data":{"fields":["acceptance","body"]}}
+{"ts":"2026-11-17T19:49:47Z","event":"task.updated","id":"task-115","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":407,"data":{"fields":["title","acceptance","body"]}}
