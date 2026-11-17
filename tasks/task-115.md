@@ -16,7 +16,7 @@ accord:
   validation: ["$ git diff --check"]
   updatedAt: "2026-11-17T19:49:47Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T19:50:31Z"
+updatedAt: "2026-11-17T19:54:24Z"
 assignee: "pi:readme-demo-clip"
 ---
 
@@ -57,3 +57,6 @@ Algorant, verbatim viaHerdra mae37f1eb (2026-11-17): "for tandem: remove teh web
 Remove ONLY the web-view still from the draft; retain demo and Board/Taskdetail/Sessionboards in a clean3-image row/grid. Keep sharedwebimage used bydocs; no redesign/re-capture/newmedia. Update existingpostZ2jkMT07Gl0 inplace and notifysolehubowner t21y. PublicREADMEremainshelduntilapproval. Link Algorant’s separateweb-viewTask onceIDconfirmed (notfoundinactivesearch; Herdraasked, no duplicatecreated).
 
 Web-view follow-up resolved: existing deferred task-75 covers the web reimagining and absorbs archived/canceled task-5. Recorded Algorant’s visual complaint there at lowpriority, retaining blocked/not-started deferral; no duplicate created or redesign started. README draft7b9753b and supportingpostZ2jkMT07Gl0v13 omit only the web still, retaindemo+3stills. Hubowner notified.
+
+## Publication approved
+Algorant, verbatim viaHerdra m921f7c07 (2026-11-17): "tandem readme yes publish". Approves current draft7b9753b/previewv13: one openingShowcase, demo, Board/Task/Sessionstills, no webview. Merge/push, verifyGitHubsignedout, complete115andclosethemanus, tellhubownert21ylive. Priorpublicationhold is satisfied for this version only.
