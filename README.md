@@ -5,6 +5,8 @@
 
 tandem is my local-first board for planning and delegating work between people and agents, stored as Markdown in the repository. It is a Rust CLI and TUI, the protocol the board follows, and the docs that explain both.
 
+## Showcase
+
 <img alt="A person claims a Task in the tandem TUI, then an agent claims another from the CLI and the open Board reloads live." src="site/public/images/readme/demo.webp" width="100%">
 
 ## Install
@@ -35,8 +37,6 @@ You don't need this repo to use tandem: install the release, then follow the [qu
 - `just dev` builds a release binary and opens a disposable Git-backed board
 - `just dev-check` runs the native checks and a workflow smoke test
 - `just site-build` builds the documentation site
-
-## Showcase
 
 <table>
   <tr>
