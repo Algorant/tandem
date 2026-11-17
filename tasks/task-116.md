@@ -3,20 +3,22 @@ id: task-116
 uid: 1e919897-d6aa-4f49-be4f-f1727e10d57e
 type: task
 title: "Polish the current read-only web view"
-state: todo
+state: "in-progress"
 priority: "high"
 effort: "medium"
 references: ["task-75", "task-115"]
 relatedFiles: ["tandem/src/web/app.css", "tandem/src/web/index.html", "tandem/src/web/ui.js", "site/public/images/web-read-only.png"]
 tags: ["ui", "web"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Existing web view receives a bounded Verdigris visual polish with clearer spacing, typography and layout, without changing its read-only functionality or server/API behavior.", "One current real after still is captured from a nonpersonal isolated sample board; one same-session Sideshow post shows comparable actual before/after plus GitHub-dark Showcase-still context.", "Runnable checks and actual real-app Board/detail/navigation checks pass; preview link is delivered for Algorant’s pick before any publication. Full task-75 remains deferred."]
+  claimedAt: "2026-11-17T21:42:24Z"
   validation: ["$ cargo check --manifest-path tandem/Cargo.toml", "$ git diff --check"]
   constraints: ["One bounded styling pass, preview within about one hour; no full web reimagining or new infrastructure/framework/dependencies.", "Use only isolated illustrative sample data; preserve loopback/read-only behavior and public-change hold until Algorant picks.", "No public README insertion, merge/push/release or live app changes before approval."]
-  updatedAt: "2026-11-17T21:42:06Z"
+  updatedAt: "2026-11-17T21:42:24Z"
 createdAt: "2026-11-17T21:42:06Z"
-updatedAt: "2026-11-17T21:42:06Z"
+updatedAt: "2026-11-17T21:42:24Z"
+assignee: "pi:web-view-visual-polish"
 ---
 
 ## Description
