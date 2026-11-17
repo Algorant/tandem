@@ -11,29 +11,23 @@ tandem is my local-first board for planning and delegating work between people a
 
 <table>
   <tr>
-    <td width="50%">
+    <td width="33%">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="site/public/images/homepage/board-dark-desktop.png">
         <img alt="The tandem TUI Board in an example workspace, showing seven example Tasks." src="site/public/images/homepage/board-light-desktop.png">
       </picture>
       <br><sub>Board: Tasks by lane, state and priority</sub>
     </td>
-    <td width="50%">
+    <td width="33%">
       <picture>
         <source media="(prefers-color-scheme: dark)" srcset="site/public/images/homepage/task-dark-desktop.png">
         <img alt="A Task open in the tandem TUI detail pane, showing its state, priority, assignee and accord." src="site/public/images/homepage/task-light-desktop.png">
       </picture>
       <br><sub>Task detail: state, assignee and accord</sub>
     </td>
-  </tr>
-  <tr>
-    <td width="50%">
+    <td width="33%">
       <img alt="The tandem TUI Session boards overlay, listing two example project boards with their counts." src="site/public/images/tui-session-activity.png">
       <br><sub>Session boards: switch between project boards</sub>
-    </td>
-    <td width="50%">
-      <img alt="The read-only tandem web view of an example board." src="site/public/images/web-read-only.png">
-      <br><sub>Read-only web view of the same board</sub>
     </td>
   </tr>
 </table>
