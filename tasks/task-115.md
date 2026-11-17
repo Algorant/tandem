@@ -11,12 +11,12 @@ relatedFiles: ["README.md", "docs/brand/", "site/public/images/"]
 tags: ["docs"]
 accord:
   status: "claimed"
-  acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A ## Showcase section near the end shows four real stills in a 2-column table with small captions; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
+  acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A single ## Showcase section immediately after the intro contains the demo followed by four real stills in a 2-column table with small captions; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
   claimedAt: "2026-11-17T15:40:13Z"
   validation: ["$ git diff --check"]
-  updatedAt: "2026-11-17T18:16:59Z"
+  updatedAt: "2026-11-17T19:45:16Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T18:16:59Z"
+updatedAt: "2026-11-17T19:45:16Z"
 assignee: "pi:readme-demo-clip"
 ---
 
@@ -48,3 +48,6 @@ Submitted tandem recommendation: demo after intro (it shows live TUI/CLI coordin
 
 ## One matching layout revision for the hub
 Algorant Ceph m8e94fed4 requests one bounded layout revision: render demo after intro plus2×2 **Showcase** near end, using existing media only. Update supporting postZ2jkMT07Gl0 IN PLACE (no new session/post/captures/media, full reread or render loops). Keep sourceREADME and mock matching, including Showcaseheading. Publicchanges remain held. Return exact supporting /p/link+version+whatrendernowshows toAlgorantCeph for replacementrowinsolehub iMTCezlsbAo/post8t9eEWa7nIY. Preserveprivacyholds; no cutover/networkwork.
+
+## Opening Showcase placement — latest chosen wording
+Algorant, via Algorant Ceph m53fd0752: "lets just go with showcase as the word to be applied everywhere." In-place current-draft revision only, no public changes. Algorant Ceph clarified m58228a40: one ## Showcase immediately after intro containing the existing demo followed directly by the existing2×2stills table and same captions. Install/Core/Development follow; License last. No duplicate Showcase or stray headerless media table. Same supportingpostZ2jkMT07Gl0 updatedinplace, no new media/captures/renderinvestigation.
