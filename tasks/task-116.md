@@ -11,13 +11,13 @@ relatedFiles: ["tandem/src/web/app.css", "tandem/src/web/index.html", "tandem/sr
 tags: ["ui", "web"]
 accord:
   status: "claimed"
-  acceptance: ["Existing web view receives a bounded Verdigris visual polish with clearer spacing, typography and layout, without changing its read-only functionality or server/API behavior.", "One current real after still is captured from a nonpersonal isolated sample board; one same-session Sideshow post shows comparable actual before/after plus GitHub-dark Showcase-still context.", "Runnable checks and actual real-app Board/detail/navigation checks pass; preview link is delivered for Algorant’s pick before any publication. Full task-75 remains deferred."]
+  acceptance: ["Existing read-only web view receives a bounded CSS-only Verdigris styling pass without markup/JS/API/server behavior changes.", "No automated VHS/headless/Obscura captures are run after the stop instruction; owned running capture jobs are stopped. Any displayed plain still must already exist and be labelled accurately.", "Code checks and a concise candidate report are delivered for Algorant’s pick before publication; no new capture needed or claimed. Full task-75 remains deferred."]
   claimedAt: "2026-11-17T21:42:24Z"
   validation: ["$ cargo check --manifest-path tandem/Cargo.toml", "$ git diff --check"]
-  constraints: ["One bounded styling pass, preview within about one hour; no full web reimagining or new infrastructure/framework/dependencies.", "Use only isolated illustrative sample data; preserve loopback/read-only behavior and public-change hold until Algorant picks.", "No public README insertion, merge/push/release or live app changes before approval."]
-  updatedAt: "2026-11-17T21:42:24Z"
+  constraints: ["Styling only; stop automated captures and do not generate new media. Existing plain still only if already available.", "No public changes before Algorant picks; no full75revival, framework/API/backend/network/binding changes or new dependencies.", "Stop only owned capture processes; leave unrelated/user apps and processes untouched."]
+  updatedAt: "2026-11-17T21:50:11Z"
 createdAt: "2026-11-17T21:42:06Z"
-updatedAt: "2026-11-17T21:42:24Z"
+updatedAt: "2026-11-17T21:50:11Z"
 assignee: "pi:web-view-visual-polish"
 ---
 
@@ -35,3 +35,7 @@ Show genuine BEFORE and AFTER from the real app against the same sample data in 
 
 ## Exclusions and gate
 No revival of full task-75, orchestration, multi-project/plugin architecture, API/data-model/Rust backend semantics, network/hosting/binding changes, frontend framework/dependency campaign, tool installs, tests/mocks/fixtures, TUI changes, binary release or live app restart. No public merge/push/release or README insertion until Algorant picks. Use one sequential finite capture pass and one disposable browser; no parallel capture services or repeated render investigations. Preserve existing loopback/read-only/security behavior; cleanup owned processes/sample/profile. Report blockers early rather than extending scope.
+
+
+## Capture automation stopped — latest Algorant instruction
+Algorant viaHerdra m28885127: "stop any vhs captures at the moment. I don't want these automated". Stop owned running captures; no VHS, headless capture, new Obscura screenshot pass or automated before/after. Styling-only work may continue. Use a plain still only if one ALREADY EXISTS, with accurate provenance; no newly generated still. This overrides earlier capture acceptance. No public changes. Await explicit permission before any new capture workflow.
