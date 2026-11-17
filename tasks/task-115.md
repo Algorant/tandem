@@ -16,7 +16,7 @@ accord:
   validation: ["$ git diff --check"]
   updatedAt: "2026-11-17T15:40:13Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T15:40:13Z"
+updatedAt: "2026-11-17T17:57:30Z"
 assignee: "pi:readme-demo-clip"
 ---
 
@@ -39,3 +39,9 @@ Mock the README in Sideshow as GitHub dark renders it, in the tandem docs site s
 
 ## Boundaries
 No live boards, private records, personal paths or machine names in frame. One sequential capture; no parallel capture services, no new tools installed without asking, no new framework. Demo asset size reasonable for a README (state the size).
+
+
+## Consolidated review gate — latest coordination
+Algorant Ceph m7b87f16a reports Algorant approved ONE README/media review hub on portfolio task-25. Existing posts are supporting previews/history, not parallel asks. No new sessions, captures or render investigations; no public changes until approval. Layout is now case-by-case: Showcase section or compact3–4-image row under banner; demo-first only where useful, not a universal mandate.
+
+Submitted tandem recommendation: demo after intro (it shows live TUI/CLI coordination) plus2×2stills near end. Currentstatus: isolated mock/branch7fdd8bf only. Decision: approveclip/layout. Existing supportingpreview: http://desktop.tail1cefc.ts.net:8228/p/Z2jkMT07Gl0. Await hubURL/selection; no new parallel review request or implementation.
