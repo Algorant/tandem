@@ -3,24 +3,27 @@ id: task-115
 uid: 7b17f57b-91be-4c84-9851-ec6c76e68224
 type: task
 title: "Add a demo and three-still Showcase to the README"
-state: "in-progress"
 priority: "low"
 effort: "medium"
 references: ["task-114", "task-75"]
 relatedFiles: ["README.md", "docs/brand/", "site/public/images/"]
 tags: ["docs"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["A looping WebP demo of about 10–12 s at quality 90, recorded headlessly from the real tandem on an isolated demo board, sits full width right after the README intro.", "A single ## Showcase immediately after intro contains the existing demo and three real stills (Board, Task detail, Session boards) in a clean row/grid with small captions; no web-view still; License remains last.", "A GitHub-dark Sideshow mock is shown first; only after Algorant picks is it committed, pushed and verified rendering on GitHub, and the link sent to Herdra."]
   claimedAt: "2026-11-17T15:40:13Z"
   deliveredAt: "2026-11-17T19:59:23Z"
   validation: ["$ git diff --check"]
   summary: "Algorant-approved README Showcase is published at7b9753b: looping demo plus Board/Task/Session stills, no web view; signed-out GitHub rendering and animation verified."
   evidence: ["Algorant explicit approval viaHerdra m921f7c07/m33eefc62: 'tandem readme yes publish'. Exactapproved7b9753b integrated viaWorktrunk --no-remove --no-commit --no-rebase and pushedmain; no textualgitguardfindings,1WebP unscannedbytool (parentboundedframeinspectiondone).", "WebP1200×580,482958B,loop0,11.7s,q90; realVHS0.17.7isolatedillustrativeAcmeAPIboard. ParentPillowdecoded137frames andinspected3boundedframes; no privatecontentvisible.", "FreshsignedoutGitHubprofile: Signin/Signupshown, no accountmenu. READMEorderintro→oneShowcase→demo→threecaptionedstills→Install/Core/Development→License; no webview. Allimagesloaded, demo1200×580natural and758×366drawn.", "AnimationconfirmedactualGitHubdemo screenshotpair1.8sapart: boarddetail→Claimaccorddialog, cropMSE254/PSNR24.07dB. ParentreadverificationnotesandinspectedsignedoutfullREADMEthumbnail+bothactualdemoframes; evidencecopiedtomainsignored.pi/proposals/readme-live-verifybeforecheckoutremoval.", "ObscurasignedoutDOMchecksworkedbutdemo0×0rendergap; earlierpermittedone-shotChromium155verifiedpixels/animation. Bothbrowserpagesclosed, exacttemporaryprofile/scratchreaped,noownedprocessleft. Sourceclean7b9753b,gitdiff--checkpass. DeferredwebTask75remainsblocked/low, linked115; no redesign."]
-  updatedAt: "2026-11-17T19:59:23Z"
+  updatedAt: "2026-11-17T19:59:29Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T19:59:23Z"
+updatedAt: "2026-11-17T19:59:29Z"
 assignee: "pi:readme-demo-clip"
+archivedAt: "2026-11-17T19:59:29Z"
+resolution:
+  outcome: "completed"
+  note: "Merged by worker_finish: readme-demo-clip → main at 7b9753b71d8b07c8d259f05ea437e3b1188ad2cd."
 ---
 
 ## Description
