@@ -6,7 +6,7 @@ title: "Add a demo and three-still Showcase to the README"
 state: "in-progress"
 priority: "low"
 effort: "medium"
-references: ["task-114"]
+references: ["task-114", "task-75"]
 relatedFiles: ["README.md", "docs/brand/", "site/public/images/"]
 tags: ["docs"]
 accord:
@@ -16,7 +16,7 @@ accord:
   validation: ["$ git diff --check"]
   updatedAt: "2026-11-17T19:49:47Z"
 createdAt: "2026-11-17T15:40:03Z"
-updatedAt: "2026-11-17T19:49:47Z"
+updatedAt: "2026-11-17T19:50:31Z"
 assignee: "pi:readme-demo-clip"
 ---
 
@@ -55,3 +55,5 @@ Algorant, via Algorant Ceph m53fd0752: "lets just go with showcase as the word t
 ## Remove web-view still — latest Algorant direction
 Algorant, verbatim viaHerdra mae37f1eb (2026-11-17): "for tandem: remove teh web view, we will have to revisit that. it looks very ugly. filed as a task in tandem itself and for now just remove the picture from showcase".
 Remove ONLY the web-view still from the draft; retain demo and Board/Taskdetail/Sessionboards in a clean3-image row/grid. Keep sharedwebimage used bydocs; no redesign/re-capture/newmedia. Update existingpostZ2jkMT07Gl0 inplace and notifysolehubowner t21y. PublicREADMEremainshelduntilapproval. Link Algorant’s separateweb-viewTask onceIDconfirmed (notfoundinactivesearch; Herdraasked, no duplicatecreated).
+
+Web-view follow-up resolved: existing deferred task-75 covers the web reimagining and absorbs archived/canceled task-5. Recorded Algorant’s visual complaint there at lowpriority, retaining blocked/not-started deferral; no duplicate created or redesign started. README draft7b9753b and supportingpostZ2jkMT07Gl0v13 omit only the web still, retaindemo+3stills. Hubowner notified.
