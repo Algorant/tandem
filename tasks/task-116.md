@@ -10,14 +10,15 @@ references: ["task-75", "task-115"]
 relatedFiles: ["tandem/src/web/app.css", "tandem/src/web/index.html", "tandem/src/web/ui.js", "site/public/images/web-read-only.png"]
 tags: ["ui", "web"]
 accord:
-  status: "claimed"
+  status: "blocked"
   acceptance: ["Existing read-only web view receives a bounded CSS-only Verdigris styling pass without markup/JS/API/server behavior changes.", "No automated VHS/headless/Obscura captures are run after the stop instruction; owned running capture jobs are stopped. Any displayed plain still must already exist and be labelled accurately.", "Code checks and a concise candidate report are delivered for Algorant’s pick before publication; no new capture needed or claimed. Full task-75 remains deferred."]
   claimedAt: "2026-11-17T21:42:24Z"
   validation: ["$ cargo check --manifest-path tandem/Cargo.toml", "$ git diff --check"]
   constraints: ["Styling only; stop automated captures and do not generate new media. Existing plain still only if already available.", "No public changes before Algorant picks; no full75revival, framework/API/backend/network/binding changes or new dependencies.", "Stop only owned capture processes; leave unrelated/user apps and processes untouched."]
-  updatedAt: "2026-11-17T21:50:11Z"
+  note: "Algorant viaHerdra m1c404fd1: \"who ordered all this stuff to be done? all these polish tasks seem to require at least some sort of scoping by me before you even start\". Stop and park; earlier Herdra launch was not Algorant-scoped authority. No public changes. Retain any local work/branch; close manus. Restart only after Algorant scopes it."
+  updatedAt: "2026-11-17T21:51:05Z"
 createdAt: "2026-11-17T21:42:06Z"
-updatedAt: "2026-11-17T21:50:11Z"
+updatedAt: "2026-11-17T21:51:05Z"
 assignee: "pi:web-view-visual-polish"
 ---
 
