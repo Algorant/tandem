@@ -36,7 +36,7 @@ You don't need this repo to use tandem: install the release, then follow the [qu
 - `just dev-check` runs the native checks and a workflow smoke test
 - `just site-build` builds the documentation site
 
-## Screenshots
+## Showcase
 
 <table>
   <tr>
