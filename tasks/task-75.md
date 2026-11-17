@@ -17,7 +17,7 @@ accord:
   note: "Web orchestration explicitly deferred by Algorant; no work without separate approval."
   updatedAt: "2026-10-13T13:27:41Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-11-17T21:42:26Z"
+updatedAt: "2026-11-17T21:52:49Z"
 ---
 ## Direction from Algorant via Herdra
 
@@ -46,3 +46,6 @@ This existing deferred web reimagining already absorbs task-5’s full-product w
 
 ## Today’s narrow visual-polish exception — 2026-11-17
 Herdra m48c4cecf relays Algorant’s meetup deadline and explicitly authorizes one bounded current-web-view styling/still preview, NOT this deferred full reimagining. Execution is task-116, independently delegated in its own worktree so its result can be reviewed/completed without accepting this broader Task. This Task stays blocked/deferred; no orchestration, architecture, plugins or live-state work resumed.
+
+## Visual-polish launch withdrawn — 2026-11-17
+Herdra m1c404fd1 confirms task-116 was launched without Algorant scoping it. Stopped and parked116; native manusclosed, localdraftacbbd76retained/no publicchanges. The earlier bounded exception above is WITHDRAWN, not authorization. This full75reimagining remainsblocked/deferred; bothrequireAlgorant’s scope before restart.
