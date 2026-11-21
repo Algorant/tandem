@@ -23,7 +23,7 @@ export default defineConfig({
     '/workspace/': '/concepts/#board-storage-and-sync',
     '/protocol/': '/concepts/#board-storage-and-sync',
     '/guides/upgrading-to-independent-sync/': '/concepts/#board-storage-and-sync',
-    '/web/': '/tui/#read-only-web-view',
+    '/web/': '/tui/',
     '/extensions/': '/agents/',
     '/skills/': '/agents/',
     '/guides/agents-and-adapters/': '/agents/',
@@ -103,7 +103,7 @@ export default defineConfig({
         { label: 'Quickstart', link: '/quick-start/' },
         { label: 'Concepts', link: '/concepts/' },
         { label: 'Agents', link: '/agents/' },
-        { label: 'TUI and web', link: '/tui/' },
+        { label: 'TUI', link: '/tui/' },
         {
           label: 'Reference',
           items: [

@@ -6,7 +6,6 @@ use crate::project::rules::rules_by_category;
 use crate::project::write::HierarchyLock;
 use crate::project::{ProjectHierarchy, StoredDocument as Document, TandemProject};
 use crate::protocol::accord::{state_divergence_warning, status as accord_status};
-use crate::protocol::config::RulesByCategory;
 use crate::protocol::document::{is_absolute_reference_url, parse_field_values};
 use crate::protocol::hierarchy::{DocumentLocation, ParentRelationship, TaskRole};
 use crate::protocol::ids::compare_ids;
@@ -177,15 +176,10 @@ pub(crate) fn documents_for_scope(
     Ok(documents)
 }
 
-/// One coherent, UI-neutral project read used by long-running peer interfaces.
+/// One coherent, UI-neutral project read with its events and read warnings.
 pub(crate) struct ReadSnapshot {
     pub(crate) snapshot: Snapshot,
     pub(crate) events: Vec<crate::project::ProjectEvent>,
-    pub(crate) revision: String,
-    pub(crate) title: String,
-    pub(crate) protocol_version: String,
-    pub(crate) states: Vec<String>,
-    pub(crate) rules: RulesByCategory,
     pub(crate) warnings: Vec<String>,
 }
 
@@ -229,21 +223,10 @@ pub(crate) fn load(project: &TandemProject) -> Result<Snapshot, Error> {
 
 pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> {
     let _lock = HierarchyLock::acquire(project)?;
-    let config = project.read_config_raw()?;
-    let documents = project.read_documents()?;
-    let hierarchy = ProjectHierarchy::from_documents(documents.clone())?;
+    let hierarchy = ProjectHierarchy::from_documents(project.read_documents()?)?;
     hierarchy.validate_document_metadata()?;
     hierarchy.validate_all_task_hierarchies()?;
-    let config_yaml = project.read_config_yaml()?;
-    let title = config_yaml
-        .as_ref()
-        .and_then(|root| crate::project::yaml_mapping_value(root, "title"))
-        .and_then(crate::project::yaml_scalar_to_string)
-        .unwrap_or_else(|| crate::app::project::default_title(project.root()));
-    let protocol_version = crate::app::project::protocol_version(project)?;
-    let states = workflow_states(config_yaml.as_ref());
     let rules = rules_by_category(&project.rules_dir())?;
-    let revision = crate::project::snapshot_revision(&config, &documents);
     let mut warnings = crate::app::project::warnings(project)?;
     for document in hierarchy.documents.values() {
         if let Some(warning) = state_divergence_warning(document) {
@@ -297,39 +280,13 @@ pub(crate) fn load_read(project: &TandemProject) -> Result<ReadSnapshot, Error> 
     Ok(ReadSnapshot {
         snapshot: Snapshot { hierarchy },
         events,
-        revision,
-        title,
-        protocol_version,
-        states,
-        rules,
         warnings,
     })
 }
 
 impl Snapshot {
-    pub(crate) fn board_documents(&self, filter: &ListFilter<'_>) -> Vec<Document> {
-        filter_documents(
-            self.hierarchy
-                .documents
-                .values()
-                .filter(|doc| doc.location == DocumentLocation::Board)
-                .cloned()
-                .collect(),
-            filter,
-        )
-    }
-
     pub(crate) fn all_documents(&self) -> Vec<Document> {
         self.hierarchy.documents.values().cloned().collect()
-    }
-
-    pub(crate) fn log_documents(&self) -> Vec<Document> {
-        self.hierarchy
-            .documents
-            .values()
-            .filter(|doc| doc.location == DocumentLocation::Logs)
-            .cloned()
-            .collect()
     }
 
     pub(crate) fn document(&self, id: &str) -> Option<Document> {

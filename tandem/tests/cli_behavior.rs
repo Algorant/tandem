@@ -65,9 +65,8 @@ fn generated_help_covers_exact_target_surfaces_without_workspace() {
         vec!["rules", "edit", "--help"],
         vec!["rules", "delete", "--help"],
         vec!["tui", "--help"],
-        vec!["web", "--help"],
     ];
-    assert_eq!(surfaces.len(), 31);
+    assert_eq!(surfaces.len(), 30);
     for argv in surfaces {
         let output = bin().args(argv.iter()).output().unwrap();
         assert!(output.status.success(), "{argv:?}: {:?}", output.stderr);

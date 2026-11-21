@@ -1,6 +1,6 @@
 ---
-title: TUI and web
-description: Browse local tandem boards in the terminal or read-only browser view.
+title: TUI
+description: Browse and work local tandem boards in the terminal.
 ---
 
 ## Terminal UI
@@ -20,11 +20,5 @@ The full TUI has Board, Logs, Rules, and Decisions views. Switch with `1`–`4` 
 ### Rules
 
 The Rules view shows every rule, including disabled ones, marked **On** or **Off**. Press **Space** on the selected rule, or click **Turn on / Turn off**, to toggle it; **Enter** opens or closes its preview. A disabled rule keeps its ID and text, so turning it back on restores the same rule. Toggling a rule does not change what a running agent has already read.
-
-## Read-only web view
-
-`tandem web` opens a browser view of one discovered workspace. It is read-only, local to this machine, and refreshes as the board changes. Its Rules page shows enabled guidance only; manage disabled records in the TUI or with `tandem rules list --all`.
-
-[![The read-only web view of one tandem workspace.](/images/web-read-only.png)](/images/web-read-only.png)
 
 See [Configuration](/reference/configuration/) for TUI themes and Board badges. Board storage and sync behavior are covered in [Concepts](/concepts/#board-storage-and-sync).

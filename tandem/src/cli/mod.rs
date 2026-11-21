@@ -10,7 +10,6 @@ use crate::CliError;
 pub(crate) enum StartupRequest {
     Exit,
     Tui(Vec<std::path::PathBuf>),
-    Web(crate::web::Options),
 }
 
 pub(crate) fn run(args: Vec<String>) -> Result<StartupRequest, CliError> {

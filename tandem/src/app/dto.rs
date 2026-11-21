@@ -1,8 +1,8 @@
 //! UI-neutral read projections over resolved documents.
 //!
 //! These types are the single serialized shape of a Tandem document for every
-//! machine consumer. The CLI JSON envelope and the web read API both build
-//! them from the same `ReadSnapshot`; neither owns a second projection.
+//! machine consumer. The CLI JSON envelope builds them from one `ReadSnapshot`
+//! and owns no second projection.
 
 use serde::Serialize;
 

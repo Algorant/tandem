@@ -11,7 +11,7 @@ Package scope: the `tandem` Rust package in this directory, which builds the use
 1. While preparing a release, update `tandem/Cargo.toml` to `X.Y.Z` and add exactly one meaningful `## X.Y.Z` section to root `RELEASES.md`. Group user-facing notes by product surface when useful, use a dedicated `Fixed` section for fixes, and mention only shipped behavior or current user-facing limitations. Do not add installation instructions or a required rolling Unreleased section.
 2. Commit the prepared version and release notes. Keep detailed task, commit, and completed-log history in Tandem; use `RELEASES.md` only for concise curated release history. A larger future release may be drafted there ahead of time.
 3. Run `just release X.Y.Z` from a clean local `main` checkout. It reads the cargo-dist version from `dist-workspace.toml`, provisions and invokes that version through mise, then rejects a missing, duplicate, or empty matching release section; a requested version that disagrees with `Cargo.toml`; and a cargo-dist announcement body that omits the curated notes before publication.
-4. The recipe runs the existing Rust formatting, release-profile tests/builds, dist-profile build, strict clippy, and version checks, followed by the site build, built-site link check, high-severity Bun audit, web JavaScript syntax check, and `git diff --check`. All these gates complete before creating/pushing the annotated tag and `main`.
+4. The recipe runs the existing Rust formatting, release-profile tests/builds, dist-profile build, strict clippy, and version checks, followed by the site build, built-site link check, high-severity Bun audit, and `git diff --check`. All these gates complete before creating/pushing the annotated tag and `main`.
 5. After pushing, the recipe waits for the matching Release workflow, then verifies the GitHub Release is non-draft/non-prerelease and includes curated notes and required nonempty assets. Only after that verification it waits for the matching `Update tandem-bin AUR package` workflow. The AUR wait is bounded; success is reported, while a failed or timed-out AUR run is explicitly reported as a downstream packaging follow-up and does not undo verified GitHub publication.
 6. Smoke-test the primary installer after publication succeeds: `curl -fsSL https://trytandem.dev/install.sh | sh`, then run `tandem --version` from the installed user-local bin directory or after updating `PATH`.
 7. For mise users picking up the just-published release immediately, run `MISE_USE_VERSIONS_HOST=0 mise up github:Algorant/tandem`, then confirm `tandem --version` reports the exact published version; do not trust `latest` while mise's versions host may be stale.
@@ -26,7 +26,7 @@ The 0.17.0 transcript at `/tmp/tandem-release-0.17.0.log` records command-report
 | Format and optimized-profile tests | Transcript: test-profile compilation reported 13.90s; tests reported 3.85s (about 18s combined command work, excluding startup/other overhead). | Keep both. | Tests remain necessary; release-profile testing lets later release build reuse compilation. |
 | Release and dist builds; strict clippy; version check | Transcript reports release build 0.06s, dist build 10.67s, clippy check 4.02s, and version command's debug build 6.35s. | Keep all existing native/dist checks; run dev-check clippy early too. | These cover distinct release/profile and lint behavior. Removing one risks late failures; early clippy shortens feedback, not total release work. |
 | Site build, links, and high audit | Transcript: site build reported 1.56s and audit 0.23s; no standalone link-check duration recorded. | Keep; run before any publication. | These gates catch preventable post-tag failures. The log does not support claiming an end-to-end time saving. |
-| Web syntax check and diff check | Transcript reports JavaScript bundling in 2ms; diff check has no timing. | Keep. | Very low cost; catches syntax and whitespace errors. |
+| Diff check | Transcript records no timing. | Keep. | Very low cost; catches whitespace errors. |
 | Publish and verify GitHub Release | Transcript shows repeated 3-second Actions status refreshes; no total wait recorded. Current discovery bound is 30 min, then `gh run watch` waits for completion. | Keep matching-run and asset verification. | Network/queue latency is variable; weakening identity or asset checks risks validating the wrong release. |
 | Verify AUR downstream workflow | 0.17.0 record identifies successful matching workflow 38305322702, despite the stale skip message. Current wait is bounded to 5 min to find a run plus 5 min to observe completion. | Restore the check; report failure/timeout without failing a verified GitHub release. | A missing/misselected workflow can otherwise appear successful; the bounded wait avoids indefinite delay while surfacing follow-up. |
 
@@ -47,7 +47,7 @@ The maintained CLI command tree and JSON contract are documented by [`tandem --h
 ### Known limitations
 
 - Binary artifacts currently target Linux x86_64, Linux ARM64, macOS Intel, and macOS Apple Silicon; Windows is not supported.
-- The web interface is local and read-only, binds to loopback, and serves one workspace. Remote access and web mutations are not supported.
+- Tandem has no web viewer or HTTP interface; use the TUI or CLI.
 - The project remains a single Rust binary crate under `tandem/`, not a root Cargo workspace or split crates; Cargo source installs target `--path tandem`.
 - TUI keybindings are fixed defaults, and Markdown rendering supports styled basics only. See [Configuration](../docs/reference/configuration.md) for current settings.
 - Brainfile import/migration, schemas/fixtures, MCP/hooks/auth, templates, and external archive integrations are out of scope.
@@ -112,12 +112,9 @@ bun run build
 bun run check:links
 bun audit --audit-level=high
 cd ..
-node --check tandem/src/web/app.js
-node --check tandem/src/web/api.js
-node --check tandem/src/web/ui.js
 git diff --check
 
-# `just release X.Y.Z` performs the native, docs, and syntax gates before publication,
+# `just release X.Y.Z` performs the native and docs gates before publication,
 # then verifies the generated announcement and published GitHub assets/notes.
 # It also verifies the matching AUR workflow when available; downstream AUR failure
 # or timeout is reported without invalidating a verified GitHub Release.

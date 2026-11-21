@@ -24,9 +24,6 @@ The `tandem` command finds the nearest workspace from the current directory. Run
 | `rules list [CATEGORY] [--all]` | Read enabled guidance; `--all` also shows disabled rules. |
 | `rules add\|edit\|delete` · `rules enable ID` · `rules disable ID` | Manage rules; changing state preserves the same record. |
 | `tui [--add-workspace PATH ...]` | Open the TUI; repeat `--add-workspace` to seed more local boards for this invocation. |
-| `web [--port PORT] [--no-open]` | Start the local, read-only web view. |
-
-`web` serves one discovered workspace over loopback from embedded assets, with no workspace roster or remote access. Its JSON API is under `/api/v1`, responses carry restrictive security headers and `no-store` caching, and the page polls the board revision about every three seconds.
 
 Global flags: `-j, --json` for JSON, `-h, --help` for help, and `-V, --version` for the installed binary version. There are no other short flags.
 

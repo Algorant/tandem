@@ -35,7 +35,6 @@ pub(crate) enum Command {
     Migrate(MigrateArgs),
     Rules(RulesArgs),
     Tui(TuiArgs),
-    Web(WebArgs),
 }
 
 #[derive(Debug, Args)]
@@ -389,11 +388,4 @@ pub(crate) enum RulesCommand {
     Delete {
         id: String,
     },
-}
-#[derive(Debug, Args)]
-pub(crate) struct WebArgs {
-    #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
-    pub(crate) port: Option<u16>,
-    #[arg(long)]
-    pub(crate) no_open: bool,
 }

@@ -15,14 +15,6 @@ dev-project:
 test-release-checks:
 	@scripts/tests/test_release_checks.sh
 
-# Start the local read-only Tandem web interface and open it in the browser.
-web:
-	#!/usr/bin/env bash
-	set -euo pipefail
-	repo_root="$(git rev-parse --show-toplevel)"
-	cd "$repo_root"
-	exec cargo run --manifest-path tandem/Cargo.toml -- web
-
 # Agent/orchestrator helper: configure the one-command delegated preview with a session-only seed.
 [private]
 dev-route manifest workspace seed_workspace:
@@ -168,7 +160,6 @@ release VERSION:
 	bun run check:links
 	bun audit --audit-level=high
 	cd ..
-	bun build --no-bundle tandem/src/web/app.js tandem/src/web/api.js tandem/src/web/ui.js --outdir /tmp/tandem-web-syntax-check
 	git diff --check
 	git tag -a "$tag" -m "Release tandem v${version}"
 	git push origin main

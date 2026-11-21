@@ -30,7 +30,6 @@ pub(crate) fn print() {
     println!("  migrate              Upgrade a 0.3.0 or 0.4.0 board");
     println!("  rules list|add|edit|delete  Manage project rules");
     println!("  tui                  Open the terminal interface");
-    println!("  web                  Open the web interface");
     println!();
     println!("Run 'tandem <command> --help' for detailed usage.");
 }

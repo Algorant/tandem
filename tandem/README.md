@@ -5,10 +5,10 @@ The rust CLI and TUI for a tandem board, and the implementation behind the publi
 - `src/protocol/` — the executable form of [`protocol/README.md`](../protocol/README.md); normative meaning stays in the protocol
 - `src/project/` — `.tandem/` discovery, files, Git sync and locking
 - `src/app/` — shared operations over the project: Tasks, Accords, review, rules, queries
-- `src/cli/`, `src/tui/`, `src/web.rs` — peer interfaces; none owns protocol rules
+- `src/cli/`, `src/tui/` — peer interfaces; none owns protocol rules
 - `examples/themes/` — `default-dark` and `verdigris` theme files
 
-The user-facing behavior lives in the [docs](../docs/): [CLI](../docs/cli/index.md), [TUI and web](../docs/tui/index.md), [configuration](../docs/reference/configuration.md), and [concepts](../docs/concepts/index.md). `tandem --help` is the authoritative command tree.
+The user-facing behavior lives in the [docs](../docs/): [CLI](../docs/cli/index.md), [TUI](../docs/tui/index.md), [configuration](../docs/reference/configuration.md), and [concepts](../docs/concepts/index.md). `tandem --help` is the authoritative command tree.
 
 ## Build and run
 
