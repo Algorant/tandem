@@ -2,6 +2,19 @@
 
 Curated release notes for published Tandem versions. Add one meaningful `## X.Y.Z` section while preparing a release; `just release X.Y.Z` verifies that cargo-dist includes that section in the GitHub Release body. Detailed task, commit, and log history remains in Tandem.
 
+## 0.19.0
+
+Protocol remains 0.5.0; existing boards need no migration.
+
+### Removed
+
+- `tandem web`, the local read-only browser view, and its `/api/v1` HTTP interface are gone. Running `tandem web` now fails as an unknown command. Use `tandem tui` to browse a board and the CLI with `--json` for scripts; board records, sync and the single-binary install are unchanged.
+- The `just web` shortcut and the web JavaScript release check are removed, and the binary no longer depends on an HTTP server.
+
+### Documentation
+
+- The TUI guide no longer covers a web view, and the old `/web/` docs address now opens the TUI guide.
+
 ## 0.17.7
 
 Protocol remains 0.5.0; existing boards need no migration.
