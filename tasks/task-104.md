@@ -4,15 +4,17 @@ uid: d5559ea8-566d-482c-bd57-bbdfb1481807
 type: task
 kind: "papercut"
 title: "AUR packaging job cannot install dependencies after Arch's openssl 4.1.0 update"
-state: todo
+state: "in-progress"
 priority: "low"
 tags: ["release"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["The AUR workflow completes for a released tag, regenerating PKGBUILD/.SRCINFO and pushing tandem-bin, with the dependency installation step fixed in a way verified in a real Arch container."]
-  updatedAt: "2026-11-10T15:59:50Z"
+  claimedAt: "2026-11-21T04:15:13Z"
+  updatedAt: "2026-11-21T04:15:13Z"
 createdAt: "2026-11-10T15:59:50Z"
-updatedAt: "2026-11-10T15:59:50Z"
+updatedAt: "2026-11-21T04:15:13Z"
+assignee: "pi:tandem"
 ---
 
 ## Description
