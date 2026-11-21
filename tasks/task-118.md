@@ -16,7 +16,7 @@ accord:
   validation: ["$ just dev-check", "$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
   updatedAt: "2026-11-21T03:17:55Z"
 createdAt: "2026-11-21T03:17:34Z"
-updatedAt: "2026-11-21T03:17:55Z"
+updatedAt: "2026-11-21T03:18:25Z"
 assignee: "pi:remove-tandem-web"
 ---
 
@@ -26,4 +26,4 @@ Algorant, verbatim (2026-11-21, via Herdra m4f3c0814): "ok for tandem yes deprec
 
 Implement decision-13: remove the web command, help, server, routes, embedded assets, dev shortcut, web-only tests/checks, release gates and unused dependencies. Remove stale viewer references across code/docs/README/site, keep the public documentation site and handle old guide URLs cleanly. Preserve board data, protocol, CLI/TUI, sync, installer and normal single-binary packaging. Historical release notes may remain truthful; new release notes name the removal. No announcement stage, compatibility server, unrelated cleanup, live app restart or package install into the user environment. Leave parked draft untouched pending separate disposition.
 
-Manus prepares and checks the removal and release candidate in isolation; starter verifies and integrates, then runs normal release from main, verifying annotated tag, GitHub Release/assets and normal AUR outcome. Do not push from child or bypass any publication gate. Choose next suitable SemVer for command removal from current tags/release plan; earlier 0.18.0 reservation for held SSH work must not be silently overridden. Report proposed version before preparing version files if reservation remains.
+Manus prepares and checks the removal and release candidate in isolation; starter verifies and integrates, then runs normal release from main, verifying annotated tag, GitHub Release/assets and normal AUR outcome. Do not push from child or bypass any publication gate. Release 0.19.0 (confirmed by Herdra m81c63059); 0.18.0 stays reserved for the parked SSH work. No change to that work or its reservation.

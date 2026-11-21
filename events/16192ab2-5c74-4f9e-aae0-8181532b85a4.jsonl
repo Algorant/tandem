@@ -428,3 +428,4 @@
 {"ts":"2026-11-21T03:17:53Z","event":"task.updated","id":"task-117","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":428,"data":{"fields":["references"]}}
 {"ts":"2026-11-21T03:17:55Z","event":"accord.claimed","id":"task-118","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":429,"data":{}}
 {"ts":"2026-11-21T03:17:59Z","event":"task.completed","id":"task-117","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":430,"data":{}}
+{"ts":"2026-11-21T03:18:25Z","event":"task.updated","id":"task-118","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":431,"data":{"fields":["body"]}}
