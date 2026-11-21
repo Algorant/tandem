@@ -39,7 +39,9 @@ jobs:
     steps:
       - name: Install packaging dependencies
         run: |
-          pacman -Sy --noconfirm --needed git github-cli openssh jq sudo
+          # A full upgrade keeps the rolling image consistent; a bare -Sy pulls
+          # newer packages (openssl) against libraries the image still has.
+          pacman -Syu --noconfirm --needed git github-cli openssh jq sudo
           useradd -m builder
           echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
 
