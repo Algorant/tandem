@@ -423,3 +423,4 @@
 {"ts":"2026-11-21T03:13:18Z","event":"task.updated","id":"task-117","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":423,"data":{"fields":["tags","body"]}}
 {"ts":"2026-11-21T03:13:28Z","event":"accord.delivered","id":"task-117","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":424,"data":{}}
 {"ts":"2026-11-21T03:17:18Z","event":"decision.created","id":"decision-13","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":425,"data":{"title":"Tandem ships without a web viewer"}}
+{"ts":"2026-11-21T03:17:22Z","event":"decision.updated","id":"decision-13","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":426,"data":{"fields":["status","decidedAt","references"]}}

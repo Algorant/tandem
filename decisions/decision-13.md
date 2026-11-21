@@ -3,11 +3,12 @@ id: decision-13
 uid: 0efc3655-b1ed-49c4-9935-901e57ef22a0
 type: decision
 title: "Tandem ships without a web viewer"
-status: "proposed"
+status: "accepted"
 deciders: ["Algorant"]
-references: ["task-117", "http://desktop.tail1cefc.ts.net:8228/session/jLMkuE8ueiY"]
+references: ["task-117"]
 createdAt: "2026-11-21T03:17:18Z"
-updatedAt: "2026-11-21T03:17:18Z"
+updatedAt: "2026-11-21T03:17:22Z"
+decidedAt: "2026-11-21T03:17:22Z"
 ---
 
 ## Status
