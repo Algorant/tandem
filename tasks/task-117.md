@@ -10,13 +10,16 @@ effort: "medium"
 references: ["task-75", "task-116"]
 tags: ["ui", "web", "triaged"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Explain what web shows today, evidence of use (or its limits), and concrete maintenance cost.", "Compare actual overlap with Herdra and Sideshow windows in Herdr, browser Sideshow, tandem tui, and Herdra's conversation list above the Pi editor; name any genuinely unique web use.", "Give a clear keep-or-deprecate verdict in a visual-first Sideshow report: keep means one or two concrete moments in Algorant’s day plus a rough screen mockup; deprecate means what stopping entails for code, docs, links and AUR/packaging, plus what would be lost.", "Handoff to Tandem Ceph for Herdra review; no implementation or public changes."]
   claimedAt: "2026-11-21T03:08:52Z"
+  deliveredAt: "2026-11-21T03:13:28Z"
   constraints: ["Research begins only after Herdra releases the manus on Astra high.", "No builds, code changes, redesign implementation, removal, live app changes, publication, or automated captures.", "Preserve parked work and unrelated holds. Ask Herdra or Tandem Ceph for clarification if needed; do not ask Algorant to diagnose."]
-  updatedAt: "2026-11-21T03:08:52Z"
+  summary: "Recommend deprecating Tandem web, pending Algorant’s judgement after Herdra review. The whole-board local read-only browser is unique, but no recurring dependent job is known; no implementation is authorized or done."
+  evidence: ["Visual-first Sideshow review: http://desktop.tail1cefc.ts.net:8228/session/jLMkuE8ueiY (also http://localhost:8228/session/jLMkuE8ueiY). Post read-back confirmed the decision and rendered diagram. Both workspace URLs returned HTTP 200.", "Checked all five comparison surfaces against Tandem 7b9753b and Herdra 61b586f. Ceph knew of no recurring reader, saved link or HTTP client; this is not telemetry. Release notes 0.10.3, kind lanes and rules changes demonstrate real upkeep.", "Independently verified 2,321 dedicated lines including tests, 9 API routes, 15 in-module tests, three browser scripts on the release path, the /web/ docs redirect, and one shared release/AUR binary. Conditional retirement and loss detailed in the report.", "No runnable Task validations. tandem web --help, tandem tui --help, real list/show reads and git diff --check succeeded; git status --porcelain was empty. No builds, captures, source changes, releases or public actions."]
+  updatedAt: "2026-11-21T03:13:28Z"
 createdAt: "2026-11-21T03:08:05Z"
-updatedAt: "2026-11-21T03:13:18Z"
+updatedAt: "2026-11-21T03:13:28Z"
 assignee: "pi:tandem-web-usefulness-research"
 ---
 
