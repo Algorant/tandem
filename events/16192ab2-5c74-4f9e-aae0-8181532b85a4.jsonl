@@ -417,3 +417,4 @@
 {"ts":"2026-11-17T21:51:05Z","event":"accord.blocked","id":"task-116","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":417,"data":{}}
 {"ts":"2026-11-17T21:52:47Z","event":"task.updated","id":"task-116","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":418,"data":{"fields":["constraints","body"]}}
 {"ts":"2026-11-17T21:52:49Z","event":"task.updated","id":"task-75","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":419,"data":{"fields":["body"]}}
+{"ts":"2026-11-21T03:08:05Z","event":"task.created","id":"task-117","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":420,"data":{"title":"Decide whether Tandem web earns its place"}}
