@@ -3,7 +3,6 @@ id: task-75
 uid: 197f29a1-27bb-4e18-b5ab-c5ed42e996a9
 type: task
 title: "Deferred: reimagine web orchestration across many projects"
-state: todo
 priority: "low"
 effort: "large"
 references: ["task-5", "task-70", "task-73", "task-74", "task-115", "task-116"]
@@ -17,7 +16,11 @@ accord:
   note: "Web orchestration explicitly deferred by Algorant; no work without separate approval."
   updatedAt: "2026-10-13T13:27:41Z"
 createdAt: "2026-10-12T15:51:25Z"
-updatedAt: "2026-11-17T21:52:49Z"
+updatedAt: "2026-11-21T03:08:20Z"
+archivedAt: "2026-11-21T03:08:20Z"
+resolution:
+  outcome: "canceled"
+  note: "Superseded by Decide whether Tandem web earns its place (task-117), per Algorant’s new research direction relayed by Herdra m2a567ca6. The question is now whether the web view has enough value to keep, not how to redesign it. No implementation, redesign or removal is authorized by this change."
 ---
 ## Direction from Algorant via Herdra
 
