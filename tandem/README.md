@@ -34,4 +34,4 @@ TUI changes are verified by running the real TUI in an hc terminal and reading t
 
 ## Release
 
-[`RELEASE.md`](RELEASE.md) holds the maintained release procedure, gates and installer targets. [`AUR.md`](AUR.md) covers the `tandem-bin` package.
+[`RELEASE.md`](RELEASE.md) holds the maintained release procedure, gates and installer targets.

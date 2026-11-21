@@ -12,7 +12,19 @@ curl -fsSL https://trytandem.dev/install.sh | sh
 tandem --version
 ```
 
-The installer is user-local and does not require `sudo`. With Rust, install the current source with `cargo install --git https://github.com/Algorant/tandem.git --locked tandem`.
+The installer is user-local and does not require `sudo`.
+
+With [mise](https://mise.jdx.dev/), install the published release as a tool and update it the same way:
+
+```sh
+mise use -g "github:Algorant/tandem@latest"
+```
+
+```sh
+MISE_USE_VERSIONS_HOST=0 mise up github:Algorant/tandem
+```
+
+With Rust, install the current source with `cargo install --git https://github.com/Algorant/tandem.git --locked tandem`.
 
 ## Complete a Task
 

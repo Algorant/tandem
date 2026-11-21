@@ -57,7 +57,7 @@ Current direction is intentionally simple:
 ├── AGENTS.md
 ├── README.md
 ├── protocol/          # normative protocol: README.md, assignment.md, links.md
-├── tandem/            # Rust binary crate: src/{protocol,project,app,cli,tui}, RELEASE.md, AUR.md
+├── tandem/            # Rust binary crate: src/{protocol,project,app,cli,tui}, RELEASE.md
 ├── docs/              # public Markdown documentation source
 ├── site/              # Astro Starlight site built from docs/
 ├── scripts/           # release and development helpers

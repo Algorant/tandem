@@ -88,7 +88,7 @@ site-build: _check-docs-node
 	bun install --frozen-lockfile
 	bun run build
 
-# Validate a prepared VERSION, tag it, publish it, and verify GitHub plus downstream AUR workflows.
+# Validate a prepared VERSION, tag it, publish it, and verify the GitHub Release.
 # Usage: just release 0.6.5
 # Before running, add one meaningful ## VERSION section to RELEASES.md.
 release VERSION:
@@ -167,18 +167,16 @@ release VERSION:
 
 	repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 	release_commit="$(git rev-parse "${tag}^{}")"
-	release_run_completed_at=""
-	wait_for_workflow() {
-		local role="$1"
-		local workflow="$2"
-		local max_attempts="$3"
-		local watch_attempts="$4"
+	wait_for_release_workflow() {
+		local workflow="$1"
+		local max_attempts="$2"
+		local watch_attempts="$3"
 		local selection=""
 		local run_id=""
 		local run_status=""
 		for ((attempt = 1; attempt <= max_attempts; attempt++)); do
 			gh run list --repo "$repo" --workflow "$workflow" --limit 100 --json databaseId,headBranch,headSha,event,createdAt,updatedAt > "$runs_file" || return $?
-			selection="$(scripts/release_checks.sh select-run "$role" "$runs_file" "$tag" "$release_commit" "$release_run_completed_at")"
+			selection="$(scripts/release_checks.sh select-run "$runs_file" "$tag" "$release_commit")"
 			if [[ -n "$selection" ]]; then
 				run_id="$(jq -r .databaseId <<<"$selection")"
 				echo "Waiting for $workflow run $run_id for $tag"
@@ -201,9 +199,6 @@ release VERSION:
 				else
 					gh run watch "$run_id" --repo "$repo" --exit-status || return $?
 				fi
-				if [[ "$role" == "release" ]]; then
-					release_run_completed_at="$(gh run view "$run_id" --repo "$repo" --json updatedAt --jq .updatedAt)"
-				fi
 				return 0
 			fi
 			sleep 10
@@ -211,15 +206,9 @@ release VERSION:
 		echo "Timed out waiting for $workflow to start for $tag after $((max_attempts * 10)) seconds" >&2
 		return 124
 	}
-	wait_for_workflow release "Release" 180 ""
+	wait_for_release_workflow "Release" 180 ""
 
 	gh release view "$tag" --repo "$repo" --json isDraft,isPrerelease,body,assets > "$release_file"
 	scripts/release_checks.sh published "$notes_file" "$release_file"
 	echo "GitHub Release $tag and required assets/notes verified."
-	if wait_for_workflow aur "Update tandem-bin AUR package" 30 30; then
-		echo "AUR workflow verified for $tag."
-	else
-		aur_status=$?
-		echo "WARNING: matching AUR workflow verification did not succeed (exit $aur_status); GitHub Release $tag remains verified. Record a downstream tandem-bin packaging follow-up." >&2
-	fi
 	echo "Release $tag and GitHub assets/notes verified."

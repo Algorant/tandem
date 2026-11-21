@@ -12,7 +12,7 @@ EXPECTED_ASSETS=(
 )
 
 usage() {
-  echo "usage: release_checks.sh {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE|select-run ROLE RUNS TAG COMMIT NOT_BEFORE}" >&2
+  echo "usage: release_checks.sh {notes VERSION OUTPUT|cargo VERSION|manifest NOTES MANIFEST|published NOTES RELEASE|select-run RUNS TAG COMMIT}" >&2
   exit 1
 }
 
@@ -83,14 +83,9 @@ published() {
 }
 
 select_run() {
-  local role="$1" runs="$2" tag="$3" commit="$4" not_before="$5"
-  case "$role" in release|aur) ;; *) fail "unknown workflow role: $role" ;; esac
-  jq -c --arg role "$role" --arg tag "$tag" --arg commit "$commit" --arg not_before "$not_before" '
-    [.[] | select(
-      if $role == "release" then .event == "push" and .headBranch == $tag and .headSha == $commit
-      else .event == "workflow_run" and .headSha == $commit and (.createdAt // "") >= $not_before
-      end
-    )] | if length == 0 then empty else reduce .[] as $run (null; if . == null or (($run.createdAt // "") > (.createdAt // "")) then $run else . end) end
+  local runs="$1" tag="$2" commit="$3"
+  jq -c --arg tag "$tag" --arg commit "$commit" '
+    [.[] | select(.event == "push" and .headBranch == $tag and .headSha == $commit)] | if length == 0 then empty else reduce .[] as $run (null; if . == null or (($run.createdAt // "") > (.createdAt // "")) then $run else . end) end
   ' "$runs"
 }
 
@@ -101,6 +96,6 @@ case "$command" in
   cargo) [[ $# -eq 1 ]] || usage; cargo_version "$@" ;;
   manifest) [[ $# -eq 2 ]] || usage; manifest "$@" ;;
   published) [[ $# -eq 2 ]] || usage; published "$@" ;;
-  select-run) [[ $# -eq 5 ]] || usage; select_run "$@" ;;
+  select-run) [[ $# -eq 3 ]] || usage; select_run "$@" ;;
   *) usage ;;
 esac
