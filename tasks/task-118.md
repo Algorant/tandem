@@ -10,13 +10,16 @@ references: ["decision-13", "task-117", "task-116"]
 relatedFiles: ["tandem/", "docs/", "protocol/", "site/", "scripts/", "justfile", "README.md", "RELEASES.md", "AGENTS.md", ".github/workflows/"]
 tags: ["ui", "release"]
 accord:
-  status: "claimed"
+  status: "delivered"
   acceptance: ["Web command, server, assets, dependencies and web-only checks removed; CLI/TUI and Git-backed workflow still work.", "Current docs and links resolve without advertising the removed viewer; normal site build/link checks pass.", "Normal release gates pass, annotated tag and non-draft GitHub Release with required assets and removal notes verified; AUR outcome reported separately."]
   claimedAt: "2026-11-21T03:17:55Z"
+  deliveredAt: "2026-11-21T03:32:08Z"
   validation: ["$ just dev-check", "$ just site-build", "$ cd site && bun run check:links", "$ git diff --check"]
-  updatedAt: "2026-11-21T03:17:55Z"
+  summary: "Tandem web was removed under decision-13 and Tandem 0.19.0 was published. The normal release job verified the GitHub Release and required assets/notes; AUR verification timed out."
+  evidence: ["3f7419f: 27 files, +33/-2757; signed-off scope is CLI/server/assets/deps/checks/docs removal, no board migration. Annotated tandem-v0.19.0 and main push confirmed by release log.", "just dev-check, Git-backed CLI/TUI smoke, dist build, clippy, docs build, 171 internal links, high-severity Bun audit and diff checks passed. Candidate rejected tandem web with exit 2; built /web/ redirects to /tui/.", "https://github.com/Algorant/tandem/releases/tag/tandem-v0.19.0 — release job verified published assets and removal notes before the network failure. AUR run 44861347249 exists, but GitHub API timed out reading it; outcome unknown, not a verified packaging failure. Independent installer smoke could not start: trytandem.dev DNS lookup failed. No user install or restart."]
+  updatedAt: "2026-11-21T03:32:08Z"
 createdAt: "2026-11-21T03:17:34Z"
-updatedAt: "2026-11-21T03:18:25Z"
+updatedAt: "2026-11-21T03:32:08Z"
 assignee: "pi:remove-tandem-web"
 ---
 
