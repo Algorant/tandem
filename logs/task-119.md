@@ -3,20 +3,23 @@ id: task-119
 uid: fc2a40e5-d87b-419b-b374-7532bf5c8687
 type: task
 title: "Remove AUR support"
-state: todo
 priority: "medium"
 effort: "medium"
 relatedFiles: [".github/workflows/aur-tandem-bin.yml", "justfile", "scripts/release_checks.sh", "scripts/tests/", "tandem/AUR.md", "tandem/RELEASE.md", "tandem/README.md", "AGENTS.md", "docs/"]
 tags: ["release", "docs"]
 accord:
-  status: "delivered"
+  status: "accepted"
   acceptance: ["Every AUR piece is gone from the repo and the release path: workflow, AUR guide, release-stage AUR wait, release-check role and fixtures, checklist/audit/validation text, README/AGENTS pointers; no dead references remain.", "Install docs present the shell script first and then the verified mise line, with no AUR or other package-manager guidance left; site build and link checks pass.", "The existing tandem-bin package's fate is decided and recorded (leave, deprecate with a note, or request deletion) with any action that needs Algorant's AUR account stated plainly."]
   deliveredAt: "2026-11-21T04:21:07Z"
   summary: "AUR support is removed from the repo and release path and the install docs now say shell script then mise; the AUD package stays frozen at 0.19.0 as approved."
   evidence: ["Commit 4ba1f46 on main removes the AUR workflow and AUR.md, the recipe's AUR stage, the aur release-check role and fixtures, the RELEASE.md AUR rows/commands, and the README/AGENTS pointers; RELEASES.md history untouched.", "Release-check workflow tests and dev-check (12 test suites, strict clippy, Git-backed smoke) passed; site build and 171 built-site links passed; git diff --check clean.", "Docs deploy 44865542422 succeeded; live /quick-start/ shows the shell script first then `mise use -g \"github:Algorant/tandem@latest\"` and the MISE_USE_VERSIONS_HOST update line, with no AUR guidance. Live / returns 200.", "AUR tandem-bin is untouched and stays published at 0.19.0; no credentials or secrets were read or altered. The two AUR repo secrets remain for Herdra to raise with Algorant."]
-  updatedAt: "2026-11-21T04:21:07Z"
+  updatedAt: "2026-11-21T04:21:12Z"
 createdAt: "2026-11-21T04:16:49Z"
-updatedAt: "2026-11-21T04:21:07Z"
+updatedAt: "2026-11-21T04:21:12Z"
+archivedAt: "2026-11-21T04:21:12Z"
+resolution:
+  outcome: "completed"
+  note: "AUR support removed in 4ba1f46; deploy 44865542422 live with the mise install line and no AUR guidance; tandem-bin left frozen at 0.19.0 as approved. AUR repo secrets untouched, pending Algorant."
 ---
 
 ## Description
