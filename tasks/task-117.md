@@ -4,18 +4,20 @@ uid: 85e5db09-7084-405e-b50c-b1bd012ce788
 type: task
 kind: "research"
 title: "Decide whether Tandem web earns its place"
-state: todo
+state: "in-progress"
 priority: "medium"
 effort: "medium"
 references: ["task-75", "task-116"]
 tags: ["ui", "web"]
 accord:
-  status: "ready"
+  status: "claimed"
   acceptance: ["Explain what web shows today, evidence of use (or its limits), and concrete maintenance cost.", "Compare actual overlap with Herdra and Sideshow windows in Herdr, browser Sideshow, tandem tui, and Herdra's conversation list above the Pi editor; name any genuinely unique web use.", "Give a clear keep-or-deprecate verdict in a visual-first Sideshow report: keep means one or two concrete moments in Algorant’s day plus a rough screen mockup; deprecate means what stopping entails for code, docs, links and AUR/packaging, plus what would be lost.", "Handoff to Tandem Ceph for Herdra review; no implementation or public changes."]
+  claimedAt: "2026-11-21T03:08:52Z"
   constraints: ["Research begins only after Herdra releases the manus on Astra high.", "No builds, code changes, redesign implementation, removal, live app changes, publication, or automated captures.", "Preserve parked work and unrelated holds. Ask Herdra or Tandem Ceph for clarification if needed; do not ask Algorant to diagnose."]
-  updatedAt: "2026-11-21T03:08:05Z"
+  updatedAt: "2026-11-21T03:08:52Z"
 createdAt: "2026-11-21T03:08:05Z"
-updatedAt: "2026-11-21T03:08:05Z"
+updatedAt: "2026-11-21T03:08:52Z"
+assignee: "pi:tandem-web-usefulness-research"
 ---
 
 ## Description
