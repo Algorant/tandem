@@ -440,3 +440,4 @@
 {"ts":"2026-11-21T04:21:12Z","event":"task.completed","id":"task-119","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":440,"data":{}}
 {"ts":"2026-11-22T16:28:29Z","event":"task.updated","id":"task-42","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":441,"data":{"fields":["body"]}}
 {"ts":"2026-11-22T16:28:31Z","event":"task.updated","id":"task-106","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":442,"data":{"fields":["body"]}}
+{"ts":"2026-11-22T16:28:33Z","event":"accord.blocked","id":"task-106","actor":"16192ab2-5c74-4f9e-aae0-8181532b85a4","seq":443,"data":{}}

@@ -8,11 +8,12 @@ state: todo
 priority: "low"
 tags: ["cli", "sync"]
 accord:
-  status: "ready"
+  status: "blocked"
   acceptance: ["A `tandem add decision` interrupted by a mid-write stall (for example an update replacing the running binary) either completes or fails cleanly without leaving a partly written record that a retry duplicates.", "A Decision added by mistake can be discarded through a documented command, with the same safety as Task cancellation (no silent history rewrite) instead of only supersede/retitle.", "Both fixes are verified end-to-end on a disposable Git-backed board, including a retry after a stalled write."]
-  updatedAt: "2026-11-11T04:35:03Z"
+  note: "Triaged 2026-11-21 on 0.19.0: duplicate create and the missing Decision discard path both still reproduce; the fix spans protocol lifecycle semantics, so it stays capture-only until Algorant authorizes Decision lifecycle work or a release plan picks it up."
+  updatedAt: "2026-11-22T16:28:33Z"
 createdAt: "2026-11-11T04:35:03Z"
-updatedAt: "2026-11-22T16:28:31Z"
+updatedAt: "2026-11-22T16:28:33Z"
 ---
 
 ## Description
