@@ -12,7 +12,7 @@ accord:
   acceptance: ["A `tandem add decision` interrupted by a mid-write stall (for example an update replacing the running binary) either completes or fails cleanly without leaving a partly written record that a retry duplicates.", "A Decision added by mistake can be discarded through a documented command, with the same safety as Task cancellation (no silent history rewrite) instead of only supersede/retitle.", "Both fixes are verified end-to-end on a disposable Git-backed board, including a retry after a stalled write."]
   updatedAt: "2026-11-11T04:35:03Z"
 createdAt: "2026-11-11T04:35:03Z"
-updatedAt: "2026-11-11T04:35:03Z"
+updatedAt: "2026-11-22T16:28:31Z"
 ---
 
 ## Description
@@ -26,3 +26,13 @@ Two separate defects to cover:
 2. There is no way to cancel or discard a Decision added by mistake. `tandem cancel` is Task-only and Decisions have no Accord, so an erroneous Decision can only be retitled/superseded. Decide the smallest safe discard path (for example a Decision-only cancel that archives to Logs with a reason, consistent with Task cancellation rather than deletion).
 
 No change now; capture only. Any fix must define what happens to an interrupted write on the local board versus a synced board, and must not rewrite archived history.
+
+
+## Triage 2026-11-21 (0.19.0)
+Re-checked against the built 0.19.0 release on a disposable Git board:
+- Two identical `tandem add decision` calls still produce decision-1 and decision-2, so a retried create after a stall still duplicates. The stall itself was not reproduced (it needed a binary replacement mid-write); only the duplication property is observed.
+- `tandem cancel decision-1` is rejected: "only active task documents can be canceled". `tandem complete decision-1` is rejected: "only task documents can be completed in v0". `tandem update decision-1 --status superseded` succeeds, matching the recorded workaround.
+
+Both defects are current. A fix spans protocol lifecycle semantics (a Decision discard path) plus write-interruption safety, so it is not a small in-place papercut fix and stays capture-only as Algorant instructed. Split when authorized: (a) interrupted-create safety in the project write path, provable E2E; (b) a Decision discard command with normatively documented archive semantics.
+
+Re-check trigger: Algorant authorizes Decision lifecycle work, or a release plan picks it up. No card raised; nothing on his decide list yet.
