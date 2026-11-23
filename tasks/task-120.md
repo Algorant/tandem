@@ -10,11 +10,12 @@ effort: "small"
 relatedFiles: ["tandem/src/cli/", "tandem/src/app/", "protocol/README.md", "docs/cli/index.md"]
 tags: ["cli", "accord"]
 accord:
-  status: "ready"
+  status: "blocked"
   acceptance: ["A CLI operation appends to a Task or Decision body without the caller reading, concatenating and rewriting the whole body, and its JSON result reports the resulting record and sync status.", "Long-body appends are verified end-to-end on a disposable Git-backed board, including a body large enough that reading it back is impractical for an agent, with no truncation or lost content."]
-  updatedAt: "2026-11-23T02:25:01Z"
+  note: "Parked after triage: intent is clear and bounded, but the append's placement (on update or beside it) and the documented body-size rule must be settled, and the CLI contract needs its normative protocol text. Re-check when release work touches update/CLI contract, or Algorant authorizes it."
+  updatedAt: "2026-11-23T02:25:06Z"
 createdAt: "2026-11-23T02:25:01Z"
-updatedAt: "2026-11-23T02:25:01Z"
+updatedAt: "2026-11-23T02:25:06Z"
 ---
 
 ## Description
